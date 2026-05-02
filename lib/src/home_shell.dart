@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 
 import 'calendar/calendar_view.dart';
 import 'folders/folder_controller.dart';
+import 'notes/note_controller.dart';
+import 'notes/notes_view.dart';
 import 'routines/routines_view.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
@@ -15,6 +17,7 @@ class HomeShell extends StatefulWidget {
     required this.settingsController,
     required this.taskController,
     required this.folderController,
+    required this.noteController,
   });
 
   static const routeName = '/';
@@ -22,6 +25,7 @@ class HomeShell extends StatefulWidget {
   final SettingsController settingsController;
   final TaskController taskController;
   final FolderController folderController;
+  final NoteController noteController;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -29,7 +33,8 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   late final CupertinoTabController _tabController;
-  final _navigatorKeys = List.generate(3, (_) => GlobalKey<NavigatorState>());
+  // 4 tabs: Tasks(0) Notes(1) Calendar(2) Routines(3)
+  final _navigatorKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
   late final List<_DepthObserver> _depthObservers;
   final _activeListId = ValueNotifier<String?>(null);
   final _activeDueDate = ValueNotifier<DateTime?>(null);
@@ -42,6 +47,7 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _tabController = CupertinoTabController();
     _depthObservers = [
+      // Tasks tab: show + unless TaskDetailView is on the stack.
       _DepthObserver(
         trackedRouteName: 'task_detail',
         onChanged: (depth, trackedCount) {
@@ -50,14 +56,22 @@ class _HomeShellState extends State<HomeShell> {
           }
         },
       ),
+      // Notes tab: always hide global +; Notes manages its own button.
       _DepthObserver(
         onChanged: (depth, trackedCount) {
-          if (_lastTabIndex == 1) _showPlusButton.value = depth <= 1;
+          if (_lastTabIndex == 1) _showPlusButton.value = false;
         },
       ),
+      // Calendar tab: hide when navigated deeper.
       _DepthObserver(
         onChanged: (depth, trackedCount) {
           if (_lastTabIndex == 2) _showPlusButton.value = depth <= 1;
+        },
+      ),
+      // Routines tab: hide when navigated deeper.
+      _DepthObserver(
+        onChanged: (depth, trackedCount) {
+          if (_lastTabIndex == 3) _showPlusButton.value = depth <= 1;
         },
       ),
     ];
@@ -77,15 +91,17 @@ class _HomeShellState extends State<HomeShell> {
     if (tappedIndex == _lastTabIndex) {
       _navigatorKeys[tappedIndex].currentState
           ?.popUntil((route) => route.isFirst);
-      if (tappedIndex == 1) {
+      if (tappedIndex == 2) {
         _calendarResetSignal.value++;
       }
     }
-    // Sync button visibility with the newly active tab's state.
-    if (tappedIndex == 0) {
-      _showPlusButton.value = _depthObservers[0].trackedCount == 0;
-    } else {
-      _showPlusButton.value = _depthObservers[tappedIndex].depth <= 1;
+    switch (tappedIndex) {
+      case 0:
+        _showPlusButton.value = _depthObservers[0].trackedCount == 0;
+      case 1:
+        _showPlusButton.value = false;
+      default:
+        _showPlusButton.value = _depthObservers[tappedIndex].depth <= 1;
     }
     _lastTabIndex = tappedIndex;
   }
@@ -108,6 +124,14 @@ class _HomeShellState extends State<HomeShell> {
                   color: Color(0xFFFF4D00),
                 ),
                 label: 'Tasks',
+              ),
+              BottomNavigationBarItem(
+                icon: ImageIcon(AssetImage('assets/icons/tab_bar/notes.png')),
+                activeIcon: ImageIcon(
+                  AssetImage('assets/icons/tab_bar/notes.png'),
+                  color: Color(0xFFFF4D00),
+                ),
+                label: 'Notes',
               ),
               BottomNavigationBarItem(
                 icon: ImageIcon(
@@ -144,7 +168,8 @@ class _HomeShellState extends State<HomeShell> {
                     activeListId: _activeListId,
                     activeDueDate: _activeDueDate,
                   ),
-                1 => CalendarView(
+                1 => NotesView(controller: widget.noteController),
+                2 => CalendarView(
                     controller: widget.taskController,
                     resetSignal: _calendarResetSignal,
                   ),

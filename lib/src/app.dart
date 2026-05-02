@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'folders/folder_controller.dart';
 import 'home_shell.dart';
+import 'notes/note_controller.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
 import 'tasks/task_controller.dart';
@@ -16,11 +17,13 @@ class MyApp extends StatelessWidget {
     required this.settingsController,
     required this.taskController,
     required this.folderController,
+    required this.noteController,
   });
 
   final SettingsController settingsController;
   final TaskController taskController;
   final FolderController folderController;
+  final NoteController noteController;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +54,7 @@ class MyApp extends StatelessWidget {
                     settingsController: settingsController,
                     taskController: taskController,
                     folderController: folderController,
+                    noteController: noteController,
                   ),
           ),
         );
