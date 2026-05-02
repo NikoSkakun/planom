@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze *)",
+      "Read(//Users/skakun/development/flutter/bin/**)",
+      "Read(//usr/local/**)",
+      "Bash(~/dev/flutter/bin/flutter analyze *)",
+      "Bash(~/dev/flutter/bin/flutter pub *)"
+    ]
+  }
+}

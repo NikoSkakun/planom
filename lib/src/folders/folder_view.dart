@@ -1,0 +1,200 @@
+import 'package:flutter/cupertino.dart';
+
+import '../models/app_folder.dart';
+import '../tasks/task_controller.dart';
+import '../utils/fast_route.dart';
+import 'create_folder_list_sheet.dart';
+import 'folder_controller.dart';
+import 'list_task_view.dart';
+
+class FolderView extends StatelessWidget {
+  const FolderView({
+    super.key,
+    required this.folder,
+    required this.folderController,
+    required this.taskController,
+    required this.activeListId,
+  });
+
+  final AppFolder folder;
+  final FolderController folderController;
+  final TaskController taskController;
+  final ValueNotifier<String?> activeListId;
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(folder.name),
+      ),
+      child: SafeArea(
+        child: Stack(
+          children: [
+            ListenableBuilder(
+              listenable: folderController,
+              builder: (context, _) {
+                final subFolders = folderController.foldersIn(folder.id);
+                final lists = folderController.listsIn(folder.id);
+
+                if (subFolders.isEmpty && lists.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No items',
+                      style: TextStyle(
+                          color: CupertinoColors.secondaryLabel),
+                    ),
+                  );
+                }
+
+                return ListView(
+                  children: [
+                    const SizedBox(height: 8),
+                    if (subFolders.isNotEmpty) ...[
+                      ...subFolders.map((f) => Dismissible(
+                            key: ValueKey(f.id),
+                            direction: DismissDirection.endToStart,
+                            background: _DeleteBackground(),
+                            onDismissed: (_) =>
+                                folderController.deleteFolderDeep(
+                              f.id,
+                              taskController.deleteTasksForList,
+                            ),
+                            child: _FolderListItem(
+                              iconAsset: 'assets/icons/folder.png',
+                              label: f.name,
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => FolderView(
+                                    folder: f,
+                                    folderController: folderController,
+                                    taskController: taskController,
+                                    activeListId: activeListId,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )),
+                    ],
+                    if (lists.isNotEmpty) ...[
+                      ...lists.map((l) {
+                        final count =
+                            taskController.uncompletedCountForList(l.id);
+                        return Dismissible(
+                          key: ValueKey(l.id),
+                          direction: DismissDirection.endToStart,
+                          background: _DeleteBackground(),
+                          onDismissed: (_) async {
+                            await taskController.deleteTasksForList(l.id);
+                            await folderController.deleteList(l.id);
+                          },
+                          child: ListenableBuilder(
+                            listenable: taskController,
+                            builder: (context, _) => _FolderListItem(
+                              iconAsset: 'assets/icons/list.png',
+                              label: l.name,
+                              count: count > 0 ? count : null,
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => ListTaskView(
+                                    list: l,
+                                    taskController: taskController,
+                                    folderController: folderController,
+                                    activeListId: activeListId,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ],
+                );
+              },
+            ),
+            Positioned(
+              left: 20,
+              bottom: 16,
+              child: _CircleButton(
+                onPressed: () => showCreateFolderListSheet(
+                  context,
+                  folderController,
+                  parentFolderId: folder.id,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeleteBackground extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 20),
+      color: CupertinoColors.destructiveRed,
+      child: const Icon(CupertinoIcons.trash, color: CupertinoColors.white),
+    );
+  }
+}
+
+class _FolderListItem extends StatelessWidget {
+  const _FolderListItem({
+    required this.iconAsset,
+    required this.label,
+    required this.onTap,
+    this.count,
+  });
+
+  final String iconAsset;
+  final String label;
+  final VoidCallback onTap;
+  final int? count;
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoListTile.notched(
+      leading: Image.asset(iconAsset, width: 22, height: 22),
+      title: Text(label),
+      additionalInfo: count != null
+          ? Text(
+              '$count',
+              style: TextStyle(
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            )
+          : null,
+      onTap: onTap,
+    );
+  }
+}
+
+class _CircleButton extends StatelessWidget {
+  const _CircleButton({required this.onPressed});
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: onPressed,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          CupertinoIcons.plus,
+          size: 20,
+          color: CupertinoColors.label.resolveFrom(context),
+        ),
+      ),
+    );
+  }
+}
