@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../folders/folder_controller.dart';
 import '../models/task.dart';
 import '../utils/fast_route.dart';
+import 'calendar_date_picker.dart';
 import 'task_controller.dart';
 import 'task_detail_view.dart';
 
@@ -43,6 +44,14 @@ class _TodayViewState extends State<TodayView> {
     super.dispose();
   }
 
+  bool _isOverdue(Task task) {
+    if (task.dueDate == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(task.dueDate!.year, task.dueDate!.month, task.dueDate!.day);
+    return due.isBefore(today);
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -77,10 +86,12 @@ class _TodayViewState extends State<TodayView> {
                     listName: task.listId != null
                         ? widget.folderController.listById(task.listId!)?.name
                         : null,
+                    isOverdue: _isOverdue(task),
                     onToggle: () =>
                         widget.controller.toggleCompleted(task.id),
                     onTap: () => Navigator.of(context).push(
                       FastRoute<void>(
+                        settings: const RouteSettings(name: TaskDetailView.routeName),
                         builder: (_) => TaskDetailView(
                           task: task,
                           controller: widget.controller,
@@ -117,12 +128,14 @@ class _TaskRow extends StatelessWidget {
     required this.onToggle,
     required this.onTap,
     this.listName,
+    this.isOverdue = false,
   });
 
   final Task task;
   final VoidCallback onToggle;
   final VoidCallback onTap;
   final String? listName;
+  final bool isOverdue;
 
   @override
   Widget build(BuildContext context) {
@@ -130,7 +143,7 @@ class _TaskRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -161,6 +174,14 @@ class _TaskRow extends StatelessWidget {
                         fontSize: 13,
                         color: CupertinoColors.secondaryLabel
                             .resolveFrom(context),
+                      ),
+                    ),
+                  if (isOverdue && task.dueDate != null)
+                    Text(
+                      formatTaskDate(task.dueDate!, doTime: task.doTime),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: CupertinoColors.destructiveRed,
                       ),
                     ),
                   if (listName != null)

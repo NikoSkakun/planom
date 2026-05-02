@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../models/app_list.dart';
 import '../models/task.dart';
+import '../tasks/calendar_date_picker.dart';
 import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../utils/fast_route.dart';
@@ -77,6 +78,7 @@ class _ListTaskViewState extends State<ListTaskView> {
                         widget.taskController.toggleCompleted(task.id),
                     onTap: () => Navigator.of(context).push(
                       FastRoute<void>(
+                        settings: const RouteSettings(name: TaskDetailView.routeName),
                         builder: (_) => TaskDetailView(
                           task: task,
                           controller: widget.taskController,
@@ -124,7 +126,7 @@ class _TaskRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -170,7 +172,7 @@ class _TaskRow extends StatelessWidget {
                           ),
                           const SizedBox(width: 3),
                           Text(
-                            _shortDate(task.dueDate!),
+                            formatTaskDate(task.dueDate!, doTime: task.doTime),
                             style: TextStyle(
                               fontSize: 11,
                               color: CupertinoColors.secondaryLabel
@@ -189,13 +191,6 @@ class _TaskRow extends StatelessWidget {
     );
   }
 
-  static String _shortDate(DateTime d) {
-    const m = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${m[d.month - 1]} ${d.day}';
-  }
 }
 
 class _RoundedCheckbox extends StatelessWidget {

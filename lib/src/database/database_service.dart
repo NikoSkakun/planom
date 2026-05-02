@@ -7,7 +7,7 @@ import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 3;
+  static const _dbVersion = 4;
 
   Database? _db;
 
@@ -28,6 +28,7 @@ class DatabaseService {
             note TEXT,
             isCompleted INTEGER NOT NULL DEFAULT 0,
             dueDate INTEGER,
+            doTime INTEGER,
             listId TEXT
           )
         ''');
@@ -54,6 +55,9 @@ class DatabaseService {
         }
         if (oldVersion < 3) {
           await db.execute('ALTER TABLE tasks ADD COLUMN listId TEXT');
+        }
+        if (oldVersion < 4) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN doTime INTEGER');
           await db.execute('''
             CREATE TABLE IF NOT EXISTS folders (
               id TEXT PRIMARY KEY,

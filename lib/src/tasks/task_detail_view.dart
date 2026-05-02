@@ -14,6 +14,8 @@ class TaskDetailView extends StatefulWidget {
     required this.folderController,
   });
 
+  static const routeName = 'task_detail';
+
   final Task task;
   final TaskController controller;
   final FolderController folderController;
@@ -26,6 +28,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
   late final TextEditingController _title;
   late final TextEditingController _note;
   late DateTime? _dueDate;
+  late int? _doTime;
   late bool _isCompleted;
   late String? _listId;
 
@@ -35,6 +38,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
     _title = TextEditingController(text: widget.task.title);
     _note = TextEditingController(text: widget.task.note ?? '');
     _dueDate = widget.task.dueDate;
+    _doTime = widget.task.doTime;
     _isCompleted = widget.task.isCompleted;
     _listId = widget.task.listId;
   }
@@ -54,6 +58,8 @@ class _TaskDetailViewState extends State<TaskDetailView> {
       note: _note.text.trim().isEmpty ? null : _note.text.trim(),
       dueDate: _dueDate,
       clearDueDate: _dueDate == null,
+      doTime: _doTime,
+      clearDoTime: _doTime == null,
       isCompleted: _isCompleted,
       listId: _listId,
       clearListId: _listId == null,
@@ -62,11 +68,16 @@ class _TaskDetailViewState extends State<TaskDetailView> {
   }
 
   Future<void> _pickDate() async {
-    final result = await showCalendarDatePicker(context, initial: _dueDate);
-    // null means "No Date" was tapped, which returns null from dialog
-    // If user dismissed by tapping barrier, result is also null — treat same way
-    if (!mounted) return;
-    setState(() => _dueDate = result);
+    final result = await showCalendarDatePicker(
+      context,
+      initial: _dueDate,
+      initialDoTime: _doTime,
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      _dueDate = result.$1;
+      _doTime = result.$2;
+    });
   }
 
   Future<void> _pickList() async {
@@ -162,7 +173,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
                     const SizedBox(width: 10),
                     Text(
                       _dueDate != null
-                          ? formatTaskDate(_dueDate!)
+                          ? formatTaskDate(_dueDate!, doTime: _doTime)
                           : 'No Date',
                       style: TextStyle(
                         fontSize: 15,

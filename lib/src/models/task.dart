@@ -7,6 +7,7 @@ class Task extends AppItem {
   final String? note;
   final bool isCompleted;
   final DateTime? dueDate;
+  final int? doTime; // minutes since midnight (0–1439), null = no time set
   final String? listId;
 
   Task({
@@ -17,6 +18,7 @@ class Task extends AppItem {
     this.note,
     this.isCompleted = false,
     this.dueDate,
+    this.doTime,
     this.listId,
   }) : super(
           id: id ?? const Uuid().v4(),
@@ -30,6 +32,8 @@ class Task extends AppItem {
     bool? isCompleted,
     DateTime? dueDate,
     bool clearDueDate = false,
+    int? doTime,
+    bool clearDoTime = false,
     String? listId,
     bool clearListId = false,
   }) {
@@ -41,6 +45,7 @@ class Task extends AppItem {
       note: note ?? this.note,
       isCompleted: isCompleted ?? this.isCompleted,
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+      doTime: clearDoTime ? null : (doTime ?? this.doTime),
       listId: clearListId ? null : (listId ?? this.listId),
     );
   }
@@ -53,6 +58,7 @@ class Task extends AppItem {
         'note': note,
         'isCompleted': isCompleted ? 1 : 0,
         'dueDate': dueDate?.millisecondsSinceEpoch,
+        'doTime': doTime,
         'listId': listId,
       };
 
@@ -67,6 +73,7 @@ class Task extends AppItem {
         dueDate: map['dueDate'] != null
             ? DateTime.fromMillisecondsSinceEpoch(map['dueDate'] as int)
             : null,
+        doTime: map['doTime'] as int?,
         listId: map['listId'] as String?,
       );
 }

@@ -18,11 +18,12 @@ class TaskController with ChangeNotifier {
 
   List<Task> get todayTasks {
     final now = DateTime.now();
-    return _completedLast(_tasks.where((t) =>
-        t.dueDate != null &&
-        t.dueDate!.year == now.year &&
-        t.dueDate!.month == now.month &&
-        t.dueDate!.day == now.day));
+    final today = DateTime(now.year, now.month, now.day);
+    return _completedLast(_tasks.where((t) {
+      if (t.dueDate == null) return false;
+      final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);
+      return !due.isAfter(today);
+    }));
   }
 
   int get todayUncompletedCount =>

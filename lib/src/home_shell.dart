@@ -30,15 +30,37 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   late final CupertinoTabController _tabController;
   final _navigatorKeys = List.generate(3, (_) => GlobalKey<NavigatorState>());
+  late final List<_DepthObserver> _depthObservers;
   final _activeListId = ValueNotifier<String?>(null);
   final _activeDueDate = ValueNotifier<DateTime?>(null);
   final _calendarResetSignal = ValueNotifier<int>(0);
+  final _showPlusButton = ValueNotifier<bool>(true);
   int _lastTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = CupertinoTabController();
+    _depthObservers = [
+      _DepthObserver(
+        trackedRouteName: 'task_detail',
+        onChanged: (depth, trackedCount) {
+          if (_lastTabIndex == 0) {
+            _showPlusButton.value = trackedCount == 0;
+          }
+        },
+      ),
+      _DepthObserver(
+        onChanged: (depth, trackedCount) {
+          if (_lastTabIndex == 1) _showPlusButton.value = depth <= 1;
+        },
+      ),
+      _DepthObserver(
+        onChanged: (depth, trackedCount) {
+          if (_lastTabIndex == 2) _showPlusButton.value = depth <= 1;
+        },
+      ),
+    ];
   }
 
   @override
@@ -47,17 +69,23 @@ class _HomeShellState extends State<HomeShell> {
     _activeListId.dispose();
     _activeDueDate.dispose();
     _calendarResetSignal.dispose();
+    _showPlusButton.dispose();
     super.dispose();
   }
 
   void _onTabTapped(int tappedIndex) {
     if (tappedIndex == _lastTabIndex) {
-      // Same tab tapped — pop to root of that tab's navigator.
       _navigatorKeys[tappedIndex].currentState
           ?.popUntil((route) => route.isFirst);
       if (tappedIndex == 1) {
         _calendarResetSignal.value++;
       }
+    }
+    // Sync button visibility with the newly active tab's state.
+    if (tappedIndex == 0) {
+      _showPlusButton.value = _depthObservers[0].trackedCount == 0;
+    } else {
+      _showPlusButton.value = _depthObservers[tappedIndex].depth <= 1;
     }
     _lastTabIndex = tappedIndex;
   }
@@ -104,6 +132,7 @@ class _HomeShellState extends State<HomeShell> {
           tabBuilder: (context, index) {
             return CupertinoTabView(
               navigatorKey: _navigatorKeys[index],
+              navigatorObservers: [_depthObservers[index]],
               routes: {
                 SettingsView.routeName: (_) =>
                     SettingsView(controller: widget.settingsController),
@@ -124,21 +153,63 @@ class _HomeShellState extends State<HomeShell> {
             );
           },
         ),
-        Positioned(
-          right: 20,
-          bottom: 50 + MediaQuery.paddingOf(context).bottom + 12,
-          child: _PlusButton(
-            onPressed: () => showTaskCreationSheet(
-              context,
-              widget.taskController,
-              widget.folderController,
-              initialListId: _activeListId.value,
-              initialDueDate: _activeDueDate.value,
-            ),
-          ),
+        ValueListenableBuilder<bool>(
+          valueListenable: _showPlusButton,
+          builder: (context, show, child) => show
+              ? Positioned(
+                  right: 20,
+                  bottom: 50 + MediaQuery.paddingOf(context).bottom + 12,
+                  child: _PlusButton(
+                    onPressed: () => showTaskCreationSheet(
+                      context,
+                      widget.taskController,
+                      widget.folderController,
+                      initialListId: _activeListId.value,
+                      initialDueDate: _activeDueDate.value,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
         ),
       ],
     );
+  }
+}
+
+/// Tracks push/pop depth and optionally counts routes with a specific name.
+class _DepthObserver extends NavigatorObserver {
+  _DepthObserver({required this.onChanged, this.trackedRouteName});
+
+  final void Function(int depth, int trackedCount) onChanged;
+  final String? trackedRouteName;
+  int depth = 1;
+  int trackedCount = 0;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    depth++;
+    if (trackedRouteName != null && route.settings.name == trackedRouteName) {
+      trackedCount++;
+    }
+    onChanged(depth, trackedCount);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    depth--;
+    if (trackedRouteName != null && route.settings.name == trackedRouteName) {
+      trackedCount--;
+    }
+    onChanged(depth, trackedCount);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    depth--;
+    if (trackedRouteName != null && route.settings.name == trackedRouteName) {
+      trackedCount--;
+    }
+    onChanged(depth, trackedCount);
   }
 }
 

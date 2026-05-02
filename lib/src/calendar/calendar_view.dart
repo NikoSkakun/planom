@@ -20,28 +20,24 @@ class CalendarView extends StatefulWidget {
 
 class _CalendarViewState extends State<CalendarView> {
   static const _pastMonths = 600;
-  static const _total = _pastMonths + 1 + 600; // 50 yrs back + current + 50 yrs forward
+  static const _futureMonths = 600;
+  // 41px label + 5 avg weeks × 88px; used for approximate year tracking only.
+  static const _avgMonthPx = 481.0;
 
   late final DateTime _now;
+  late final DateTime _currentMonth;
   late final ScrollController _scrollCtrl;
-  late final List<double> _cumHeights;
-  final _currentMonthKey = GlobalKey();
+  final _centerKey = GlobalKey();
   late int _visibleYear;
 
   @override
   void initState() {
     super.initState();
     _now = DateTime.now();
+    _currentMonth = DateTime(_now.year, _now.month, 1);
     _visibleYear = _now.year;
-    _initCumHeights();
-    _scrollCtrl = ScrollController(
-      initialScrollOffset: _cumHeights[_pastMonths],
-    );
+    _scrollCtrl = ScrollController(); // offset 0 = center = current month
     _scrollCtrl.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ctx = _currentMonthKey.currentContext;
-      if (ctx != null) Scrollable.ensureVisible(ctx, duration: Duration.zero);
-    });
     widget.resetSignal.addListener(_scrollToCurrentMonth);
   }
 
@@ -53,97 +49,86 @@ class _CalendarViewState extends State<CalendarView> {
     super.dispose();
   }
 
-  void _initCumHeights() {
-    _cumHeights = [0.0];
-    for (var i = 0; i < _total; i++) {
-      _cumHeights.add(_cumHeights.last + _estimatedMonthHeight(_monthAt(i)));
-    }
-  }
-
   void _onScroll() {
     if (!_scrollCtrl.hasClients) return;
-    final idx = _monthIndexAtOffset(_scrollCtrl.offset);
-    final year = _monthAt(idx).year;
-    if (year != _visibleYear) {
-      setState(() => _visibleYear = year);
-    }
-  }
-
-  int _monthIndexAtOffset(double offset) {
-    int lo = 0, hi = _total - 1;
-    while (lo < hi) {
-      final mid = (lo + hi + 1) ~/ 2;
-      if (_cumHeights[mid] <= offset) {
-        lo = mid;
-      } else {
-        hi = mid - 1;
-      }
-    }
-    return lo;
+    final monthsFromNow = (_scrollCtrl.offset / _avgMonthPx).round();
+    final epochMonths = _now.year * 12 + _now.month - 1 + monthsFromNow;
+    final year = epochMonths ~/ 12;
+    if (year != _visibleYear) setState(() => _visibleYear = year);
   }
 
   void _scrollToCurrentMonth() {
-    _scrollCtrl
-        .animateTo(
-          _cumHeights[_pastMonths],
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOut,
-        )
-        .then((_) {
-      final ctx = _currentMonthKey.currentContext;
-      if (ctx != null) Scrollable.ensureVisible(ctx, duration: Duration.zero);
-    });
+    _scrollCtrl.animateTo(
+      0.0,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+    );
   }
 
-  DateTime _monthAt(int index) {
-    final monthsFromEpoch =
-        _now.year * 12 + (_now.month - 1) - _pastMonths + index;
-    return DateTime(monthsFromEpoch ~/ 12, monthsFromEpoch % 12 + 1, 1);
+  // Past months: index 0 = last month, index 1 = 2 months ago, …
+  // The SliverList before center is laid out bottom-to-top, so index 0 sits
+  // just above the current month and higher indices go further into the past.
+  DateTime _monthBefore(int n) {
+    final e = _now.year * 12 + _now.month - 1 - n;
+    return DateTime(e ~/ 12, e % 12 + 1, 1);
   }
 
-  static double _estimatedMonthHeight(DateTime month) {
-    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    final firstWeekday = DateTime(month.year, month.month, 1).weekday;
-    final numWeeks = ((firstWeekday - 1 + daysInMonth) / 7).ceil();
-    // label(41) + weeks×88
-    return 41.0 + numWeeks * 88.0;
+  DateTime _monthAfter(int n) {
+    final e = _now.year * 12 + _now.month - 1 + n;
+    return DateTime(e ~/ 12, e % 12 + 1, 1);
   }
+
+  Widget _buildMonth(DateTime month) => ListenableBuilder(
+        listenable: widget.controller,
+        builder: (context, _) => _MonthSection(
+          month: month,
+          today: _now,
+          controller: widget.controller,
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      child: CustomScrollView(
-        controller: _scrollCtrl,
-        slivers: [
-          CupertinoSliverNavigationBar(
-            largeTitle: Text('$_visibleYear'),
-            middle: const Text('Calendar'),
-          ),
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _WeekdayHeaderDelegate(),
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, i) {
-                final month = _monthAt(i);
-                final isCurrent =
-                    month.year == _now.year && month.month == _now.month;
-                return ListenableBuilder(
-                  listenable: widget.controller,
-                  builder: (context, _) => _MonthSection(
-                    key: isCurrent ? _currentMonthKey : null,
-                    month: month,
-                    today: _now,
-                    controller: widget.controller,
+      navigationBar: CupertinoNavigationBar(
+        middle: Text('$_visibleYear'),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            _WeekdayHeader(),
+            Expanded(
+              child: CustomScrollView(
+                // The center sliver is the viewport origin: offset 0 always
+                // shows the current month without any initialScrollOffset math.
+                center: _centerKey,
+                controller: _scrollCtrl,
+                slivers: [
+                  // Past months built lazily only when user scrolls up.
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => _buildMonth(_monthBefore(i + 1)),
+                      childCount: _pastMonths,
+                    ),
                   ),
-                );
-              },
-              childCount: _total,
+                  // Current month — viewport anchor.
+                  SliverToBoxAdapter(
+                    key: _centerKey,
+                    child: _buildMonth(_currentMonth),
+                  ),
+                  // Future months built lazily as user scrolls down.
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => _buildMonth(_monthAfter(i + 1)),
+                      childCount: _futureMonths,
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                ],
+              ),
             ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 120)),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -151,20 +136,13 @@ class _CalendarViewState extends State<CalendarView> {
 
 // ─── Weekday header ───────────────────────────────────────────────────────────
 
-class _WeekdayHeaderDelegate extends SliverPersistentHeaderDelegate {
+class _WeekdayHeader extends StatelessWidget {
   static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  static const _height = 32.0;
 
   @override
-  double get minExtent => _height;
-  @override
-  double get maxExtent => _height;
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(BuildContext context) {
     return Container(
-      height: _height,
+      height: 32,
       color: CupertinoColors.systemBackground.resolveFrom(context),
       child: Row(
         children: _weekdays
@@ -185,16 +163,12 @@ class _WeekdayHeaderDelegate extends SliverPersistentHeaderDelegate {
       ),
     );
   }
-
-  @override
-  bool shouldRebuild(_WeekdayHeaderDelegate old) => true;
 }
 
 // ─── Month section ────────────────────────────────────────────────────────────
 
 class _MonthSection extends StatelessWidget {
   const _MonthSection({
-    super.key,
     required this.month,
     required this.today,
     required this.controller,
@@ -210,10 +184,9 @@ class _MonthSection extends StatelessWidget {
   ];
 
   List<DateTime?> _buildGrid() {
-    final first = DateTime(month.year, month.month, 1);
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    // Monday-first: Mon=1→0, Tue=2→1, …, Sun=7→6
-    final startOffset = first.weekday - 1;
+    // Monday-first: Mon=1→0, …, Sun=7→6
+    final startOffset = DateTime(month.year, month.month, 1).weekday - 1;
     final cells = <DateTime?>[];
     for (var i = 0; i < startOffset; i++) {
       cells.add(null);
@@ -230,7 +203,6 @@ class _MonthSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grid = _buildGrid();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -307,6 +279,7 @@ class _DayCell extends StatelessWidget {
   Widget build(BuildContext context) {
     if (date == null) {
       return Container(
+        constraints: const BoxConstraints(minHeight: 88),
         decoration: BoxDecoration(
           border: Border(
             top: BorderSide(
@@ -315,11 +288,13 @@ class _DayCell extends StatelessWidget {
             ),
           ),
         ),
-        constraints: const BoxConstraints(minHeight: 88),
       );
     }
 
-    final tasks = controller.tasksForDate(date!).where((t) => !t.isCompleted).toList();
+    final tasks = controller
+        .tasksForDate(date!)
+        .where((t) => !t.isCompleted)
+        .toList();
 
     return Container(
       constraints: const BoxConstraints(minHeight: 88),
@@ -370,8 +345,7 @@ class _DayCell extends StatelessWidget {
                 '+${tasks.length - 3}',
                 style: TextStyle(
                   fontSize: 9,
-                  color:
-                      CupertinoColors.secondaryLabel.resolveFrom(context),
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
             ),

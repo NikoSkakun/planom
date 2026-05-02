@@ -176,18 +176,28 @@ class _ListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoListTile.notched(
-      leading: Image.asset(iconAsset, width: 22, height: 22),
-      title: Text(label),
-      additionalInfo: count != null && count! > 0
-          ? Text(
-              '$count',
-              style: TextStyle(
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            )
-          : null,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        child: Row(
+          children: [
+            Image.asset(iconAsset, width: 22, height: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(label, style: const TextStyle(fontSize: 17)),
+            ),
+            if (count != null && count! > 0)
+              Text(
+                '$count',
+                style: TextStyle(
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

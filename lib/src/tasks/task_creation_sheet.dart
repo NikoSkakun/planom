@@ -50,6 +50,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
   final _titleCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   DateTime? _dueDate;
+  int? _doTime;
   late String? _listId;
   bool _titleEmpty = true;
 
@@ -78,15 +79,23 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
       title: title,
       note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
       dueDate: _dueDate,
+      doTime: _doTime,
       listId: _listId,
     ));
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
 
   Future<void> _pickDate() async {
-    final result = await showCalendarDatePicker(context, initial: _dueDate);
-    if (!mounted) return;
-    setState(() => _dueDate = result);
+    final result = await showCalendarDatePicker(
+      context,
+      initial: _dueDate,
+      initialDoTime: _doTime,
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      _dueDate = result.$1;
+      _doTime = result.$2;
+    });
   }
 
   Future<void> _pickList() async {
@@ -203,7 +212,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                         const SizedBox(width: 4),
                         Text(
                           _dueDate != null
-                              ? formatTaskDate(_dueDate!)
+                              ? formatTaskDate(_dueDate!, doTime: _doTime)
                               : 'Date',
                           style: TextStyle(
                             fontSize: 14,

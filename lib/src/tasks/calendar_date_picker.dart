@@ -1,34 +1,55 @@
 import 'package:flutter/cupertino.dart';
 
-String formatTaskDate(DateTime d) {
+// Formats a task date (and optional time) for display.
+String formatTaskDate(DateTime d, {int? doTime}) {
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
-  return '${months[d.month - 1]} ${d.day}';
+  final datePart = '${months[d.month - 1]} ${d.day}';
+  if (doTime == null) return datePart;
+  return '$datePart ${formatDoTime(doTime)}';
 }
 
-Future<DateTime?> showCalendarDatePicker(
+// Formats minutes-since-midnight as "9:00 AM".
+String formatDoTime(int minutes) {
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  final ampm = h < 12 ? 'AM' : 'PM';
+  final displayH = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+  return '$displayH:${m.toString().padLeft(2, '0')} $ampm';
+}
+
+/// Returns null when the user dismissed via barrier (no change intended).
+/// Returns (null, null) when "No Date" was tapped.
+/// Returns (DateTime, int?) when a date (and optionally time) was chosen.
+Future<(DateTime?, int?)?> showCalendarDatePicker(
   BuildContext context, {
   DateTime? initial,
+  int? initialDoTime,
 }) {
-  return showCupertinoDialog<DateTime?>(
+  return showCupertinoDialog<(DateTime?, int?)>(
     context: context,
     barrierDismissible: true,
-    builder: (_) => _CalendarPickerDialog(initial: initial ?? DateTime.now()),
+    builder: (_) => _CalendarPickerDialog(
+      initial: initial ?? DateTime.now(),
+      initialDoTime: initialDoTime,
+    ),
   );
 }
 
 // Monday-first: Mon=0 … Sun=6
 int _mondayOffset(DateTime firstOfMonth) => (firstOfMonth.weekday - 1) % 7;
 
-int _daysInMonth(int year, int month) =>
-    DateTime(year, month == 12 ? year + 1 : year, month == 12 ? 1 : month + 1, 0)
-        .day;
+int _daysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;
 
 class _CalendarPickerDialog extends StatefulWidget {
-  const _CalendarPickerDialog({required this.initial});
+  const _CalendarPickerDialog({
+    required this.initial,
+    required this.initialDoTime,
+  });
   final DateTime initial;
+  final int? initialDoTime;
 
   @override
   State<_CalendarPickerDialog> createState() => _CalendarPickerDialogState();
@@ -37,6 +58,8 @@ class _CalendarPickerDialog extends StatefulWidget {
 class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
   late DateTime _selected;
   late PageController _pageCtrl;
+  int? _doTime;
+  bool _showTimePicker = false;
 
   static final _base = DateTime(DateTime.now().year - 5, 1, 1);
   static const _totalMonths = 120; // 10-year range
@@ -44,15 +67,15 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
   static int _pageOf(DateTime d) =>
       (d.year - _base.year) * 12 + (d.month - _base.month);
 
-  DateTime _monthForPage(int page) {
-    final total = page;
-    return DateTime(_base.year + total ~/ 12, _base.month + total % 12, 1);
-  }
+  DateTime _monthForPage(int page) =>
+      DateTime(_base.year + page ~/ 12, _base.month + page % 12, 1);
 
   @override
   void initState() {
     super.initState();
     _selected = widget.initial;
+    _doTime = widget.initialDoTime;
+    _showTimePicker = widget.initialDoTime != null;
     final page = _pageOf(_selected).clamp(0, _totalMonths - 1);
     _pageCtrl = PageController(initialPage: page);
   }
@@ -63,12 +86,27 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
     super.dispose();
   }
 
+  void _toggleTime() {
+    setState(() {
+      _showTimePicker = !_showTimePicker;
+      if (_showTimePicker) {
+        _doTime ??= 9 * 60; // default 9:00 AM
+      } else {
+        _doTime = null;
+      }
+    });
+  }
+
+  DateTime _timeAsDateTime() {
+    final now = DateTime.now();
+    final t = _doTime ?? (9 * 60);
+    return DateTime(now.year, now.month, now.day, t ~/ 60, t % 60);
+  }
+
   @override
   Widget build(BuildContext context) {
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
     const accent = Color(0xFFFF4D00);
-
-    // 6 rows × 36 + header 44 + weekday-row 24 + gaps 16 + padding 20 = 316
     const pageHeight = 320.0;
 
     return Center(
@@ -81,6 +119,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Calendar month grid
             SizedBox(
               height: pageHeight,
               child: PageView.builder(
@@ -105,6 +144,68 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                 },
               ),
             ),
+            // Time toggle row
+            Container(
+              height: 0.5,
+              color: CupertinoColors.separator.resolveFrom(context),
+            ),
+            GestureDetector(
+              onTap: _toggleTime,
+              child: Container(
+                color: bg,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(
+                      CupertinoIcons.clock,
+                      size: 16,
+                      color: _showTimePicker
+                          ? accent
+                          : CupertinoColors.secondaryLabel.resolveFrom(context),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _showTimePicker ? formatDoTime(_doTime!) : 'Set time',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _showTimePicker
+                            ? accent
+                            : CupertinoColors.secondaryLabel
+                                .resolveFrom(context),
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      _showTimePicker
+                          ? CupertinoIcons.chevron_up
+                          : CupertinoIcons.chevron_down,
+                      size: 12,
+                      color:
+                          CupertinoColors.tertiaryLabel.resolveFrom(context),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Inline time picker (animated)
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOut,
+              child: _showTimePicker
+                  ? SizedBox(
+                      height: 150,
+                      child: CupertinoDatePicker(
+                        mode: CupertinoDatePickerMode.time,
+                        initialDateTime: _timeAsDateTime(),
+                        use24hFormat: false,
+                        onDateTimeChanged: (dt) => setState(
+                          () => _doTime = dt.hour * 60 + dt.minute,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
             Container(
               height: 0.5,
               color: CupertinoColors.separator.resolveFrom(context),
@@ -113,7 +214,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
               children: [
                 Expanded(
                   child: CupertinoButton(
-                    onPressed: () => Navigator.of(context).pop(null),
+                    onPressed: () => Navigator.of(context).pop((null, null)),
                     child: Text(
                       'No Date',
                       style: TextStyle(
@@ -130,7 +231,8 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                 ),
                 Expanded(
                   child: CupertinoButton(
-                    onPressed: () => Navigator.of(context).pop(_selected),
+                    onPressed: () =>
+                        Navigator.of(context).pop((_selected, _doTime)),
                     child: const Text(
                       'Done',
                       style: TextStyle(
@@ -166,7 +268,6 @@ class _MonthGrid extends StatelessWidget {
   final VoidCallback onNext;
   final ValueChanged<DateTime> onSelect;
 
-  // Monday-first
   static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   static const _monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -181,7 +282,6 @@ class _MonthGrid extends StatelessWidget {
     final offset = _mondayOffset(DateTime(month.year, month.month, 1));
     final days = _daysInMonth(month.year, month.month);
 
-    // Build 42-cell grid (always 6 rows) so height is stable across months
     final cells = List<int?>.filled(42, null);
     for (var d = 1; d <= days; d++) {
       cells[offset + d - 1] = d;
@@ -192,7 +292,6 @@ class _MonthGrid extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Navigation header
           SizedBox(
             height: 44,
             child: Row(
@@ -227,7 +326,6 @@ class _MonthGrid extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          // Weekday labels
           SizedBox(
             height: 24,
             child: Row(
@@ -249,14 +347,15 @@ class _MonthGrid extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          // Day rows — 6 explicit rows so height never clips
           for (var row = 0; row < 6; row++)
             SizedBox(
               height: _rowHeight,
               child: Row(
                 children: List.generate(7, (col) {
                   final day = cells[row * 7 + col];
-                  if (day == null) return const Expanded(child: SizedBox.shrink());
+                  if (day == null) {
+                    return const Expanded(child: SizedBox.shrink());
+                  }
                   final date = DateTime(month.year, month.month, day);
                   final isSel = date.year == selected.year &&
                       date.month == selected.month &&
