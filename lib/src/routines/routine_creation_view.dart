@@ -64,6 +64,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
   late String _autoReset; // 'everyday' | 'none'
 
   bool _nameEmpty = true;
+  bool _showIconPicker = false;
 
   @override
   void initState() {
@@ -198,36 +199,40 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
           ),
         ),
       ),
-      child: SafeArea(
-        child: ListView(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+        child: SafeArea(
+          child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.symmetric(vertical: 20),
           children: [
-            // ── Name + icon row ──────────────────────────────────────────
+            // ── Name + icon row (icon tap expands picker) ────────────────
             _Section(
               children: [
                 _NameRow(
                   nameCtrl: _nameCtrl,
                   iconId: _iconId,
                   iconColor: _iconColor,
+                  onIconTap: () =>
+                      setState(() => _showIconPicker = !_showIconPicker),
                 ),
+                if (_showIconPicker) ...[
+                  const _Divider(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    child: _IconPicker(
+                      selectedIconId: _iconId,
+                      selectedColor: _iconColor,
+                      onChanged: (iconId, color) => setState(() {
+                        _iconId = iconId;
+                        _iconColor = color;
+                      }),
+                    ),
+                  ),
+                ],
               ],
-            ),
-
-            // ── Icon picker ──────────────────────────────────────────────
-            _SectionHeader('ICON'),
-            Container(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: _IconPicker(
-                selectedIconId: _iconId,
-                selectedColor: _iconColor,
-                onChanged: (iconId, color) =>
-                    setState(() {
-                      _iconId = iconId;
-                      _iconColor = color;
-                    }),
-              ),
             ),
 
             // ── Frequency ────────────────────────────────────────────────
@@ -320,38 +325,21 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
             ]),
           ],
         ),
+        ),
       ),
     );
   }
 
-  void _showAutoResetPicker() {
-    showCupertinoModalPopup<void>(
+  Future<void> _showAutoResetPicker() async {
+    await showCupertinoDialog<void>(
       context: context,
-      builder: (_) => CupertinoActionSheet(
-        title: const Text('Auto Reset'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              setState(() => _autoReset = 'everyday');
-              Navigator.of(context, rootNavigator: true).pop();
-            },
-            isDefaultAction: _autoReset == 'everyday',
-            child: const Text('Every day'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              setState(() => _autoReset = 'none');
-              Navigator.of(context, rootNavigator: true).pop();
-            },
-            isDefaultAction: _autoReset == 'none',
-            child: const Text('Do not reset'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () =>
-              Navigator.of(context, rootNavigator: true).pop(),
-          child: const Text('Cancel'),
-        ),
+      barrierDismissible: true,
+      builder: (_) => _AutoResetPopup(
+        current: _autoReset,
+        onChanged: (v) {
+          setState(() => _autoReset = v);
+          Navigator.of(context, rootNavigator: true).pop();
+        },
       ),
     );
   }
@@ -418,11 +406,13 @@ class _NameRow extends StatelessWidget {
     required this.nameCtrl,
     required this.iconId,
     required this.iconColor,
+    required this.onIconTap,
   });
 
   final TextEditingController nameCtrl;
   final String iconId;
   final int iconColor;
+  final VoidCallback onIconTap;
 
   @override
   Widget build(BuildContext context) {
@@ -430,17 +420,20 @@ class _NameRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Color(iconColor),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              routineIconData(iconId),
-              color: CupertinoColors.white,
-              size: 18,
+          GestureDetector(
+            onTap: onIconTap,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Color(iconColor),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                routineIconData(iconId),
+                color: CupertinoColors.white,
+                size: 18,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -740,6 +733,85 @@ class _TextRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Auto-reset popup ─────────────────────────────────────────────────────────
+
+class _AutoResetPopup extends StatelessWidget {
+  const _AutoResetPopup({required this.current, required this.onChanged});
+
+  final String current;
+  final void Function(String) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = CupertinoColors.systemBackground.resolveFrom(context);
+    final sep = CupertinoColors.separator.resolveFrom(context);
+
+    return Center(
+      child: Container(
+        width: 260,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [
+            BoxShadow(color: Color(0x29000000), blurRadius: 24, offset: Offset(0, 8)),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 10),
+              child: Text(
+                'Auto Reset',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+            Container(height: 0.5, color: sep),
+            _Option(label: 'Every day', value: 'everyday', current: current, onChanged: onChanged),
+            Container(height: 0.5, color: sep),
+            _Option(label: 'Do not reset', value: 'none', current: current, onChanged: onChanged),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Option extends StatelessWidget {
+  const _Option({
+    required this.label,
+    required this.value,
+    required this.current,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final String current;
+  final void Function(String) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = current == value;
+    return GestureDetector(
+      onTap: () => onChanged(value),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Text(label, style: const TextStyle(fontSize: 15)),
+            const Spacer(),
+            if (selected)
+              const Icon(CupertinoIcons.checkmark,
+                  size: 16, color: Color(0xFFFF4D00)),
+          ],
+        ),
       ),
     );
   }

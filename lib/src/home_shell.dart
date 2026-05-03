@@ -229,6 +229,7 @@ class _DepthObserver extends NavigatorObserver {
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (previousRoute == null) return; // skip the navigator's own initial route
     depth++;
     if (trackedRouteName != null && route.settings.name == trackedRouteName) {
       trackedCount++;
