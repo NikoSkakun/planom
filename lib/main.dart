@@ -4,6 +4,7 @@ import 'src/app.dart';
 import 'src/database/database_service.dart';
 import 'src/folders/folder_controller.dart';
 import 'src/notes/note_controller.dart';
+import 'src/routines/routine_controller.dart';
 import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
 import 'src/tasks/task_controller.dart';
@@ -24,10 +25,14 @@ void main() async {
   final noteController = NoteController(db);
   await noteController.load();
 
+  final routineController = RoutineController(db);
+  await routineController.load();
+
   runApp(MyApp(
     settingsController: settingsController,
     taskController: taskController,
     folderController: folderController,
     noteController: noteController,
+    routineController: routineController,
   ));
 }

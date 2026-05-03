@@ -18,7 +18,7 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 ## Tech stack
 
 - **Framework**: Flutter / Dart, Cupertino (iOS-native) widgets throughout — no Material widgets in UI except `showModalBottomSheet` (which requires `GlobalMaterialLocalizations.delegate` already registered)
-- **Database**: `sqflite` v2, single file `planom.db`, current schema version 2
+- **Database**: `sqflite` v2, single file `planom.db`, current schema version **6**
 - **State**: Flutter `ChangeNotifier` — no third-party state library
 - **Routing**: `FastRoute` (custom `CupertinoPageRoute` subclass with 180 ms transition, in `lib/src/utils/fast_route.dart`) used everywhere instead of bare `CupertinoPageRoute`
 - **Icons**: `cupertino_icons` package required for `CupertinoIcons`; custom PNG tab-bar icons in `assets/icons/tab_bar/`; list icons (`inbox.png`, `today.png`, `folder.png`) in `assets/icons/`; use `Image.asset` (not `ImageIcon`) when original PNG colors must be preserved
@@ -48,15 +48,35 @@ Task extends AppItem (lib/src/models/task.dart)
   dueDate: DateTime?          ← nullable; drives calendar view
   doTime: int?                ← minutes since midnight (0–1439); null = no time set
   listId: String?
+
+Routine extends AppItem (lib/src/models/routine.dart)
+  name: String
+  iconColor: int              ← ARGB; iconId (from AppItem) is the SF-symbol key
+  goalType: String            ← 'achieve_all' | 'certain_amount'
+  goalAmount: int?            ← daily target; only for 'certain_amount'
+  goalUnit: String?           ← 'ml', 'km', 'count', etc.; only for 'certain_amount'
+  recordAmount: int?          ← amount added per tap; only for 'certain_amount'
+  frequencyType: String       ← 'daily' | 'days_after_complete'
+  weekdays: List<int>?        ← 0=Mon … 6=Sun; null = all days (daily only)
+  daysAfterComplete: int?     ← gap before routine reappears (days_after_complete only)
+  autoReset: String           ← 'everyday' | 'none'
+
+RoutineEntry (lib/src/models/routine_entry.dart)   ← NOT an AppItem; no iconId
+  id: String (UUID v4)
+  routineId: String
+  date: DateTime              ← normalized to midnight
+  amount: int                 ← progress units recorded on that date
 ```
 
-`Task.copyWith` accepts `clearDueDate: bool` and `clearDoTime: bool` to explicitly null out those fields (standard Dart nullable-copyWith pattern). Item spacing: task rows use `vertical: 7` padding; list/folder items use `vertical: 9` in custom `GestureDetector` rows (not `CupertinoListTile.notched`).
-
-Future types (`Note`, `Routine`) should also extend `AppItem`.
+`Task.copyWith` accepts `clearDueDate: bool` and `clearDoTime: bool` to explicitly null out those fields (standard Dart nullable-copyWith pattern). `Routine.copyWith` follows the same clear-flag pattern for all nullable fields. Item spacing: task rows use `vertical: 7` padding; list/folder items use `vertical: 9` in custom `GestureDetector` rows (not `CupertinoListTile.notched`).
 
 ### Database (`lib/src/database/database_service.dart`)
 
-Single `DatabaseService` class, lazy-opens `planom.db` via sqflite. Current version: **4**. Migration history: v2 adds `dueDate INTEGER`, v3 adds `listId TEXT` + folder/list tables, v4 adds `doTime INTEGER`. When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
+Single `DatabaseService` class, lazy-opens `planom.db` via sqflite. Current version: **6**. Migration history: v2 adds `dueDate INTEGER`, v3 adds `listId TEXT` + folder/list tables, v4 adds `doTime INTEGER` + folder/list tables (IF NOT EXISTS guard), v5 adds `note_folders` + `notes` tables, v6 adds `routines` + `routine_entries` tables. When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
+
+Routine DB schema:
+- `routines` — stores routine definitions (all Routine fields; `weekdays` stored as comma-separated string e.g. `"0,1,2,3,4,5,6"`)
+- `routine_entries` — per-day progress records; one row per (routineId, date); `amount` is cumulative for the day
 
 ### Controllers
 
@@ -64,12 +84,20 @@ Single `DatabaseService` class, lazy-opens `planom.db` via sqflite. Current vers
 - Initialized in `main.dart`, passed through `MyApp` → `HomeShell` → individual views
 - Key API: `inboxTasks`, `inboxUncompletedCount`, `todayTasks`, `tasksForDate(DateTime)`, `addTask`, `updateTask`, `toggleCompleted`, `load`
 
+**`RoutineController`** (`lib/src/routines/routine_controller.dart`)
+- Initialized in `main.dart`, passed through `MyApp` → `HomeShell` → `RoutinesView`
+- Key API: `todayRoutines`, `entryForToday(routineId)`, `todayProgress(routineId)`, `isTodayCompleted(Routine)`, `recordProgress(Routine)`, `addRoutine`, `updateRoutine`, `deleteRoutine`, `load`
+- `todayRoutines` filters `_routines` by schedule: `daily` checks weekday membership; `days_after_complete` shows routine when `today >= lastCompletionDate + gap`
+- `recordProgress` toggles for `achieve_all` (0↔1) and increments by `recordAmount` for `certain_amount`; creates today's entry if absent
+- `autoReset='none'`: carries over last known amount as today's starting value; for `achieve_all` shows as done if any historical completion exists (until toggled off today)
+- Weekdays stored as `List<int>` (0=Mon … 6=Sun); Dart's `DateTime.weekday` is 1=Mon, so always subtract 1 when comparing
+
 **`SettingsController`** (`lib/src/settings/settings_controller.dart`)
 - Manages `ThemeMode`; mapped to `CupertinoThemeData.brightness` in `app.dart`
 
 ### App shell (`lib/src/home_shell.dart`)
 
-`HomeShell` is a `StatefulWidget` that wraps a `CupertinoTabScaffold` (3 tabs: Tasks / Calendar / Routines) in a `Stack` with a floating orange `+` button (52×52, `Color(0xFFFF4D00)`) above the tab bar. Key state:
+`HomeShell` is a `StatefulWidget` that wraps a `CupertinoTabScaffold` (**4 tabs**: Tasks(0) / Notes(1) / Calendar(2) / Routines(3)) in a `Stack` with a floating orange `+` button (52×52, `Color(0xFFFF4D00)`) above the tab bar. Key state:
 - `_navigatorKeys`: per-tab `GlobalKey<NavigatorState>` — used to pop-to-root on same-tab re-tap
 - `_depthObservers`: per-tab `_DepthObserver extends NavigatorObserver` — tracks push/pop depth AND counts routes matching `trackedRouteName`
 - `_showPlusButton`: `ValueNotifier<bool>` toggled by `_depthObservers`; passed to `ValueListenableBuilder` that wraps the `Positioned` button
@@ -78,10 +106,15 @@ Single `DatabaseService` class, lazy-opens `planom.db` via sqflite. Current vers
 - `_lastTabIndex`: tracks last tapped tab to detect same-tab re-tap via `CupertinoTabBar.onTap`
 
 **Plus button visibility rules:**
-- **Tab 0 (Tasks)**: shown whenever no `TaskDetailView` is on the stack — i.e. `_depthObservers[0].trackedCount == 0`. This means Plus is visible on TasksView, InboxView, TodayView, FolderView, and ListTaskView at any nesting depth, hidden only inside the task edit screen.
-- **Tabs 1 & 2 (Calendar / Routines)**: hidden when depth > 1 (any push beyond the tab root).
+- **Tab 0 (Tasks)**: shown whenever no `TaskDetailView` is on the stack — i.e. `_depthObservers[0].trackedCount == 0`. Visible on TasksView, InboxView, TodayView, FolderView, ListTaskView at any nesting depth; hidden only inside the task edit screen.
+- **Tab 1 (Notes)**: always hidden — Notes manages its own UI.
+- **Tabs 2 & 3 (Calendar / Routines)**: hidden when depth > 1 (any push beyond the tab root).
 - `_DepthObserver` accepts an optional `trackedRouteName`; `trackedCount` increments/decrements as matching routes are pushed/popped. Tab 0's observer tracks `'task_detail'`.
 - All `TaskDetailView` pushes use `RouteSettings(name: TaskDetailView.routeName)` (`'task_detail'`) so the observer can identify them.
+
+**Plus button action (`_onPlusPressed`):**
+- `_lastTabIndex == 3` (Routines): pushes `RoutineCreationView` on the Routines tab navigator via `_navigatorKeys[3]` — this increments depth to 2, hiding the button automatically.
+- All other tabs: shows `TaskCreationSheet` modal (root navigator).
 
 ### Navigation
 
@@ -106,6 +139,25 @@ Single `DatabaseService` class, lazy-opens `planom.db` via sqflite. Current vers
 **`todayTasks` / `todayUncompletedCount`**: includes all tasks where `dueDate` (normalized to midnight) is ≤ today — i.e. today's tasks plus any overdue tasks. `todayUncompletedCount` derives from `todayTasks`, so the iOS app badge automatically counts overdue uncompleted tasks.
 
 **List/folder row items** (`_ListItem` in `tasks_view.dart`, `_FolderListItem` in `folder_view.dart`): no chevron icon — rows show icon + label + optional uncompleted count only.
+
+### Routines feature (`lib/src/routines/`)
+
+| File | Purpose |
+|------|---------|
+| `routine_icons.dart` | `kRoutineIconPresets` — 16 `(iconId, colorARGB)` preset combos; `routineIconData(iconId)` maps string keys to `CupertinoIcons` constants |
+| `routine_controller.dart` | `ChangeNotifier`; owns `_routines` + `_entries` lists; computes `todayRoutines`, progress, completion state |
+| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; also used for editing (`existing` param). Sections: name+icon row, icon picker grid, Frequency (segmented + weekday chips or days-after input + auto-reset), Goal (segmented + amount/unit/record fields) |
+| `routines_view.dart` | Tab root; `todayRoutines` list with `_RoutineRow` items; swipe-to-delete (`Dismissible`); tap → `recordProgress`; long-press → edit/delete action sheet; empty state with prompt |
+
+**Routine row layout**: 40px colored circle icon (dimmed + checkmark overlay when `achieve_all` complete) · name (strikethrough when complete) · right-aligned `_ProgressBadge` showing `"progress/goal unit"` (only for `certain_amount`)
+
+**Icon system**: `iconId` is a string key (e.g. `'drop.fill'`, `'heart.fill'`) stored in `Routine.iconId` (inherited from `AppItem`). `iconColor` is a separate ARGB int field on `Routine`. Together they describe a filled colored circle with a white icon inside. The 16 presets in `kRoutineIconPresets` are shown as a `Wrap` grid in the creation view.
+
+**Unit picker**: `_UnitPickerSheet` (modal bottom sheet) offers preset units (`ml`, `L`, `oz`, `count`, `minute`, `hour`, `km`, `mi`, `page`, `cup`, `lap`, `step`) plus a "Custom…" option with a free-text field.
+
+**`autoReset` semantics**:
+- `'everyday'`: each new day's entry starts at 0 (default behavior since entries are per-day)
+- `'none'`: for `achieve_all` — shows as completed if any historical completion exists (persists across days until toggled off); for `certain_amount` — carries over the last entry's amount as today's starting value
 
 ### Calendar feature (`lib/src/calendar/calendar_view.dart`)
 

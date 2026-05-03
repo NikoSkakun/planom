@@ -4,6 +4,8 @@ import 'calendar/calendar_view.dart';
 import 'folders/folder_controller.dart';
 import 'notes/note_controller.dart';
 import 'notes/notes_view.dart';
+import 'routines/routine_controller.dart';
+import 'routines/routine_creation_view.dart';
 import 'routines/routines_view.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
@@ -18,6 +20,7 @@ class HomeShell extends StatefulWidget {
     required this.taskController,
     required this.folderController,
     required this.noteController,
+    required this.routineController,
   });
 
   static const routeName = '/';
@@ -26,6 +29,7 @@ class HomeShell extends StatefulWidget {
   final TaskController taskController;
   final FolderController folderController;
   final NoteController noteController;
+  final RoutineController routineController;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -85,6 +89,27 @@ class _HomeShellState extends State<HomeShell> {
     _calendarResetSignal.dispose();
     _showPlusButton.dispose();
     super.dispose();
+  }
+
+  void _onPlusPressed() {
+    if (_lastTabIndex == 3) {
+      _navigatorKeys[3].currentState?.push(
+        CupertinoPageRoute(
+          settings: const RouteSettings(name: 'routine_creation'),
+          builder: (_) => RoutineCreationView(
+            controller: widget.routineController,
+          ),
+        ),
+      );
+    } else {
+      showTaskCreationSheet(
+        context,
+        widget.taskController,
+        widget.folderController,
+        initialListId: _activeListId.value,
+        initialDueDate: _activeDueDate.value,
+      );
+    }
   }
 
   void _onTabTapped(int tappedIndex) {
@@ -173,7 +198,7 @@ class _HomeShellState extends State<HomeShell> {
                     controller: widget.taskController,
                     resetSignal: _calendarResetSignal,
                   ),
-                _ => const RoutinesView(),
+                _ => RoutinesView(controller: widget.routineController),
               },
             );
           },
@@ -184,15 +209,7 @@ class _HomeShellState extends State<HomeShell> {
               ? Positioned(
                   right: 20,
                   bottom: 50 + MediaQuery.paddingOf(context).bottom + 12,
-                  child: _PlusButton(
-                    onPressed: () => showTaskCreationSheet(
-                      context,
-                      widget.taskController,
-                      widget.folderController,
-                      initialListId: _activeListId.value,
-                      initialDueDate: _activeDueDate.value,
-                    ),
-                  ),
+                  child: _PlusButton(onPressed: _onPlusPressed),
                 )
               : const SizedBox.shrink(),
         ),

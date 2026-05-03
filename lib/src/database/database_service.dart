@@ -5,11 +5,13 @@ import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
+import '../models/routine.dart';
+import '../models/routine_entry.dart';
 import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 5;
+  static const _dbVersion = 6;
 
   Database? _db;
 
@@ -68,6 +70,31 @@ class DatabaseService {
             modifiedDate INTEGER NOT NULL
           )
         ''');
+        await db.execute('''
+          CREATE TABLE routines (
+            id TEXT PRIMARY KEY,
+            creationDate INTEGER NOT NULL,
+            iconId TEXT NOT NULL,
+            iconColor INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            goalType TEXT NOT NULL,
+            goalAmount INTEGER,
+            goalUnit TEXT,
+            recordAmount INTEGER,
+            frequencyType TEXT NOT NULL,
+            weekdays TEXT,
+            daysAfterComplete INTEGER,
+            autoReset TEXT NOT NULL
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE routine_entries (
+            id TEXT PRIMARY KEY,
+            routineId TEXT NOT NULL,
+            date INTEGER NOT NULL,
+            amount INTEGER NOT NULL DEFAULT 0
+          )
+        ''');
       },
       onUpgrade: (db, oldVersion, _) async {
         if (oldVersion < 2) {
@@ -112,6 +139,33 @@ class DatabaseService {
               folderId TEXT,
               creationDate INTEGER NOT NULL,
               modifiedDate INTEGER NOT NULL
+            )
+          ''');
+        }
+        if (oldVersion < 6) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS routines (
+              id TEXT PRIMARY KEY,
+              creationDate INTEGER NOT NULL,
+              iconId TEXT NOT NULL,
+              iconColor INTEGER NOT NULL,
+              name TEXT NOT NULL,
+              goalType TEXT NOT NULL,
+              goalAmount INTEGER,
+              goalUnit TEXT,
+              recordAmount INTEGER,
+              frequencyType TEXT NOT NULL,
+              weekdays TEXT,
+              daysAfterComplete INTEGER,
+              autoReset TEXT NOT NULL
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS routine_entries (
+              id TEXT PRIMARY KEY,
+              routineId TEXT NOT NULL,
+              date INTEGER NOT NULL,
+              amount INTEGER NOT NULL DEFAULT 0
             )
           ''');
         }
@@ -229,5 +283,50 @@ class DatabaseService {
   Future<void> deleteNotesForFolder(String folderId) async {
     final db = await _database;
     await db.delete('notes', where: 'folderId = ?', whereArgs: [folderId]);
+  }
+
+  // Routines
+  Future<List<Routine>> getRoutines() async {
+    final db = await _database;
+    final rows = await db.query('routines', orderBy: 'creationDate ASC');
+    return rows.map(Routine.fromMap).toList();
+  }
+
+  Future<void> insertRoutine(Routine routine) async {
+    final db = await _database;
+    await db.insert('routines', routine.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateRoutine(Routine routine) async {
+    final db = await _database;
+    await db.update('routines', routine.toMap(),
+        where: 'id = ?', whereArgs: [routine.id]);
+  }
+
+  Future<void> deleteRoutine(String id) async {
+    final db = await _database;
+    await db.delete('routines', where: 'id = ?', whereArgs: [id]);
+    await db.delete('routine_entries', where: 'routineId = ?', whereArgs: [id]);
+  }
+
+  // Routine entries
+  Future<List<RoutineEntry>> getRoutineEntries() async {
+    final db = await _database;
+    final rows =
+        await db.query('routine_entries', orderBy: 'date DESC');
+    return rows.map(RoutineEntry.fromMap).toList();
+  }
+
+  Future<void> insertRoutineEntry(RoutineEntry entry) async {
+    final db = await _database;
+    await db.insert('routine_entries', entry.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateRoutineEntry(RoutineEntry entry) async {
+    final db = await _database;
+    await db.update('routine_entries', entry.toMap(),
+        where: 'id = ?', whereArgs: [entry.id]);
   }
 }
