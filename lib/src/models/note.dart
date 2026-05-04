@@ -7,6 +7,7 @@ class Note {
   final String? folderId;
   final DateTime creationDate;
   final DateTime modifiedDate;
+  final int sortOrder;
 
   Note({
     String? id,
@@ -15,6 +16,7 @@ class Note {
     this.folderId,
     DateTime? creationDate,
     DateTime? modifiedDate,
+    this.sortOrder = 0,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate ?? DateTime.now(),
         modifiedDate = modifiedDate ?? DateTime.now();
@@ -24,6 +26,7 @@ class Note {
     String? content,
     String? folderId,
     bool clearFolderId = false,
+    int? sortOrder,
   }) =>
       Note(
         id: id,
@@ -32,6 +35,7 @@ class Note {
         folderId: clearFolderId ? null : (folderId ?? this.folderId),
         creationDate: creationDate,
         modifiedDate: DateTime.now(),
+        sortOrder: sortOrder ?? this.sortOrder,
       );
 
   Map<String, dynamic> toMap() => {
@@ -41,6 +45,7 @@ class Note {
         'folderId': folderId,
         'creationDate': creationDate.millisecondsSinceEpoch,
         'modifiedDate': modifiedDate.millisecondsSinceEpoch,
+        'sortOrder': sortOrder,
       };
 
   factory Note.fromMap(Map<String, dynamic> map) => Note(
@@ -52,5 +57,6 @@ class Note {
             DateTime.fromMillisecondsSinceEpoch(map['creationDate'] as int),
         modifiedDate:
             DateTime.fromMillisecondsSinceEpoch(map['modifiedDate'] as int),
+        sortOrder: map['sortOrder'] as int? ?? 0,
       );
 }

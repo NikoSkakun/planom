@@ -13,6 +13,22 @@ class NotesView extends StatelessWidget {
 
   final NoteController controller;
 
+  Widget _proxyDecorator(
+      Widget child, int index, Animation<double> animation) {
+    return Container(
+      decoration: const BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x18000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -31,49 +47,90 @@ class NotesView extends StatelessWidget {
                   return const Center(
                     child: Text(
                       'No notes',
-                      style: TextStyle(color: CupertinoColors.secondaryLabel),
+                      style: TextStyle(
+                          color: CupertinoColors.secondaryLabel),
                     ),
                   );
                 }
-                return ListView(
-                  children: [
-                    const SizedBox(height: 8),
-                    ...folders.map((f) => Dismissible(
-                          key: ValueKey(f.id),
-                          direction: DismissDirection.endToStart,
-                          background: const NoteDeleteBackground(),
-                          onDismissed: (_) => controller.deleteFolderDeep(f.id),
-                          child: NoteFolderRow(
-                            folder: f,
-                            onTap: () => Navigator.of(context).push(
-                              FastRoute<void>(
-                                builder: (_) => NoteFolderView(
-                                  folder: f,
-                                  controller: controller,
+                return CustomScrollView(
+                  slivers: [
+                    const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+                    // Reorderable note folders
+                    if (folders.isNotEmpty)
+                      SliverReorderableList(
+                        itemCount: folders.length,
+                        onReorder: (old, neo) =>
+                            controller.reorderNoteFolders(
+                                null, old, neo),
+                        proxyDecorator: _proxyDecorator,
+                        itemBuilder: (context, index) {
+                          final f = folders[index];
+                          return ReorderableDelayedDragStartListener(
+                            key: ValueKey('nf_${f.id}'),
+                            index: index,
+                            child: Dismissible(
+                              key: ValueKey(f.id),
+                              direction: DismissDirection.endToStart,
+                              background: const NoteDeleteBackground(),
+                              onDismissed: (_) =>
+                                  controller.deleteFolderDeep(f.id),
+                              child: NoteFolderRow(
+                                folder: f,
+                                onTap: () =>
+                                    Navigator.of(context).push(
+                                  FastRoute<void>(
+                                    builder: (_) => NoteFolderView(
+                                      folder: f,
+                                      controller: controller,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        )),
-                    ...notes.map((n) => Dismissible(
-                          key: ValueKey(n.id),
-                          direction: DismissDirection.endToStart,
-                          background: const NoteDeleteBackground(),
-                          onDismissed: (_) => controller.deleteNote(n.id),
-                          child: NoteRow(
-                            note: n,
-                            onTap: () => Navigator.of(context).push(
-                              FastRoute<void>(
-                                settings: const RouteSettings(
-                                    name: NoteDetailView.routeName),
-                                builder: (_) => NoteDetailView(
-                                  note: n,
-                                  controller: controller,
+                          );
+                        },
+                      ),
+
+                    // Reorderable notes
+                    if (notes.isNotEmpty)
+                      SliverReorderableList(
+                        itemCount: notes.length,
+                        onReorder: (old, neo) =>
+                            controller.reorderNotes(null, old, neo),
+                        proxyDecorator: _proxyDecorator,
+                        itemBuilder: (context, index) {
+                          final n = notes[index];
+                          return ReorderableDelayedDragStartListener(
+                            key: ValueKey('note_${n.id}'),
+                            index: index,
+                            child: Dismissible(
+                              key: ValueKey(n.id),
+                              direction: DismissDirection.endToStart,
+                              background: const NoteDeleteBackground(),
+                              onDismissed: (_) =>
+                                  controller.deleteNote(n.id),
+                              child: NoteRow(
+                                note: n,
+                                onTap: () =>
+                                    Navigator.of(context).push(
+                                  FastRoute<void>(
+                                    settings: const RouteSettings(
+                                        name: NoteDetailView.routeName),
+                                    builder: (_) => NoteDetailView(
+                                      note: n,
+                                      controller: controller,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        )),
+                          );
+                        },
+                      ),
+
+                    const SliverToBoxAdapter(
+                        child: SizedBox(height: 80)),
                   ],
                 );
               },

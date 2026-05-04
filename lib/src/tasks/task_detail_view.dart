@@ -31,6 +31,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
   late int? _doTime;
   late bool _isCompleted;
   late String? _listId;
+  late int _priority;
 
   @override
   void initState() {
@@ -41,6 +42,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
     _doTime = widget.task.doTime;
     _isCompleted = widget.task.isCompleted;
     _listId = widget.task.listId;
+    _priority = widget.task.priority;
   }
 
   @override
@@ -63,6 +65,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
       isCompleted: _isCompleted,
       listId: _listId,
       clearListId: _listId == null,
+      priority: _priority,
     ));
     if (mounted) Navigator.of(context).pop();
   }
@@ -110,7 +113,8 @@ class _TaskDetailViewState extends State<TaskDetailView> {
       ),
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,87 +153,173 @@ class _TaskDetailViewState extends State<TaskDetailView> {
               ),
             ),
             const SizedBox(height: 24),
+
+            // Priority picker
+            _SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(CupertinoIcons.flag_fill,
+                          size: 16,
+                          color: CupertinoColors.secondaryLabel),
+                      const SizedBox(width: 10),
+                      const Text('Priority',
+                          style: TextStyle(fontSize: 15)),
+                      const Spacer(),
+                      _PriorityPicker(
+                        value: _priority,
+                        onChanged: (v) =>
+                            setState(() => _priority = v),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
             // Date picker row
-            GestureDetector(
+            _SectionCard(
               onTap: _pickDate,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.tertiarySystemFill
-                      .resolveFrom(context),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      CupertinoIcons.calendar,
-                      size: 18,
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.calendar,
+                    size: 18,
+                    color: _dueDate != null
+                        ? const Color(0xFFFF4D00)
+                        : CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    _dueDate != null
+                        ? formatTaskDate(_dueDate!, doTime: _doTime)
+                        : 'No Date',
+                    style: TextStyle(
+                      fontSize: 15,
                       color: _dueDate != null
                           ? const Color(0xFFFF4D00)
                           : CupertinoColors.secondaryLabel
                               .resolveFrom(context),
                     ),
-                    const SizedBox(width: 10),
-                    Text(
-                      _dueDate != null
-                          ? formatTaskDate(_dueDate!, doTime: _doTime)
-                          : 'No Date',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: _dueDate != null
-                            ? const Color(0xFFFF4D00)
-                            : CupertinoColors.secondaryLabel
-                                .resolveFrom(context),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
+
             // List picker row
-            GestureDetector(
+            _SectionCard(
               onTap: _pickList,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.tertiarySystemFill
-                      .resolveFrom(context),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Image.asset(
-                      _listId == null
-                          ? 'assets/icons/inbox.png'
-                          : 'assets/icons/list.png',
-                      width: 18,
-                      height: 18,
+              child: Row(
+                children: [
+                  Image.asset(
+                    _listId == null
+                        ? 'assets/icons/inbox.png'
+                        : 'assets/icons/list.png',
+                    width: 18,
+                    height: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    _listLabel,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color:
+                          CupertinoColors.label.resolveFrom(context),
                     ),
-                    const SizedBox(width: 10),
-                    Text(
-                      _listLabel,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: CupertinoColors.label.resolveFrom(context),
-                      ),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      CupertinoIcons.chevron_right,
-                      size: 14,
-                      color: CupertinoColors.secondaryLabel
-                          .resolveFrom(context),
-                    ),
-                  ],
-                ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    CupertinoIcons.chevron_right,
+                    size: 14,
+                    color: CupertinoColors.secondaryLabel
+                        .resolveFrom(context),
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.child, this.onTap});
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _PriorityPicker extends StatelessWidget {
+  const _PriorityPicker({required this.value, required this.onChanged});
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  static const _labels = ['None', 'Low', 'Med', 'High'];
+  static const _colors = [
+    CupertinoColors.systemGrey,
+    CupertinoColors.systemBlue,
+    CupertinoColors.systemOrange,
+    CupertinoColors.systemRed,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(4, (i) {
+        final selected = value == i;
+        return GestureDetector(
+          onTap: () => onChanged(i),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.only(left: 6),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: selected
+                  ? _colors[i].withOpacity(0.15)
+                  : CupertinoColors.systemFill.resolveFrom(context),
+              borderRadius: BorderRadius.circular(8),
+              border: selected
+                  ? Border.all(color: _colors[i], width: 1.5)
+                  : null,
+            ),
+            child: Text(
+              _labels[i],
+              style: TextStyle(
+                fontSize: 13,
+                color: selected
+                    ? _colors[i]
+                    : CupertinoColors.secondaryLabel.resolveFrom(context),
+                fontWeight:
+                    selected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ),
+        );
+      }),
     );
   }
 }
@@ -249,7 +339,8 @@ class _RoundedCheckbox extends StatelessWidget {
         border: checked
             ? null
             : Border.all(
-                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                color:
+                    CupertinoColors.tertiaryLabel.resolveFrom(context),
                 width: 1.5,
               ),
       ),

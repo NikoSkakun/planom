@@ -21,6 +21,22 @@ class FolderView extends StatelessWidget {
   final TaskController taskController;
   final ValueNotifier<String?> activeListId;
 
+  Widget _proxyDecorator(
+      Widget child, int index, Animation<double> animation) {
+    return Container(
+      decoration: const BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x18000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -31,10 +47,13 @@ class FolderView extends StatelessWidget {
         child: Stack(
           children: [
             ListenableBuilder(
-              listenable: folderController,
+              listenable:
+                  Listenable.merge([folderController, taskController]),
               builder: (context, _) {
-                final subFolders = folderController.foldersIn(folder.id);
-                final lists = folderController.listsIn(folder.id);
+                final subFolders =
+                    folderController.foldersIn(folder.id);
+                final lists =
+                    folderController.listsIn(folder.id);
 
                 if (subFolders.isEmpty && lists.isEmpty) {
                   return const Center(
@@ -46,68 +65,98 @@ class FolderView extends StatelessWidget {
                   );
                 }
 
-                return ListView(
-                  children: [
-                    const SizedBox(height: 8),
-                    if (subFolders.isNotEmpty) ...[
-                      ...subFolders.map((f) => Dismissible(
-                            key: ValueKey(f.id),
-                            direction: DismissDirection.endToStart,
-                            background: _DeleteBackground(),
-                            onDismissed: (_) =>
-                                folderController.deleteFolderDeep(
-                              f.id,
-                              taskController.deleteTasksForList,
-                            ),
-                            child: _FolderListItem(
-                              iconAsset: 'assets/icons/folder.png',
-                              label: f.name,
-                              onTap: () => Navigator.of(context).push(
-                                FastRoute<void>(
-                                  builder: (_) => FolderView(
-                                    folder: f,
-                                    folderController: folderController,
-                                    taskController: taskController,
-                                    activeListId: activeListId,
+                return CustomScrollView(
+                  slivers: [
+                    const SliverToBoxAdapter(
+                        child: SizedBox(height: 8)),
+
+                    if (subFolders.isNotEmpty)
+                      SliverReorderableList(
+                        itemCount: subFolders.length,
+                        onReorder: (old, neo) =>
+                            folderController.reorderFolders(
+                                folder.id, old, neo),
+                        proxyDecorator: _proxyDecorator,
+                        itemBuilder: (context, index) {
+                          final f = subFolders[index];
+                          return ReorderableDelayedDragStartListener(
+                            key: ValueKey('sf_${f.id}'),
+                            index: index,
+                            child: Dismissible(
+                              key: ValueKey(f.id),
+                              direction: DismissDirection.endToStart,
+                              background: _DeleteBackground(),
+                              onDismissed: (_) =>
+                                  folderController.deleteFolderDeep(
+                                f.id,
+                                taskController.deleteTasksForList,
+                              ),
+                              child: _FolderListItem(
+                                iconAsset: 'assets/icons/folder.png',
+                                label: f.name,
+                                onTap: () =>
+                                    Navigator.of(context).push(
+                                  FastRoute<void>(
+                                    builder: (_) => FolderView(
+                                      folder: f,
+                                      folderController: folderController,
+                                      taskController: taskController,
+                                      activeListId: activeListId,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          )),
-                    ],
-                    if (lists.isNotEmpty) ...[
-                      ...lists.map((l) {
-                        final count =
-                            taskController.uncompletedCountForList(l.id);
-                        return Dismissible(
-                          key: ValueKey(l.id),
-                          direction: DismissDirection.endToStart,
-                          background: _DeleteBackground(),
-                          onDismissed: (_) async {
-                            await taskController.deleteTasksForList(l.id);
-                            await folderController.deleteList(l.id);
-                          },
-                          child: ListenableBuilder(
-                            listenable: taskController,
-                            builder: (context, _) => _FolderListItem(
-                              iconAsset: 'assets/icons/list.png',
-                              label: l.name,
-                              count: count > 0 ? count : null,
-                              onTap: () => Navigator.of(context).push(
-                                FastRoute<void>(
-                                  builder: (_) => ListTaskView(
-                                    list: l,
-                                    taskController: taskController,
-                                    folderController: folderController,
-                                    activeListId: activeListId,
+                          );
+                        },
+                      ),
+
+                    if (lists.isNotEmpty)
+                      SliverReorderableList(
+                        itemCount: lists.length,
+                        onReorder: (old, neo) =>
+                            folderController.reorderLists(
+                                folder.id, old, neo),
+                        proxyDecorator: _proxyDecorator,
+                        itemBuilder: (context, index) {
+                          final l = lists[index];
+                          final count = taskController
+                              .uncompletedCountForList(l.id);
+                          return ReorderableDelayedDragStartListener(
+                            key: ValueKey('fl_${l.id}'),
+                            index: index,
+                            child: Dismissible(
+                              key: ValueKey(l.id),
+                              direction: DismissDirection.endToStart,
+                              background: _DeleteBackground(),
+                              onDismissed: (_) async {
+                                await taskController
+                                    .deleteTasksForList(l.id);
+                                await folderController.deleteList(l.id);
+                              },
+                              child: _FolderListItem(
+                                iconAsset: 'assets/icons/list.png',
+                                label: l.name,
+                                count: count > 0 ? count : null,
+                                onTap: () =>
+                                    Navigator.of(context).push(
+                                  FastRoute<void>(
+                                    builder: (_) => ListTaskView(
+                                      list: l,
+                                      taskController: taskController,
+                                      folderController: folderController,
+                                      activeListId: activeListId,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      }),
-                    ],
+                          );
+                        },
+                      ),
+
+                    const SliverToBoxAdapter(
+                        child: SizedBox(height: 80)),
                   ],
                 );
               },
@@ -173,7 +222,8 @@ class _FolderListItem extends StatelessWidget {
               Text(
                 '$count',
                 style: TextStyle(
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  color: CupertinoColors.secondaryLabel
+                      .resolveFrom(context),
                 ),
               ),
           ],

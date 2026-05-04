@@ -2,6 +2,9 @@ import 'package:uuid/uuid.dart';
 
 import 'item.dart';
 
+// 0=none 1=low 2=medium 3=high
+enum TaskPriority { none, low, medium, high }
+
 class Task extends AppItem {
   final String title;
   final String? note;
@@ -9,6 +12,8 @@ class Task extends AppItem {
   final DateTime? dueDate;
   final int? doTime; // minutes since midnight (0–1439), null = no time set
   final String? listId;
+  final int priority; // TaskPriority.index
+  final int sortOrder; // 0 = not yet manually sorted; >0 = user-defined position
 
   Task({
     String? id,
@@ -20,6 +25,8 @@ class Task extends AppItem {
     this.dueDate,
     this.doTime,
     this.listId,
+    this.priority = 0,
+    this.sortOrder = 0,
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -36,6 +43,8 @@ class Task extends AppItem {
     bool clearDoTime = false,
     String? listId,
     bool clearListId = false,
+    int? priority,
+    int? sortOrder,
   }) {
     return Task(
       id: id,
@@ -47,6 +56,8 @@ class Task extends AppItem {
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       doTime: clearDoTime ? null : (doTime ?? this.doTime),
       listId: clearListId ? null : (listId ?? this.listId),
+      priority: priority ?? this.priority,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 
@@ -60,6 +71,8 @@ class Task extends AppItem {
         'dueDate': dueDate?.millisecondsSinceEpoch,
         'doTime': doTime,
         'listId': listId,
+        'priority': priority,
+        'sortOrder': sortOrder,
       };
 
   factory Task.fromMap(Map<String, dynamic> map) => Task(
@@ -75,5 +88,7 @@ class Task extends AppItem {
             : null,
         doTime: map['doTime'] as int?,
         listId: map['listId'] as String?,
+        priority: map['priority'] as int? ?? 0,
+        sortOrder: map['sortOrder'] as int? ?? 0,
       );
 }

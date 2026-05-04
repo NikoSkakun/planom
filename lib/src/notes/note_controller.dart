@@ -11,11 +11,18 @@ class NoteController with ChangeNotifier {
   List<NoteFolder> _folders = [];
   List<Note> _notes = [];
 
-  List<NoteFolder> foldersIn(String? parentId) =>
-      _folders.where((f) => f.parentFolderId == parentId).toList();
+  List<NoteFolder> foldersIn(String? parentId) {
+    final result =
+        _folders.where((f) => f.parentFolderId == parentId).toList();
+    _sortFoldersByDefault(result);
+    return result;
+  }
 
-  List<Note> notesIn(String? folderId) =>
-      _notes.where((n) => n.folderId == folderId).toList();
+  List<Note> notesIn(String? folderId) {
+    final result = _notes.where((n) => n.folderId == folderId).toList();
+    _sortNotesByDefault(result);
+    return result;
+  }
 
   Future<void> load() async {
     _folders = await _db.getNoteFolders();
@@ -34,8 +41,6 @@ class NoteController with ChangeNotifier {
     final i = _notes.indexWhere((n) => n.id == updated.id);
     if (i == -1) return;
     _notes = [..._notes]..[i] = updated;
-    // Re-sort by modifiedDate DESC so the updated note floats to the top.
-    _notes.sort((a, b) => b.modifiedDate.compareTo(a.modifiedDate));
     notifyListeners();
   }
 
@@ -70,5 +75,63 @@ class NoteController with ChangeNotifier {
     await _db.deleteNoteFolder(id);
     _folders = _folders.where((f) => f.id != id).toList();
     _notes = _notes.where((n) => n.folderId != id).toList();
+  }
+
+  /// Reorders note folders within [parentFolderId] scope.
+  Future<void> reorderNoteFolders(
+      String? parentFolderId, int oldIndex, int newIndex) async {
+    final scope = _folders
+        .where((f) => f.parentFolderId == parentFolderId)
+        .toList();
+    _sortFoldersByDefault(scope);
+
+    if (newIndex > oldIndex) newIndex--;
+    final item = scope.removeAt(oldIndex);
+    scope.insert(newIndex, item);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _folders.indexWhere((f) => f.id == updated.id);
+      if (idx != -1) _folders[idx] = updated;
+    }
+    await _db.updateNoteFolderSortOrders(scope);
+    notifyListeners();
+  }
+
+  /// Reorders notes within [folderId] scope.
+  Future<void> reorderNotes(
+      String? folderId, int oldIndex, int newIndex) async {
+    final scope = _notes.where((n) => n.folderId == folderId).toList();
+    _sortNotesByDefault(scope);
+
+    if (newIndex > oldIndex) newIndex--;
+    final item = scope.removeAt(oldIndex);
+    scope.insert(newIndex, item);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _notes.indexWhere((n) => n.id == updated.id);
+      if (idx != -1) _notes[idx] = updated;
+    }
+    await _db.updateNoteSortOrders(scope);
+    notifyListeners();
+  }
+
+  static void _sortFoldersByDefault(List<NoteFolder> list) {
+    list.sort((a, b) {
+      if (a.sortOrder != b.sortOrder) return a.sortOrder.compareTo(b.sortOrder);
+      return a.creationDate.compareTo(b.creationDate);
+    });
+  }
+
+  static void _sortNotesByDefault(List<Note> list) {
+    list.sort((a, b) {
+      if (a.sortOrder != b.sortOrder) return a.sortOrder.compareTo(b.sortOrder);
+      return b.modifiedDate.compareTo(a.modifiedDate);
+    });
   }
 }

@@ -23,11 +23,76 @@ class TasksView extends StatelessWidget {
   final ValueNotifier<String?> activeListId;
   final ValueNotifier<DateTime?> activeDueDate;
 
+  void _showSortSheet(BuildContext context) {
+    final current = controller.sortOrder;
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (_) => CupertinoActionSheet(
+        title: const Text('Sort Tasks'),
+        actions: TaskSortOrder.values.map((order) {
+          final label = _sortLabel(order);
+          final isSelected = order == current;
+          return CupertinoActionSheetAction(
+            onPressed: () {
+              controller.setSortOrder(order);
+              Navigator.of(context, rootNavigator: true).pop();
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isSelected)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Icon(CupertinoIcons.checkmark,
+                        size: 16, color: CupertinoColors.activeBlue),
+                  ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected
+                        ? CupertinoColors.activeBlue
+                        : CupertinoColors.label,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
+  }
+
+  static String _sortLabel(TaskSortOrder order) {
+    switch (order) {
+      case TaskSortOrder.defaultOrder:
+        return 'Default';
+      case TaskSortOrder.creationDate:
+        return 'By Creation Date';
+      case TaskSortOrder.name:
+        return 'By Name';
+      case TaskSortOrder.priority:
+        return 'By Priority';
+      case TaskSortOrder.dateTime:
+        return 'By Date & Time';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('Tasks'),
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('Tasks'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => _showSortSheet(context),
+          child: const Icon(CupertinoIcons.arrow_up_arrow_down, size: 20),
+        ),
       ),
       child: SafeArea(
         child: Stack(
@@ -39,97 +104,138 @@ class TasksView extends StatelessWidget {
                 final rootLists = folderController.listsIn(null);
                 final todayCount = controller.todayUncompletedCount;
 
-                return ListView(
-                  children: [
-                    const SizedBox(height: 8),
-                    _ListItem(
-                      iconAsset: 'assets/icons/inbox.png',
-                      label: 'Inbox',
-                      count: controller.inboxUncompletedCount,
-                      onTap: () => Navigator.of(context).push(
-                        FastRoute<void>(
-                          builder: (_) => InboxView(
-                            controller: controller,
-                            folderController: folderController,
-                          ),
-                        ),
-                      ),
-                    ),
-                    _ListItem(
-                      iconAsset: 'assets/icons/today.png',
-                      label: 'Today',
-                      count: todayCount > 0 ? todayCount : null,
-                      onTap: () => Navigator.of(context).push(
-                        FastRoute<void>(
-                          builder: (_) => TodayView(
-                            controller: controller,
-                            folderController: folderController,
-                            activeDueDate: activeDueDate,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Separator below Today
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Container(
-                        height: 0.5,
-                        color: CupertinoColors.separator.resolveFrom(context),
-                      ),
-                    ),
-                    // Root folders
-                    ...rootFolders.map((f) => Dismissible(
-                          key: ValueKey(f.id),
-                          direction: DismissDirection.endToStart,
-                          background: _DeleteBackground(),
-                          onDismissed: (_) => folderController.deleteFolderDeep(
-                            f.id,
-                            controller.deleteTasksForList,
-                          ),
-                          child: _ListItem(
-                            iconAsset: 'assets/icons/folder.png',
-                            label: f.name,
+                return CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 8),
+                          _ListItem(
+                            iconAsset: 'assets/icons/inbox.png',
+                            label: 'Inbox',
+                            count: controller.inboxUncompletedCount,
                             onTap: () => Navigator.of(context).push(
                               FastRoute<void>(
-                                builder: (_) => FolderView(
-                                  folder: f,
+                                builder: (_) => InboxView(
+                                  controller: controller,
                                   folderController: folderController,
-                                  taskController: controller,
-                                  activeListId: activeListId,
                                 ),
                               ),
                             ),
                           ),
-                        )),
-                    // Root lists
-                    ...rootLists.map((l) {
-                      final count = controller.uncompletedCountForList(l.id);
-                      return Dismissible(
-                        key: ValueKey(l.id),
-                        direction: DismissDirection.endToStart,
-                        background: _DeleteBackground(),
-                        onDismissed: (_) async {
-                          await controller.deleteTasksForList(l.id);
-                          await folderController.deleteList(l.id);
-                        },
-                        child: _ListItem(
-                          iconAsset: 'assets/icons/list.png',
-                          label: l.name,
-                          count: count > 0 ? count : null,
-                          onTap: () => Navigator.of(context).push(
-                            FastRoute<void>(
-                              builder: (_) => ListTaskView(
-                                list: l,
-                                taskController: controller,
-                                folderController: folderController,
-                                activeListId: activeListId,
+                          _ListItem(
+                            iconAsset: 'assets/icons/today.png',
+                            label: 'Today',
+                            count: todayCount > 0 ? todayCount : null,
+                            onTap: () => Navigator.of(context).push(
+                              FastRoute<void>(
+                                builder: (_) => TodayView(
+                                  controller: controller,
+                                  folderController: folderController,
+                                  activeDueDate: activeDueDate,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }),
+                          // Separator
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            child: Container(
+                              height: 0.5,
+                              color: CupertinoColors.separator
+                                  .resolveFrom(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Reorderable folders
+                    if (rootFolders.isNotEmpty)
+                      SliverReorderableList(
+                        itemCount: rootFolders.length,
+                        onReorder: (oldIndex, newIndex) =>
+                            folderController.reorderFolders(
+                                null, oldIndex, newIndex),
+                        proxyDecorator: _proxyDecorator,
+                        itemBuilder: (context, index) {
+                          final f = rootFolders[index];
+                          return ReorderableDelayedDragStartListener(
+                            key: ValueKey('folder_${f.id}'),
+                            index: index,
+                            child: Dismissible(
+                              key: ValueKey(f.id),
+                              direction: DismissDirection.endToStart,
+                              background: _DeleteBackground(),
+                              onDismissed: (_) =>
+                                  folderController.deleteFolderDeep(
+                                f.id,
+                                controller.deleteTasksForList,
+                              ),
+                              child: _ListItem(
+                                iconAsset: 'assets/icons/folder.png',
+                                label: f.name,
+                                onTap: () => Navigator.of(context).push(
+                                  FastRoute<void>(
+                                    builder: (_) => FolderView(
+                                      folder: f,
+                                      folderController: folderController,
+                                      taskController: controller,
+                                      activeListId: activeListId,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+
+                    // Reorderable lists
+                    if (rootLists.isNotEmpty)
+                      SliverReorderableList(
+                        itemCount: rootLists.length,
+                        onReorder: (oldIndex, newIndex) =>
+                            folderController.reorderLists(
+                                null, oldIndex, newIndex),
+                        proxyDecorator: _proxyDecorator,
+                        itemBuilder: (context, index) {
+                          final l = rootLists[index];
+                          final count =
+                              controller.uncompletedCountForList(l.id);
+                          return ReorderableDelayedDragStartListener(
+                            key: ValueKey('list_${l.id}'),
+                            index: index,
+                            child: Dismissible(
+                              key: ValueKey(l.id),
+                              direction: DismissDirection.endToStart,
+                              background: _DeleteBackground(),
+                              onDismissed: (_) async {
+                                await controller.deleteTasksForList(l.id);
+                                await folderController.deleteList(l.id);
+                              },
+                              child: _ListItem(
+                                iconAsset: 'assets/icons/list.png',
+                                label: l.name,
+                                count: count > 0 ? count : null,
+                                onTap: () => Navigator.of(context).push(
+                                  FastRoute<void>(
+                                    builder: (_) => ListTaskView(
+                                      list: l,
+                                      taskController: controller,
+                                      folderController: folderController,
+                                      activeListId: activeListId,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 80)),
                   ],
                 );
               },
@@ -145,6 +251,22 @@ class TasksView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _proxyDecorator(
+      Widget child, int index, Animation<double> animation) {
+    return Container(
+      decoration: const BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x18000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }
@@ -192,7 +314,8 @@ class _ListItem extends StatelessWidget {
               Text(
                 '$count',
                 style: TextStyle(
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  color:
+                      CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
           ],

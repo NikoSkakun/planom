@@ -11,7 +11,7 @@ import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 6;
+  static const _dbVersion = 7;
 
   Database? _db;
 
@@ -33,7 +33,9 @@ class DatabaseService {
             isCompleted INTEGER NOT NULL DEFAULT 0,
             dueDate INTEGER,
             doTime INTEGER,
-            listId TEXT
+            listId TEXT,
+            priority INTEGER NOT NULL DEFAULT 0,
+            sortOrder INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -41,7 +43,8 @@ class DatabaseService {
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             parentFolderId TEXT,
-            creationDate INTEGER NOT NULL
+            creationDate INTEGER NOT NULL,
+            sortOrder INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -49,7 +52,8 @@ class DatabaseService {
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             folderId TEXT,
-            creationDate INTEGER NOT NULL
+            creationDate INTEGER NOT NULL,
+            sortOrder INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -57,7 +61,8 @@ class DatabaseService {
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             parentFolderId TEXT,
-            creationDate INTEGER NOT NULL
+            creationDate INTEGER NOT NULL,
+            sortOrder INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -67,7 +72,8 @@ class DatabaseService {
             content TEXT NOT NULL,
             folderId TEXT,
             creationDate INTEGER NOT NULL,
-            modifiedDate INTEGER NOT NULL
+            modifiedDate INTEGER NOT NULL,
+            sortOrder INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -169,14 +175,29 @@ class DatabaseService {
             )
           ''');
         }
+        if (oldVersion < 7) {
+          await db.execute(
+              'ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE tasks ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE folders ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE app_lists ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE note_folders ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE notes ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0');
+        }
       },
     );
   }
 
-  // Tasks
+  // Tasks — sorted by manual order first, then newest first for unsorted items
   Future<List<Task>> getTasks() async {
     final db = await _database;
-    final rows = await db.query('tasks', orderBy: 'creationDate DESC');
+    final rows = await db.query('tasks',
+        orderBy: 'sortOrder ASC, creationDate DESC');
     return rows.map(Task.fromMap).toList();
   }
 
@@ -202,10 +223,21 @@ class DatabaseService {
     await db.delete('tasks', where: 'listId = ?', whereArgs: [listId]);
   }
 
+  Future<void> updateTaskSortOrders(List<Task> tasks) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final task in tasks) {
+      batch.update('tasks', {'sortOrder': task.sortOrder},
+          where: 'id = ?', whereArgs: [task.id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
   // Task folders
   Future<List<AppFolder>> getFolders() async {
     final db = await _database;
-    final rows = await db.query('folders', orderBy: 'creationDate ASC');
+    final rows = await db.query('folders',
+        orderBy: 'sortOrder ASC, creationDate ASC');
     return rows.map(AppFolder.fromMap).toList();
   }
 
@@ -220,10 +252,21 @@ class DatabaseService {
     await db.delete('folders', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> updateFolderSortOrders(List<AppFolder> folders) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final f in folders) {
+      batch.update('folders', {'sortOrder': f.sortOrder},
+          where: 'id = ?', whereArgs: [f.id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
   // Lists
   Future<List<AppList>> getLists() async {
     final db = await _database;
-    final rows = await db.query('app_lists', orderBy: 'creationDate ASC');
+    final rows = await db.query('app_lists',
+        orderBy: 'sortOrder ASC, creationDate ASC');
     return rows.map(AppList.fromMap).toList();
   }
 
@@ -238,10 +281,21 @@ class DatabaseService {
     await db.delete('app_lists', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> updateListSortOrders(List<AppList> lists) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final l in lists) {
+      batch.update('app_lists', {'sortOrder': l.sortOrder},
+          where: 'id = ?', whereArgs: [l.id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
   // Note folders
   Future<List<NoteFolder>> getNoteFolders() async {
     final db = await _database;
-    final rows = await db.query('note_folders', orderBy: 'creationDate ASC');
+    final rows = await db.query('note_folders',
+        orderBy: 'sortOrder ASC, creationDate ASC');
     return rows.map(NoteFolder.fromMap).toList();
   }
 
@@ -256,10 +310,21 @@ class DatabaseService {
     await db.delete('note_folders', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> updateNoteFolderSortOrders(List<NoteFolder> folders) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final f in folders) {
+      batch.update('note_folders', {'sortOrder': f.sortOrder},
+          where: 'id = ?', whereArgs: [f.id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
   // Notes
   Future<List<Note>> getNotes() async {
     final db = await _database;
-    final rows = await db.query('notes', orderBy: 'modifiedDate DESC');
+    final rows = await db.query('notes',
+        orderBy: 'sortOrder ASC, modifiedDate DESC');
     return rows.map(Note.fromMap).toList();
   }
 
@@ -285,6 +350,16 @@ class DatabaseService {
     await db.delete('notes', where: 'folderId = ?', whereArgs: [folderId]);
   }
 
+  Future<void> updateNoteSortOrders(List<Note> notes) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final n in notes) {
+      batch.update('notes', {'sortOrder': n.sortOrder},
+          where: 'id = ?', whereArgs: [n.id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
   // Routines
   Future<List<Routine>> getRoutines() async {
     final db = await _database;
@@ -307,7 +382,8 @@ class DatabaseService {
   Future<void> deleteRoutine(String id) async {
     final db = await _database;
     await db.delete('routines', where: 'id = ?', whereArgs: [id]);
-    await db.delete('routine_entries', where: 'routineId = ?', whereArgs: [id]);
+    await db.delete('routine_entries',
+        where: 'routineId = ?', whereArgs: [id]);
   }
 
   // Routine entries

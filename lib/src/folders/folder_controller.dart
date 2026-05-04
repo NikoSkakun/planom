@@ -14,11 +14,20 @@ class FolderController with ChangeNotifier {
   List<AppFolder> get folders => List.unmodifiable(_folders);
   List<AppList> get lists => List.unmodifiable(_lists);
 
-  List<AppFolder> foldersIn(String? parentId) =>
-      _folders.where((f) => f.parentFolderId == parentId).toList();
+  List<AppFolder> foldersIn(String? parentId) {
+    final result = _folders
+        .where((f) => f.parentFolderId == parentId)
+        .toList();
+    _sortByDefault(result);
+    return result;
+  }
 
-  List<AppList> listsIn(String? folderId) =>
-      _lists.where((l) => l.folderId == folderId).toList();
+  List<AppList> listsIn(String? folderId) {
+    final result =
+        _lists.where((l) => l.folderId == folderId).toList();
+    _sortListsByDefault(result);
+    return result;
+  }
 
   AppList? listById(String id) {
     try {
@@ -58,6 +67,52 @@ class FolderController with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Reorders folders within [parentFolderId] scope using drag indices from
+  /// [SliverReorderableList].
+  Future<void> reorderFolders(
+      String? parentFolderId, int oldIndex, int newIndex) async {
+    final scope = _folders
+        .where((f) => f.parentFolderId == parentFolderId)
+        .toList();
+    _sortByDefault(scope);
+
+    if (newIndex > oldIndex) newIndex--;
+    final item = scope.removeAt(oldIndex);
+    scope.insert(newIndex, item);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _folders.indexWhere((f) => f.id == updated.id);
+      if (idx != -1) _folders[idx] = updated;
+    }
+    await _db.updateFolderSortOrders(scope);
+    notifyListeners();
+  }
+
+  /// Reorders lists within [folderId] scope.
+  Future<void> reorderLists(
+      String? folderId, int oldIndex, int newIndex) async {
+    final scope =
+        _lists.where((l) => l.folderId == folderId).toList();
+    _sortListsByDefault(scope);
+
+    if (newIndex > oldIndex) newIndex--;
+    final item = scope.removeAt(oldIndex);
+    scope.insert(newIndex, item);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _lists.indexWhere((l) => l.id == updated.id);
+      if (idx != -1) _lists[idx] = updated;
+    }
+    await _db.updateListSortOrders(scope);
+    notifyListeners();
+  }
+
   /// Recursively deletes a folder, all nested subfolders, all lists inside
   /// them, and calls [onDeleteList] for each deleted list so the caller can
   /// clean up associated tasks.
@@ -83,5 +138,19 @@ class FolderController with ChangeNotifier {
     await _db.deleteFolder(id);
     _folders = _folders.where((f) => f.id != id).toList();
     _lists = _lists.where((l) => l.folderId != id).toList();
+  }
+
+  static void _sortByDefault(List<AppFolder> list) {
+    list.sort((a, b) {
+      if (a.sortOrder != b.sortOrder) return a.sortOrder.compareTo(b.sortOrder);
+      return a.creationDate.compareTo(b.creationDate);
+    });
+  }
+
+  static void _sortListsByDefault(List<AppList> list) {
+    list.sort((a, b) {
+      if (a.sortOrder != b.sortOrder) return a.sortOrder.compareTo(b.sortOrder);
+      return a.creationDate.compareTo(b.creationDate);
+    });
   }
 }

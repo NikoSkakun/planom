@@ -52,6 +52,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
   DateTime? _dueDate;
   int? _doTime;
   late String? _listId;
+  int _priority = 0;
   bool _titleEmpty = true;
 
   @override
@@ -81,6 +82,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
       dueDate: _dueDate,
       doTime: _doTime,
       listId: _listId,
+      priority: _priority,
     ));
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
@@ -105,12 +107,6 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
       _listId,
     );
     if (!mounted) return;
-    // result == null means Inbox was chosen; sheet dismissed without
-    // selection also returns null — both cases mean keep/set to Inbox.
-    // We only update if the sheet returned (not just barrier-dismissed).
-    // Since Inbox returns null and dismiss also returns null we treat
-    // any non-Future-null return (the Future always completes) as the
-    // user's selection. We always accept the result.
     setState(() => _listId = result);
   }
 
@@ -122,6 +118,18 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
   String get _listIcon =>
       _listId == null ? 'assets/icons/inbox.png' : 'assets/icons/list.png';
 
+  // Cycles None→Low→Med→High→None on tap
+  void _cyclePriority() =>
+      setState(() => _priority = (_priority + 1) % 4);
+
+  static const _priorityLabels = ['', 'Low', 'Med', 'High'];
+  static const _priorityColors = [
+    CupertinoColors.systemGrey,
+    CupertinoColors.systemBlue,
+    CupertinoColors.systemOrange,
+    CupertinoColors.systemRed,
+  ];
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -130,9 +138,11 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     return Container(
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(12)),
       ),
-      padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset + 16),
+      padding:
+          EdgeInsets.fromLTRB(16, 12, 16, bottomInset + 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -154,7 +164,8 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
             autofocus: true,
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.sentences,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+                fontSize: 17, fontWeight: FontWeight.w500),
             decoration: const BoxDecoration(),
           ),
           Container(
@@ -174,6 +185,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
             children: [
               Row(
                 children: [
+                  // List picker
                   GestureDetector(
                     onTap: _pickList,
                     child: Row(
@@ -196,7 +208,8 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
+                  // Date picker
                   GestureDetector(
                     onTap: _pickDate,
                     child: Row(
@@ -225,13 +238,42 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 14),
+                  // Priority toggle
+                  GestureDetector(
+                    onTap: _cyclePriority,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.flag_fill,
+                          size: 15,
+                          color: _priority == 0
+                              ? CupertinoColors.secondaryLabel
+                                  .resolveFrom(context)
+                              : _priorityColors[_priority],
+                        ),
+                        if (_priority > 0) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            _priorityLabels[_priority],
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _priorityColors[_priority],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
               CupertinoButton(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 10),
                 color: _titleEmpty
-                    ? CupertinoColors.tertiarySystemFill.resolveFrom(context)
+                    ? CupertinoColors.tertiarySystemFill
+                        .resolveFrom(context)
                     : const Color(0xFFFF4D00),
                 borderRadius: BorderRadius.circular(22),
                 onPressed: _titleEmpty ? null : _submit,
@@ -239,7 +281,8 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                   'Add',
                   style: TextStyle(
                     color: _titleEmpty
-                        ? CupertinoColors.tertiaryLabel.resolveFrom(context)
+                        ? CupertinoColors.tertiaryLabel
+                            .resolveFrom(context)
                         : CupertinoColors.white,
                     fontWeight: FontWeight.w600,
                   ),
