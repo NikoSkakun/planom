@@ -179,7 +179,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
 
     return CupertinoPageScaffold(
       backgroundColor: bg,
-      navigationBar: CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(border: null,
         backgroundColor: bg,
         middle: Text(widget.existing == null ? 'New Routine' : 'Edit Routine'),
         leading: CupertinoButton(

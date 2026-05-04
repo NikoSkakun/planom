@@ -54,7 +54,7 @@ class _TodayViewState extends State<TodayView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: const CupertinoNavigationBar(border: null,
         middle: Text('Today'),
       ),
       child: SafeArea(

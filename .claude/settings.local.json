@@ -6,7 +6,8 @@
       "Read(//usr/local/**)",
       "Bash(~/dev/flutter/bin/flutter analyze *)",
       "Bash(~/dev/flutter/bin/flutter pub *)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(xargs sed *)"
     ]
   }
 }

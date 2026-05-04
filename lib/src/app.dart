@@ -48,7 +48,10 @@ class MyApp extends StatelessWidget {
           ],
           supportedLocales: const [Locale('en', '')],
           onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
-          theme: CupertinoThemeData(brightness: brightness),
+          theme: CupertinoThemeData(
+            brightness: brightness,
+            barBackgroundColor: CupertinoColors.systemBackground,
+          ),
           onGenerateRoute: (settings) => FastRoute<void>(
             settings: settings,
             builder: (context) => settings.name == SettingsView.routeName

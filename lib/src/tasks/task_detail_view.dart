@@ -101,7 +101,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(border: null,
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: _save,

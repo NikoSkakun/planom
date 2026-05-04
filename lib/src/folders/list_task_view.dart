@@ -43,7 +43,7 @@ class _ListTaskViewState extends State<ListTaskView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(border: null,
         middle: Text(widget.list.name),
       ),
       child: SafeArea(

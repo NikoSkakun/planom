@@ -86,7 +86,7 @@ class TasksView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(border: null,
         middle: const Text('Tasks'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,

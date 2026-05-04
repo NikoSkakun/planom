@@ -90,7 +90,7 @@ class _CalendarViewState extends State<CalendarView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(border: null,
         middle: Text('$_visibleYear'),
       ),
       child: SafeArea(
@@ -291,10 +291,10 @@ class _DayCell extends StatelessWidget {
       );
     }
 
-    final tasks = controller
-        .tasksForDate(date!)
-        .where((t) => !t.isCompleted)
-        .toList();
+    final allTasks = controller.tasksForDate(date!);
+    final uncompleted = allTasks.where((t) => !t.isCompleted).toList();
+    final completed = allTasks.where((t) => t.isCompleted).toList();
+    final tasks = [...uncompleted, ...completed];
 
     return Container(
       constraints: const BoxConstraints(minHeight: 88),
@@ -337,7 +337,7 @@ class _DayCell extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          ...tasks.take(3).map((t) => _TaskChip(task: t)),
+          ...tasks.take(3).map((t) => _TaskChip(task: t, completed: t.isCompleted)),
           if (tasks.length > 3)
             Padding(
               padding: const EdgeInsets.only(left: 2),
@@ -358,9 +358,10 @@ class _DayCell extends StatelessWidget {
 // ─── Task chip ────────────────────────────────────────────────────────────────
 
 class _TaskChip extends StatelessWidget {
-  const _TaskChip({required this.task});
+  const _TaskChip({required this.task, this.completed = false});
 
   final Task task;
+  final bool completed;
 
   @override
   Widget build(BuildContext context) {
@@ -368,16 +369,20 @@ class _TaskChip extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF4D00),
+        color: completed
+            ? CupertinoColors.systemGrey5.resolveFrom(context)
+            : const Color(0xFFFF4D00),
         borderRadius: BorderRadius.circular(3),
       ),
       child: Text(
         task.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 9,
-          color: CupertinoColors.white,
+          color: completed
+              ? CupertinoColors.secondaryLabel.resolveFrom(context)
+              : CupertinoColors.white,
         ),
       ),
     );

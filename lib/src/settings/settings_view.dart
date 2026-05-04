@@ -13,7 +13,7 @@ class SettingsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: const CupertinoNavigationBar(border: null,
         middle: Text('Settings'),
       ),
       child: SafeArea(

@@ -37,7 +37,7 @@ class NoteFolderView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(border: null,
         middle: Text(folder.name),
       ),
       child: SafeArea(

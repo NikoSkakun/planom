@@ -140,39 +140,69 @@ class _HomeShellState extends State<HomeShell> {
           tabBar: CupertinoTabBar(
             activeColor: const Color(0xFF000000),
             inactiveColor: const Color(0xFF636366),
+            backgroundColor: const CupertinoDynamicColor.withBrightness(
+              color: Color(0xF0F9F9F9),
+              darkColor: Color(0xF01D1D1D),
+            ),
             onTap: _onTabTapped,
             items: const [
               BottomNavigationBarItem(
-                icon: ImageIcon(AssetImage('assets/icons/tab_bar/tasks.png')),
-                activeIcon: ImageIcon(
-                  AssetImage('assets/icons/tab_bar/tasks.png'),
-                  color: Color(0xFFFF4D00),
+                icon: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: ImageIcon(
+                      AssetImage('assets/icons/tab_bar/tasks.png')),
+                ),
+                activeIcon: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: ImageIcon(
+                    AssetImage('assets/icons/tab_bar/tasks.png'),
+                    color: Color(0xFFFF4D00),
+                  ),
                 ),
                 label: 'Tasks',
               ),
               BottomNavigationBarItem(
-                icon: ImageIcon(AssetImage('assets/icons/tab_bar/notes.png')),
-                activeIcon: ImageIcon(
-                  AssetImage('assets/icons/tab_bar/notes.png'),
-                  color: Color(0xFFFF4D00),
+                icon: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: ImageIcon(
+                      AssetImage('assets/icons/tab_bar/notes.png')),
+                ),
+                activeIcon: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: ImageIcon(
+                    AssetImage('assets/icons/tab_bar/notes.png'),
+                    color: Color(0xFFFF4D00),
+                  ),
                 ),
                 label: 'Notes',
               ),
               BottomNavigationBarItem(
-                icon: ImageIcon(
-                    AssetImage('assets/icons/tab_bar/calendar.png')),
-                activeIcon: ImageIcon(
-                  AssetImage('assets/icons/tab_bar/calendar.png'),
-                  color: Color(0xFFFF4D00),
+                icon: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: ImageIcon(
+                      AssetImage('assets/icons/tab_bar/calendar.png')),
+                ),
+                activeIcon: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: ImageIcon(
+                    AssetImage('assets/icons/tab_bar/calendar.png'),
+                    color: Color(0xFFFF4D00),
+                  ),
                 ),
                 label: 'Calendar',
               ),
               BottomNavigationBarItem(
-                icon: ImageIcon(
-                    AssetImage('assets/icons/tab_bar/routines.png')),
-                activeIcon: ImageIcon(
-                  AssetImage('assets/icons/tab_bar/routines.png'),
-                  color: Color(0xFFFF4D00),
+                icon: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: ImageIcon(
+                      AssetImage('assets/icons/tab_bar/routines.png')),
+                ),
+                activeIcon: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: ImageIcon(
+                    AssetImage('assets/icons/tab_bar/routines.png'),
+                    color: Color(0xFFFF4D00),
+                  ),
                 ),
                 label: 'Routines',
               ),
