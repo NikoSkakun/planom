@@ -81,11 +81,6 @@ class TaskRow extends StatelessWidget {
                       color: task.isCompleted
                           ? CupertinoColors.secondaryLabel.resolveFrom(context)
                           : null,
-                      decoration: task.isCompleted
-                          ? TextDecoration.lineThrough
-                          : null,
-                      decorationColor: CupertinoColors.secondaryLabel
-                          .resolveFrom(context),
                     ),
                   ),
                   if (task.note != null && task.note!.isNotEmpty)

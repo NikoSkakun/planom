@@ -121,6 +121,7 @@ class _CreateSheetState extends State<_CreateSheet> {
             controller: _nameCtrl,
             placeholder: _type == _CreateType.folder ? 'Folder name' : 'List name',
             autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _submit(),
             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),

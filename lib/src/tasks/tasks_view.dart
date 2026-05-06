@@ -8,6 +8,7 @@ import '../utils/fast_route.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
 import 'today_view.dart';
+import 'upcoming_view.dart';
 
 class TasksView extends StatelessWidget {
   const TasksView({
@@ -103,6 +104,7 @@ class TasksView extends StatelessWidget {
                 final rootFolders = folderController.foldersIn(null);
                 final rootLists = folderController.listsIn(null);
                 final todayCount = controller.todayUncompletedCount;
+                final upcomingCount = controller.upcomingUncompletedCount;
 
                 return CustomScrollView(
                   slivers: [
@@ -133,6 +135,19 @@ class TasksView extends StatelessWidget {
                                   controller: controller,
                                   folderController: folderController,
                                   activeDueDate: activeDueDate,
+                                ),
+                              ),
+                            ),
+                          ),
+                          _ListItem(
+                            iconAsset: 'assets/icons/upcoming.png',
+                            label: 'Upcoming',
+                            count: upcomingCount > 0 ? upcomingCount : null,
+                            onTap: () => Navigator.of(context).push(
+                              FastRoute<void>(
+                                builder: (_) => UpcomingView(
+                                  controller: controller,
+                                  folderController: folderController,
                                 ),
                               ),
                             ),
