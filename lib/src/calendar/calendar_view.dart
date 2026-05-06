@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../folders/folder_controller.dart';
 import '../models/task.dart';
 import '../tasks/task_controller.dart';
 
@@ -7,11 +8,12 @@ class CalendarView extends StatefulWidget {
   const CalendarView({
     super.key,
     required this.controller,
+    required this.folderController,
     required this.resetSignal,
   });
 
   final TaskController controller;
-  /// Incremented by HomeShell when the Calendar tab is re-tapped.
+  final FolderController folderController;
   final ValueNotifier<int> resetSignal;
 
   @override
@@ -21,7 +23,6 @@ class CalendarView extends StatefulWidget {
 class _CalendarViewState extends State<CalendarView> {
   static const _pastMonths = 600;
   static const _futureMonths = 600;
-  // 41px label + 5 avg weeks × 88px; used for approximate year tracking only.
   static const _avgMonthPx = 481.0;
 
   late final DateTime _now;
@@ -36,7 +37,7 @@ class _CalendarViewState extends State<CalendarView> {
     _now = DateTime.now();
     _currentMonth = DateTime(_now.year, _now.month, 1);
     _visibleYear = _now.year;
-    _scrollCtrl = ScrollController(); // offset 0 = center = current month
+    _scrollCtrl = ScrollController();
     _scrollCtrl.addListener(_onScroll);
     widget.resetSignal.addListener(_scrollToCurrentMonth);
   }
@@ -65,9 +66,6 @@ class _CalendarViewState extends State<CalendarView> {
     );
   }
 
-  // Past months: index 0 = last month, index 1 = 2 months ago, …
-  // The SliverList before center is laid out bottom-to-top, so index 0 sits
-  // just above the current month and higher indices go further into the past.
   DateTime _monthBefore(int n) {
     final e = _now.year * 12 + _now.month - 1 - n;
     return DateTime(e ~/ 12, e % 12 + 1, 1);
@@ -79,18 +77,21 @@ class _CalendarViewState extends State<CalendarView> {
   }
 
   Widget _buildMonth(DateTime month) => ListenableBuilder(
-        listenable: widget.controller,
+        listenable:
+            Listenable.merge([widget.controller, widget.folderController]),
         builder: (context, _) => _MonthSection(
           month: month,
           today: _now,
           controller: widget.controller,
+          folderController: widget.folderController,
         ),
       );
 
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(border: null,
+      navigationBar: CupertinoNavigationBar(
+        border: null,
         middle: Text('$_visibleYear'),
       ),
       child: SafeArea(
@@ -99,24 +100,19 @@ class _CalendarViewState extends State<CalendarView> {
             _WeekdayHeader(),
             Expanded(
               child: CustomScrollView(
-                // The center sliver is the viewport origin: offset 0 always
-                // shows the current month without any initialScrollOffset math.
                 center: _centerKey,
                 controller: _scrollCtrl,
                 slivers: [
-                  // Past months built lazily only when user scrolls up.
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (_, i) => _buildMonth(_monthBefore(i + 1)),
                       childCount: _pastMonths,
                     ),
                   ),
-                  // Current month — viewport anchor.
                   SliverToBoxAdapter(
                     key: _centerKey,
                     child: _buildMonth(_currentMonth),
                   ),
-                  // Future months built lazily as user scrolls down.
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (_, i) => _buildMonth(_monthAfter(i + 1)),
@@ -172,11 +168,13 @@ class _MonthSection extends StatelessWidget {
     required this.month,
     required this.today,
     required this.controller,
+    required this.folderController,
   });
 
   final DateTime month;
   final DateTime today;
   final TaskController controller;
+  final FolderController folderController;
 
   static const _monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -185,7 +183,6 @@ class _MonthSection extends StatelessWidget {
 
   List<DateTime?> _buildGrid() {
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    // Monday-first: Mon=1→0, …, Sun=7→6
     final startOffset = DateTime(month.year, month.month, 1).weekday - 1;
     final cells = <DateTime?>[];
     for (var i = 0; i < startOffset; i++) {
@@ -210,7 +207,8 @@ class _MonthSection extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Text(
             '${_monthNames[month.month - 1]} ${month.year}',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style:
+                const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ),
         for (var w = 0; w < grid.length; w += 7)
@@ -218,6 +216,7 @@ class _MonthSection extends StatelessWidget {
             days: grid.sublist(w, w + 7),
             today: today,
             controller: controller,
+            folderController: folderController,
           ),
       ],
     );
@@ -231,11 +230,13 @@ class _WeekRow extends StatelessWidget {
     required this.days,
     required this.today,
     required this.controller,
+    required this.folderController,
   });
 
   final List<DateTime?> days;
   final DateTime today;
   final TaskController controller;
+  final FolderController folderController;
 
   @override
   Widget build(BuildContext context) {
@@ -248,6 +249,7 @@ class _WeekRow extends StatelessWidget {
                     date: day,
                     today: today,
                     controller: controller,
+                    folderController: folderController,
                   ),
                 ))
             .toList(),
@@ -263,11 +265,13 @@ class _DayCell extends StatelessWidget {
     required this.date,
     required this.today,
     required this.controller,
+    required this.folderController,
   });
 
   final DateTime? date;
   final DateTime today;
   final TaskController controller;
+  final FolderController folderController;
 
   bool get _isToday =>
       date != null &&
@@ -337,7 +341,16 @@ class _DayCell extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          ...tasks.take(3).map((t) => _TaskChip(task: t, completed: t.isCompleted)),
+          ...tasks.take(3).map((t) {
+            final listColor = t.listId != null
+                ? folderController.listById(t.listId!)?.color
+                : null;
+            return _TaskChip(
+              task: t,
+              completed: t.isCompleted,
+              listColor: listColor != null ? Color(listColor) : null,
+            );
+          }),
           if (tasks.length > 3)
             Padding(
               padding: const EdgeInsets.only(left: 2),
@@ -345,7 +358,8 @@ class _DayCell extends StatelessWidget {
                 '+${tasks.length - 3}',
                 style: TextStyle(
                   fontSize: 9,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  color:
+                      CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
             ),
@@ -358,20 +372,27 @@ class _DayCell extends StatelessWidget {
 // ─── Task chip ────────────────────────────────────────────────────────────────
 
 class _TaskChip extends StatelessWidget {
-  const _TaskChip({required this.task, this.completed = false});
+  const _TaskChip({
+    required this.task,
+    this.completed = false,
+    this.listColor,
+  });
 
   final Task task;
   final bool completed;
+  final Color? listColor;
 
   @override
   Widget build(BuildContext context) {
+    final chipColor = completed
+        ? CupertinoColors.systemGrey5.resolveFrom(context)
+        : (listColor ?? const Color(0xFFFF4D00));
+
     return Container(
       margin: const EdgeInsets.only(bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
       decoration: BoxDecoration(
-        color: completed
-            ? CupertinoColors.systemGrey5.resolveFrom(context)
-            : const Color(0xFFFF4D00),
+        color: chipColor,
         borderRadius: BorderRadius.circular(3),
       ),
       child: Text(

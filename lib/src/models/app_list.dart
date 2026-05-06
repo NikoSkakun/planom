@@ -6,6 +6,7 @@ class AppList {
   final String? folderId;
   final DateTime creationDate;
   final int sortOrder;
+  final int? color; // ARGB; null = no color
 
   AppList({
     String? id,
@@ -13,6 +14,7 @@ class AppList {
     this.folderId,
     DateTime? creationDate,
     this.sortOrder = 0,
+    this.color,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate ?? DateTime.now();
 
@@ -21,6 +23,8 @@ class AppList {
     String? folderId,
     bool clearFolder = false,
     int? sortOrder,
+    int? color,
+    bool clearColor = false,
   }) =>
       AppList(
         id: id,
@@ -28,6 +32,7 @@ class AppList {
         folderId: clearFolder ? null : (folderId ?? this.folderId),
         creationDate: creationDate,
         sortOrder: sortOrder ?? this.sortOrder,
+        color: clearColor ? null : (color ?? this.color),
       );
 
   Map<String, dynamic> toMap() => {
@@ -36,6 +41,7 @@ class AppList {
         'folderId': folderId,
         'creationDate': creationDate.millisecondsSinceEpoch,
         'sortOrder': sortOrder,
+        'color': color,
       };
 
   factory AppList.fromMap(Map<String, dynamic> map) => AppList(
@@ -45,5 +51,6 @@ class AppList {
         creationDate:
             DateTime.fromMillisecondsSinceEpoch(map['creationDate'] as int),
         sortOrder: map['sortOrder'] as int? ?? 0,
+        color: map['color'] as int?,
       );
 }

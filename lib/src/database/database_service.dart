@@ -11,7 +11,7 @@ import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 7;
+  static const _dbVersion = 8;
 
   Database? _db;
 
@@ -53,7 +53,8 @@ class DatabaseService {
             name TEXT NOT NULL,
             folderId TEXT,
             creationDate INTEGER NOT NULL,
-            sortOrder INTEGER NOT NULL DEFAULT 0
+            sortOrder INTEGER NOT NULL DEFAULT 0,
+            color INTEGER
           )
         ''');
         await db.execute('''
@@ -189,6 +190,10 @@ class DatabaseService {
           await db.execute(
               'ALTER TABLE notes ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0');
         }
+        if (oldVersion < 8) {
+          await db.execute(
+              'ALTER TABLE app_lists ADD COLUMN color INTEGER');
+        }
       },
     );
   }
@@ -274,6 +279,12 @@ class DatabaseService {
     final db = await _database;
     await db.insert('app_lists', list.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateList(AppList list) async {
+    final db = await _database;
+    await db.update('app_lists', list.toMap(),
+        where: 'id = ?', whereArgs: [list.id]);
   }
 
   Future<void> deleteList(String id) async {

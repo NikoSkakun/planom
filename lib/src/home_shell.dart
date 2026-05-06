@@ -226,6 +226,7 @@ class _HomeShellState extends State<HomeShell> {
                 1 => NotesView(controller: widget.noteController),
                 2 => CalendarView(
                     controller: widget.taskController,
+                    folderController: widget.folderController,
                     resetSignal: _calendarResetSignal,
                   ),
                 _ => RoutinesView(controller: widget.routineController),

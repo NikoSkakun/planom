@@ -54,12 +54,14 @@ class _TodayViewState extends State<TodayView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(border: null,
+      navigationBar: const CupertinoNavigationBar(
+        border: null,
         middle: Text('Today'),
       ),
       child: SafeArea(
         child: ListenableBuilder(
-          listenable: widget.controller,
+          listenable: Listenable.merge(
+              [widget.controller, widget.folderController]),
           builder: (context, _) {
             final tasks = widget.controller.todayTasks;
 
@@ -76,16 +78,15 @@ class _TodayViewState extends State<TodayView> {
               slivers: [
                 SliverReorderableList(
                   itemCount: tasks.length,
-                  // Today tasks span multiple lists so we don't persist reorder
                   onReorder: (_, __) {},
                   proxyDecorator: taskProxyDecorator,
                   itemBuilder: (context, i) {
                     final task = tasks[i];
-                    final listName = task.listId != null
-                        ? widget.folderController
-                            .listById(task.listId!)
-                            ?.name
+                    final list = task.listId != null
+                        ? widget.folderController.listById(task.listId!)
                         : null;
+                    final listColor =
+                        list?.color != null ? Color(list!.color!) : null;
                     return ReorderableDelayedDragStartListener(
                       key: ValueKey('today_${task.id}'),
                       index: i,
@@ -99,8 +100,8 @@ class _TodayViewState extends State<TodayView> {
                         child: TaskRow(
                           task: task,
                           isOverdue: _isOverdue(task),
-                          showList: true,
-                          listName: listName,
+                          showList: task.listId != null,
+                          listColor: listColor,
                           onToggle: () =>
                               widget.controller.toggleCompleted(task.id),
                           onTap: () => Navigator.of(context).push(

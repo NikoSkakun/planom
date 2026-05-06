@@ -19,12 +19,14 @@ class UpcomingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(border: null,
+      navigationBar: const CupertinoNavigationBar(
+        border: null,
         middle: Text('Upcoming'),
       ),
       child: SafeArea(
         child: ListenableBuilder(
-          listenable: controller,
+          listenable:
+              Listenable.merge([controller, folderController]),
           builder: (context, _) {
             final tasks = controller.upcomingTasks;
 
@@ -44,9 +46,11 @@ class UpcomingView extends StatelessWidget {
                   proxyDecorator: taskProxyDecorator,
                   itemBuilder: (context, i) {
                     final task = tasks[i];
-                    final listName = task.listId != null
-                        ? folderController.listById(task.listId!)?.name
+                    final list = task.listId != null
+                        ? folderController.listById(task.listId!)
                         : null;
+                    final listColor =
+                        list?.color != null ? Color(list!.color!) : null;
                     return ReorderableDelayedDragStartListener(
                       key: ValueKey('upcoming_${task.id}'),
                       index: i,
@@ -58,8 +62,8 @@ class UpcomingView extends StatelessWidget {
                         onDismissed: (_) => controller.deleteTask(task.id),
                         child: TaskRow(
                           task: task,
-                          showList: true,
-                          listName: listName,
+                          showList: task.listId != null,
+                          listColor: listColor,
                           onToggle: () => controller.toggleCompleted(task.id),
                           onTap: () => Navigator.of(context).push(
                             FastRoute<void>(

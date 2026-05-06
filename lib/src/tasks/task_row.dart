@@ -41,7 +41,7 @@ class TaskRow extends StatelessWidget {
     required this.onToggle,
     required this.onTap,
     this.showList = false,
-    this.listName,
+    this.listColor,
     this.isOverdue = false,
   });
 
@@ -49,7 +49,7 @@ class TaskRow extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onTap;
   final bool showList;
-  final String? listName;
+  final Color? listColor;
   final bool isOverdue;
 
   @override
@@ -126,13 +126,16 @@ class TaskRow extends StatelessWidget {
                         ],
                       ),
                     ),
-                  if (showList && listName != null)
-                    Text(
-                      listName!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: CupertinoColors.secondaryLabel
-                            .resolveFrom(context),
+                  if (showList && listColor != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: listColor,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
                 ],

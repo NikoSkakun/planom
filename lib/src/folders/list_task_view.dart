@@ -6,6 +6,7 @@ import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
 import '../utils/fast_route.dart';
 import 'folder_controller.dart';
+import 'list_color_picker.dart';
 
 class ListTaskView extends StatefulWidget {
   const ListTaskView({
@@ -26,9 +27,12 @@ class ListTaskView extends StatefulWidget {
 }
 
 class _ListTaskViewState extends State<ListTaskView> {
+  late AppList _currentList;
+
   @override
   void initState() {
     super.initState();
+    _currentList = widget.list;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) widget.activeListId.value = widget.list.id;
     });
@@ -40,11 +44,46 @@ class _ListTaskViewState extends State<ListTaskView> {
     super.dispose();
   }
 
+  void _showOptionsMenu(BuildContext context) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (_) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.of(context, rootNavigator: true).pop();
+              showListColorPickerSheet(context, _currentList.color, (color) {
+                final updated = _currentList.copyWith(
+                  color: color,
+                  clearColor: color == null,
+                );
+                widget.folderController.updateList(updated);
+                if (mounted) setState(() => _currentList = updated);
+              });
+            },
+            child: const Text('Change Color'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(border: null,
-        middle: Text(widget.list.name),
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        middle: Text(_currentList.name),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => _showOptionsMenu(context),
+          child: const Icon(CupertinoIcons.ellipsis_circle, size: 22),
+        ),
       ),
       child: SafeArea(
         child: ListenableBuilder(

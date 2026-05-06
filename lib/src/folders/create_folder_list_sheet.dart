@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' show showModalBottomSheet;
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import 'folder_controller.dart';
+import 'list_color_picker.dart';
 
 void showCreateFolderListSheet(
   BuildContext context,
@@ -40,6 +41,7 @@ class _CreateSheet extends StatefulWidget {
 class _CreateSheetState extends State<_CreateSheet> {
   _CreateType _type = _CreateType.list;
   final _nameCtrl = TextEditingController();
+  int? _selectedColor;
 
   @override
   void dispose() {
@@ -59,6 +61,7 @@ class _CreateSheetState extends State<_CreateSheet> {
       await widget.controller.addList(AppList(
         name: name,
         folderId: widget.parentFolderId,
+        color: _selectedColor,
       ));
     }
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -90,7 +93,6 @@ class _CreateSheetState extends State<_CreateSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          // Type selector
           CupertinoSlidingSegmentedControl<_CreateType>(
             groupValue: _type,
             children: {
@@ -119,7 +121,8 @@ class _CreateSheetState extends State<_CreateSheet> {
           const SizedBox(height: 16),
           CupertinoTextField(
             controller: _nameCtrl,
-            placeholder: _type == _CreateType.folder ? 'Folder name' : 'List name',
+            placeholder:
+                _type == _CreateType.folder ? 'Folder name' : 'List name',
             autofocus: true,
             textCapitalization: TextCapitalization.sentences,
             textInputAction: TextInputAction.done,
@@ -129,8 +132,16 @@ class _CreateSheetState extends State<_CreateSheet> {
               color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
               borderRadius: BorderRadius.circular(10),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
+          if (_type == _CreateType.list) ...[
+            const SizedBox(height: 16),
+            ListColorSwatches(
+              selected: _selectedColor,
+              onSelect: (c) => setState(() => _selectedColor = c),
+            ),
+          ],
           const SizedBox(height: 16),
           CupertinoButton(
             color: const Color(0xFFFF4D00),
