@@ -47,27 +47,24 @@ class _TaskDetailViewState extends State<TaskDetailView> {
 
   @override
   void dispose() {
+    final title = _title.text.trim();
+    if (title.isNotEmpty) {
+      widget.controller.updateTask(widget.task.copyWith(
+        title: title,
+        note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+        dueDate: _dueDate,
+        clearDueDate: _dueDate == null,
+        doTime: _doTime,
+        clearDoTime: _doTime == null,
+        isCompleted: _isCompleted,
+        listId: _listId,
+        clearListId: _listId == null,
+        priority: _priority,
+      ));
+    }
     _title.dispose();
     _note.dispose();
     super.dispose();
-  }
-
-  Future<void> _save() async {
-    final title = _title.text.trim();
-    if (title.isEmpty) return;
-    await widget.controller.updateTask(widget.task.copyWith(
-      title: title,
-      note: _note.text.trim().isEmpty ? null : _note.text.trim(),
-      dueDate: _dueDate,
-      clearDueDate: _dueDate == null,
-      doTime: _doTime,
-      clearDoTime: _doTime == null,
-      isCompleted: _isCompleted,
-      listId: _listId,
-      clearListId: _listId == null,
-      priority: _priority,
-    ));
-    if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _pickDate() async {
@@ -101,16 +98,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(border: null,
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: _save,
-          child: const Text(
-            'Done',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
-      ),
+      navigationBar: const CupertinoNavigationBar(border: null),
       child: SafeArea(
         child: ListView(
           padding:
@@ -150,6 +138,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
                 style: const TextStyle(fontSize: 15),
                 decoration: const BoxDecoration(),
                 maxLines: null,
+                textCapitalization: TextCapitalization.sentences,
               ),
             ),
             const SizedBox(height: 24),

@@ -77,6 +77,7 @@ class NotesView extends StatelessWidget {
                                   controller.deleteFolderDeep(f.id),
                               child: NoteFolderRow(
                                 folder: f,
+                                noteCount: controller.notesIn(f.id).length,
                                 onTap: () =>
                                     Navigator.of(context).push(
                                   FastRoute<void>(
@@ -137,7 +138,7 @@ class NotesView extends StatelessWidget {
             ),
             Positioned(
               left: 20,
-              bottom: 16,
+              bottom: 12,
               child: NoteFolderCircleButton(
                 onPressed: () =>
                     showCreateNoteFolderSheet(context, controller),
@@ -145,7 +146,7 @@ class NotesView extends StatelessWidget {
             ),
             Positioned(
               right: 20,
-              bottom: 16,
+              bottom: 12,
               child: NoteOrangeAddButton(
                 onPressed: () => Navigator.of(context).push(
                   FastRoute<void>(

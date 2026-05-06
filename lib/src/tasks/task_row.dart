@@ -141,15 +141,6 @@ class TaskRow extends StatelessWidget {
                 ],
               ),
             ),
-            if (task.priority > 0)
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Icon(
-                  CupertinoIcons.flag_fill,
-                  size: 13,
-                  color: _priorityColor(task.priority),
-                ),
-              ),
           ],
         ),
       ),

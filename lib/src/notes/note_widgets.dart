@@ -18,10 +18,16 @@ class NoteDeleteBackground extends StatelessWidget {
 }
 
 class NoteFolderRow extends StatelessWidget {
-  const NoteFolderRow({super.key, required this.folder, required this.onTap});
+  const NoteFolderRow({
+    super.key,
+    required this.folder,
+    required this.onTap,
+    this.noteCount,
+  });
 
   final NoteFolder folder;
   final VoidCallback onTap;
+  final int? noteCount;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +43,14 @@ class NoteFolderRow extends StatelessWidget {
             Expanded(
               child: Text(folder.name, style: const TextStyle(fontSize: 17)),
             ),
+            if (noteCount != null && noteCount! > 0)
+              Text(
+                '$noteCount',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
           ],
         ),
       ),

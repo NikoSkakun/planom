@@ -34,44 +34,28 @@ class _NoteDetailViewState extends State<NoteDetailView> {
 
   @override
   void dispose() {
+    final title = _title.text.trim();
+    final content = _content.text.trim();
+    if (widget.isNew) {
+      if (title.isNotEmpty || content.isNotEmpty) {
+        widget.controller.addNote(
+          widget.note.copyWith(title: title, content: content),
+        );
+      }
+    } else {
+      widget.controller.updateNote(
+        widget.note.copyWith(title: title, content: content),
+      );
+    }
     _title.dispose();
     _content.dispose();
     super.dispose();
   }
 
-  Future<void> _save() async {
-    final title = _title.text.trim();
-    final content = _content.text.trim();
-
-    if (widget.isNew) {
-      if (title.isEmpty && content.isEmpty) {
-        if (mounted) Navigator.of(context).pop();
-        return;
-      }
-      await widget.controller.addNote(
-        widget.note.copyWith(title: title, content: content),
-      );
-    } else {
-      await widget.controller.updateNote(
-        widget.note.copyWith(title: title, content: content),
-      );
-    }
-    if (mounted) Navigator.of(context).pop();
-  }
-
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(border: null,
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: _save,
-          child: const Text(
-            'Done',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
-      ),
+      navigationBar: const CupertinoNavigationBar(border: null),
       child: SafeArea(
         child: Column(
           children: [
@@ -80,6 +64,7 @@ class _NoteDetailViewState extends State<NoteDetailView> {
               child: CupertinoTextField(
                 controller: _title,
                 placeholder: 'Title',
+                autofocus: widget.isNew,
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
@@ -87,6 +72,7 @@ class _NoteDetailViewState extends State<NoteDetailView> {
                 decoration: const BoxDecoration(),
                 maxLines: null,
                 textInputAction: TextInputAction.next,
+                textCapitalization: TextCapitalization.sentences,
               ),
             ),
             Padding(
@@ -107,6 +93,7 @@ class _NoteDetailViewState extends State<NoteDetailView> {
                   maxLines: null,
                   expands: true,
                   textAlignVertical: TextAlignVertical.top,
+                  textCapitalization: TextCapitalization.sentences,
                 ),
               ),
             ),

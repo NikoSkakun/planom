@@ -49,6 +49,9 @@ class TaskCreationSheet extends StatefulWidget {
 class _TaskCreationSheetState extends State<TaskCreationSheet> {
   final _titleCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _titleFocus = FocusNode();
+  final _noteFocus = FocusNode();
+  FocusNode? _activeFocus;
   DateTime? _dueDate;
   int? _doTime;
   late String? _listId;
@@ -64,10 +67,21 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
       final empty = _titleCtrl.text.trim().isEmpty;
       if (empty != _titleEmpty) setState(() => _titleEmpty = empty);
     });
+    _titleFocus.addListener(_onFocusChange);
+    _noteFocus.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (_titleFocus.hasFocus) _activeFocus = _titleFocus;
+    if (_noteFocus.hasFocus) _activeFocus = _noteFocus;
   }
 
   @override
   void dispose() {
+    _titleFocus.removeListener(_onFocusChange);
+    _noteFocus.removeListener(_onFocusChange);
+    _titleFocus.dispose();
+    _noteFocus.dispose();
     _titleCtrl.dispose();
     _noteCtrl.dispose();
     super.dispose();
@@ -88,6 +102,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
   }
 
   Future<void> _pickDate() async {
+    final saved = _activeFocus;
     final result = await showCalendarDatePicker(
       context,
       initial: _dueDate,
@@ -98,9 +113,11 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
       _dueDate = result.$1;
       _doTime = result.$2;
     });
+    saved?.requestFocus();
   }
 
   Future<void> _pickList() async {
+    final saved = _activeFocus;
     final result = await showListPickerSheet(
       context,
       widget.folderController,
@@ -108,6 +125,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     );
     if (!mounted) return;
     setState(() => _listId = result);
+    saved?.requestFocus();
   }
 
   String get _listLabel {
@@ -160,6 +178,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
           const SizedBox(height: 20),
           CupertinoTextField(
             controller: _titleCtrl,
+            focusNode: _titleFocus,
             placeholder: 'Task name',
             autofocus: true,
             textInputAction: TextInputAction.next,
@@ -175,9 +194,11 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
           const SizedBox(height: 8),
           CupertinoTextField(
             controller: _noteCtrl,
+            focusNode: _noteFocus,
             placeholder: 'Note',
             style: const TextStyle(fontSize: 15),
             decoration: const BoxDecoration(),
+            textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: 16),
           Row(
