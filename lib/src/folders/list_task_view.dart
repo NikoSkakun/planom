@@ -44,33 +44,28 @@ class _ListTaskViewState extends State<ListTaskView> {
     super.dispose();
   }
 
-  void _showOptionsMenu(BuildContext context) {
-    showCupertinoModalPopup<void>(
-      context: context,
-      builder: (_) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(context, rootNavigator: true).pop();
-              showListColorPickerSheet(context, _currentList.color, (color) {
-                final updated = _currentList.copyWith(
-                  color: color,
-                  clearColor: color == null,
-                );
-                widget.folderController.updateList(updated);
-                if (mounted) setState(() => _currentList = updated);
-              });
-            },
-            child: const Text('Change Color'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-          child: const Text('Cancel'),
-        ),
+  void _showDropdown(BuildContext context) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+
+    entry = OverlayEntry(
+      builder: (ctx) => _ListOptionsDropdown(
+        onDismiss: () => entry.remove(),
+        onChangeColor: () {
+          entry.remove();
+          showListColorPickerSheet(context, _currentList.color, (color) {
+            final updated = _currentList.copyWith(
+              color: color,
+              clearColor: color == null,
+            );
+            widget.folderController.updateList(updated);
+            if (mounted) setState(() => _currentList = updated);
+          });
+        },
       ),
     );
+
+    overlay.insert(entry);
   }
 
   @override
@@ -81,8 +76,8 @@ class _ListTaskViewState extends State<ListTaskView> {
         middle: Text(_currentList.name),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: () => _showOptionsMenu(context),
-          child: const Icon(CupertinoIcons.ellipsis_circle, size: 22),
+          onPressed: () => _showDropdown(context),
+          child: const Icon(CupertinoIcons.ellipsis, size: 26),
         ),
       ),
       child: SafeArea(
@@ -151,6 +146,100 @@ class _ListTaskViewState extends State<ListTaskView> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _ListOptionsDropdown extends StatelessWidget {
+  const _ListOptionsDropdown({
+    required this.onDismiss,
+    required this.onChangeColor,
+  });
+
+  final VoidCallback onDismiss;
+  final VoidCallback onChangeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDismiss,
+          child: const SizedBox.expand(),
+        ),
+        Positioned(
+          top: topOffset,
+          right: 8,
+          child: _DropdownPanel(
+            items: [
+              _DropdownItem(label: 'Change Color', onTap: onChangeColor),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DropdownPanel extends StatelessWidget {
+  const _DropdownPanel({required this.items});
+
+  final List<_DropdownItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 160),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x30000000),
+            blurRadius: 20,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0)
+              Container(
+                height: 0.5,
+                color: CupertinoColors.separator.resolveFrom(context),
+              ),
+            items[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DropdownItem extends StatelessWidget {
+  const _DropdownItem({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            color: CupertinoColors.label.resolveFrom(context),
+          ),
         ),
       ),
     );
