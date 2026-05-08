@@ -11,7 +11,7 @@ import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 8;
+  static const _dbVersion = 9;
 
   Database? _db;
 
@@ -44,7 +44,8 @@ class DatabaseService {
             name TEXT NOT NULL,
             parentFolderId TEXT,
             creationDate INTEGER NOT NULL,
-            sortOrder INTEGER NOT NULL DEFAULT 0
+            sortOrder INTEGER NOT NULL DEFAULT 0,
+            iconId TEXT
           )
         ''');
         await db.execute('''
@@ -54,7 +55,8 @@ class DatabaseService {
             folderId TEXT,
             creationDate INTEGER NOT NULL,
             sortOrder INTEGER NOT NULL DEFAULT 0,
-            color INTEGER
+            color INTEGER,
+            iconId TEXT
           )
         ''');
         await db.execute('''
@@ -194,6 +196,12 @@ class DatabaseService {
           await db.execute(
               'ALTER TABLE app_lists ADD COLUMN color INTEGER');
         }
+        if (oldVersion < 9) {
+          await db.execute(
+              'ALTER TABLE folders ADD COLUMN iconId TEXT');
+          await db.execute(
+              'ALTER TABLE app_lists ADD COLUMN iconId TEXT');
+        }
       },
     );
   }
@@ -250,6 +258,12 @@ class DatabaseService {
     final db = await _database;
     await db.insert('folders', folder.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateFolder(AppFolder folder) async {
+    final db = await _database;
+    await db.update('folders', folder.toMap(),
+        where: 'id = ?', whereArgs: [folder.id]);
   }
 
   Future<void> deleteFolder(String id) async {

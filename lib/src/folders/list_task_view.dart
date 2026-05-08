@@ -6,6 +6,7 @@ import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
 import '../utils/fast_route.dart';
 import 'folder_controller.dart';
+import 'folder_icon_picker.dart';
 import 'list_color_picker.dart';
 
 class ListTaskView extends StatefulWidget {
@@ -61,6 +62,22 @@ class _ListTaskViewState extends State<ListTaskView> {
             widget.folderController.updateList(updated);
             if (mounted) setState(() => _currentList = updated);
           });
+        },
+        onChangeIcon: () {
+          entry.remove();
+          showFolderIconPickerSheet(
+            context,
+            currentIconId: _currentList.iconId,
+            isFolder: false,
+            onSelected: (id) {
+              final updated = _currentList.copyWith(
+                iconId: id,
+                clearIconId: id == null,
+              );
+              widget.folderController.updateList(updated);
+              if (mounted) setState(() => _currentList = updated);
+            },
+          );
         },
       ),
     );
@@ -156,10 +173,12 @@ class _ListOptionsDropdown extends StatelessWidget {
   const _ListOptionsDropdown({
     required this.onDismiss,
     required this.onChangeColor,
+    required this.onChangeIcon,
   });
 
   final VoidCallback onDismiss;
   final VoidCallback onChangeColor;
+  final VoidCallback onChangeIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -176,6 +195,7 @@ class _ListOptionsDropdown extends StatelessWidget {
           right: 8,
           child: _DropdownPanel(
             items: [
+              _DropdownItem(label: 'Change Icon', onTap: onChangeIcon),
               _DropdownItem(label: 'Change Color', onTap: onChangeColor),
             ],
           ),

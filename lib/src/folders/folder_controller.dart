@@ -55,6 +55,13 @@ class FolderController with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateFolder(AppFolder folder) async {
+    await _db.updateFolder(folder);
+    final idx = _folders.indexWhere((f) => f.id == folder.id);
+    if (idx != -1) _folders[idx] = folder;
+    notifyListeners();
+  }
+
   Future<void> deleteFolder(String id) async {
     await _db.deleteFolder(id);
     _folders = _folders.where((f) => f.id != id).toList();

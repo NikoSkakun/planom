@@ -7,6 +7,7 @@ class AppList {
   final DateTime creationDate;
   final int sortOrder;
   final int? color; // ARGB; null = no color
+  final String? iconId; // null=default asset; SF-symbol key or absolute file path
 
   AppList({
     String? id,
@@ -15,6 +16,7 @@ class AppList {
     DateTime? creationDate,
     this.sortOrder = 0,
     this.color,
+    this.iconId,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate ?? DateTime.now();
 
@@ -25,6 +27,8 @@ class AppList {
     int? sortOrder,
     int? color,
     bool clearColor = false,
+    String? iconId,
+    bool clearIconId = false,
   }) =>
       AppList(
         id: id,
@@ -33,6 +37,7 @@ class AppList {
         creationDate: creationDate,
         sortOrder: sortOrder ?? this.sortOrder,
         color: clearColor ? null : (color ?? this.color),
+        iconId: clearIconId ? null : (iconId ?? this.iconId),
       );
 
   Map<String, dynamic> toMap() => {
@@ -42,6 +47,7 @@ class AppList {
         'creationDate': creationDate.millisecondsSinceEpoch,
         'sortOrder': sortOrder,
         'color': color,
+        'iconId': iconId,
       };
 
   factory AppList.fromMap(Map<String, dynamic> map) => AppList(
@@ -52,5 +58,6 @@ class AppList {
             DateTime.fromMillisecondsSinceEpoch(map['creationDate'] as int),
         sortOrder: map['sortOrder'] as int? ?? 0,
         color: map['color'] as int?,
+        iconId: map['iconId'] as String?,
       );
 }

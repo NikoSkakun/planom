@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../folders/create_folder_list_sheet.dart';
 import '../folders/folder_controller.dart';
+import '../folders/folder_icon_picker.dart';
 import '../folders/folder_view.dart';
 import '../folders/list_task_view.dart';
 import '../utils/fast_route.dart';
@@ -190,6 +191,8 @@ class TasksView extends StatelessWidget {
                               ),
                               child: _ListItem(
                                 iconAsset: 'assets/icons/folder.png',
+                                iconId: f.iconId,
+                                isFolder: true,
                                 label: f.name,
                                 onTap: () => Navigator.of(context).push(
                                   FastRoute<void>(
@@ -232,6 +235,8 @@ class TasksView extends StatelessWidget {
                               },
                               child: _ListItem(
                                 iconAsset: 'assets/icons/list.png',
+                                iconId: l.iconId,
+                                isFolder: false,
                                 label: l.name,
                                 count: count > 0 ? count : null,
                                 onTap: () => Navigator.of(context).push(
@@ -303,16 +308,24 @@ class _ListItem extends StatelessWidget {
     required this.iconAsset,
     required this.label,
     required this.onTap,
+    this.iconId,
+    this.isFolder = false,
     this.count,
   });
 
   final String iconAsset;
+  final String? iconId;
+  final bool isFolder;
   final String label;
   final VoidCallback onTap;
   final int? count;
 
   @override
   Widget build(BuildContext context) {
+    final icon = iconId != null
+        ? buildFolderItemIcon(iconId, isFolder: isFolder)
+        : Image.asset(iconAsset, width: 22, height: 22);
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -320,7 +333,7 @@ class _ListItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         child: Row(
           children: [
-            Image.asset(iconAsset, width: 22, height: 22),
+            SizedBox(width: 22, height: 22, child: icon),
             const SizedBox(width: 12),
             Expanded(
               child: Text(label, style: const TextStyle(fontSize: 17)),

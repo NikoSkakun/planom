@@ -5,9 +5,10 @@ import '../tasks/task_controller.dart';
 import '../utils/fast_route.dart';
 import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
+import 'folder_icon_picker.dart';
 import 'list_task_view.dart';
 
-class FolderView extends StatelessWidget {
+class FolderView extends StatefulWidget {
   const FolderView({
     super.key,
     required this.folder,
@@ -20,6 +21,19 @@ class FolderView extends StatelessWidget {
   final FolderController folderController;
   final TaskController taskController;
   final ValueNotifier<String?> activeListId;
+
+  @override
+  State<FolderView> createState() => _FolderViewState();
+}
+
+class _FolderViewState extends State<FolderView> {
+  late AppFolder _currentFolder;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentFolder = widget.folder;
+  }
 
   Widget _proxyDecorator(
       Widget child, int index, Animation<double> animation) {
@@ -37,23 +51,58 @@ class FolderView extends StatelessWidget {
     );
   }
 
+  void _showDropdown(BuildContext context) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+
+    entry = OverlayEntry(
+      builder: (ctx) => _FolderOptionsDropdown(
+        onDismiss: () => entry.remove(),
+        onChangeIcon: () {
+          entry.remove();
+          showFolderIconPickerSheet(
+            context,
+            currentIconId: _currentFolder.iconId,
+            isFolder: true,
+            onSelected: (id) {
+              final updated = _currentFolder.copyWith(
+                iconId: id,
+                clearIconId: id == null,
+              );
+              widget.folderController.updateFolder(updated);
+              if (mounted) setState(() => _currentFolder = updated);
+            },
+          );
+        },
+      ),
+    );
+
+    overlay.insert(entry);
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(border: null,
-        middle: Text(folder.name),
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        middle: Text(_currentFolder.name),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => _showDropdown(context),
+          child: const Icon(CupertinoIcons.ellipsis, size: 26),
+        ),
       ),
       child: SafeArea(
         child: Stack(
           children: [
             ListenableBuilder(
               listenable:
-                  Listenable.merge([folderController, taskController]),
+                  Listenable.merge([widget.folderController, widget.taskController]),
               builder: (context, _) {
                 final subFolders =
-                    folderController.foldersIn(folder.id);
+                    widget.folderController.foldersIn(_currentFolder.id);
                 final lists =
-                    folderController.listsIn(folder.id);
+                    widget.folderController.listsIn(_currentFolder.id);
 
                 if (subFolders.isEmpty && lists.isEmpty) {
                   return const Center(
@@ -74,8 +123,8 @@ class FolderView extends StatelessWidget {
                       SliverReorderableList(
                         itemCount: subFolders.length,
                         onReorder: (old, neo) =>
-                            folderController.reorderFolders(
-                                folder.id, old, neo),
+                            widget.folderController.reorderFolders(
+                                _currentFolder.id, old, neo),
                         proxyDecorator: _proxyDecorator,
                         itemBuilder: (context, index) {
                           final f = subFolders[index];
@@ -87,21 +136,24 @@ class FolderView extends StatelessWidget {
                               direction: DismissDirection.endToStart,
                               background: _DeleteBackground(),
                               onDismissed: (_) =>
-                                  folderController.deleteFolderDeep(
+                                  widget.folderController.deleteFolderDeep(
                                 f.id,
-                                taskController.deleteTasksForList,
+                                widget.taskController.deleteTasksForList,
                               ),
                               child: _FolderListItem(
-                                iconAsset: 'assets/icons/folder.png',
+                                icon: buildFolderItemIcon(
+                                  f.iconId,
+                                  isFolder: true,
+                                ),
                                 label: f.name,
                                 onTap: () =>
                                     Navigator.of(context).push(
                                   FastRoute<void>(
                                     builder: (_) => FolderView(
                                       folder: f,
-                                      folderController: folderController,
-                                      taskController: taskController,
-                                      activeListId: activeListId,
+                                      folderController: widget.folderController,
+                                      taskController: widget.taskController,
+                                      activeListId: widget.activeListId,
                                     ),
                                   ),
                                 ),
@@ -115,12 +167,12 @@ class FolderView extends StatelessWidget {
                       SliverReorderableList(
                         itemCount: lists.length,
                         onReorder: (old, neo) =>
-                            folderController.reorderLists(
-                                folder.id, old, neo),
+                            widget.folderController.reorderLists(
+                                _currentFolder.id, old, neo),
                         proxyDecorator: _proxyDecorator,
                         itemBuilder: (context, index) {
                           final l = lists[index];
-                          final count = taskController
+                          final count = widget.taskController
                               .uncompletedCountForList(l.id);
                           return ReorderableDelayedDragStartListener(
                             key: ValueKey('fl_${l.id}'),
@@ -130,12 +182,15 @@ class FolderView extends StatelessWidget {
                               direction: DismissDirection.endToStart,
                               background: _DeleteBackground(),
                               onDismissed: (_) async {
-                                await taskController
+                                await widget.taskController
                                     .deleteTasksForList(l.id);
-                                await folderController.deleteList(l.id);
+                                await widget.folderController.deleteList(l.id);
                               },
                               child: _FolderListItem(
-                                iconAsset: 'assets/icons/list.png',
+                                icon: buildFolderItemIcon(
+                                  l.iconId,
+                                  isFolder: false,
+                                ),
                                 label: l.name,
                                 count: count > 0 ? count : null,
                                 onTap: () =>
@@ -143,9 +198,9 @@ class FolderView extends StatelessWidget {
                                   FastRoute<void>(
                                     builder: (_) => ListTaskView(
                                       list: l,
-                                      taskController: taskController,
-                                      folderController: folderController,
-                                      activeListId: activeListId,
+                                      taskController: widget.taskController,
+                                      folderController: widget.folderController,
+                                      activeListId: widget.activeListId,
                                     ),
                                   ),
                                 ),
@@ -167,12 +222,106 @@ class FolderView extends StatelessWidget {
               child: _CircleButton(
                 onPressed: () => showCreateFolderListSheet(
                   context,
-                  folderController,
-                  parentFolderId: folder.id,
+                  widget.folderController,
+                  parentFolderId: _currentFolder.id,
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FolderOptionsDropdown extends StatelessWidget {
+  const _FolderOptionsDropdown({
+    required this.onDismiss,
+    required this.onChangeIcon,
+  });
+
+  final VoidCallback onDismiss;
+  final VoidCallback onChangeIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDismiss,
+          child: const SizedBox.expand(),
+        ),
+        Positioned(
+          top: topOffset,
+          right: 8,
+          child: _DropdownPanel(
+            items: [
+              _DropdownItem(label: 'Change Icon', onTap: onChangeIcon),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DropdownPanel extends StatelessWidget {
+  const _DropdownPanel({required this.items});
+
+  final List<_DropdownItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 160),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x30000000),
+            blurRadius: 20,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0)
+              Container(
+                height: 0.5,
+                color: CupertinoColors.separator.resolveFrom(context),
+              ),
+            items[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DropdownItem extends StatelessWidget {
+  const _DropdownItem({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            color: CupertinoColors.label.resolveFrom(context),
+          ),
         ),
       ),
     );
@@ -193,13 +342,13 @@ class _DeleteBackground extends StatelessWidget {
 
 class _FolderListItem extends StatelessWidget {
   const _FolderListItem({
-    required this.iconAsset,
+    required this.icon,
     required this.label,
     required this.onTap,
     this.count,
   });
 
-  final String iconAsset;
+  final Widget icon;
   final String label;
   final VoidCallback onTap;
   final int? count;
@@ -213,7 +362,7 @@ class _FolderListItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         child: Row(
           children: [
-            Image.asset(iconAsset, width: 22, height: 22),
+            SizedBox(width: 22, height: 22, child: icon),
             const SizedBox(width: 12),
             Expanded(
               child: Text(label, style: const TextStyle(fontSize: 17)),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' show showModalBottomSheet;
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import 'folder_controller.dart';
+import 'folder_icon_picker.dart';
 import 'list_color_picker.dart';
 
 void showCreateFolderListSheet(
@@ -42,6 +43,7 @@ class _CreateSheetState extends State<_CreateSheet> {
   _CreateType _type = _CreateType.list;
   final _nameCtrl = TextEditingController();
   int? _selectedColor;
+  String? _selectedIconId;
 
   @override
   void dispose() {
@@ -56,21 +58,35 @@ class _CreateSheetState extends State<_CreateSheet> {
       await widget.controller.addFolder(AppFolder(
         name: name,
         parentFolderId: widget.parentFolderId,
+        iconId: _selectedIconId,
       ));
     } else {
       await widget.controller.addList(AppList(
         name: name,
         folderId: widget.parentFolderId,
         color: _selectedColor,
+        iconId: _selectedIconId,
       ));
     }
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
+  }
+
+  void _openIconPicker() {
+    showFolderIconPickerSheet(
+      context,
+      currentIconId: _selectedIconId,
+      isFolder: _type == _CreateType.folder,
+      onSelected: (id) {
+        if (mounted) setState(() => _selectedIconId = id);
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
+    final isFolder = _type == _CreateType.folder;
 
     return Container(
       decoration: BoxDecoration(
@@ -115,25 +131,55 @@ class _CreateSheetState extends State<_CreateSheet> {
               ),
             },
             onValueChanged: (v) {
-              if (v != null) setState(() => _type = v);
+              if (v != null) {
+                setState(() {
+                  _type = v;
+                  _selectedIconId = null;
+                });
+              }
             },
           ),
           const SizedBox(height: 16),
-          CupertinoTextField(
-            controller: _nameCtrl,
-            placeholder:
-                _type == _CreateType.folder ? 'Folder name' : 'List name',
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _submit(),
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
-            decoration: BoxDecoration(
-              color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: _openIconPicker,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: buildFolderItemIcon(
+                      _selectedIconId,
+                      isFolder: isFolder,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: CupertinoTextField(
+                  controller: _nameCtrl,
+                  placeholder: isFolder ? 'Folder name' : 'List name',
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w500),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.tertiarySystemFill
+                        .resolveFrom(context),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 12),
+                ),
+              ),
+            ],
           ),
           if (_type == _CreateType.list) ...[
             const SizedBox(height: 16),
@@ -148,7 +194,7 @@ class _CreateSheetState extends State<_CreateSheet> {
             borderRadius: BorderRadius.circular(12),
             onPressed: _submit,
             child: Text(
-              _type == _CreateType.folder ? 'Create Folder' : 'Create List',
+              isFolder ? 'Create Folder' : 'Create List',
               style: const TextStyle(
                 color: CupertinoColors.white,
                 fontWeight: FontWeight.w600,

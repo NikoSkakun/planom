@@ -6,6 +6,7 @@ class AppFolder {
   final String? parentFolderId;
   final DateTime creationDate;
   final int sortOrder;
+  final String? iconId; // null=default asset; SF-symbol key or absolute file path
 
   AppFolder({
     String? id,
@@ -13,6 +14,7 @@ class AppFolder {
     this.parentFolderId,
     DateTime? creationDate,
     this.sortOrder = 0,
+    this.iconId,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate ?? DateTime.now();
 
@@ -21,6 +23,8 @@ class AppFolder {
     String? parentFolderId,
     bool clearParent = false,
     int? sortOrder,
+    String? iconId,
+    bool clearIconId = false,
   }) =>
       AppFolder(
         id: id,
@@ -29,6 +33,7 @@ class AppFolder {
             clearParent ? null : (parentFolderId ?? this.parentFolderId),
         creationDate: creationDate,
         sortOrder: sortOrder ?? this.sortOrder,
+        iconId: clearIconId ? null : (iconId ?? this.iconId),
       );
 
   Map<String, dynamic> toMap() => {
@@ -37,6 +42,7 @@ class AppFolder {
         'parentFolderId': parentFolderId,
         'creationDate': creationDate.millisecondsSinceEpoch,
         'sortOrder': sortOrder,
+        'iconId': iconId,
       };
 
   factory AppFolder.fromMap(Map<String, dynamic> map) => AppFolder(
@@ -46,5 +52,6 @@ class AppFolder {
         creationDate:
             DateTime.fromMillisecondsSinceEpoch(map['creationDate'] as int),
         sortOrder: map['sortOrder'] as int? ?? 0,
+        iconId: map['iconId'] as String?,
       );
 }
