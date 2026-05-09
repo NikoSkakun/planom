@@ -4,6 +4,7 @@ import '../folders/folder_icon_picker.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 import '../utils/fast_route.dart';
+import '../folders/create_folder_list_sheet.dart' show showRenameSheet;
 import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
 import 'note_detail_view.dart';
@@ -55,6 +56,18 @@ class _NoteFolderViewState extends State<NoteFolderView> {
     entry = OverlayEntry(
       builder: (ctx) => _NoteFolderOptionsDropdown(
         onDismiss: () => entry.remove(),
+        onRename: () {
+          entry.remove();
+          showRenameSheet(
+            context,
+            currentName: _currentFolder.name,
+            onRename: (name) async {
+              final updated = _currentFolder.copyWith(name: name);
+              await widget.controller.updateFolder(updated);
+              if (mounted) setState(() => _currentFolder = updated);
+            },
+          );
+        },
         onChangeIcon: () {
           entry.remove();
           showFolderIconPickerSheet(
@@ -231,10 +244,12 @@ class _NoteFolderViewState extends State<NoteFolderView> {
 class _NoteFolderOptionsDropdown extends StatelessWidget {
   const _NoteFolderOptionsDropdown({
     required this.onDismiss,
+    required this.onRename,
     required this.onChangeIcon,
   });
 
   final VoidCallback onDismiss;
+  final VoidCallback onRename;
   final VoidCallback onChangeIcon;
 
   @override
@@ -252,6 +267,7 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
           right: 8,
           child: _DropdownPanel(
             items: [
+              _DropdownItem(label: 'Rename', onTap: onRename),
               _DropdownItem(label: 'Change Icon', onTap: onChangeIcon),
             ],
           ),

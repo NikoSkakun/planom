@@ -14,6 +14,7 @@ class TaskController with ChangeNotifier {
   List<Task> _trashedTasks = [];
 
   TaskSortOrder _sortOrder = TaskSortOrder.defaultOrder;
+  final List<String> _completionOrder = [];
   TaskSortOrder get sortOrder => _sortOrder;
 
   void setSortOrder(TaskSortOrder order) {
@@ -112,6 +113,12 @@ class TaskController with ChangeNotifier {
     final updated = _tasks[i].copyWith(isCompleted: !_tasks[i].isCompleted);
     await _db.updateTask(updated);
     _tasks = [..._tasks]..[i] = updated;
+    if (updated.isCompleted) {
+      _completionOrder.remove(id);
+      _completionOrder.insert(0, id);
+    } else {
+      _completionOrder.remove(id);
+    }
     _updateBadge();
     notifyListeners();
   }
@@ -245,13 +252,21 @@ class TaskController with ChangeNotifier {
     });
   }
 
-  /// Incomplete tasks first (preserving current order), completed at end.
-  static List<Task> _completedLast(Iterable<Task> tasks) {
+  /// Incomplete tasks first, completed at end — most recently completed first.
+  List<Task> _completedLast(Iterable<Task> tasks) {
     final incomplete = <Task>[];
     final completed = <Task>[];
     for (final t in tasks) {
       (t.isCompleted ? completed : incomplete).add(t);
     }
+    completed.sort((a, b) {
+      final ai = _completionOrder.indexOf(a.id);
+      final bi = _completionOrder.indexOf(b.id);
+      if (ai == -1 && bi == -1) return 0;
+      if (ai == -1) return 1;
+      if (bi == -1) return -1;
+      return ai.compareTo(bi);
+    });
     return [...incomplete, ...completed];
   }
 

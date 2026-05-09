@@ -5,6 +5,7 @@ import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
 import '../utils/fast_route.dart';
+import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
 import 'list_color_picker.dart';
@@ -52,6 +53,18 @@ class _ListTaskViewState extends State<ListTaskView> {
     entry = OverlayEntry(
       builder: (ctx) => _ListOptionsDropdown(
         onDismiss: () => entry.remove(),
+        onRename: () {
+          entry.remove();
+          showRenameSheet(
+            context,
+            currentName: _currentList.name,
+            onRename: (name) async {
+              final updated = _currentList.copyWith(name: name);
+              await widget.folderController.updateList(updated);
+              if (mounted) setState(() => _currentList = updated);
+            },
+          );
+        },
         onChangeColor: () {
           entry.remove();
           showListColorPickerSheet(context, _currentList.color, (color) {
@@ -172,11 +185,13 @@ class _ListTaskViewState extends State<ListTaskView> {
 class _ListOptionsDropdown extends StatelessWidget {
   const _ListOptionsDropdown({
     required this.onDismiss,
+    required this.onRename,
     required this.onChangeColor,
     required this.onChangeIcon,
   });
 
   final VoidCallback onDismiss;
+  final VoidCallback onRename;
   final VoidCallback onChangeColor;
   final VoidCallback onChangeIcon;
 
@@ -195,6 +210,7 @@ class _ListOptionsDropdown extends StatelessWidget {
           right: 8,
           child: _DropdownPanel(
             items: [
+              _DropdownItem(label: 'Rename', onTap: onRename),
               _DropdownItem(label: 'Change Icon', onTap: onChangeIcon),
               _DropdownItem(label: 'Change Color', onTap: onChangeColor),
             ],

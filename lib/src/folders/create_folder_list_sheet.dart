@@ -7,6 +7,113 @@ import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
 import 'list_color_picker.dart';
 
+Future<void> showRenameSheet(
+  BuildContext context, {
+  required String currentName,
+  required Future<void> Function(String) onRename,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    backgroundColor: const Color(0x00000000),
+    builder: (_) => _RenameSheet(
+      currentName: currentName,
+      onRename: onRename,
+    ),
+  );
+}
+
+class _RenameSheet extends StatefulWidget {
+  const _RenameSheet({required this.currentName, required this.onRename});
+  final String currentName;
+  final Future<void> Function(String) onRename;
+
+  @override
+  State<_RenameSheet> createState() => _RenameSheetState();
+}
+
+class _RenameSheetState extends State<_RenameSheet> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.currentName);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final name = _ctrl.text.trim();
+    if (name.isEmpty) return;
+    await widget.onRename(name);
+    if (mounted) Navigator.of(context, rootNavigator: true).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bg = CupertinoColors.systemBackground.resolveFrom(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: CupertinoColors.separator.resolveFrom(context),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          CupertinoTextField(
+            controller: _ctrl,
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+            decoration: BoxDecoration(
+              color:
+                  CupertinoColors.tertiarySystemFill.resolveFrom(context),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          const SizedBox(height: 16),
+          CupertinoButton(
+            color: const Color(0xFFFF4D00),
+            borderRadius: BorderRadius.circular(12),
+            onPressed: _submit,
+            child: const Text(
+              'Rename',
+              style: TextStyle(
+                color: CupertinoColors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 void showCreateFolderListSheet(
   BuildContext context,
   FolderController controller, {

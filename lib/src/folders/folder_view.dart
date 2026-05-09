@@ -3,7 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../models/app_folder.dart';
 import '../tasks/task_controller.dart';
 import '../utils/fast_route.dart';
-import 'create_folder_list_sheet.dart';
+import 'create_folder_list_sheet.dart' show showCreateFolderListSheet, showRenameSheet;
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
 import 'list_task_view.dart';
@@ -83,6 +83,18 @@ class _FolderViewState extends State<FolderView> {
     entry = OverlayEntry(
       builder: (ctx) => _FolderOptionsDropdown(
         onDismiss: () => entry.remove(),
+        onRename: () {
+          entry.remove();
+          showRenameSheet(
+            context,
+            currentName: _currentFolder.name,
+            onRename: (name) async {
+              final updated = _currentFolder.copyWith(name: name);
+              await widget.folderController.updateFolder(updated);
+              if (mounted) setState(() => _currentFolder = updated);
+            },
+          );
+        },
         onChangeIcon: () {
           entry.remove();
           showFolderIconPickerSheet(
@@ -173,6 +185,7 @@ class _FolderViewState extends State<FolderView> {
                                   isFolder: true,
                                 ),
                                 label: f.name,
+                                isFolder: true,
                                 onTap: () =>
                                     Navigator.of(context).push(
                                   FastRoute<void>(
@@ -266,10 +279,12 @@ class _FolderViewState extends State<FolderView> {
 class _FolderOptionsDropdown extends StatelessWidget {
   const _FolderOptionsDropdown({
     required this.onDismiss,
+    required this.onRename,
     required this.onChangeIcon,
   });
 
   final VoidCallback onDismiss;
+  final VoidCallback onRename;
   final VoidCallback onChangeIcon;
 
   @override
@@ -287,6 +302,7 @@ class _FolderOptionsDropdown extends StatelessWidget {
           right: 8,
           child: _DropdownPanel(
             items: [
+              _DropdownItem(label: 'Rename', onTap: onRename),
               _DropdownItem(label: 'Change Icon', onTap: onChangeIcon),
             ],
           ),
@@ -374,12 +390,14 @@ class _FolderListItem extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.isFolder = false,
     this.count,
   });
 
   final Widget icon;
   final String label;
   final VoidCallback onTap;
+  final bool isFolder;
   final int? count;
 
   @override
@@ -394,7 +412,13 @@ class _FolderListItem extends StatelessWidget {
             SizedBox(width: 22, height: 22, child: icon),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(label, style: const TextStyle(fontSize: 17)),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: isFolder ? FontWeight.w500 : FontWeight.normal,
+                ),
+              ),
             ),
             if (count != null && count! > 0)
               Text(
@@ -428,7 +452,7 @@ class _CircleButton extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Icon(
-          CupertinoIcons.plus,
+          CupertinoIcons.folder_badge_plus,
           size: 20,
           color: CupertinoColors.label.resolveFrom(context),
         ),

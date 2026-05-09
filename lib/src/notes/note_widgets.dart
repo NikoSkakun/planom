@@ -46,7 +46,7 @@ class NoteFolderRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(folder.name, style: const TextStyle(fontSize: 17)),
+              child: Text(folder.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
             ),
             if (noteCount != null && noteCount! > 0)
               Text(

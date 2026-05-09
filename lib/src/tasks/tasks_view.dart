@@ -434,7 +434,14 @@ class _ListItem extends StatelessWidget {
             SizedBox(width: 22, height: 22, child: icon),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(label, style: const TextStyle(fontSize: 17)),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight:
+                      isFolder ? FontWeight.w500 : FontWeight.normal,
+                ),
+              ),
             ),
             if (count != null && count! > 0)
               Text(
@@ -466,16 +473,9 @@ class _CircleAddButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
           shape: BoxShape.circle,
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 6,
-              offset: Offset(0, 2),
-            ),
-          ],
         ),
         child: Icon(
-          CupertinoIcons.plus,
+          CupertinoIcons.folder_badge_plus,
           size: 20,
           color: CupertinoColors.label.resolveFrom(context),
         ),

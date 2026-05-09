@@ -7,7 +7,10 @@
       "Bash(~/dev/flutter/bin/flutter analyze *)",
       "Bash(~/dev/flutter/bin/flutter pub *)",
       "Bash(grep -v \"^$\")",
-      "Bash(xargs sed *)"
+      "Bash(xargs sed *)",
+      "Bash(sed -n '21,35p' \"/Users/skakun/Personal Projects/Planom/planom/lib/src/models/note_folder.dart\")",
+      "Bash(sed -n '25,40p' \"/Users/skakun/Personal Projects/Planom/planom/lib/src/models/app_folder.dart\")",
+      "Bash(sed -n '27,45p' \"/Users/skakun/Personal Projects/Planom/planom/lib/src/models/app_list.dart\")"
     ]
   }
 }

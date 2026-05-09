@@ -116,6 +116,7 @@ class _CreateSheetState extends State<_CreateSheet> {
                   controller: _nameCtrl,
                   placeholder: 'Folder name',
                   autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _submit(),
                   style: const TextStyle(

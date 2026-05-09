@@ -138,7 +138,7 @@ class NotesView extends StatelessWidget {
             ),
             Positioned(
               left: 20,
-              bottom: 12,
+              bottom: 16,
               child: NoteFolderCircleButton(
                 onPressed: () =>
                     showCreateNoteFolderSheet(context, controller),
@@ -146,7 +146,7 @@ class NotesView extends StatelessWidget {
             ),
             Positioned(
               right: 20,
-              bottom: 12,
+              bottom: 16,
               child: NoteOrangeAddButton(
                 onPressed: () => Navigator.of(context).push(
                   FastRoute<void>(
