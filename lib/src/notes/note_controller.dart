@@ -56,6 +56,13 @@ class NoteController with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateFolder(NoteFolder folder) async {
+    await _db.updateNoteFolder(folder);
+    final idx = _folders.indexWhere((f) => f.id == folder.id);
+    if (idx != -1) _folders[idx] = folder;
+    notifyListeners();
+  }
+
   Future<void> deleteFolder(String id) async {
     await _db.deleteNoteFolder(id);
     _folders = _folders.where((f) => f.id != id).toList();

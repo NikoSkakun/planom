@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../folders/folder_icon_picker.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 
@@ -38,7 +39,11 @@ class NoteFolderRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         child: Row(
           children: [
-            Image.asset('assets/icons/folder.png', width: 22, height: 22),
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: buildFolderItemIcon(folder.iconId, isFolder: true),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(folder.name, style: const TextStyle(fontSize: 17)),

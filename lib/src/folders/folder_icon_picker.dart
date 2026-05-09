@@ -61,17 +61,15 @@ Widget buildFolderItemIcon(String? iconId, {required bool isFolder}) {
     return SizedBox(
       width: 22,
       height: 22,
-      child: ClipOval(
-        child: Image.file(
-          File(iconId),
+      child: Image.file(
+        File(iconId),
+        width: 22,
+        height: 22,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => Image.asset(
+          isFolder ? 'assets/icons/folder.png' : 'assets/icons/list.png',
           width: 22,
           height: 22,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Image.asset(
-            isFolder ? 'assets/icons/folder.png' : 'assets/icons/list.png',
-            width: 22,
-            height: 22,
-          ),
         ),
       ),
     );

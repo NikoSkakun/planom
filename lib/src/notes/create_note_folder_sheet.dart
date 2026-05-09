@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../folders/folder_icon_picker.dart';
 import '../models/note_folder.dart';
 import 'note_controller.dart';
 
@@ -33,6 +34,7 @@ class _CreateSheet extends StatefulWidget {
 
 class _CreateSheetState extends State<_CreateSheet> {
   final _nameCtrl = TextEditingController();
+  String? _selectedIconId;
 
   @override
   void dispose() {
@@ -46,8 +48,20 @@ class _CreateSheetState extends State<_CreateSheet> {
     await widget.controller.addFolder(NoteFolder(
       name: name,
       parentFolderId: widget.parentFolderId,
+      iconId: _selectedIconId,
     ));
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
+  }
+
+  void _openIconPicker() {
+    showFolderIconPickerSheet(
+      context,
+      currentIconId: _selectedIconId,
+      isFolder: true,
+      onSelected: (id) {
+        if (mounted) setState(() => _selectedIconId = id);
+      },
+    );
   }
 
   @override
@@ -76,18 +90,46 @@ class _CreateSheetState extends State<_CreateSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          CupertinoTextField(
-            controller: _nameCtrl,
-            placeholder: 'Folder name',
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _submit(),
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
-            decoration: BoxDecoration(
-              color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: _openIconPicker,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.tertiarySystemFill
+                        .resolveFrom(context),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: buildFolderItemIcon(
+                      _selectedIconId,
+                      isFolder: true,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: CupertinoTextField(
+                  controller: _nameCtrl,
+                  placeholder: 'Folder name',
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w500),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.tertiarySystemFill
+                        .resolveFrom(context),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 12),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           CupertinoButton(
