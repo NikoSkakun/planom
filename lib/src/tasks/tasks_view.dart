@@ -6,7 +6,8 @@ import '../folders/folder_icon_picker.dart';
 import '../folders/folder_view.dart';
 import '../folders/list_task_view.dart';
 import '../utils/fast_route.dart';
-import 'completed_view.dart';
+// KEEP: import for Completed smart list — re-enable when the list is shown again.
+// import 'completed_view.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
 import 'today_view.dart';
@@ -134,7 +135,8 @@ class TasksView extends StatelessWidget {
                 final rootLists = folderController.listsIn(null);
                 final todayCount = controller.todayUncompletedCount;
                 final upcomingCount = controller.upcomingUncompletedCount;
-                final completedCount = controller.completedTasksCount;
+                // KEEP: re-enable when Completed smart list is shown again.
+                // final completedCount = controller.completedTasksCount;
                 final hasTrash = controller.trashedTasks.isNotEmpty ||
                     folderController.trashedFolders.isNotEmpty ||
                     folderController.trashedLists.isNotEmpty;
@@ -304,23 +306,24 @@ class TasksView extends StatelessWidget {
                                   .resolveFrom(context),
                             ),
                           ),
-                          if (completedCount > 0)
-                            _ListItem(
-                              iconWidget: const Icon(
-                                CupertinoIcons.checkmark_circle_fill,
-                                size: 22,
-                                color: Color(0xFF34C759),
-                              ),
-                              label: 'Completed',
-                              onTap: () => Navigator.of(context).push(
-                                FastRoute<void>(
-                                  builder: (_) => CompletedView(
-                                    controller: controller,
-                                    folderController: folderController,
-                                  ),
-                                ),
-                              ),
-                            ),
+                          // KEEP: Completed smart list — hidden for now, will be re-enabled later.
+                          // if (completedCount > 0)
+                          //   _ListItem(
+                          //     iconWidget: const Icon(
+                          //       CupertinoIcons.checkmark_circle_fill,
+                          //       size: 22,
+                          //       color: Color(0xFF34C759),
+                          //     ),
+                          //     label: 'Completed',
+                          //     onTap: () => Navigator.of(context).push(
+                          //       FastRoute<void>(
+                          //         builder: (_) => CompletedView(
+                          //           controller: controller,
+                          //           folderController: folderController,
+                          //         ),
+                          //       ),
+                          //     ),
+                          //   ),
                           if (hasTrash)
                             _ListItem(
                               iconWidget: Icon(
