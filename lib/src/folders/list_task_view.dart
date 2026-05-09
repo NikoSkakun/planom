@@ -5,6 +5,7 @@ import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
 import '../utils/fast_route.dart';
+import '../utils/item_info_sheet.dart';
 import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
@@ -91,6 +92,10 @@ class _ListTaskViewState extends State<ListTaskView> {
               if (mounted) setState(() => _currentList = updated);
             },
           );
+        },
+        onInfo: () {
+          entry.remove();
+          showItemInfoSheet(context, creationDate: _currentList.creationDate);
         },
       ),
     );
@@ -188,12 +193,14 @@ class _ListOptionsDropdown extends StatelessWidget {
     required this.onRename,
     required this.onChangeColor,
     required this.onChangeIcon,
+    required this.onInfo,
   });
 
   final VoidCallback onDismiss;
   final VoidCallback onRename;
   final VoidCallback onChangeColor;
   final VoidCallback onChangeIcon;
+  final VoidCallback onInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -213,6 +220,7 @@ class _ListOptionsDropdown extends StatelessWidget {
               _DropdownItem(label: 'Rename', onTap: onRename),
               _DropdownItem(label: 'Change Icon', onTap: onChangeIcon),
               _DropdownItem(label: 'Change Color', onTap: onChangeColor),
+              _DropdownItem(label: 'Info', onTap: onInfo),
             ],
           ),
         ),

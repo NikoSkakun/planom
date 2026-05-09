@@ -4,6 +4,7 @@ import '../folders/folder_icon_picker.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 import '../utils/fast_route.dart';
+import '../utils/item_info_sheet.dart';
 import '../folders/create_folder_list_sheet.dart' show showRenameSheet;
 import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
@@ -83,6 +84,10 @@ class _NoteFolderViewState extends State<NoteFolderView> {
               if (mounted) setState(() => _currentFolder = updated);
             },
           );
+        },
+        onInfo: () {
+          entry.remove();
+          showItemInfoSheet(context, creationDate: _currentFolder.creationDate);
         },
       ),
     );
@@ -246,11 +251,13 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
     required this.onDismiss,
     required this.onRename,
     required this.onChangeIcon,
+    required this.onInfo,
   });
 
   final VoidCallback onDismiss;
   final VoidCallback onRename;
   final VoidCallback onChangeIcon;
+  final VoidCallback onInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -269,6 +276,7 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
             items: [
               _DropdownItem(label: 'Rename', onTap: onRename),
               _DropdownItem(label: 'Change Icon', onTap: onChangeIcon),
+              _DropdownItem(label: 'Info', onTap: onInfo),
             ],
           ),
         ),

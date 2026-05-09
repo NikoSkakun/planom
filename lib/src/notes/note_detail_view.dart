@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../models/note.dart';
+import '../utils/item_info_sheet.dart';
 import 'note_controller.dart';
 
 class NoteDetailView extends StatefulWidget {
@@ -32,6 +33,25 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     _content = TextEditingController(text: widget.note.content);
   }
 
+  void _showDropdown(BuildContext context) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => _NoteOptionsDropdown(
+        onDismiss: () => entry.remove(),
+        onInfo: () {
+          entry.remove();
+          showItemInfoSheet(
+            context,
+            creationDate: widget.note.creationDate,
+            modifiedDate: widget.note.modifiedDate,
+          );
+        },
+      ),
+    );
+    overlay.insert(entry);
+  }
+
   @override
   void dispose() {
     final title = _title.text.trim();
@@ -55,7 +75,16 @@ class _NoteDetailViewState extends State<NoteDetailView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(border: null),
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        trailing: widget.isNew
+            ? null
+            : CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () => _showDropdown(context),
+                child: const Icon(CupertinoIcons.ellipsis, size: 26),
+              ),
+      ),
       child: SafeArea(
         child: Column(
           children: [
@@ -100,6 +129,57 @@ class _NoteDetailViewState extends State<NoteDetailView> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _NoteOptionsDropdown extends StatelessWidget {
+  const _NoteOptionsDropdown({required this.onDismiss, required this.onInfo});
+  final VoidCallback onDismiss;
+  final VoidCallback onInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDismiss,
+          child: const SizedBox.expand(),
+        ),
+        Positioned(
+          top: topOffset,
+          right: 8,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 160),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x30000000),
+                  blurRadius: 20,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: GestureDetector(
+              onTap: onInfo,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Text(
+                  'Info',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: CupertinoColors.label.resolveFrom(context),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

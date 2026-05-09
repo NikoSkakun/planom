@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../models/task.dart';
+import '../utils/item_info_sheet.dart';
 import 'calendar_date_picker.dart';
 import 'task_controller.dart';
 
@@ -67,6 +68,21 @@ class _TaskDetailViewState extends State<TaskDetailView> {
     super.dispose();
   }
 
+  void _showDropdown(BuildContext context) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => _TaskOptionsDropdown(
+        onDismiss: () => entry.remove(),
+        onInfo: () {
+          entry.remove();
+          showItemInfoSheet(context, creationDate: widget.task.creationDate);
+        },
+      ),
+    );
+    overlay.insert(entry);
+  }
+
   Future<void> _pickDate() async {
     final result = await showCalendarDatePicker(
       context,
@@ -98,7 +114,14 @@ class _TaskDetailViewState extends State<TaskDetailView> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(border: null),
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => _showDropdown(context),
+          child: const Icon(CupertinoIcons.ellipsis, size: 26),
+        ),
+      ),
       child: SafeArea(
         child: ListView(
           padding:
@@ -309,6 +332,57 @@ class _PriorityPicker extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _TaskOptionsDropdown extends StatelessWidget {
+  const _TaskOptionsDropdown({required this.onDismiss, required this.onInfo});
+  final VoidCallback onDismiss;
+  final VoidCallback onInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDismiss,
+          child: const SizedBox.expand(),
+        ),
+        Positioned(
+          top: topOffset,
+          right: 8,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 160),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x30000000),
+                  blurRadius: 20,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: GestureDetector(
+              onTap: onInfo,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Text(
+                  'Info',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: CupertinoColors.label.resolveFrom(context),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

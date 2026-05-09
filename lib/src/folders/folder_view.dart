@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../models/app_folder.dart';
 import '../tasks/task_controller.dart';
 import '../utils/fast_route.dart';
+import '../utils/item_info_sheet.dart';
 import 'create_folder_list_sheet.dart' show showCreateFolderListSheet, showRenameSheet;
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
@@ -110,6 +111,10 @@ class _FolderViewState extends State<FolderView> {
               if (mounted) setState(() => _currentFolder = updated);
             },
           );
+        },
+        onInfo: () {
+          entry.remove();
+          showItemInfoSheet(context, creationDate: _currentFolder.creationDate);
         },
       ),
     );
@@ -281,11 +286,13 @@ class _FolderOptionsDropdown extends StatelessWidget {
     required this.onDismiss,
     required this.onRename,
     required this.onChangeIcon,
+    required this.onInfo,
   });
 
   final VoidCallback onDismiss;
   final VoidCallback onRename;
   final VoidCallback onChangeIcon;
+  final VoidCallback onInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -304,6 +311,7 @@ class _FolderOptionsDropdown extends StatelessWidget {
             items: [
               _DropdownItem(label: 'Rename', onTap: onRename),
               _DropdownItem(label: 'Change Icon', onTap: onChangeIcon),
+              _DropdownItem(label: 'Info', onTap: onInfo),
             ],
           ),
         ),
