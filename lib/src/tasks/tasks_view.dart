@@ -294,37 +294,37 @@ class TasksView extends StatelessWidget {
                       ),
 
                     // Bottom section: Completed + Trash smart lists
-                    SliverToBoxAdapter(
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            child: Container(
-                              height: 0.5,
-                              color: CupertinoColors.separator
-                                  .resolveFrom(context),
+                    if (hasTrash)
+                      SliverToBoxAdapter(
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              child: Container(
+                                height: 0.5,
+                                color: CupertinoColors.separator
+                                    .resolveFrom(context),
+                              ),
                             ),
-                          ),
-                          // KEEP: Completed smart list — hidden for now, will be re-enabled later.
-                          // if (completedCount > 0)
-                          //   _ListItem(
-                          //     iconWidget: const Icon(
-                          //       CupertinoIcons.checkmark_circle_fill,
-                          //       size: 22,
-                          //       color: Color(0xFF34C759),
-                          //     ),
-                          //     label: 'Completed',
-                          //     onTap: () => Navigator.of(context).push(
-                          //       FastRoute<void>(
-                          //         builder: (_) => CompletedView(
-                          //           controller: controller,
-                          //           folderController: folderController,
-                          //         ),
-                          //       ),
-                          //     ),
-                          //   ),
-                          if (hasTrash)
+                            // KEEP: Completed smart list — hidden for now, will be re-enabled later.
+                            // if (completedCount > 0)
+                            //   _ListItem(
+                            //     iconWidget: const Icon(
+                            //       CupertinoIcons.checkmark_circle_fill,
+                            //       size: 22,
+                            //       color: Color(0xFF34C759),
+                            //     ),
+                            //     label: 'Completed',
+                            //     onTap: () => Navigator.of(context).push(
+                            //       FastRoute<void>(
+                            //         builder: (_) => CompletedView(
+                            //           controller: controller,
+                            //           folderController: folderController,
+                            //         ),
+                            //       ),
+                            //     ),
+                            //   ),
                             _ListItem(
                               iconWidget: Icon(
                                 CupertinoIcons.trash,
@@ -342,9 +342,9 @@ class TasksView extends StatelessWidget {
                                 ),
                               ),
                             ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
 
                     const SliverToBoxAdapter(child: SizedBox(height: 80)),
                   ],
