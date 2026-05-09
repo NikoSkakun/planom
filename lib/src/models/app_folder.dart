@@ -7,6 +7,8 @@ class AppFolder {
   final DateTime creationDate;
   final int sortOrder;
   final String? iconId; // null=default asset; SF-symbol key or absolute file path
+  final bool isDeleted;
+  final DateTime? deletedDate;
 
   AppFolder({
     String? id,
@@ -15,6 +17,8 @@ class AppFolder {
     DateTime? creationDate,
     this.sortOrder = 0,
     this.iconId,
+    this.isDeleted = false,
+    this.deletedDate,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate ?? DateTime.now();
 
@@ -25,6 +29,9 @@ class AppFolder {
     int? sortOrder,
     String? iconId,
     bool clearIconId = false,
+    bool? isDeleted,
+    DateTime? deletedDate,
+    bool clearDeletedDate = false,
   }) =>
       AppFolder(
         id: id,
@@ -34,6 +41,8 @@ class AppFolder {
         creationDate: creationDate,
         sortOrder: sortOrder ?? this.sortOrder,
         iconId: clearIconId ? null : (iconId ?? this.iconId),
+        isDeleted: isDeleted ?? this.isDeleted,
+        deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
       );
 
   Map<String, dynamic> toMap() => {
@@ -43,6 +52,8 @@ class AppFolder {
         'creationDate': creationDate.millisecondsSinceEpoch,
         'sortOrder': sortOrder,
         'iconId': iconId,
+        'isDeleted': isDeleted ? 1 : 0,
+        'deletedDate': deletedDate?.millisecondsSinceEpoch,
       };
 
   factory AppFolder.fromMap(Map<String, dynamic> map) => AppFolder(
@@ -53,5 +64,9 @@ class AppFolder {
             DateTime.fromMillisecondsSinceEpoch(map['creationDate'] as int),
         sortOrder: map['sortOrder'] as int? ?? 0,
         iconId: map['iconId'] as String?,
+        isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
+        deletedDate: map['deletedDate'] != null
+            ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)
+            : null,
       );
 }

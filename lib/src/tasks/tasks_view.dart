@@ -6,9 +6,11 @@ import '../folders/folder_icon_picker.dart';
 import '../folders/folder_view.dart';
 import '../folders/list_task_view.dart';
 import '../utils/fast_route.dart';
+import 'completed_view.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
 import 'today_view.dart';
+import 'trash_view.dart';
 import 'upcoming_view.dart';
 
 class TasksView extends StatelessWidget {
@@ -85,6 +87,32 @@ class TasksView extends StatelessWidget {
     }
   }
 
+  Future<bool> _confirmDelete(BuildContext context, String name,
+      {required bool isFolder}) async {
+    final result = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text('Move "$name" to Trash?'),
+        content: Text(isFolder
+            ? 'This folder and all its contents will be moved to Trash.'
+            : 'This list and all its tasks will be moved to Trash.'),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Move to Trash'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -106,6 +134,10 @@ class TasksView extends StatelessWidget {
                 final rootLists = folderController.listsIn(null);
                 final todayCount = controller.todayUncompletedCount;
                 final upcomingCount = controller.upcomingUncompletedCount;
+                final completedCount = controller.completedTasksCount;
+                final hasTrash = controller.trashedTasks.isNotEmpty ||
+                    folderController.trashedFolders.isNotEmpty ||
+                    folderController.trashedLists.isNotEmpty;
 
                 return CustomScrollView(
                   slivers: [
@@ -153,7 +185,7 @@ class TasksView extends StatelessWidget {
                               ),
                             ),
                           ),
-                          // Separator
+                          // Separator between smart lists and user folders/lists
                           Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
@@ -184,6 +216,8 @@ class TasksView extends StatelessWidget {
                               key: ValueKey(f.id),
                               direction: DismissDirection.endToStart,
                               background: _DeleteBackground(),
+                              confirmDismiss: (_) =>
+                                  _confirmDelete(context, f.name, isFolder: true),
                               onDismissed: (_) =>
                                   folderController.deleteFolderDeep(
                                 f.id,
@@ -229,6 +263,8 @@ class TasksView extends StatelessWidget {
                               key: ValueKey(l.id),
                               direction: DismissDirection.endToStart,
                               background: _DeleteBackground(),
+                              confirmDismiss: (_) =>
+                                  _confirmDelete(context, l.name, isFolder: false),
                               onDismissed: (_) async {
                                 await controller.deleteTasksForList(l.id);
                                 await folderController.deleteList(l.id);
@@ -254,6 +290,58 @@ class TasksView extends StatelessWidget {
                           );
                         },
                       ),
+
+                    // Bottom section: Completed + Trash smart lists
+                    SliverToBoxAdapter(
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            child: Container(
+                              height: 0.5,
+                              color: CupertinoColors.separator
+                                  .resolveFrom(context),
+                            ),
+                          ),
+                          if (completedCount > 0)
+                            _ListItem(
+                              iconWidget: const Icon(
+                                CupertinoIcons.checkmark_circle_fill,
+                                size: 22,
+                                color: Color(0xFF34C759),
+                              ),
+                              label: 'Completed',
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => CompletedView(
+                                    controller: controller,
+                                    folderController: folderController,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (hasTrash)
+                            _ListItem(
+                              iconWidget: Icon(
+                                CupertinoIcons.trash,
+                                size: 22,
+                                color: CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                              ),
+                              label: 'Trash',
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => TrashView(
+                                    taskController: controller,
+                                    folderController: folderController,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
 
                     const SliverToBoxAdapter(child: SizedBox(height: 80)),
                   ],
@@ -305,15 +393,17 @@ class _DeleteBackground extends StatelessWidget {
 
 class _ListItem extends StatelessWidget {
   const _ListItem({
-    required this.iconAsset,
     required this.label,
     required this.onTap,
+    this.iconAsset,
+    this.iconWidget,
     this.iconId,
     this.isFolder = false,
     this.count,
   });
 
-  final String iconAsset;
+  final String? iconAsset;
+  final Widget? iconWidget;
   final String? iconId;
   final bool isFolder;
   final String label;
@@ -322,9 +412,14 @@ class _ListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = iconId != null
-        ? buildFolderItemIcon(iconId, isFolder: isFolder)
-        : Image.asset(iconAsset, width: 22, height: 22);
+    final Widget icon;
+    if (iconWidget != null) {
+      icon = iconWidget!;
+    } else if (iconId != null) {
+      icon = buildFolderItemIcon(iconId, isFolder: isFolder);
+    } else {
+      icon = Image.asset(iconAsset!, width: 22, height: 22);
+    }
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

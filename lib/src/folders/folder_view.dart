@@ -35,6 +35,31 @@ class _FolderViewState extends State<FolderView> {
     _currentFolder = widget.folder;
   }
 
+  Future<bool> _confirmDelete(String name, {required bool isFolder}) async {
+    final result = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text('Move "$name" to Trash?'),
+        content: Text(isFolder
+            ? 'This folder and all its contents will be moved to Trash.'
+            : 'This list and all its tasks will be moved to Trash.'),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Move to Trash'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   Widget _proxyDecorator(
       Widget child, int index, Animation<double> animation) {
     return Container(
@@ -135,6 +160,8 @@ class _FolderViewState extends State<FolderView> {
                               key: ValueKey(f.id),
                               direction: DismissDirection.endToStart,
                               background: _DeleteBackground(),
+                              confirmDismiss: (_) =>
+                                  _confirmDelete(f.name, isFolder: true),
                               onDismissed: (_) =>
                                   widget.folderController.deleteFolderDeep(
                                 f.id,
@@ -181,6 +208,8 @@ class _FolderViewState extends State<FolderView> {
                               key: ValueKey(l.id),
                               direction: DismissDirection.endToStart,
                               background: _DeleteBackground(),
+                              confirmDismiss: (_) =>
+                                  _confirmDelete(l.name, isFolder: false),
                               onDismissed: (_) async {
                                 await widget.taskController
                                     .deleteTasksForList(l.id);

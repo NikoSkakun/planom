@@ -14,6 +14,8 @@ class Task extends AppItem {
   final String? listId;
   final int priority; // TaskPriority.index
   final int sortOrder; // 0 = not yet manually sorted; >0 = user-defined position
+  final bool isDeleted;
+  final DateTime? deletedDate;
 
   Task({
     String? id,
@@ -27,6 +29,8 @@ class Task extends AppItem {
     this.listId,
     this.priority = 0,
     this.sortOrder = 0,
+    this.isDeleted = false,
+    this.deletedDate,
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -45,6 +49,9 @@ class Task extends AppItem {
     bool clearListId = false,
     int? priority,
     int? sortOrder,
+    bool? isDeleted,
+    DateTime? deletedDate,
+    bool clearDeletedDate = false,
   }) {
     return Task(
       id: id,
@@ -58,6 +65,8 @@ class Task extends AppItem {
       listId: clearListId ? null : (listId ?? this.listId),
       priority: priority ?? this.priority,
       sortOrder: sortOrder ?? this.sortOrder,
+      isDeleted: isDeleted ?? this.isDeleted,
+      deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
     );
   }
 
@@ -73,6 +82,8 @@ class Task extends AppItem {
         'listId': listId,
         'priority': priority,
         'sortOrder': sortOrder,
+        'isDeleted': isDeleted ? 1 : 0,
+        'deletedDate': deletedDate?.millisecondsSinceEpoch,
       };
 
   factory Task.fromMap(Map<String, dynamic> map) => Task(
@@ -90,5 +101,9 @@ class Task extends AppItem {
         listId: map['listId'] as String?,
         priority: map['priority'] as int? ?? 0,
         sortOrder: map['sortOrder'] as int? ?? 0,
+        isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
+        deletedDate: map['deletedDate'] != null
+            ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)
+            : null,
       );
 }

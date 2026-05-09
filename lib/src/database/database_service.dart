@@ -11,7 +11,7 @@ import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 10;
+  static const _dbVersion = 11;
 
   Database? _db;
 
@@ -35,7 +35,9 @@ class DatabaseService {
             doTime INTEGER,
             listId TEXT,
             priority INTEGER NOT NULL DEFAULT 0,
-            sortOrder INTEGER NOT NULL DEFAULT 0
+            sortOrder INTEGER NOT NULL DEFAULT 0,
+            isDeleted INTEGER NOT NULL DEFAULT 0,
+            deletedDate INTEGER
           )
         ''');
         await db.execute('''
@@ -45,7 +47,9 @@ class DatabaseService {
             parentFolderId TEXT,
             creationDate INTEGER NOT NULL,
             sortOrder INTEGER NOT NULL DEFAULT 0,
-            iconId TEXT
+            iconId TEXT,
+            isDeleted INTEGER NOT NULL DEFAULT 0,
+            deletedDate INTEGER
           )
         ''');
         await db.execute('''
@@ -56,7 +60,9 @@ class DatabaseService {
             creationDate INTEGER NOT NULL,
             sortOrder INTEGER NOT NULL DEFAULT 0,
             color INTEGER,
-            iconId TEXT
+            iconId TEXT,
+            isDeleted INTEGER NOT NULL DEFAULT 0,
+            deletedDate INTEGER
           )
         ''');
         await db.execute('''
@@ -207,15 +213,38 @@ class DatabaseService {
           await db.execute(
               'ALTER TABLE note_folders ADD COLUMN iconId TEXT');
         }
+        if (oldVersion < 11) {
+          await db.execute(
+              'ALTER TABLE tasks ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE tasks ADD COLUMN deletedDate INTEGER');
+          await db.execute(
+              'ALTER TABLE folders ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE folders ADD COLUMN deletedDate INTEGER');
+          await db.execute(
+              'ALTER TABLE app_lists ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE app_lists ADD COLUMN deletedDate INTEGER');
+        }
       },
     );
   }
 
-  // Tasks — sorted by manual order first, then newest first for unsorted items
+  // Tasks — active (non-deleted), sorted by manual order first, then newest first
   Future<List<Task>> getTasks() async {
     final db = await _database;
     final rows = await db.query('tasks',
+        where: 'isDeleted = 0',
         orderBy: 'sortOrder ASC, creationDate DESC');
+    return rows.map(Task.fromMap).toList();
+  }
+
+  Future<List<Task>> getTrashedTasks() async {
+    final db = await _database;
+    final rows = await db.query('tasks',
+        where: 'isDeleted = 1',
+        orderBy: 'deletedDate DESC');
     return rows.map(Task.fromMap).toList();
   }
 
@@ -231,7 +260,38 @@ class DatabaseService {
         where: 'id = ?', whereArgs: [task.id]);
   }
 
-  Future<void> deleteTask(String id) async {
+  Future<void> softDeleteTask(String id, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'tasks',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> softDeleteTasksForList(
+      String listId, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'tasks',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'listId = ? AND isDeleted = 0',
+      whereArgs: [listId],
+    );
+  }
+
+  Future<void> restoreTask(String id) async {
+    final db = await _database;
+    await db.update(
+      'tasks',
+      {'isDeleted': 0, 'deletedDate': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> permanentlyDeleteTask(String id) async {
     final db = await _database;
     await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
   }
@@ -251,11 +311,20 @@ class DatabaseService {
     await batch.commit(noResult: true);
   }
 
-  // Task folders
+  // Task folders — active only
   Future<List<AppFolder>> getFolders() async {
     final db = await _database;
     final rows = await db.query('folders',
+        where: 'isDeleted = 0',
         orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(AppFolder.fromMap).toList();
+  }
+
+  Future<List<AppFolder>> getTrashedFolders() async {
+    final db = await _database;
+    final rows = await db.query('folders',
+        where: 'isDeleted = 1',
+        orderBy: 'deletedDate DESC');
     return rows.map(AppFolder.fromMap).toList();
   }
 
@@ -269,6 +338,26 @@ class DatabaseService {
     final db = await _database;
     await db.update('folders', folder.toMap(),
         where: 'id = ?', whereArgs: [folder.id]);
+  }
+
+  Future<void> softDeleteFolder(String id, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'folders',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> restoreFolder(String id) async {
+    final db = await _database;
+    await db.update(
+      'folders',
+      {'isDeleted': 0, 'deletedDate': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> deleteFolder(String id) async {
@@ -286,11 +375,20 @@ class DatabaseService {
     await batch.commit(noResult: true);
   }
 
-  // Lists
+  // Lists — active only
   Future<List<AppList>> getLists() async {
     final db = await _database;
     final rows = await db.query('app_lists',
+        where: 'isDeleted = 0',
         orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(AppList.fromMap).toList();
+  }
+
+  Future<List<AppList>> getTrashedLists() async {
+    final db = await _database;
+    final rows = await db.query('app_lists',
+        where: 'isDeleted = 1',
+        orderBy: 'deletedDate DESC');
     return rows.map(AppList.fromMap).toList();
   }
 
@@ -304,6 +402,26 @@ class DatabaseService {
     final db = await _database;
     await db.update('app_lists', list.toMap(),
         where: 'id = ?', whereArgs: [list.id]);
+  }
+
+  Future<void> softDeleteList(String id, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'app_lists',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> restoreList(String id) async {
+    final db = await _database;
+    await db.update(
+      'app_lists',
+      {'isDeleted': 0, 'deletedDate': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> deleteList(String id) async {

@@ -11,6 +11,7 @@ class TaskController with ChangeNotifier {
 
   final DatabaseService _db;
   List<Task> _tasks = [];
+  List<Task> _trashedTasks = [];
 
   TaskSortOrder _sortOrder = TaskSortOrder.defaultOrder;
   TaskSortOrder get sortOrder => _sortOrder;
@@ -75,8 +76,16 @@ class TaskController with ChangeNotifier {
   int uncompletedCountForList(String listId) =>
       _tasks.where((t) => t.listId == listId && !t.isCompleted).length;
 
+  List<Task> get allCompletedTasks =>
+      _tasks.where((t) => t.isCompleted).toList();
+
+  int get completedTasksCount => allCompletedTasks.length;
+
+  List<Task> get trashedTasks => List.unmodifiable(_trashedTasks);
+
   Future<void> load() async {
     _tasks = await _db.getTasks();
+    _trashedTasks = await _db.getTrashedTasks();
     _updateBadge();
     notifyListeners();
   }
@@ -108,46 +117,81 @@ class TaskController with ChangeNotifier {
   }
 
   Future<void> deleteTask(String id) async {
-    await _db.deleteTask(id);
+    final i = _tasks.indexWhere((t) => t.id == id);
+    if (i == -1) return;
+    final now = DateTime.now();
+    final trashed = _tasks[i].copyWith(isDeleted: true, deletedDate: now);
+    await _db.softDeleteTask(id, now);
     _tasks = _tasks.where((t) => t.id != id).toList();
+    _trashedTasks = [trashed, ..._trashedTasks];
     _updateBadge();
     notifyListeners();
   }
 
   Future<void> deleteTasksForList(String listId) async {
-    await _db.deleteTasksForList(listId);
+    final now = DateTime.now();
+    await _db.softDeleteTasksForList(listId, now);
+    final toTrash = _tasks
+        .where((t) => t.listId == listId)
+        .map((t) => t.copyWith(isDeleted: true, deletedDate: now))
+        .toList();
     _tasks = _tasks.where((t) => t.listId != listId).toList();
+    _trashedTasks = [...toTrash, ..._trashedTasks];
+    _updateBadge();
+    notifyListeners();
+  }
+
+  Future<void> permanentlyDeleteTask(String id) async {
+    await _db.permanentlyDeleteTask(id);
+    _trashedTasks = _trashedTasks.where((t) => t.id != id).toList();
+    notifyListeners();
+  }
+
+  Future<void> restoreTask(String id, String? targetListId) async {
+    final i = _trashedTasks.indexWhere((t) => t.id == id);
+    if (i == -1) return;
+    final orig = _trashedTasks[i];
+    final restored = Task(
+      id: orig.id,
+      creationDate: orig.creationDate,
+      iconId: orig.iconId,
+      title: orig.title,
+      note: orig.note,
+      isCompleted: orig.isCompleted,
+      dueDate: orig.dueDate,
+      doTime: orig.doTime,
+      listId: targetListId,
+      priority: orig.priority,
+      sortOrder: orig.sortOrder,
+    );
+    await _db.restoreTask(id);
+    if (targetListId != orig.listId) {
+      await _db.updateTask(restored);
+    }
+    _trashedTasks = List.of(_trashedTasks)..removeAt(i);
+    _tasks = [restored, ..._tasks];
     _updateBadge();
     notifyListeners();
   }
 
   /// Reorders tasks in a scope (inbox when [listId] is null, or a specific list).
-  /// [oldIndex] and [newIndex] are positions in the displayed list (after
-  /// [_completedLast] is applied), matching what the UI's SliverReorderableList
-  /// reports.
   Future<void> reorderTasks({
     required String? listId,
     required int oldIndex,
     required int newIndex,
   }) async {
-    // Build the currently displayed list for this scope.
     final scopeRaw = _tasks.where((t) => t.listId == listId).toList();
     _sortByDefault(scopeRaw);
     final displayed = _completedLast(scopeRaw);
 
-    // SliverReorderableList passes newIndex *before* the removed item is
-    // taken out; adjust when moving downward.
     if (newIndex > oldIndex) newIndex--;
     final task = displayed.removeAt(oldIndex);
     displayed.insert(newIndex, task);
 
-    // Assign sequential sortOrder so the new positions are persisted (1-indexed,
-    // queried ASC so 1 = top of list).
     for (int i = 0; i < displayed.length; i++) {
       displayed[i] = displayed[i].copyWith(sortOrder: i + 1);
     }
 
-    // Patch _tasks in place.
     for (final updated in displayed) {
       final idx = _tasks.indexWhere((t) => t.id == updated.id);
       if (idx != -1) _tasks[idx] = updated;
