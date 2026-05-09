@@ -134,70 +134,128 @@ class TrashView extends StatelessWidget {
     }
   }
 
+  // ── Menu ─────────────────────────────────────────────────────────────────
+
+  void _showMenu(BuildContext context) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _confirmEmptyTrash(context);
+            },
+            child: const Text('Empty Trash'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmEmptyTrash(BuildContext context) async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('Empty Trash?'),
+        content: const Text(
+          'All items in Trash will be permanently deleted. This cannot be undone.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete All'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await taskController.permanentlyDeleteAllTrashed();
+    await folderController.permanentlyDeleteAllTrashed();
+  }
+
   // ── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        border: null,
-        middle: Text('Trash'),
-      ),
-      child: SafeArea(
-        child: ListenableBuilder(
-          listenable: Listenable.merge([taskController, folderController]),
-          builder: (context, _) {
-            final tasks = taskController.trashedTasks;
-            final lists = folderController.trashedLists;
-            final folders = folderController.trashedFolders;
+    return ListenableBuilder(
+      listenable: Listenable.merge([taskController, folderController]),
+      builder: (context, _) {
+        final tasks = taskController.trashedTasks;
+        final lists = folderController.trashedLists;
+        final folders = folderController.trashedFolders;
+        final isEmpty = tasks.isEmpty && lists.isEmpty && folders.isEmpty;
 
-            if (tasks.isEmpty && lists.isEmpty && folders.isEmpty) {
-              return const Center(
-                child: Text(
-                  'Trash is empty',
-                  style: TextStyle(color: CupertinoColors.secondaryLabel),
-                ),
-              );
-            }
-
-            final entries = <_TrashEntry>[
-              for (final t in tasks) _TrashEntry.task(t),
-              for (final l in lists) _TrashEntry.list(l),
-              for (final f in folders) _TrashEntry.folder(f),
-            ]..sort((a, b) {
-                final da = a.deletedDate ?? DateTime(0);
-                final db = b.deletedDate ?? DateTime(0);
-                return db.compareTo(da);
-              });
-
-            return CustomScrollView(
-              slivers: [
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) {
-                      final entry = entries[i];
-                      return Dismissible(
-                        key: ValueKey(entry.id),
-                        direction: DismissDirection.horizontal,
-                        // Swipe right → Put Back (blue)
-                        background: const _PutBackBackground(),
-                        // Swipe left → Delete permanently (red)
-                        secondaryBackground: const _DeleteBackground(),
-                        confirmDismiss: (direction) =>
-                            _confirmDismiss(context, direction, entry),
-                        onDismissed: (direction) =>
-                            _handleDismissed(direction, entry),
-                        child: _TrashRow(entry: entry),
-                      );
-                    },
-                    childCount: entries.length,
+        return CupertinoPageScaffold(
+          navigationBar: CupertinoNavigationBar(
+            border: null,
+            middle: const Text('Trash'),
+            trailing: isEmpty
+                ? null
+                : CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minSize: 0,
+                    onPressed: () => _showMenu(context),
+                    child: const Icon(CupertinoIcons.ellipsis_circle),
                   ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+          ),
+          child: SafeArea(
+            child: isEmpty
+                ? const Center(
+                    child: Text(
+                      'Trash is empty',
+                      style:
+                          TextStyle(color: CupertinoColors.secondaryLabel),
+                    ),
+                  )
+                : Builder(builder: (context) {
+                    final entries = <_TrashEntry>[
+                      for (final t in tasks) _TrashEntry.task(t),
+                      for (final l in lists) _TrashEntry.list(l),
+                      for (final f in folders) _TrashEntry.folder(f),
+                    ]..sort((a, b) {
+                        final da = a.deletedDate ?? DateTime(0);
+                        final db = b.deletedDate ?? DateTime(0);
+                        return db.compareTo(da);
+                      });
+                    return CustomScrollView(
+                      slivers: [
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, i) {
+                              final entry = entries[i];
+                              return Dismissible(
+                                key: ValueKey(entry.id),
+                                direction: DismissDirection.horizontal,
+                                background: const _PutBackBackground(),
+                                secondaryBackground: const _DeleteBackground(),
+                                confirmDismiss: (direction) =>
+                                    _confirmDismiss(context, direction, entry),
+                                onDismissed: (direction) =>
+                                    _handleDismissed(direction, entry),
+                                child: _TrashRow(entry: entry),
+                              );
+                            },
+                            childCount: entries.length,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+          ),
+        );
+      },
     );
   }
 }

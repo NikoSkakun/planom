@@ -7,6 +7,7 @@ import 'notes/notes_view.dart';
 import 'routines/routine_controller.dart';
 import 'routines/routine_creation_view.dart';
 import 'routines/routines_view.dart';
+import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
 import 'tasks/task_controller.dart';
@@ -21,6 +22,7 @@ class HomeShell extends StatefulWidget {
     required this.folderController,
     required this.noteController,
     required this.routineController,
+    required this.backupService,
   });
 
   static const routeName = '/';
@@ -30,6 +32,7 @@ class HomeShell extends StatefulWidget {
   final FolderController folderController;
   final NoteController noteController;
   final RoutineController routineController;
+  final BackupService backupService;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -37,8 +40,8 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   late final CupertinoTabController _tabController;
-  // 4 tabs: Tasks(0) Notes(1) Calendar(2) Routines(3)
-  final _navigatorKeys = List.generate(4, (_) => GlobalKey<NavigatorState>());
+  // 5 tabs: Tasks(0) Notes(1) Calendar(2) Routines(3) Settings(4)
+  final _navigatorKeys = List.generate(5, (_) => GlobalKey<NavigatorState>());
   late final List<_DepthObserver> _depthObservers;
   final _activeListId = ValueNotifier<String?>(null);
   final _activeDueDate = ValueNotifier<DateTime?>(null);
@@ -76,6 +79,12 @@ class _HomeShellState extends State<HomeShell> {
       _DepthObserver(
         onChanged: (depth, trackedCount) {
           if (_lastTabIndex == 3) _showPlusButton.value = depth <= 1;
+        },
+      ),
+      // Settings tab: always hide +.
+      _DepthObserver(
+        onChanged: (depth, trackedCount) {
+          if (_lastTabIndex == 4) _showPlusButton.value = false;
         },
       ),
     ];
@@ -124,6 +133,8 @@ class _HomeShellState extends State<HomeShell> {
       case 0:
         _showPlusButton.value = _depthObservers[0].trackedCount == 0;
       case 1:
+        _showPlusButton.value = false;
+      case 4:
         _showPlusButton.value = false;
       default:
         _showPlusButton.value = _depthObservers[tappedIndex].depth <= 1;
@@ -206,16 +217,27 @@ class _HomeShellState extends State<HomeShell> {
                 ),
                 label: 'Routines',
               ),
+              BottomNavigationBarItem(
+                icon: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Icon(CupertinoIcons.gear_alt, size: 24),
+                ),
+                activeIcon: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Icon(
+                    CupertinoIcons.gear_alt_fill,
+                    size: 24,
+                    color: Color(0xFFFF4D00),
+                  ),
+                ),
+                label: 'Settings',
+              ),
             ],
           ),
           tabBuilder: (context, index) {
             return CupertinoTabView(
               navigatorKey: _navigatorKeys[index],
               navigatorObservers: [_depthObservers[index]],
-              routes: {
-                SettingsView.routeName: (_) =>
-                    SettingsView(controller: widget.settingsController),
-              },
               builder: (context) => switch (index) {
                 0 => TasksView(
                     controller: widget.taskController,
@@ -229,7 +251,11 @@ class _HomeShellState extends State<HomeShell> {
                     folderController: widget.folderController,
                     resetSignal: _calendarResetSignal,
                   ),
-                _ => RoutinesView(controller: widget.routineController),
+                3 => RoutinesView(controller: widget.routineController),
+                _ => SettingsView(
+                    controller: widget.settingsController,
+                    backupService: widget.backupService,
+                  ),
               },
             );
           },

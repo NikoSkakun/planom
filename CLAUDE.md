@@ -21,8 +21,9 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 - **Database**: `sqflite` v2, single file `planom.db`, current schema version **11**
 - **State**: Flutter `ChangeNotifier` — no third-party state library
 - **Routing**: `FastRoute` (custom `CupertinoPageRoute` subclass with 180 ms transition, in `lib/src/utils/fast_route.dart`) used everywhere instead of bare `CupertinoPageRoute`
-- **Icons**: `cupertino_icons` package required for `CupertinoIcons`; custom PNG tab-bar icons in `assets/icons/tab_bar/`; list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`; use `Image.asset` (not `ImageIcon`) when original PNG colors must be preserved. Smart lists that have no PNG asset (Completed, Trash) use `CupertinoIcons` passed as `iconWidget` to `_ListItem`.
+- **Icons**: `cupertino_icons` package required for `CupertinoIcons`; custom PNG tab-bar icons in `assets/icons/tab_bar/` (Tasks/Notes/Calendar/Routines use PNGs; Settings tab uses `CupertinoIcons.gear_alt` / `gear_alt_fill`); list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`; use `Image.asset` (not `ImageIcon`) when original PNG colors must be preserved. Smart lists that have no PNG asset (Completed, Trash) use `CupertinoIcons` passed as `iconWidget` to `_ListItem`.
 - **App badge**: `flutter_app_badger ^1.5.0` (discontinued but functional) — set by `TaskController._updateBadge()` to `todayUncompletedCount`; iOS badge permission requested in `AppDelegate.swift` via `UNUserNotificationCenter`
+- **Backup / share**: `share_plus ^7.2.1` — iOS share sheet for exporting `.planom` backup files; `file_picker ^8.0.0` — document picker for importing backup files
 
 ## Architecture
 
@@ -59,7 +60,7 @@ AppFolder (lib/src/models/app_folder.dart)   ← NOT an AppItem
   parentFolderId: String?     ← null = root level
   creationDate: DateTime
   sortOrder: int
-  iconId: String?             ← null = default folder asset
+  iconId: String?             ← null = default folder asset; SF-symbol key or relative file path (see custom icons)
   isDeleted: bool
   deletedDate: DateTime?
 
@@ -70,7 +71,7 @@ AppList (lib/src/models/app_list.dart)   ← NOT an AppItem
   creationDate: DateTime
   sortOrder: int
   color: int?                 ← ARGB; null = no color accent
-  iconId: String?             ← null = default list asset
+  iconId: String?             ← null = default list asset; SF-symbol key or relative file path (see custom icons)
   isDeleted: bool
   deletedDate: DateTime?
 
@@ -108,8 +109,20 @@ RoutineEntry (lib/src/models/routine_entry.dart)   ← NOT an AppItem; no iconId
 
 Permanent deletion (from Trash) removes the row from the DB:
 - `TaskController.permanentlyDeleteTask(id)`
+- `TaskController.permanentlyDeleteAllTrashed()` — bulk hard-delete all trashed tasks
 - `FolderController.permanentlyDeleteList(id)`
 - `FolderController.permanentlyDeleteFolder(id)`
+- `FolderController.permanentlyDeleteAllTrashed()` — bulk hard-delete all trashed lists and folders
+
+### Custom icon storage (`lib/src/folders/folder_icon_picker.dart`)
+
+Custom photo icons for folders and lists are stored as **relative paths** (`icons/<timestamp>.<ext>`) under the app's documents directory. This is critical for iOS — absolute paths break after every reinstall because the app container UUID changes.
+
+- `initFolderIconService()` — called once in `main.dart` before `runApp`; caches `getApplicationDocumentsDirectory()` so path resolution is synchronous during widget builds
+- `isCustomIconId(iconId)` — returns `true` for relative paths (`icons/…`) and legacy absolute paths (`/…`)
+- `resolveCustomIconPath(iconId)` — returns the absolute path at runtime using the cached docs dir; handles both new relative format and legacy absolute paths (with graceful fallback)
+- `buildFolderItemIcon(iconId, isFolder)` — synchronous widget builder; uses `resolveCustomIconPath` for custom icons and `folderItemIconData` for SF-symbol keys; falls back to the default PNG on error
+- **Legacy absolute paths** (stored before this fix) still display if the file exists (e.g. on first launch after an in-place update on device), and fall back to the default icon otherwise; re-picking the icon writes the new relative format
 
 ### Database (`lib/src/database/database_service.dart`)
 
@@ -137,8 +150,14 @@ Key query methods (tasks):
 - `softDeleteTask(id, deletedDate)` / `softDeleteTasksForList(listId, deletedDate)`
 - `restoreTask(id)` — sets `isDeleted = 0, deletedDate = NULL`
 - `permanentlyDeleteTask(id)` — hard `DELETE`
+- `clearTrashedTasks()` / `clearTrashedFolders()` / `clearTrashedLists()` — bulk `DELETE WHERE isDeleted = 1` (used by "Empty Trash")
 
 Equivalent soft-delete/restore/trash methods exist for `folders` and `app_lists`.
+
+Backup methods (no filters — export includes active + trashed items):
+- `exportTasks()` / `exportFolders()` / `exportLists()` / `exportNoteFolders()` / `exportNotes()` / `exportRoutines()` / `exportRoutineEntries()` — return `List<Map<String, dynamic>>` (raw sqflite rows)
+- `clearAllData()` — deletes all rows from all 7 tables (used before import)
+- `importTasks(maps)` / `importFolders(maps)` / `importLists(maps)` / `importNoteFolders(maps)` / `importNotes(maps)` / `importRoutines(maps)` / `importRoutineEntries(maps)` — batch-insert from raw maps
 
 Routine DB schema:
 - `routines` — stores routine definitions (all Routine fields; `weekdays` stored as comma-separated string e.g. `"0,1,2,3,4,5,6"`)
@@ -162,6 +181,7 @@ Routine DB schema:
   - `deleteTasksForList(listId)` — bulk soft-delete (called when list is trashed)
   - `restoreTask(id, targetListId)` — moves from `_trashedTasks` back to `_tasks`; if `targetListId` differs from the original `listId` (e.g. list was trashed), updates the DB row too
   - `permanentlyDeleteTask(id)` — hard delete from `_trashedTasks` + DB
+  - `permanentlyDeleteAllTrashed()` — bulk hard-delete all items in `_trashedTasks`; used by "Empty Trash"
   - `sortOrder` / `setSortOrder(TaskSortOrder)` — affects all list views
   - `reorderTasks({listId, oldIndex, newIndex})` — manual drag reorder within a scope
 
@@ -179,6 +199,7 @@ Routine DB schema:
   - `deleteFolderDeep(id, onDeleteList)` — recursive soft-delete; `onDeleteList` is `TaskController.deleteTasksForList`
   - `restoreList(id, targetFolderId)`, `restoreFolder(id, targetParentId)`
   - `permanentlyDeleteList(id)`, `permanentlyDeleteFolder(id)`
+  - `permanentlyDeleteAllTrashed()` — bulk hard-delete all trashed lists and folders; used by "Empty Trash"
   - `reorderFolders(parentId?, old, new)`, `reorderLists(folderId?, old, new)`
 
 **`RoutineController`** (`lib/src/routines/routine_controller.dart`)
@@ -192,9 +213,15 @@ Routine DB schema:
 **`SettingsController`** (`lib/src/settings/settings_controller.dart`)
 - Manages `ThemeMode`; mapped to `CupertinoThemeData.brightness` in `app.dart`
 
+**`BackupService`** (`lib/src/settings/backup_service.dart`)
+- Not a `ChangeNotifier`; created in `main.dart` alongside controllers and passed through `MyApp` → `HomeShell` → `SettingsView`
+- `exportBackup()` — reads all 7 tables (including trashed items), collects custom icon image bytes (base64), writes a `planom_backup_YYYY-MM-DD.planom` JSON file to the temp directory, shares it via iOS share sheet. Custom iconIds are normalised to relative paths (`icons/<filename>`) in the export; image bytes are stored under a top-level `customIcons` map keyed by relative path.
+- `importBackup()` — opens the file picker, parses the JSON, writes custom icon files to `<docsDir>/icons/`, clears all DB tables, bulk-inserts all records, then calls `load()` on each controller. Returns `true` on success, `false` if the file was invalid or the picker was cancelled.
+- Backup format: JSON with `.planom` extension, `version: 1`. Top-level keys: `version`, `exportDate`, `customIcons`, `tasks`, `folders`, `app_lists`, `note_folders`, `notes`, `routines`, `routine_entries`.
+
 ### App shell (`lib/src/home_shell.dart`)
 
-`HomeShell` is a `StatefulWidget` that wraps a `CupertinoTabScaffold` (**4 tabs**: Tasks(0) / Notes(1) / Calendar(2) / Routines(3)) in a `Stack` with a floating orange `+` button (52×52, `Color(0xFFFF4D00)`) above the tab bar. Key state:
+`HomeShell` is a `StatefulWidget` that wraps a `CupertinoTabScaffold` (**5 tabs**: Tasks(0) / Notes(1) / Calendar(2) / Routines(3) / Settings(4)) in a `Stack` with a floating orange `+` button (52×52, `Color(0xFFFF4D00)`) above the tab bar. Key state:
 - `_navigatorKeys`: per-tab `GlobalKey<NavigatorState>` — used to pop-to-root on same-tab re-tap
 - `_depthObservers`: per-tab `_DepthObserver extends NavigatorObserver` — tracks push/pop depth AND counts routes matching `trackedRouteName`
 - `_showPlusButton`: `ValueNotifier<bool>` toggled by `_depthObservers`; passed to `ValueListenableBuilder` that wraps the `Positioned` button
@@ -206,6 +233,7 @@ Routine DB schema:
 - **Tab 0 (Tasks)**: shown whenever no `TaskDetailView` is on the stack — i.e. `_depthObservers[0].trackedCount == 0`. Visible on TasksView, InboxView, TodayView, CompletedView, TrashView, FolderView, ListTaskView at any nesting depth; hidden only inside the task edit screen.
 - **Tab 1 (Notes)**: always hidden — Notes manages its own UI.
 - **Tabs 2 & 3 (Calendar / Routines)**: hidden when depth > 1 (any push beyond the tab root).
+- **Tab 4 (Settings)**: always hidden.
 - `_DepthObserver` accepts an optional `trackedRouteName`; `trackedCount` increments/decrements as matching routes are pushed/popped. Tab 0's observer tracks `'task_detail'`.
 - All `TaskDetailView` pushes use `RouteSettings(name: TaskDetailView.routeName)` (`'task_detail'`) so the observer can identify them.
 
@@ -215,9 +243,9 @@ Routine DB schema:
 
 ### Navigation
 
-- `MyApp.onGenerateRoute` in `app.dart` handles the root `/` and `/settings` routes using `FastRoute`
+- `MyApp.onGenerateRoute` in `app.dart` handles the root `/` route (→ `HomeShell`) and the legacy `/settings` route (→ bare `SettingsView` without backup) using `FastRoute`
 - In-tab navigation (e.g. Tasks → Inbox, Inbox → TaskDetail) uses `Navigator.of(context).push(FastRoute(...))` directly
-- `CupertinoTabView.routes` registers the `/settings` route inside each tab so it pushes within the tab navigator
+- Settings is a dedicated tab (index 4); it is no longer registered as a pushed route inside individual tab navigators
 
 ### Tasks feature (`lib/src/tasks/`)
 
@@ -228,7 +256,7 @@ Routine DB schema:
 | `today_view.dart` | Tasks due today + overdue (`dueDate ≤ today`); sets `activeDueDate` so `+` pre-fills today; overdue tasks show date in red |
 | `upcoming_view.dart` | Tasks with `dueDate > today`, sorted by date; grouped by date header |
 | `completed_view.dart` | All non-trashed completed tasks across every scope; swipe-to-delete sends to Trash; no count badge on entry |
-| `trash_view.dart` | All trashed tasks + lists + folders, sorted by `deletedDate DESC`; **swipe right → Put Back** (blue background, confirmation shows restore destination); **swipe left → Delete Permanently** (red background, confirmation required); no count badge on entry |
+| `trash_view.dart` | All trashed tasks + lists + folders, sorted by `deletedDate DESC`; **swipe right → Put Back** (blue, confirmation shows restore destination); **swipe left → Delete Permanently** (red, confirmation required); **`⋯` nav bar button → Empty Trash** (action sheet + confirmation dialog, only shown when trash is non-empty); no count badge on entry |
 | `task_detail_view.dart` | Edit screen; "Done" nav bar button saves via `controller.updateTask`; `routeName = 'task_detail'` used by `_DepthObserver` to hide the global `+` button |
 | `task_creation_sheet.dart` | Modal bottom sheet (root navigator); title (sentence-cap) + note + date + list picker + Add; accepts `initialListId` and `initialDueDate` |
 | `calendar_date_picker.dart` | Date+time picker dialog; `formatTaskDate(DateTime, {int? doTime})` and `formatDoTime(int)` helpers; returns `(DateTime?, int?)?` — outer null = barrier dismiss (no change), `(null,null)` = No Date, `(date, time?)` = selection |
@@ -256,9 +284,18 @@ Routine DB schema:
 | `folder_view.dart` | Subfolder/list browser inside a folder; reorderable via `SliverReorderableList`; swipe-to-delete with `confirmDismiss` dialog; bottom `+` button opens `CreateFolderListSheet` scoped to this folder |
 | `list_task_view.dart` | Task list for a named list; sets `activeListId` on enter/exit so the global `+` pre-fills the list; dropdown menu for icon/color change |
 | `folder_controller.dart` | Owns `_folders`, `_lists`, `_trashedFolders`, `_trashedLists`; soft-delete and restore; recursive `deleteFolderDeep` |
-| `folder_icon_picker.dart` | `buildFolderItemIcon(iconId, isFolder)` — renders a 22×22 icon from an SF-symbol key or falls back to the default PNG; `showFolderIconPickerSheet` — modal picker |
+| `folder_icon_picker.dart` | Custom icon storage and rendering. `initFolderIconService()` caches docs dir at startup. `buildFolderItemIcon(iconId, isFolder)` renders a 22×22 icon (file image, SF-symbol, or default PNG). `isCustomIconId(iconId)` / `resolveCustomIconPath(iconId)` — path helpers. `showFolderIconPickerSheet` — modal picker that writes relative paths (`icons/<ts>.<ext>`). |
 | `create_folder_list_sheet.dart` | `showCreateFolderListSheet` — bottom sheet to create a new folder or list, optionally scoped to a parent folder |
 | `list_color_picker.dart` | Color swatch picker for list accent color |
+
+### Settings feature (`lib/src/settings/`)
+
+| File | Purpose |
+|------|---------|
+| `settings_controller.dart` | `ChangeNotifier` managing `ThemeMode`; persisted via `SettingsService` |
+| `settings_service.dart` | Persists `ThemeMode` to `SharedPreferences` |
+| `settings_view.dart` | Settings tab root (`StatefulWidget`); **Appearance** section (Light/System/Dark segmented control); **Data** section with Export Backup and Import Backup rows (only rendered when `backupService` is non-null). Loading spinner shown in place of chevron while operation is in progress. |
+| `backup_service.dart` | `exportBackup()` — serialises all data + custom icon image bytes to `.planom` JSON, shares via share sheet. `importBackup()` — picks a file, validates, restores icon files, clears DB, re-inserts data, reloads all controllers. |
 
 ### Routines feature (`lib/src/routines/`)
 

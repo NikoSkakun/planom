@@ -147,6 +147,12 @@ class TaskController with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> permanentlyDeleteAllTrashed() async {
+    await _db.clearTrashedTasks();
+    _trashedTasks = [];
+    notifyListeners();
+  }
+
   Future<void> restoreTask(String id, String? targetListId) async {
     final i = _trashedTasks.indexWhere((t) => t.id == id);
     if (i == -1) return;

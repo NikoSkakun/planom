@@ -7,6 +7,7 @@ import 'folders/folder_controller.dart';
 import 'home_shell.dart';
 import 'notes/note_controller.dart';
 import 'routines/routine_controller.dart';
+import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
 import 'tasks/task_controller.dart';
@@ -20,6 +21,7 @@ class MyApp extends StatelessWidget {
     required this.folderController,
     required this.noteController,
     required this.routineController,
+    required this.backupService,
   });
 
   final SettingsController settingsController;
@@ -27,6 +29,7 @@ class MyApp extends StatelessWidget {
   final FolderController folderController;
   final NoteController noteController;
   final RoutineController routineController;
+  final BackupService backupService;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +65,7 @@ class MyApp extends StatelessWidget {
                     folderController: folderController,
                     noteController: noteController,
                     routineController: routineController,
+                    backupService: backupService,
                   ),
           ),
         );

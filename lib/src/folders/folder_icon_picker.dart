@@ -46,34 +46,57 @@ IconData folderItemIconData(String iconId) => switch (iconId) {
       _ => CupertinoIcons.circle_fill,
     };
 
-bool _isFilePath(String iconId) => iconId.startsWith('/');
+// Cached app docs path — populated by initFolderIconService() in main.dart.
+String? _docsPath;
+
+/// Call once at startup (before runApp) to cache the documents directory.
+/// This makes custom icon resolution synchronous during widget builds.
+Future<void> initFolderIconService() async {
+  _docsPath = (await getApplicationDocumentsDirectory()).path;
+}
+
+/// Returns true for custom-image iconIds (relative or legacy absolute paths).
+bool isCustomIconId(String? iconId) {
+  if (iconId == null) return false;
+  return iconId.startsWith('icons/') || iconId.startsWith('/');
+}
+
+/// Resolves a custom iconId to an absolute file path.
+/// Returns null if the docs dir isn't cached yet or the format is unrecognised.
+String? resolveCustomIconPath(String iconId) {
+  if (iconId.startsWith('/')) return iconId; // legacy absolute path
+  if (iconId.startsWith('icons/') && _docsPath != null) {
+    return '$_docsPath/$iconId';
+  }
+  return null;
+}
 
 /// Renders the appropriate icon widget for a folder/list row (22×22).
 Widget buildFolderItemIcon(String? iconId, {required bool isFolder}) {
+  final defaultAsset =
+      isFolder ? 'assets/icons/folder.png' : 'assets/icons/list.png';
+
   if (iconId == null) {
-    return Image.asset(
-      isFolder ? 'assets/icons/folder.png' : 'assets/icons/list.png',
-      width: 22,
-      height: 22,
-    );
+    return Image.asset(defaultAsset, width: 22, height: 22);
   }
-  if (_isFilePath(iconId)) {
+
+  final filePath = resolveCustomIconPath(iconId);
+  if (filePath != null) {
     return SizedBox(
       width: 22,
       height: 22,
       child: Image.file(
-        File(iconId),
+        File(filePath),
         width: 22,
         height: 22,
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => Image.asset(
-          isFolder ? 'assets/icons/folder.png' : 'assets/icons/list.png',
-          width: 22,
-          height: 22,
-        ),
+        errorBuilder: (_, __, ___) =>
+            Image.asset(defaultAsset, width: 22, height: 22),
       ),
     );
   }
+
+  // SF-symbol key
   return SizedBox(
     width: 22,
     height: 22,
@@ -88,22 +111,23 @@ Widget buildFolderItemIcon(String? iconId, {required bool isFolder}) {
 }
 
 /// Copies [source] into the app's documents directory under `icons/` and
-/// returns the destination absolute path.
+/// returns the **relative** path (`icons/<timestamp><ext>`) that survives
+/// app reinstalls.
 Future<String> _copyIconToDocuments(String sourcePath) async {
-  final docs = await getApplicationDocumentsDirectory();
-  final iconsDir = Directory(p.join(docs.path, 'icons'));
+  _docsPath ??= (await getApplicationDocumentsDirectory()).path;
+  final iconsDir = Directory('$_docsPath/icons');
   if (!iconsDir.existsSync()) iconsDir.createSync(recursive: true);
   final ext = p.extension(sourcePath);
-  final dest = p.join(iconsDir.path, '${DateTime.now().millisecondsSinceEpoch}$ext');
-  await File(sourcePath).copy(dest);
-  return dest;
+  final filename = '${DateTime.now().millisecondsSinceEpoch}$ext';
+  await File(sourcePath).copy('$_docsPath/icons/$filename');
+  return 'icons/$filename'; // relative — stable across rebuilds
 }
 
-/// Opens the system photo picker and returns the copied file path, or null if
-/// the user cancelled.
+/// Opens the system photo picker and returns the relative icon path, or null.
 Future<String?> pickCustomIcon() async {
   final picker = ImagePicker();
-  final xfile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+  final xfile =
+      await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
   if (xfile == null) return null;
   return _copyIconToDocuments(xfile.path);
 }
@@ -301,7 +325,8 @@ class _IconTile extends StatelessWidget {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: color ?? CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          color: color ??
+              CupertinoColors.tertiarySystemFill.resolveFrom(context),
           borderRadius: BorderRadius.circular(12),
           border: isSelected
               ? Border.all(

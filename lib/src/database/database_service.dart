@@ -559,4 +559,141 @@ class DatabaseService {
     await db.update('routine_entries', entry.toMap(),
         where: 'id = ?', whereArgs: [entry.id]);
   }
+
+  Future<void> clearTrashedTasks() async {
+    final db = await _database;
+    await db.delete('tasks', where: 'isDeleted = 1');
+  }
+
+  Future<void> clearTrashedFolders() async {
+    final db = await _database;
+    await db.delete('folders', where: 'isDeleted = 1');
+  }
+
+  Future<void> clearTrashedLists() async {
+    final db = await _database;
+    await db.delete('app_lists', where: 'isDeleted = 1');
+  }
+
+  // ── Backup / Restore ─────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> exportTasks() async {
+    final db = await _database;
+    final rows = await db.query('tasks');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> exportFolders() async {
+    final db = await _database;
+    final rows = await db.query('folders');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> exportLists() async {
+    final db = await _database;
+    final rows = await db.query('app_lists');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> exportNoteFolders() async {
+    final db = await _database;
+    final rows = await db.query('note_folders');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> exportNotes() async {
+    final db = await _database;
+    final rows = await db.query('notes');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> exportRoutines() async {
+    final db = await _database;
+    final rows = await db.query('routines');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> exportRoutineEntries() async {
+    final db = await _database;
+    final rows = await db.query('routine_entries');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<void> clearAllData() async {
+    final db = await _database;
+    await db.delete('routine_entries');
+    await db.delete('routines');
+    await db.delete('notes');
+    await db.delete('note_folders');
+    await db.delete('app_lists');
+    await db.delete('folders');
+    await db.delete('tasks');
+  }
+
+  Future<void> importTasks(List<Map<String, dynamic>> maps) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final m in maps) {
+      batch.insert('tasks', m, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> importFolders(List<Map<String, dynamic>> maps) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final m in maps) {
+      batch.insert('folders', m, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> importLists(List<Map<String, dynamic>> maps) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final m in maps) {
+      batch.insert('app_lists', m,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> importNoteFolders(List<Map<String, dynamic>> maps) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final m in maps) {
+      batch.insert('note_folders', m,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> importNotes(List<Map<String, dynamic>> maps) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final m in maps) {
+      batch.insert('notes', m, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> importRoutines(List<Map<String, dynamic>> maps) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final m in maps) {
+      batch.insert('routines', m,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> importRoutineEntries(List<Map<String, dynamic>> maps) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final m in maps) {
+      batch.insert('routine_entries', m,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
 }

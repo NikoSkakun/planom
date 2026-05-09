@@ -114,6 +114,14 @@ class FolderController with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> permanentlyDeleteAllTrashed() async {
+    await _db.clearTrashedLists();
+    await _db.clearTrashedFolders();
+    _trashedLists = [];
+    _trashedFolders = [];
+    notifyListeners();
+  }
+
   Future<void> restoreList(String id, String? targetFolderId) async {
     final i = _trashedLists.indexWhere((l) => l.id == id);
     if (i == -1) return;
