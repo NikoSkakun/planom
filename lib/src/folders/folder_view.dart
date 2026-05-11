@@ -8,6 +8,7 @@ import 'create_folder_list_sheet.dart' show showCreateFolderListSheet, showRenam
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
 import 'list_task_view.dart';
+import 'move_to_sheet.dart';
 
 class FolderView extends StatefulWidget {
   const FolderView({
@@ -108,6 +109,22 @@ class _FolderViewState extends State<FolderView> {
                 clearIconId: id == null,
               );
               widget.folderController.updateFolder(updated);
+              if (mounted) setState(() => _currentFolder = updated);
+            },
+          );
+        },
+        onMoveTo: () {
+          entry.remove();
+          showMoveToSheet(
+            context,
+            folderController: widget.folderController,
+            currentParentId: _currentFolder.parentFolderId,
+            excludeFolderId: _currentFolder.id,
+            onMove: (folderId) async {
+              final updated = folderId == null
+                  ? _currentFolder.copyWith(clearParent: true)
+                  : _currentFolder.copyWith(parentFolderId: folderId);
+              await widget.folderController.updateFolder(updated);
               if (mounted) setState(() => _currentFolder = updated);
             },
           );
@@ -286,12 +303,14 @@ class _FolderOptionsDropdown extends StatelessWidget {
     required this.onDismiss,
     required this.onRename,
     required this.onChangeIcon,
+    required this.onMoveTo,
     required this.onInfo,
   });
 
   final VoidCallback onDismiss;
   final VoidCallback onRename;
   final VoidCallback onChangeIcon;
+  final VoidCallback onMoveTo;
   final VoidCallback onInfo;
 
   @override
@@ -309,9 +328,22 @@ class _FolderOptionsDropdown extends StatelessWidget {
           right: 8,
           child: _DropdownPanel(
             items: [
-              _DropdownItem(label: 'Rename', onTap: onRename),
-              _DropdownItem(label: 'Change Icon', onTap: onChangeIcon),
-              _DropdownItem(label: 'Info', onTap: onInfo),
+              _DropdownItem(
+                  label: 'Rename',
+                  icon: CupertinoIcons.pencil,
+                  onTap: onRename),
+              _DropdownItem(
+                  label: 'Change Icon',
+                  icon: CupertinoIcons.photo,
+                  onTap: onChangeIcon),
+              _DropdownItem(
+                  label: 'Move to',
+                  icon: CupertinoIcons.folder,
+                  onTap: onMoveTo),
+              _DropdownItem(
+                  label: 'Info',
+                  icon: CupertinoIcons.info,
+                  onTap: onInfo),
             ],
           ),
         ),
@@ -328,7 +360,7 @@ class _DropdownPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 160),
+      width: 220,
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground.resolveFrom(context),
         borderRadius: BorderRadius.circular(12),
@@ -342,6 +374,7 @@ class _DropdownPanel extends StatelessWidget {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < items.length; i++) ...[
             if (i > 0)
@@ -358,9 +391,14 @@ class _DropdownPanel extends StatelessWidget {
 }
 
 class _DropdownItem extends StatelessWidget {
-  const _DropdownItem({required this.label, required this.onTap});
+  const _DropdownItem({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
 
   final String label;
+  final IconData icon;
   final VoidCallback onTap;
 
   @override
@@ -369,12 +407,24 @@ class _DropdownItem extends StatelessWidget {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 15,
-            color: CupertinoColors.label.resolveFrom(context),
-          ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              icon,
+              size: 17,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ],
         ),
       ),
     );

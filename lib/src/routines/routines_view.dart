@@ -280,7 +280,13 @@ class _TodayRoutineRow extends StatelessWidget {
                 ),
               );
             },
-            child: const Text('Edit'),
+            child: const Row(
+              children: [
+                Expanded(
+                    child: Text('Edit', textAlign: TextAlign.left)),
+                Icon(CupertinoIcons.pencil, size: 18),
+              ],
+            ),
           ),
           CupertinoActionSheetAction(
             isDestructiveAction: true,
@@ -289,7 +295,14 @@ class _TodayRoutineRow extends StatelessWidget {
               final ok = await _confirmDelete(context);
               if (ok) controller.deleteRoutine(routine.id);
             },
-            child: const Text('Delete'),
+            child: const Row(
+              children: [
+                Expanded(
+                    child: Text('Delete', textAlign: TextAlign.left)),
+                Icon(CupertinoIcons.trash,
+                    size: 18, color: CupertinoColors.destructiveRed),
+              ],
+            ),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
