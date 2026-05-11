@@ -8,6 +8,8 @@ class Note {
   final DateTime creationDate;
   final DateTime modifiedDate;
   final int sortOrder;
+  final bool isDeleted;
+  final DateTime? deletedDate;
 
   Note({
     String? id,
@@ -17,6 +19,8 @@ class Note {
     DateTime? creationDate,
     DateTime? modifiedDate,
     this.sortOrder = 0,
+    this.isDeleted = false,
+    this.deletedDate,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate ?? DateTime.now(),
         modifiedDate = modifiedDate ?? DateTime.now();
@@ -27,6 +31,12 @@ class Note {
     String? folderId,
     bool clearFolderId = false,
     int? sortOrder,
+    bool? isDeleted,
+    DateTime? deletedDate,
+    bool clearDeletedDate = false,
+    // Pass true when only updating metadata (isDeleted, folderId, etc.)
+    // so the visible "modified" timestamp is not disturbed.
+    bool preserveModifiedDate = false,
   }) =>
       Note(
         id: id,
@@ -34,8 +44,11 @@ class Note {
         content: content ?? this.content,
         folderId: clearFolderId ? null : (folderId ?? this.folderId),
         creationDate: creationDate,
-        modifiedDate: DateTime.now(),
+        modifiedDate: preserveModifiedDate ? modifiedDate : DateTime.now(),
         sortOrder: sortOrder ?? this.sortOrder,
+        isDeleted: isDeleted ?? this.isDeleted,
+        deletedDate:
+            clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
       );
 
   Map<String, dynamic> toMap() => {
@@ -46,6 +59,8 @@ class Note {
         'creationDate': creationDate.millisecondsSinceEpoch,
         'modifiedDate': modifiedDate.millisecondsSinceEpoch,
         'sortOrder': sortOrder,
+        'isDeleted': isDeleted ? 1 : 0,
+        'deletedDate': deletedDate?.millisecondsSinceEpoch,
       };
 
   factory Note.fromMap(Map<String, dynamic> map) => Note(
@@ -58,5 +73,9 @@ class Note {
         modifiedDate:
             DateTime.fromMillisecondsSinceEpoch(map['modifiedDate'] as int),
         sortOrder: map['sortOrder'] as int? ?? 0,
+        isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
+        deletedDate: map['deletedDate'] != null
+            ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)
+            : null,
       );
 }

@@ -10,6 +10,11 @@ class NoteController with ChangeNotifier {
   final DatabaseService _db;
   List<NoteFolder> _folders = [];
   List<Note> _notes = [];
+  List<NoteFolder> _trashedFolders = [];
+  List<Note> _trashedNotes = [];
+
+  List<NoteFolder> get trashedFolders => List.unmodifiable(_trashedFolders);
+  List<Note> get trashedNotes => List.unmodifiable(_trashedNotes);
 
   List<NoteFolder> foldersIn(String? parentId) {
     final result =
@@ -24,9 +29,19 @@ class NoteController with ChangeNotifier {
     return result;
   }
 
+  NoteFolder? folderById(String id) {
+    try {
+      return _folders.firstWhere((f) => f.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> load() async {
     _folders = await _db.getNoteFolders();
     _notes = await _db.getNotes();
+    _trashedFolders = await _db.getTrashedNoteFolders();
+    _trashedNotes = await _db.getTrashedNotes();
     notifyListeners();
   }
 
@@ -45,8 +60,44 @@ class NoteController with ChangeNotifier {
   }
 
   Future<void> deleteNote(String id) async {
-    await _db.deleteNote(id);
+    final now = DateTime.now();
+    await _db.softDeleteNote(id, now);
+    final note = _notes.firstWhere((n) => n.id == id,
+        orElse: () => Note(id: id, title: '', content: ''));
     _notes = _notes.where((n) => n.id != id).toList();
+    _trashedNotes = [
+      note.copyWith(
+          isDeleted: true, deletedDate: now, preserveModifiedDate: true),
+      ..._trashedNotes,
+    ];
+    notifyListeners();
+  }
+
+  Future<void> restoreNote(String id, String? targetFolderId) async {
+    final i = _trashedNotes.indexWhere((n) => n.id == id);
+    if (i == -1) return;
+    final orig = _trashedNotes[i];
+    final restored = Note(
+      id: orig.id,
+      title: orig.title,
+      content: orig.content,
+      folderId: targetFolderId,
+      creationDate: orig.creationDate,
+      modifiedDate: orig.modifiedDate,
+      sortOrder: orig.sortOrder,
+    );
+    await _db.restoreNote(id);
+    if (targetFolderId != orig.folderId) {
+      await _db.updateNote(restored);
+    }
+    _trashedNotes = List.of(_trashedNotes)..removeAt(i);
+    _notes = [..._notes, restored];
+    notifyListeners();
+  }
+
+  Future<void> permanentlyDeleteNote(String id) async {
+    await _db.deleteNote(id);
+    _trashedNotes = _trashedNotes.where((n) => n.id != id).toList();
     notifyListeners();
   }
 
@@ -64,24 +115,83 @@ class NoteController with ChangeNotifier {
   }
 
   Future<void> deleteFolder(String id) async {
-    await _db.deleteNoteFolder(id);
+    final now = DateTime.now();
+    await _db.softDeleteNoteFolder(id, now);
+    final folder = _folders.firstWhere((f) => f.id == id,
+        orElse: () => NoteFolder(id: id, name: ''));
     _folders = _folders.where((f) => f.id != id).toList();
+    _trashedFolders = [
+      folder.copyWith(isDeleted: true, deletedDate: now),
+      ..._trashedFolders,
+    ];
+    notifyListeners();
+  }
+
+  Future<void> restoreFolder(String id, String? targetParentId) async {
+    final i = _trashedFolders.indexWhere((f) => f.id == id);
+    if (i == -1) return;
+    final orig = _trashedFolders[i];
+    final restored = NoteFolder(
+      id: orig.id,
+      name: orig.name,
+      parentFolderId: targetParentId,
+      creationDate: orig.creationDate,
+      sortOrder: orig.sortOrder,
+      iconId: orig.iconId,
+    );
+    await _db.restoreNoteFolder(id);
+    if (targetParentId != orig.parentFolderId) {
+      await _db.updateNoteFolder(restored);
+    }
+    _trashedFolders = List.of(_trashedFolders)..removeAt(i);
+    _folders = [..._folders, restored];
+    notifyListeners();
+  }
+
+  Future<void> permanentlyDeleteFolder(String id) async {
+    await _db.deleteNoteFolder(id);
+    _trashedFolders = _trashedFolders.where((f) => f.id != id).toList();
+    notifyListeners();
+  }
+
+  Future<void> permanentlyDeleteAllTrashed() async {
+    await _db.clearTrashedNotes();
+    await _db.clearTrashedNoteFolders();
+    _trashedNotes = [];
+    _trashedFolders = [];
     notifyListeners();
   }
 
   Future<void> deleteFolderDeep(String id) async {
-    await _deleteFolderRecursive(id);
+    final now = DateTime.now();
+    await _softDeleteFolderRecursive(id, now);
     notifyListeners();
   }
 
-  Future<void> _deleteFolderRecursive(String id) async {
+  Future<void> _softDeleteFolderRecursive(
+      String id, DateTime deletedDate) async {
     for (final f in foldersIn(id)) {
-      await _deleteFolderRecursive(f.id);
+      await _softDeleteFolderRecursive(f.id, deletedDate);
     }
-    await _db.deleteNotesForFolder(id);
-    await _db.deleteNoteFolder(id);
+    for (final n in notesIn(id)) {
+      await _db.softDeleteNote(n.id, deletedDate);
+      _notes = _notes.where((x) => x.id != n.id).toList();
+      _trashedNotes = [
+        n.copyWith(
+            isDeleted: true,
+            deletedDate: deletedDate,
+            preserveModifiedDate: true),
+        ..._trashedNotes,
+      ];
+    }
+    await _db.softDeleteNoteFolder(id, deletedDate);
+    final folder = _folders.firstWhere((f) => f.id == id,
+        orElse: () => NoteFolder(id: id, name: ''));
     _folders = _folders.where((f) => f.id != id).toList();
-    _notes = _notes.where((n) => n.folderId != id).toList();
+    _trashedFolders = [
+      folder.copyWith(isDeleted: true, deletedDate: deletedDate),
+      ..._trashedFolders,
+    ];
   }
 
   /// Reorders note folders within [parentFolderId] scope.
@@ -118,7 +228,7 @@ class NoteController with ChangeNotifier {
     scope.insert(newIndex, item);
 
     for (int i = 0; i < scope.length; i++) {
-      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+      scope[i] = scope[i].copyWith(sortOrder: i + 1, preserveModifiedDate: true);
     }
     for (final updated in scope) {
       final idx = _notes.indexWhere((n) => n.id == updated.id);

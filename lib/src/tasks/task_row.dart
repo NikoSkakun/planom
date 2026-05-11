@@ -54,23 +54,34 @@ class TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: onToggle,
-              child: _RoundedCheckbox(
-                checked: task.isCompleted,
-                priority: task.priority,
-              ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Checkbox zone — includes the vertical padding so the full item height is tappable
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onToggle,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 16, top: 7, bottom: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _RoundedCheckbox(
+                  checked: task.isCompleted,
+                  priority: task.priority,
+                ),
+                const SizedBox(width: 12),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
+          ),
+        ),
+        // Text zone
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 7, bottom: 7, right: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -141,9 +152,9 @@ class TaskRow extends StatelessWidget {
                 ],
               ),
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -174,10 +185,10 @@ class _RoundedCheckbox extends StatelessWidget {
         : CupertinoColors.tertiaryLabel.resolveFrom(context);
 
     return Container(
-      width: 22,
-      height: 22,
+      width: 20,
+      height: 20,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(5),
         color: checked ? const Color(0xFFFF4D00) : null,
         border: checked
             ? null
@@ -185,7 +196,7 @@ class _RoundedCheckbox extends StatelessWidget {
       ),
       child: checked
           ? const Icon(CupertinoIcons.checkmark,
-              size: 13, color: CupertinoColors.white)
+              size: 11, color: CupertinoColors.white)
           : null,
     );
   }

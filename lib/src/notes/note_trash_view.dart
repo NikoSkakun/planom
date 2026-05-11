@@ -1,52 +1,34 @@
 import 'package:flutter/cupertino.dart';
 
-import '../folders/folder_controller.dart';
-import '../models/app_folder.dart';
-import '../models/app_list.dart';
-import '../models/task.dart';
-import 'task_controller.dart';
+import '../models/note.dart';
+import '../models/note_folder.dart';
+import 'note_controller.dart';
 
-class TrashView extends StatelessWidget {
-  const TrashView({
-    super.key,
-    required this.taskController,
-    required this.folderController,
-  });
+class NoteTrashView extends StatelessWidget {
+  const NoteTrashView({super.key, required this.controller});
 
-  final TaskController taskController;
-  final FolderController folderController;
+  final NoteController controller;
 
-  // ── Restore destination helpers ──────────────────────────────────────────
+  // ── Restore destination helpers ─────────────────────��────────────────────
 
-  String _taskDestination(Task task) {
-    if (task.listId == null) return 'Inbox';
-    final list = folderController.listById(task.listId!);
-    return list?.name ?? 'Inbox';
+  String _noteDestination(Note note) {
+    if (note.folderId == null) return 'Notes';
+    return controller.folderById(note.folderId!)?.name ?? 'Notes';
   }
 
-  String? _taskTargetListId(Task task) {
-    if (task.listId == null) return null;
-    return folderController.listById(task.listId!)?.id;
+  String? _noteTargetFolderId(Note note) {
+    if (note.folderId == null) return null;
+    return controller.folderById(note.folderId!)?.id;
   }
 
-  String _listDestination(AppList list) {
-    if (list.folderId == null) return 'Tasks';
-    return folderController.folderById(list.folderId!)?.name ?? 'Tasks';
+  String _folderDestination(NoteFolder folder) {
+    if (folder.parentFolderId == null) return 'Notes';
+    return controller.folderById(folder.parentFolderId!)?.name ?? 'Notes';
   }
 
-  String? _listTargetFolderId(AppList list) {
-    if (list.folderId == null) return null;
-    return folderController.folderById(list.folderId!)?.id;
-  }
-
-  String _folderDestination(AppFolder folder) {
-    if (folder.parentFolderId == null) return 'Tasks';
-    return folderController.folderById(folder.parentFolderId!)?.name ?? 'Tasks';
-  }
-
-  String? _folderTargetParentId(AppFolder folder) {
+  String? _folderTargetParentId(NoteFolder folder) {
     if (folder.parentFolderId == null) return null;
-    return folderController.folderById(folder.parentFolderId!)?.id;
+    return controller.folderById(folder.parentFolderId!)?.id;
   }
 
   // ── Confirmation dialogs ─────────────────────────────────────────────────
@@ -101,11 +83,9 @@ class TrashView extends StatelessWidget {
   Future<bool> _confirmDismiss(
       BuildContext context, DismissDirection direction, _TrashEntry entry) {
     if (direction == DismissDirection.startToEnd) {
-      final dest = entry.task != null
-          ? _taskDestination(entry.task!)
-          : entry.list != null
-              ? _listDestination(entry.list!)
-              : _folderDestination(entry.folder!);
+      final dest = entry.note != null
+          ? _noteDestination(entry.note!)
+          : _folderDestination(entry.folder!);
       return _confirmRestore(context, entry.label, dest);
     }
     return _confirmPermanentDelete(context, entry.label);
@@ -113,28 +93,23 @@ class TrashView extends StatelessWidget {
 
   void _handleDismissed(DismissDirection direction, _TrashEntry entry) {
     if (direction == DismissDirection.startToEnd) {
-      if (entry.task != null) {
-        taskController.restoreTask(
-            entry.task!.id, _taskTargetListId(entry.task!));
-      } else if (entry.list != null) {
-        folderController.restoreList(
-            entry.list!.id, _listTargetFolderId(entry.list!));
+      if (entry.note != null) {
+        controller.restoreNote(
+            entry.note!.id, _noteTargetFolderId(entry.note!));
       } else if (entry.folder != null) {
-        folderController.restoreFolder(
+        controller.restoreFolder(
             entry.folder!.id, _folderTargetParentId(entry.folder!));
       }
     } else {
-      if (entry.task != null) {
-        taskController.permanentlyDeleteTask(entry.task!.id);
-      } else if (entry.list != null) {
-        folderController.permanentlyDeleteList(entry.list!.id);
+      if (entry.note != null) {
+        controller.permanentlyDeleteNote(entry.note!.id);
       } else if (entry.folder != null) {
-        folderController.permanentlyDeleteFolder(entry.folder!.id);
+        controller.permanentlyDeleteFolder(entry.folder!.id);
       }
     }
   }
 
-  // ── Menu ─────────────────────────────────────────────────────────────────
+  // ── Menu ──────────────────────────���──────────────────────────────────────
 
   void _showMenu(BuildContext context) {
     showCupertinoModalPopup<void>(
@@ -189,21 +164,19 @@ class TrashView extends StatelessWidget {
       ),
     );
     if (confirmed != true) return;
-    await taskController.permanentlyDeleteAllTrashed();
-    await folderController.permanentlyDeleteAllTrashed();
+    await controller.permanentlyDeleteAllTrashed();
   }
 
-  // ── Build ────────────────────────────────────────────────────────────────
+  // ── Build ───────────────────────────────────────────────────────��────────
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([taskController, folderController]),
+      listenable: controller,
       builder: (context, _) {
-        final tasks = taskController.trashedTasks;
-        final lists = folderController.trashedLists;
-        final folders = folderController.trashedFolders;
-        final isEmpty = tasks.isEmpty && lists.isEmpty && folders.isEmpty;
+        final notes = controller.trashedNotes;
+        final folders = controller.trashedFolders;
+        final isEmpty = notes.isEmpty && folders.isEmpty;
 
         return CupertinoPageScaffold(
           navigationBar: CupertinoNavigationBar(
@@ -229,8 +202,7 @@ class TrashView extends StatelessWidget {
                   )
                 : Builder(builder: (context) {
                     final entries = <_TrashEntry>[
-                      for (final t in tasks) _TrashEntry.task(t),
-                      for (final l in lists) _TrashEntry.list(l),
+                      for (final n in notes) _TrashEntry.note(n),
                       for (final f in folders) _TrashEntry.folder(f),
                     ]..sort((a, b) {
                         final da = a.deletedDate ?? DateTime(0);
@@ -247,7 +219,8 @@ class TrashView extends StatelessWidget {
                                 key: ValueKey(entry.id),
                                 direction: DismissDirection.horizontal,
                                 background: const _PutBackBackground(),
-                                secondaryBackground: const _DeleteBackground(),
+                                secondaryBackground:
+                                    const _DeleteBackground(),
                                 confirmDismiss: (direction) =>
                                     _confirmDismiss(context, direction, entry),
                                 onDismissed: (direction) =>
@@ -268,39 +241,27 @@ class TrashView extends StatelessWidget {
   }
 }
 
-// ── Data model ───────────────────────────────────────────────────────────────
+// ── Data model ──────────────────────────��────────────────────────────────────
 
 class _TrashEntry {
-  _TrashEntry.task(Task t)
-      : task = t,
-        list = null,
+  _TrashEntry.note(Note n)
+      : note = n,
         folder = null,
-        id = 'task_${t.id}',
-        label = t.title,
-        deletedDate = t.deletedDate,
-        icon = CupertinoIcons.checkmark_square;
+        id = 'note_${n.id}',
+        label = n.title.isNotEmpty ? n.title : 'Untitled',
+        deletedDate = n.deletedDate,
+        icon = CupertinoIcons.doc_text;
 
-  _TrashEntry.list(AppList l)
-      : task = null,
-        list = l,
-        folder = null,
-        id = 'list_${l.id}',
-        label = l.name,
-        deletedDate = l.deletedDate,
-        icon = CupertinoIcons.list_bullet;
-
-  _TrashEntry.folder(AppFolder f)
-      : task = null,
-        list = null,
+  _TrashEntry.folder(NoteFolder f)
+      : note = null,
         folder = f,
         id = 'folder_${f.id}',
         label = f.name,
         deletedDate = f.deletedDate,
         icon = CupertinoIcons.folder;
 
-  final Task? task;
-  final AppList? list;
-  final AppFolder? folder;
+  final Note? note;
+  final NoteFolder? folder;
   final String id;
   final String label;
   final DateTime? deletedDate;
@@ -359,7 +320,8 @@ class _TrashRow extends StatelessWidget {
               entry.label,
               style: TextStyle(
                 fontSize: 16,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                color:
+                    CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
           ),

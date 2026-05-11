@@ -6,6 +6,7 @@ import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
 import 'note_detail_view.dart';
 import 'note_folder_view.dart';
+import 'note_trash_view.dart';
 import 'note_widgets.dart';
 
 class NotesView extends StatelessWidget {
@@ -43,7 +44,9 @@ class NotesView extends StatelessWidget {
               builder: (context, _) {
                 final folders = controller.foldersIn(null);
                 final notes = controller.notesIn(null);
-                if (folders.isEmpty && notes.isEmpty) {
+                final hasTrash = controller.trashedNotes.isNotEmpty ||
+                    controller.trashedFolders.isNotEmpty;
+                if (folders.isEmpty && notes.isEmpty && !hasTrash) {
                   return const Center(
                     child: Text(
                       'No notes',
@@ -128,6 +131,57 @@ class NotesView extends StatelessWidget {
                             ),
                           );
                         },
+                      ),
+
+                    if (hasTrash)
+                      SliverToBoxAdapter(
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              child: Container(
+                                height: 0.5,
+                                color: CupertinoColors.separator
+                                    .resolveFrom(context),
+                              ),
+                            ),
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) =>
+                                      NoteTrashView(controller: controller),
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 9),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: Icon(
+                                        CupertinoIcons.trash,
+                                        size: 22,
+                                        color: CupertinoColors.secondaryLabel
+                                            .resolveFrom(context),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: Text(
+                                        'Trash',
+                                        style: TextStyle(fontSize: 17),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
 
                     const SliverToBoxAdapter(

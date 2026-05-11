@@ -152,9 +152,9 @@ class _NoteOptionsDropdown extends StatelessWidget {
           top: topOffset,
           right: 8,
           child: Container(
-            constraints: const BoxConstraints(minWidth: 160),
+            width: 220,
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground,
+              color: CupertinoColors.systemBackground.resolveFrom(context),
               borderRadius: BorderRadius.circular(12),
               boxShadow: const [
                 BoxShadow(
@@ -167,13 +167,28 @@ class _NoteOptionsDropdown extends StatelessWidget {
             child: GestureDetector(
               onTap: onInfo,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Text(
-                  'Info',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: CupertinoColors.label.resolveFrom(context),
-                  ),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Info',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color:
+                              CupertinoColors.label.resolveFrom(context),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      CupertinoIcons.info,
+                      size: 17,
+                      color: CupertinoColors.secondaryLabel
+                          .resolveFrom(context),
+                    ),
+                  ],
                 ),
               ),
             ),

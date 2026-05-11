@@ -11,7 +11,7 @@ import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 11;
+  static const _dbVersion = 12;
 
   Database? _db;
 
@@ -72,7 +72,9 @@ class DatabaseService {
             parentFolderId TEXT,
             creationDate INTEGER NOT NULL,
             sortOrder INTEGER NOT NULL DEFAULT 0,
-            iconId TEXT
+            iconId TEXT,
+            isDeleted INTEGER NOT NULL DEFAULT 0,
+            deletedDate INTEGER
           )
         ''');
         await db.execute('''
@@ -83,7 +85,9 @@ class DatabaseService {
             folderId TEXT,
             creationDate INTEGER NOT NULL,
             modifiedDate INTEGER NOT NULL,
-            sortOrder INTEGER NOT NULL DEFAULT 0
+            sortOrder INTEGER NOT NULL DEFAULT 0,
+            isDeleted INTEGER NOT NULL DEFAULT 0,
+            deletedDate INTEGER
           )
         ''');
         await db.execute('''
@@ -226,6 +230,16 @@ class DatabaseService {
               'ALTER TABLE app_lists ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0');
           await db.execute(
               'ALTER TABLE app_lists ADD COLUMN deletedDate INTEGER');
+        }
+        if (oldVersion < 12) {
+          await db.execute(
+              'ALTER TABLE note_folders ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE note_folders ADD COLUMN deletedDate INTEGER');
+          await db.execute(
+              'ALTER TABLE notes ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE notes ADD COLUMN deletedDate INTEGER');
         }
       },
     );
@@ -439,11 +453,19 @@ class DatabaseService {
     await batch.commit(noResult: true);
   }
 
-  // Note folders
+  // Note folders — active only
   Future<List<NoteFolder>> getNoteFolders() async {
     final db = await _database;
     final rows = await db.query('note_folders',
+        where: 'isDeleted = 0',
         orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(NoteFolder.fromMap).toList();
+  }
+
+  Future<List<NoteFolder>> getTrashedNoteFolders() async {
+    final db = await _database;
+    final rows = await db.query('note_folders',
+        where: 'isDeleted = 1', orderBy: 'deletedDate DESC');
     return rows.map(NoteFolder.fromMap).toList();
   }
 
@@ -459,9 +481,34 @@ class DatabaseService {
         where: 'id = ?', whereArgs: [folder.id]);
   }
 
+  Future<void> softDeleteNoteFolder(String id, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'note_folders',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> restoreNoteFolder(String id) async {
+    final db = await _database;
+    await db.update(
+      'note_folders',
+      {'isDeleted': 0, 'deletedDate': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<void> deleteNoteFolder(String id) async {
     final db = await _database;
     await db.delete('note_folders', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> clearTrashedNoteFolders() async {
+    final db = await _database;
+    await db.delete('note_folders', where: 'isDeleted = 1');
   }
 
   Future<void> updateNoteFolderSortOrders(List<NoteFolder> folders) async {
@@ -474,11 +521,19 @@ class DatabaseService {
     await batch.commit(noResult: true);
   }
 
-  // Notes
+  // Notes — active only
   Future<List<Note>> getNotes() async {
     final db = await _database;
     final rows = await db.query('notes',
+        where: 'isDeleted = 0',
         orderBy: 'sortOrder ASC, modifiedDate DESC');
+    return rows.map(Note.fromMap).toList();
+  }
+
+  Future<List<Note>> getTrashedNotes() async {
+    final db = await _database;
+    final rows = await db.query('notes',
+        where: 'isDeleted = 1', orderBy: 'deletedDate DESC');
     return rows.map(Note.fromMap).toList();
   }
 
@@ -494,6 +549,37 @@ class DatabaseService {
         where: 'id = ?', whereArgs: [note.id]);
   }
 
+  Future<void> softDeleteNote(String id, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'notes',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> softDeleteNotesForFolder(
+      String folderId, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'notes',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'folderId = ? AND isDeleted = 0',
+      whereArgs: [folderId],
+    );
+  }
+
+  Future<void> restoreNote(String id) async {
+    final db = await _database;
+    await db.update(
+      'notes',
+      {'isDeleted': 0, 'deletedDate': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<void> deleteNote(String id) async {
     final db = await _database;
     await db.delete('notes', where: 'id = ?', whereArgs: [id]);
@@ -502,6 +588,11 @@ class DatabaseService {
   Future<void> deleteNotesForFolder(String folderId) async {
     final db = await _database;
     await db.delete('notes', where: 'folderId = ?', whereArgs: [folderId]);
+  }
+
+  Future<void> clearTrashedNotes() async {
+    final db = await _database;
+    await db.delete('notes', where: 'isDeleted = 1');
   }
 
   Future<void> updateNoteSortOrders(List<Note> notes) async {
