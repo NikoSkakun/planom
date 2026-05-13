@@ -16,6 +16,7 @@ class Task extends AppItem {
   final int sortOrder; // 0 = not yet manually sorted; >0 = user-defined position
   final bool isDeleted;
   final DateTime? deletedDate;
+  final DateTime? completionDate;
 
   Task({
     String? id,
@@ -31,6 +32,7 @@ class Task extends AppItem {
     this.sortOrder = 0,
     this.isDeleted = false,
     this.deletedDate,
+    this.completionDate,
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -52,6 +54,8 @@ class Task extends AppItem {
     bool? isDeleted,
     DateTime? deletedDate,
     bool clearDeletedDate = false,
+    DateTime? completionDate,
+    bool clearCompletionDate = false,
   }) {
     return Task(
       id: id,
@@ -67,6 +71,7 @@ class Task extends AppItem {
       sortOrder: sortOrder ?? this.sortOrder,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
+      completionDate: clearCompletionDate ? null : (completionDate ?? this.completionDate),
     );
   }
 
@@ -84,6 +89,7 @@ class Task extends AppItem {
         'sortOrder': sortOrder,
         'isDeleted': isDeleted ? 1 : 0,
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
+        'completionDate': completionDate?.millisecondsSinceEpoch,
       };
 
   factory Task.fromMap(Map<String, dynamic> map) => Task(
@@ -104,6 +110,9 @@ class Task extends AppItem {
         isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
         deletedDate: map['deletedDate'] != null
             ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)
+            : null,
+        completionDate: map['completionDate'] != null
+            ? DateTime.fromMillisecondsSinceEpoch(map['completionDate'] as int)
             : null,
       );
 }

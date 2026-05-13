@@ -4,6 +4,7 @@ void showItemInfoSheet(
   BuildContext context, {
   required DateTime creationDate,
   DateTime? modifiedDate,
+  DateTime? completionDate,
 }) {
   showCupertinoDialog<void>(
     context: context,
@@ -18,6 +19,10 @@ void showItemInfoSheet(
             if (modifiedDate != null) ...[
               const SizedBox(height: 6),
               _InfoRow(label: 'Modified', value: _formatDateTime(modifiedDate)),
+            ],
+            if (completionDate != null) ...[
+              const SizedBox(height: 6),
+              _InfoRow(label: 'Completed', value: _formatDateTime(completionDate)),
             ],
           ],
         ),

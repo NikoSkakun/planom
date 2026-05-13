@@ -11,7 +11,7 @@ import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 12;
+  static const _dbVersion = 13;
 
   Database? _db;
 
@@ -37,7 +37,8 @@ class DatabaseService {
             priority INTEGER NOT NULL DEFAULT 0,
             sortOrder INTEGER NOT NULL DEFAULT 0,
             isDeleted INTEGER NOT NULL DEFAULT 0,
-            deletedDate INTEGER
+            deletedDate INTEGER,
+            completionDate INTEGER
           )
         ''');
         await db.execute('''
@@ -240,6 +241,10 @@ class DatabaseService {
               'ALTER TABLE notes ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0');
           await db.execute(
               'ALTER TABLE notes ADD COLUMN deletedDate INTEGER');
+        }
+        if (oldVersion < 13) {
+          await db.execute(
+              'ALTER TABLE tasks ADD COLUMN completionDate INTEGER');
         }
       },
     );

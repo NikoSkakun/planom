@@ -76,7 +76,11 @@ class _TaskDetailViewState extends State<TaskDetailView> {
         onDismiss: () => entry.remove(),
         onInfo: () {
           entry.remove();
-          showItemInfoSheet(context, creationDate: widget.task.creationDate);
+          showItemInfoSheet(
+            context,
+            creationDate: widget.task.creationDate,
+            completionDate: widget.task.completionDate,
+          );
         },
       ),
     );

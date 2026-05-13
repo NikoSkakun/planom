@@ -110,7 +110,12 @@ class TaskController with ChangeNotifier {
   Future<void> toggleCompleted(String id) async {
     final i = _tasks.indexWhere((t) => t.id == id);
     if (i == -1) return;
-    final updated = _tasks[i].copyWith(isCompleted: !_tasks[i].isCompleted);
+    final completing = !_tasks[i].isCompleted;
+    final updated = _tasks[i].copyWith(
+      isCompleted: completing,
+      completionDate: completing ? DateTime.now() : null,
+      clearCompletionDate: !completing,
+    );
     await _db.updateTask(updated);
     _tasks = [..._tasks]..[i] = updated;
     if (updated.isCompleted) {
