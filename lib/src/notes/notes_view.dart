@@ -9,10 +9,72 @@ import 'note_folder_view.dart';
 import 'note_trash_view.dart';
 import 'note_widgets.dart';
 
-class NotesView extends StatelessWidget {
+class NotesView extends StatefulWidget {
   const NotesView({super.key, required this.controller});
 
   final NoteController controller;
+
+  @override
+  State<NotesView> createState() => _NotesViewState();
+}
+
+class _NotesViewState extends State<NotesView> {
+  final Set<String> _expandedIds = {};
+
+  void _toggle(String id) {
+    setState(() {
+      if (_expandedIds.contains(id)) {
+        _expandedIds.remove(id);
+      } else {
+        _expandedIds.add(id);
+      }
+    });
+  }
+
+  Widget _buildFolderChildren(
+      BuildContext context, String folderId, double indent) {
+    final subFolders = widget.controller.foldersIn(folderId);
+    final notes = widget.controller.notesIn(folderId);
+
+    return Column(
+      children: [
+        for (final f in subFolders) ...[
+          NoteFolderRow(
+            folder: f,
+            noteCount: widget.controller.notesIn(f.id).length,
+            indent: indent,
+            onTap: () => Navigator.of(context).push(
+              FastRoute<void>(
+                builder: (_) => NoteFolderView(
+                  folder: f,
+                  controller: widget.controller,
+                ),
+              ),
+            ),
+            onExpand: () => _toggle(f.id),
+            isExpanded: _expandedIds.contains(f.id),
+          ),
+          if (_expandedIds.contains(f.id))
+            _buildFolderChildren(context, f.id, indent + 24),
+        ],
+        for (final n in notes)
+          NoteRow(
+            note: n,
+            indent: indent,
+            onTap: () => Navigator.of(context).push(
+              FastRoute<void>(
+                settings:
+                    const RouteSettings(name: NoteDetailView.routeName),
+                builder: (_) => NoteDetailView(
+                  note: n,
+                  controller: widget.controller,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
   Widget _proxyDecorator(
       Widget child, int index, Animation<double> animation) {
@@ -33,19 +95,21 @@ class NotesView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(border: null,
+      navigationBar: const CupertinoNavigationBar(
+        border: null,
         middle: Text('Notes'),
       ),
       child: SafeArea(
         child: Stack(
           children: [
             ListenableBuilder(
-              listenable: controller,
+              listenable: widget.controller,
               builder: (context, _) {
-                final folders = controller.foldersIn(null);
-                final notes = controller.notesIn(null);
-                final hasTrash = controller.trashedNotes.isNotEmpty ||
-                    controller.trashedFolders.isNotEmpty;
+                final folders = widget.controller.foldersIn(null);
+                final notes = widget.controller.notesIn(null);
+                final hasTrash =
+                    widget.controller.trashedNotes.isNotEmpty ||
+                        widget.controller.trashedFolders.isNotEmpty;
                 if (folders.isEmpty && notes.isEmpty && !hasTrash) {
                   return const Center(
                     child: Text(
@@ -64,7 +128,7 @@ class NotesView extends StatelessWidget {
                       SliverReorderableList(
                         itemCount: folders.length,
                         onReorder: (old, neo) =>
-                            controller.reorderNoteFolders(
+                            widget.controller.reorderNoteFolders(
                                 null, old, neo),
                         proxyDecorator: _proxyDecorator,
                         itemBuilder: (context, index) {
@@ -77,19 +141,29 @@ class NotesView extends StatelessWidget {
                               direction: DismissDirection.endToStart,
                               background: const NoteDeleteBackground(),
                               onDismissed: (_) =>
-                                  controller.deleteFolderDeep(f.id),
-                              child: NoteFolderRow(
-                                folder: f,
-                                noteCount: controller.notesIn(f.id).length,
-                                onTap: () =>
-                                    Navigator.of(context).push(
-                                  FastRoute<void>(
-                                    builder: (_) => NoteFolderView(
-                                      folder: f,
-                                      controller: controller,
+                                  widget.controller.deleteFolderDeep(f.id),
+                              child: Column(
+                                children: [
+                                  NoteFolderRow(
+                                    folder: f,
+                                    noteCount: widget.controller
+                                        .notesIn(f.id)
+                                        .length,
+                                    onTap: () =>
+                                        Navigator.of(context).push(
+                                      FastRoute<void>(
+                                        builder: (_) => NoteFolderView(
+                                          folder: f,
+                                          controller: widget.controller,
+                                        ),
+                                      ),
                                     ),
+                                    onExpand: () => _toggle(f.id),
+                                    isExpanded: _expandedIds.contains(f.id),
                                   ),
-                                ),
+                                  if (_expandedIds.contains(f.id))
+                                    _buildFolderChildren(context, f.id, 24),
+                                ],
                               ),
                             ),
                           );
@@ -101,7 +175,7 @@ class NotesView extends StatelessWidget {
                       SliverReorderableList(
                         itemCount: notes.length,
                         onReorder: (old, neo) =>
-                            controller.reorderNotes(null, old, neo),
+                            widget.controller.reorderNotes(null, old, neo),
                         proxyDecorator: _proxyDecorator,
                         itemBuilder: (context, index) {
                           final n = notes[index];
@@ -113,7 +187,7 @@ class NotesView extends StatelessWidget {
                               direction: DismissDirection.endToStart,
                               background: const NoteDeleteBackground(),
                               onDismissed: (_) =>
-                                  controller.deleteNote(n.id),
+                                  widget.controller.deleteNote(n.id),
                               child: NoteRow(
                                 note: n,
                                 onTap: () =>
@@ -123,7 +197,7 @@ class NotesView extends StatelessWidget {
                                         name: NoteDetailView.routeName),
                                     builder: (_) => NoteDetailView(
                                       note: n,
-                                      controller: controller,
+                                      controller: widget.controller,
                                     ),
                                   ),
                                 ),
@@ -150,8 +224,8 @@ class NotesView extends StatelessWidget {
                               behavior: HitTestBehavior.opaque,
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
-                                  builder: (_) =>
-                                      NoteTrashView(controller: controller),
+                                  builder: (_) => NoteTrashView(
+                                      controller: widget.controller),
                                 ),
                               ),
                               child: Padding(
@@ -195,7 +269,7 @@ class NotesView extends StatelessWidget {
               bottom: 16,
               child: NoteFolderCircleButton(
                 onPressed: () =>
-                    showCreateNoteFolderSheet(context, controller),
+                    showCreateNoteFolderSheet(context, widget.controller),
               ),
             ),
             Positioned(
@@ -208,7 +282,7 @@ class NotesView extends StatelessWidget {
                         name: NoteDetailView.routeName),
                     builder: (_) => NoteDetailView(
                       note: Note(title: '', content: ''),
-                      controller: controller,
+                      controller: widget.controller,
                       isNew: true,
                     ),
                   ),

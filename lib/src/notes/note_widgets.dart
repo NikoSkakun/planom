@@ -24,50 +24,99 @@ class NoteFolderRow extends StatelessWidget {
     required this.folder,
     required this.onTap,
     this.noteCount,
+    this.onExpand,
+    this.isExpanded = false,
+    this.indent = 0,
   });
 
   final NoteFolder folder;
   final VoidCallback onTap;
   final int? noteCount;
+  final VoidCallback? onExpand;
+  final bool isExpanded;
+  final double indent;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 22,
-              height: 22,
-              child: buildFolderItemIcon(folder.iconId, isFolder: true),
+    return IntrinsicHeight(
+      child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                  16 + indent, 9, onExpand != null ? 4 : 16, 9),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: buildFolderItemIcon(folder.iconId, isFolder: true),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      folder.name,
+                      style: const TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  if (noteCount != null && noteCount! > 0) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '$noteCount',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(folder.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
-            ),
-            if (noteCount != null && noteCount! > 0)
-              Text(
-                '$noteCount',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          ),
+        ),
+        if (onExpand != null)
+          GestureDetector(
+            onTap: onExpand,
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: 48,
+              child: Center(
+                child: AnimatedRotation(
+                  turns: isExpanded ? 0.25 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    CupertinoIcons.chevron_right,
+                    size: 14,
+                    color:
+                        CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
                 ),
               ),
-          ],
-        ),
+            ),
+          ),
+      ],
       ),
     );
   }
 }
 
 class NoteRow extends StatelessWidget {
-  const NoteRow({super.key, required this.note, required this.onTap});
+  const NoteRow({
+    super.key,
+    required this.note,
+    required this.onTap,
+    this.indent = 0,
+  });
 
   final Note note;
   final VoidCallback onTap;
+  final double indent;
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +124,7 @@ class NoteRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        padding: EdgeInsets.fromLTRB(16 + indent, 9, 16, 9),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

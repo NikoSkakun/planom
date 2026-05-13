@@ -10,7 +10,12 @@
       "Bash(xargs sed *)",
       "Bash(sed -n '21,35p' \"/Users/skakun/Personal Projects/Planom/planom/lib/src/models/note_folder.dart\")",
       "Bash(sed -n '25,40p' \"/Users/skakun/Personal Projects/Planom/planom/lib/src/models/app_folder.dart\")",
-      "Bash(sed -n '27,45p' \"/Users/skakun/Personal Projects/Planom/planom/lib/src/models/app_list.dart\")"
+      "Bash(sed -n '27,45p' \"/Users/skakun/Personal Projects/Planom/planom/lib/src/models/app_list.dart\")",
+      "Bash(grep -r \"keyboard_chevron\" /Users/skakun/dev/flutter/packages/flutter/ 2>/dev/null | head -5)",
+      "Read(//Users/skakun/dev/flutter/packages/flutter/**)",
+      "Bash(grep \"keyboard\" ~/.pub-cache/hosted/pub.dev/cupertino_icons-1.*/lib/cupertino_icons.dart 2>/dev/null | head -20)",
+      "Read(//Users/skakun/.pub-cache/hosted/pub.dev/**)",
+      "Bash(git checkout *)"
     ]
   }
 }

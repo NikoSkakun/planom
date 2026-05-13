@@ -14,7 +14,7 @@ import 'today_view.dart';
 import 'trash_view.dart';
 import 'upcoming_view.dart';
 
-class TasksView extends StatelessWidget {
+class TasksView extends StatefulWidget {
   const TasksView({
     super.key,
     required this.controller,
@@ -28,8 +28,25 @@ class TasksView extends StatelessWidget {
   final ValueNotifier<String?> activeListId;
   final ValueNotifier<DateTime?> activeDueDate;
 
+  @override
+  State<TasksView> createState() => _TasksViewState();
+}
+
+class _TasksViewState extends State<TasksView> {
+  final Set<String> _expandedIds = {};
+
+  void _toggle(String id) {
+    setState(() {
+      if (_expandedIds.contains(id)) {
+        _expandedIds.remove(id);
+      } else {
+        _expandedIds.add(id);
+      }
+    });
+  }
+
   void _showSortSheet(BuildContext context) {
-    final current = controller.sortOrder;
+    final current = widget.controller.sortOrder;
     showCupertinoModalPopup<void>(
       context: context,
       builder: (_) => CupertinoActionSheet(
@@ -39,7 +56,7 @@ class TasksView extends StatelessWidget {
           final isSelected = order == current;
           return CupertinoActionSheetAction(
             onPressed: () {
-              controller.setSortOrder(order);
+              widget.controller.setSortOrder(order);
               Navigator.of(context, rootNavigator: true).pop();
             },
             child: Row(
@@ -114,10 +131,67 @@ class TasksView extends StatelessWidget {
     return result ?? false;
   }
 
+  Widget _buildFolderChildren(
+      BuildContext context, String folderId, double indent) {
+    final subFolders = widget.folderController.foldersIn(folderId);
+    final lists = widget.folderController.listsIn(folderId);
+
+    return Column(
+      children: [
+        for (final f in subFolders) ...[
+          _ListItem(
+            iconAsset: 'assets/icons/folder.png',
+            iconId: f.iconId,
+            isFolder: true,
+            label: f.name,
+            indent: indent,
+            onTap: () => Navigator.of(context).push(
+              FastRoute<void>(
+                builder: (_) => FolderView(
+                  folder: f,
+                  folderController: widget.folderController,
+                  taskController: widget.controller,
+                  activeListId: widget.activeListId,
+                ),
+              ),
+            ),
+            onExpand: () => _toggle(f.id),
+            isExpanded: _expandedIds.contains(f.id),
+          ),
+          if (_expandedIds.contains(f.id))
+            _buildFolderChildren(context, f.id, indent + 24),
+        ],
+        for (final l in lists) ...[
+          _ListItem(
+            iconAsset: 'assets/icons/list.png',
+            iconId: l.iconId,
+            isFolder: false,
+            label: l.name,
+            indent: indent,
+            count: widget.controller.uncompletedCountForList(l.id) > 0
+                ? widget.controller.uncompletedCountForList(l.id)
+                : null,
+            onTap: () => Navigator.of(context).push(
+              FastRoute<void>(
+                builder: (_) => ListTaskView(
+                  list: l,
+                  taskController: widget.controller,
+                  folderController: widget.folderController,
+                  activeListId: widget.activeListId,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(border: null,
+      navigationBar: CupertinoNavigationBar(
+        border: null,
         middle: const Text('Tasks'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
@@ -129,17 +203,21 @@ class TasksView extends StatelessWidget {
         child: Stack(
           children: [
             ListenableBuilder(
-              listenable: Listenable.merge([controller, folderController]),
+              listenable: Listenable.merge(
+                  [widget.controller, widget.folderController]),
               builder: (context, _) {
-                final rootFolders = folderController.foldersIn(null);
-                final rootLists = folderController.listsIn(null);
-                final todayCount = controller.todayUncompletedCount;
-                final upcomingCount = controller.upcomingUncompletedCount;
+                final rootFolders =
+                    widget.folderController.foldersIn(null);
+                final rootLists = widget.folderController.listsIn(null);
+                final todayCount = widget.controller.todayUncompletedCount;
+                final upcomingCount =
+                    widget.controller.upcomingUncompletedCount;
                 // KEEP: re-enable when Completed smart list is shown again.
-                // final completedCount = controller.completedTasksCount;
-                final hasTrash = controller.trashedTasks.isNotEmpty ||
-                    folderController.trashedFolders.isNotEmpty ||
-                    folderController.trashedLists.isNotEmpty;
+                // final completedCount = widget.controller.completedTasksCount;
+                final hasTrash =
+                    widget.controller.trashedTasks.isNotEmpty ||
+                        widget.folderController.trashedFolders.isNotEmpty ||
+                        widget.folderController.trashedLists.isNotEmpty;
 
                 return CustomScrollView(
                   slivers: [
@@ -150,12 +228,12 @@ class TasksView extends StatelessWidget {
                           _ListItem(
                             iconAsset: 'assets/icons/inbox.png',
                             label: 'Inbox',
-                            count: controller.inboxUncompletedCount,
+                            count: widget.controller.inboxUncompletedCount,
                             onTap: () => Navigator.of(context).push(
                               FastRoute<void>(
                                 builder: (_) => InboxView(
-                                  controller: controller,
-                                  folderController: folderController,
+                                  controller: widget.controller,
+                                  folderController: widget.folderController,
                                 ),
                               ),
                             ),
@@ -167,9 +245,9 @@ class TasksView extends StatelessWidget {
                             onTap: () => Navigator.of(context).push(
                               FastRoute<void>(
                                 builder: (_) => TodayView(
-                                  controller: controller,
-                                  folderController: folderController,
-                                  activeDueDate: activeDueDate,
+                                  controller: widget.controller,
+                                  folderController: widget.folderController,
+                                  activeDueDate: widget.activeDueDate,
                                 ),
                               ),
                             ),
@@ -181,8 +259,8 @@ class TasksView extends StatelessWidget {
                             onTap: () => Navigator.of(context).push(
                               FastRoute<void>(
                                 builder: (_) => UpcomingView(
-                                  controller: controller,
-                                  folderController: folderController,
+                                  controller: widget.controller,
+                                  folderController: widget.folderController,
                                 ),
                               ),
                             ),
@@ -206,7 +284,7 @@ class TasksView extends StatelessWidget {
                       SliverReorderableList(
                         itemCount: rootFolders.length,
                         onReorder: (oldIndex, newIndex) =>
-                            folderController.reorderFolders(
+                            widget.folderController.reorderFolders(
                                 null, oldIndex, newIndex),
                         proxyDecorator: _proxyDecorator,
                         itemBuilder: (context, index) {
@@ -218,28 +296,41 @@ class TasksView extends StatelessWidget {
                               key: ValueKey(f.id),
                               direction: DismissDirection.endToStart,
                               background: _DeleteBackground(),
-                              confirmDismiss: (_) =>
-                                  _confirmDelete(context, f.name, isFolder: true),
+                              confirmDismiss: (_) => _confirmDelete(
+                                  context, f.name,
+                                  isFolder: true),
                               onDismissed: (_) =>
-                                  folderController.deleteFolderDeep(
+                                  widget.folderController.deleteFolderDeep(
                                 f.id,
-                                controller.deleteTasksForList,
+                                widget.controller.deleteTasksForList,
                               ),
-                              child: _ListItem(
-                                iconAsset: 'assets/icons/folder.png',
-                                iconId: f.iconId,
-                                isFolder: true,
-                                label: f.name,
-                                onTap: () => Navigator.of(context).push(
-                                  FastRoute<void>(
-                                    builder: (_) => FolderView(
-                                      folder: f,
-                                      folderController: folderController,
-                                      taskController: controller,
-                                      activeListId: activeListId,
+                              child: Column(
+                                children: [
+                                  _ListItem(
+                                    iconAsset: 'assets/icons/folder.png',
+                                    iconId: f.iconId,
+                                    isFolder: true,
+                                    label: f.name,
+                                    onTap: () =>
+                                        Navigator.of(context).push(
+                                      FastRoute<void>(
+                                        builder: (_) => FolderView(
+                                          folder: f,
+                                          folderController:
+                                              widget.folderController,
+                                          taskController: widget.controller,
+                                          activeListId: widget.activeListId,
+                                        ),
+                                      ),
                                     ),
+                                    onExpand: () => _toggle(f.id),
+                                    isExpanded:
+                                        _expandedIds.contains(f.id),
                                   ),
-                                ),
+                                  if (_expandedIds.contains(f.id))
+                                    _buildFolderChildren(
+                                        context, f.id, 24),
+                                ],
                               ),
                             ),
                           );
@@ -251,13 +342,13 @@ class TasksView extends StatelessWidget {
                       SliverReorderableList(
                         itemCount: rootLists.length,
                         onReorder: (oldIndex, newIndex) =>
-                            folderController.reorderLists(
+                            widget.folderController.reorderLists(
                                 null, oldIndex, newIndex),
                         proxyDecorator: _proxyDecorator,
                         itemBuilder: (context, index) {
                           final l = rootLists[index];
                           final count =
-                              controller.uncompletedCountForList(l.id);
+                              widget.controller.uncompletedCountForList(l.id);
                           return ReorderableDelayedDragStartListener(
                             key: ValueKey('list_${l.id}'),
                             index: index,
@@ -265,11 +356,13 @@ class TasksView extends StatelessWidget {
                               key: ValueKey(l.id),
                               direction: DismissDirection.endToStart,
                               background: _DeleteBackground(),
-                              confirmDismiss: (_) =>
-                                  _confirmDelete(context, l.name, isFolder: false),
+                              confirmDismiss: (_) => _confirmDelete(
+                                  context, l.name,
+                                  isFolder: false),
                               onDismissed: (_) async {
-                                await controller.deleteTasksForList(l.id);
-                                await folderController.deleteList(l.id);
+                                await widget.controller
+                                    .deleteTasksForList(l.id);
+                                await widget.folderController.deleteList(l.id);
                               },
                               child: _ListItem(
                                 iconAsset: 'assets/icons/list.png',
@@ -281,9 +374,10 @@ class TasksView extends StatelessWidget {
                                   FastRoute<void>(
                                     builder: (_) => ListTaskView(
                                       list: l,
-                                      taskController: controller,
-                                      folderController: folderController,
-                                      activeListId: activeListId,
+                                      taskController: widget.controller,
+                                      folderController:
+                                          widget.folderController,
+                                      activeListId: widget.activeListId,
                                     ),
                                   ),
                                 ),
@@ -319,8 +413,8 @@ class TasksView extends StatelessWidget {
                             //     onTap: () => Navigator.of(context).push(
                             //       FastRoute<void>(
                             //         builder: (_) => CompletedView(
-                            //           controller: controller,
-                            //           folderController: folderController,
+                            //           controller: widget.controller,
+                            //           folderController: widget.folderController,
                             //         ),
                             //       ),
                             //     ),
@@ -336,8 +430,8 @@ class TasksView extends StatelessWidget {
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => TrashView(
-                                    taskController: controller,
-                                    folderController: folderController,
+                                    taskController: widget.controller,
+                                    folderController: widget.folderController,
                                   ),
                                 ),
                               ),
@@ -355,8 +449,8 @@ class TasksView extends StatelessWidget {
               left: 20,
               bottom: 16,
               child: _CircleAddButton(
-                onPressed: () =>
-                    showCreateFolderListSheet(context, folderController),
+                onPressed: () => showCreateFolderListSheet(
+                    context, widget.folderController),
               ),
             ),
           ],
@@ -403,6 +497,9 @@ class _ListItem extends StatelessWidget {
     this.iconId,
     this.isFolder = false,
     this.count,
+    this.onExpand,
+    this.isExpanded = false,
+    this.indent = 0,
   });
 
   final String? iconAsset;
@@ -412,6 +509,9 @@ class _ListItem extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final int? count;
+  final VoidCallback? onExpand;
+  final bool isExpanded;
+  final double indent;
 
   @override
   Widget build(BuildContext context) {
@@ -424,36 +524,69 @@ class _ListItem extends StatelessWidget {
       icon = Image.asset(iconAsset!, width: 22, height: 22);
     }
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        child: Row(
-          children: [
-            SizedBox(width: 22, height: 22, child: icon),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight:
-                      isFolder ? FontWeight.w500 : FontWeight.normal,
+    return IntrinsicHeight(
+      child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                  16 + indent, 9, onExpand != null ? 4 : 16, 9),
+              child: Row(
+                children: [
+                  SizedBox(width: 22, height: 22, child: icon),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: isFolder
+                            ? FontWeight.w500
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                  if (count != null && count! > 0) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '$count',
+                      style: TextStyle(
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (onExpand != null)
+          GestureDetector(
+            onTap: onExpand,
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: 48,
+              child: Center(
+                child: AnimatedRotation(
+                  turns: isExpanded ? 0.25 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    CupertinoIcons.chevron_right,
+                    size: 14,
+                    color:
+                        CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
                 ),
               ),
             ),
-            if (count != null && count! > 0)
-              Text(
-                '$count',
-                style: TextStyle(
-                  color:
-                      CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-              ),
-          ],
-        ),
-      ),
+          ),
+      ],
+    ),
     );
   }
 }
