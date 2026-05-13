@@ -45,6 +45,8 @@ class _HomeShellState extends State<HomeShell> {
   late final List<_DepthObserver> _depthObservers;
   final _activeListId = ValueNotifier<String?>(null);
   final _activeDueDate = ValueNotifier<DateTime?>(null);
+  final _tasksCollapseSignal = ValueNotifier<int>(0);
+  final _notesCollapseSignal = ValueNotifier<int>(0);
   final _calendarResetSignal = ValueNotifier<int>(0);
   final _showPlusButton = ValueNotifier<bool>(true);
   int _lastTabIndex = 0;
@@ -95,6 +97,8 @@ class _HomeShellState extends State<HomeShell> {
     _tabController.dispose();
     _activeListId.dispose();
     _activeDueDate.dispose();
+    _tasksCollapseSignal.dispose();
+    _notesCollapseSignal.dispose();
     _calendarResetSignal.dispose();
     _showPlusButton.dispose();
     super.dispose();
@@ -125,9 +129,9 @@ class _HomeShellState extends State<HomeShell> {
     if (tappedIndex == _lastTabIndex) {
       _navigatorKeys[tappedIndex].currentState
           ?.popUntil((route) => route.isFirst);
-      if (tappedIndex == 2) {
-        _calendarResetSignal.value++;
-      }
+      if (tappedIndex == 0) _tasksCollapseSignal.value++;
+      if (tappedIndex == 1) _notesCollapseSignal.value++;
+      if (tappedIndex == 2) _calendarResetSignal.value++;
     }
     switch (tappedIndex) {
       case 0:
@@ -244,8 +248,12 @@ class _HomeShellState extends State<HomeShell> {
                     folderController: widget.folderController,
                     activeListId: _activeListId,
                     activeDueDate: _activeDueDate,
+                    collapseSignal: _tasksCollapseSignal,
                   ),
-                1 => NotesView(controller: widget.noteController),
+                1 => NotesView(
+                    controller: widget.noteController,
+                    collapseSignal: _notesCollapseSignal,
+                  ),
                 2 => CalendarView(
                     controller: widget.taskController,
                     folderController: widget.folderController,

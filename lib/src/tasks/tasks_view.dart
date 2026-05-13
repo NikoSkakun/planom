@@ -21,12 +21,14 @@ class TasksView extends StatefulWidget {
     required this.folderController,
     required this.activeListId,
     required this.activeDueDate,
+    required this.collapseSignal,
   });
 
   final TaskController controller;
   final FolderController folderController;
   final ValueNotifier<String?> activeListId;
   final ValueNotifier<DateTime?> activeDueDate;
+  final ValueNotifier<int> collapseSignal;
 
   @override
   State<TasksView> createState() => _TasksViewState();
@@ -34,6 +36,22 @@ class TasksView extends StatefulWidget {
 
 class _TasksViewState extends State<TasksView> {
   final Set<String> _expandedIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    widget.collapseSignal.addListener(_collapseAll);
+  }
+
+  @override
+  void dispose() {
+    widget.collapseSignal.removeListener(_collapseAll);
+    super.dispose();
+  }
+
+  void _collapseAll() {
+    if (_expandedIds.isNotEmpty) setState(() => _expandedIds.clear());
+  }
 
   void _toggle(String id) {
     setState(() {

@@ -10,9 +10,14 @@ import 'note_trash_view.dart';
 import 'note_widgets.dart';
 
 class NotesView extends StatefulWidget {
-  const NotesView({super.key, required this.controller});
+  const NotesView({
+    super.key,
+    required this.controller,
+    required this.collapseSignal,
+  });
 
   final NoteController controller;
+  final ValueNotifier<int> collapseSignal;
 
   @override
   State<NotesView> createState() => _NotesViewState();
@@ -20,6 +25,22 @@ class NotesView extends StatefulWidget {
 
 class _NotesViewState extends State<NotesView> {
   final Set<String> _expandedIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    widget.collapseSignal.addListener(_collapseAll);
+  }
+
+  @override
+  void dispose() {
+    widget.collapseSignal.removeListener(_collapseAll);
+    super.dispose();
+  }
+
+  void _collapseAll() {
+    if (_expandedIds.isNotEmpty) setState(() => _expandedIds.clear());
+  }
 
   void _toggle(String id) {
     setState(() {
