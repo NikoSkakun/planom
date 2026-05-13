@@ -30,11 +30,74 @@ class FolderView extends StatefulWidget {
 
 class _FolderViewState extends State<FolderView> {
   late AppFolder _currentFolder;
+  final Set<String> _expandedIds = {};
 
   @override
   void initState() {
     super.initState();
     _currentFolder = widget.folder;
+  }
+
+  void _toggle(String id) {
+    setState(() {
+      if (_expandedIds.contains(id)) {
+        _expandedIds.remove(id);
+      } else {
+        _expandedIds.add(id);
+      }
+    });
+  }
+
+  Widget _buildFolderChildren(
+      BuildContext context, String folderId, double indent) {
+    final subFolders = widget.folderController.foldersIn(folderId);
+    final lists = widget.folderController.listsIn(folderId);
+    return Column(
+      children: [
+        for (final f in subFolders) ...[
+          _FolderListItem(
+            icon: buildFolderItemIcon(f.iconId, isFolder: true),
+            label: f.name,
+            isFolder: true,
+            indent: indent,
+            onTap: () => Navigator.of(context).push(
+              FastRoute<void>(
+                builder: (_) => FolderView(
+                  folder: f,
+                  folderController: widget.folderController,
+                  taskController: widget.taskController,
+                  activeListId: widget.activeListId,
+                ),
+              ),
+            ),
+            onExpand: () => _toggle(f.id),
+            isExpanded: _expandedIds.contains(f.id),
+          ),
+          if (_expandedIds.contains(f.id))
+            _buildFolderChildren(context, f.id, indent + 24),
+        ],
+        for (final l in lists) ...[
+          _FolderListItem(
+            icon: buildFolderItemIcon(l.iconId, isFolder: false),
+            label: l.name,
+            indent: indent,
+            count: widget.taskController.uncompletedCountForList(l.id) > 0
+                ? widget.taskController.uncompletedCountForList(l.id)
+                : null,
+            onTap: () => Navigator.of(context).push(
+              FastRoute<void>(
+                builder: (_) => ListTaskView(
+                  list: l,
+                  taskController: widget.taskController,
+                  folderController: widget.folderController,
+                  activeListId: widget.activeListId,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   Future<bool> _confirmDelete(String name, {required bool isFolder}) async {
@@ -201,24 +264,32 @@ class _FolderViewState extends State<FolderView> {
                                 f.id,
                                 widget.taskController.deleteTasksForList,
                               ),
-                              child: _FolderListItem(
-                                icon: buildFolderItemIcon(
-                                  f.iconId,
-                                  isFolder: true,
-                                ),
-                                label: f.name,
-                                isFolder: true,
-                                onTap: () =>
-                                    Navigator.of(context).push(
-                                  FastRoute<void>(
-                                    builder: (_) => FolderView(
-                                      folder: f,
-                                      folderController: widget.folderController,
-                                      taskController: widget.taskController,
-                                      activeListId: widget.activeListId,
+                              child: Column(
+                                children: [
+                                  _FolderListItem(
+                                    icon: buildFolderItemIcon(
+                                      f.iconId,
+                                      isFolder: true,
                                     ),
+                                    label: f.name,
+                                    isFolder: true,
+                                    onTap: () => Navigator.of(context).push(
+                                      FastRoute<void>(
+                                        builder: (_) => FolderView(
+                                          folder: f,
+                                          folderController:
+                                              widget.folderController,
+                                          taskController: widget.taskController,
+                                          activeListId: widget.activeListId,
+                                        ),
+                                      ),
+                                    ),
+                                    onExpand: () => _toggle(f.id),
+                                    isExpanded: _expandedIds.contains(f.id),
                                   ),
-                                ),
+                                  if (_expandedIds.contains(f.id))
+                                    _buildFolderChildren(context, f.id, 24),
+                                ],
                               ),
                             ),
                           );
@@ -450,6 +521,9 @@ class _FolderListItem extends StatelessWidget {
     required this.onTap,
     this.isFolder = false,
     this.count,
+    this.onExpand,
+    this.isExpanded = false,
+    this.indent = 0,
   });
 
   final Widget icon;
@@ -457,37 +531,74 @@ class _FolderListItem extends StatelessWidget {
   final VoidCallback onTap;
   final bool isFolder;
   final int? count;
+  final VoidCallback? onExpand;
+  final bool isExpanded;
+  final double indent;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        child: Row(
-          children: [
-            SizedBox(width: 22, height: 22, child: icon),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: isFolder ? FontWeight.w500 : FontWeight.normal,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                    16 + indent, 9, onExpand != null ? 4 : 16, 9),
+                child: Row(
+                  children: [
+                    SizedBox(width: 22, height: 22, child: icon),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight:
+                              isFolder ? FontWeight.w500 : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                    if (count != null && count! > 0) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '$count',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: CupertinoColors.secondaryLabel
+                              .resolveFrom(context),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
-            if (count != null && count! > 0)
-              Text(
-                '$count',
-                style: TextStyle(
-                  color: CupertinoColors.secondaryLabel
-                      .resolveFrom(context),
+          ),
+          if (onExpand != null)
+            GestureDetector(
+              onTap: onExpand,
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
+                width: 48,
+                child: Center(
+                  child: AnimatedRotation(
+                    turns: isExpanded ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      CupertinoIcons.chevron_right,
+                      size: 14,
+                      color: CupertinoColors.secondaryLabel
+                          .resolveFrom(context),
+                    ),
+                  ),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -506,7 +617,7 @@ class _CircleButton extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          color: CupertinoColors.secondarySystemBackground.resolveFrom(context),
           shape: BoxShape.circle,
         ),
         child: Icon(

@@ -28,11 +28,66 @@ class NoteFolderView extends StatefulWidget {
 
 class _NoteFolderViewState extends State<NoteFolderView> {
   late NoteFolder _currentFolder;
+  final Set<String> _expandedIds = {};
 
   @override
   void initState() {
     super.initState();
     _currentFolder = widget.folder;
+  }
+
+  void _toggle(String id) {
+    setState(() {
+      if (_expandedIds.contains(id)) {
+        _expandedIds.remove(id);
+      } else {
+        _expandedIds.add(id);
+      }
+    });
+  }
+
+  Widget _buildFolderChildren(
+      BuildContext context, String folderId, double indent) {
+    final subFolders = widget.controller.foldersIn(folderId);
+    final notes = widget.controller.notesIn(folderId);
+    return Column(
+      children: [
+        for (final f in subFolders) ...[
+          NoteFolderRow(
+            folder: f,
+            noteCount: widget.controller.notesIn(f.id).length,
+            indent: indent,
+            onTap: () => Navigator.of(context).push(
+              FastRoute<void>(
+                builder: (_) => NoteFolderView(
+                  folder: f,
+                  controller: widget.controller,
+                ),
+              ),
+            ),
+            onExpand: () => _toggle(f.id),
+            isExpanded: _expandedIds.contains(f.id),
+          ),
+          if (_expandedIds.contains(f.id))
+            _buildFolderChildren(context, f.id, indent + 24),
+        ],
+        for (final n in notes)
+          NoteRow(
+            note: n,
+            indent: indent,
+            onTap: () => Navigator.of(context).push(
+              FastRoute<void>(
+                settings:
+                    const RouteSettings(name: NoteDetailView.routeName),
+                builder: (_) => NoteDetailView(
+                  note: n,
+                  controller: widget.controller,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _proxyDecorator(
@@ -165,19 +220,26 @@ class _NoteFolderViewState extends State<NoteFolderView> {
                               background: const NoteDeleteBackground(),
                               onDismissed: (_) =>
                                   widget.controller.deleteFolderDeep(f.id),
-                              child: NoteFolderRow(
-                                folder: f,
-                                noteCount:
-                                    widget.controller.notesIn(f.id).length,
-                                onTap: () =>
-                                    Navigator.of(context).push(
-                                  FastRoute<void>(
-                                    builder: (_) => NoteFolderView(
-                                      folder: f,
-                                      controller: widget.controller,
+                              child: Column(
+                                children: [
+                                  NoteFolderRow(
+                                    folder: f,
+                                    noteCount:
+                                        widget.controller.notesIn(f.id).length,
+                                    onTap: () => Navigator.of(context).push(
+                                      FastRoute<void>(
+                                        builder: (_) => NoteFolderView(
+                                          folder: f,
+                                          controller: widget.controller,
+                                        ),
+                                      ),
                                     ),
+                                    onExpand: () => _toggle(f.id),
+                                    isExpanded: _expandedIds.contains(f.id),
                                   ),
-                                ),
+                                  if (_expandedIds.contains(f.id))
+                                    _buildFolderChildren(context, f.id, 24),
+                                ],
                               ),
                             ),
                           );
