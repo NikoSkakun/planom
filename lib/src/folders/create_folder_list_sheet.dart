@@ -290,9 +290,15 @@ class _CreateSheetState extends State<_CreateSheet> {
           ),
           if (_type == _CreateType.list) ...[
             const SizedBox(height: 16),
-            ListColorSwatches(
-              selected: _selectedColor,
-              onSelect: (c) => setState(() => _selectedColor = c),
+            _ColorPickerButton(
+              selectedColor: _selectedColor,
+              onTap: () => showListColorPickerSheet(
+                context,
+                _selectedColor,
+                (c) {
+                  if (mounted) setState(() => _selectedColor = c);
+                },
+              ),
             ),
           ],
           const SizedBox(height: 16),
@@ -309,6 +315,67 @@ class _CreateSheetState extends State<_CreateSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ColorPickerButton extends StatelessWidget {
+  const _ColorPickerButton({
+    required this.selectedColor,
+    required this.onTap,
+  });
+
+  final int? selectedColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'List color',
+                style: TextStyle(fontSize: 17),
+              ),
+            ),
+            if (selectedColor == null)
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: CupertinoColors.separator.resolveFrom(context),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  CupertinoIcons.xmark,
+                  size: 10,
+                  color:
+                      CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              )
+            else
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(selectedColor!),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

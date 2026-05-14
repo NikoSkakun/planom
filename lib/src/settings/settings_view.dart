@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 
 import 'backup_service.dart';
 import 'settings_controller.dart';
+import 'smart_list_prefs.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({
@@ -31,7 +32,8 @@ class _SettingsViewState extends State<SettingsView> {
       await widget.backupService!.exportBackup();
     } catch (_) {
       if (!mounted) return;
-      _showErrorDialog('Export Failed', 'An error occurred while creating the backup.');
+      _showErrorDialog(
+          'Export Failed', 'An error occurred while creating the backup.');
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -72,7 +74,8 @@ class _SettingsViewState extends State<SettingsView> {
           context: context,
           builder: (ctx) => CupertinoAlertDialog(
             title: const Text('Import Successful'),
-            content: const Text('Your data has been restored from the backup.'),
+            content:
+                const Text('Your data has been restored from the backup.'),
             actions: [
               CupertinoDialogAction(
                 isDefaultAction: true,
@@ -90,7 +93,8 @@ class _SettingsViewState extends State<SettingsView> {
       }
     } catch (_) {
       if (mounted) {
-        _showErrorDialog('Import Failed', 'An error occurred while reading the file.');
+        _showErrorDialog(
+            'Import Failed', 'An error occurred while reading the file.');
       }
     } finally {
       if (mounted) setState(() => _importing = false);
@@ -112,6 +116,64 @@ class _SettingsViewState extends State<SettingsView> {
         ],
       ),
     );
+  }
+
+  void _showVisibilityPicker(
+      BuildContext context, String key, SmartListVisibility current) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (_) => CupertinoActionSheet(
+        title: const Text('Visibility'),
+        actions: SmartListVisibility.values.map((v) {
+          final isSelected = v == current;
+          return CupertinoActionSheetAction(
+            onPressed: () {
+              widget.controller.updateSmartListVisibility(key, v);
+              Navigator.of(context, rootNavigator: true).pop();
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isSelected)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Icon(
+                      CupertinoIcons.checkmark,
+                      size: 16,
+                      color: CupertinoColors.activeBlue,
+                    ),
+                  ),
+                Text(
+                  _visibilityLabel(v),
+                  style: TextStyle(
+                    color: isSelected
+                        ? CupertinoColors.activeBlue
+                        : CupertinoColors.label,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
+  }
+
+  static String _visibilityLabel(SmartListVisibility v) {
+    switch (v) {
+      case SmartListVisibility.show:
+        return 'Show';
+      case SmartListVisibility.showIfNotEmpty:
+        return 'If not empty';
+      case SmartListVisibility.hidden:
+        return 'Hidden';
+    }
   }
 
   @override
@@ -140,7 +202,8 @@ class _SettingsViewState extends State<SettingsView> {
             const SizedBox(height: 8),
             ListenableBuilder(
               listenable: widget.controller,
-              builder: (context, _) => CupertinoSlidingSegmentedControl<ThemeMode>(
+              builder: (context, _) =>
+                  CupertinoSlidingSegmentedControl<ThemeMode>(
                 groupValue: widget.controller.themeMode,
                 onValueChanged: widget.controller.updateThemeMode,
                 children: const {
@@ -158,6 +221,76 @@ class _SettingsViewState extends State<SettingsView> {
                   ),
                 },
               ),
+            ),
+
+            // ── Smart Lists ─────────────────────────────────────────────
+            const SizedBox(height: 32),
+            Text(
+              'Smart Lists',
+              style: TextStyle(
+                fontSize: 13,
+                color: labelColor,
+                letterSpacing: -0.08,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListenableBuilder(
+              listenable: widget.controller,
+              builder: (ctx, _) {
+                final prefs = widget.controller.smartListPrefs;
+                return Column(
+                  children: [
+                    _SmartListRow(
+                      icon: Image.asset('assets/icons/inbox.png',
+                          width: 22, height: 22),
+                      label: 'Inbox',
+                    ),
+                    const SizedBox(height: 1),
+                    _SmartListRow(
+                      icon: Image.asset('assets/icons/today.png',
+                          width: 22, height: 22),
+                      label: 'Today',
+                      visibility: prefs.today,
+                      onTap: () => _showVisibilityPicker(
+                          ctx, 'today', prefs.today),
+                    ),
+                    const SizedBox(height: 1),
+                    _SmartListRow(
+                      icon: Image.asset('assets/icons/upcoming.png',
+                          width: 22, height: 22),
+                      label: 'Upcoming',
+                      visibility: prefs.upcoming,
+                      onTap: () => _showVisibilityPicker(
+                          ctx, 'upcoming', prefs.upcoming),
+                    ),
+                    const SizedBox(height: 1),
+                    _SmartListRow(
+                      icon: const Icon(
+                        CupertinoIcons.checkmark_circle_fill,
+                        size: 22,
+                        color: Color(0xFF34C759),
+                      ),
+                      label: 'Completed',
+                      visibility: prefs.completed,
+                      onTap: () => _showVisibilityPicker(
+                          ctx, 'completed', prefs.completed),
+                    ),
+                    const SizedBox(height: 1),
+                    _SmartListRow(
+                      icon: Icon(
+                        CupertinoIcons.trash,
+                        size: 22,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(ctx),
+                      ),
+                      label: 'Trash',
+                      visibility: prefs.trash,
+                      onTap: () => _showVisibilityPicker(
+                          ctx, 'trash', prefs.trash),
+                    ),
+                  ],
+                );
+              },
             ),
 
             if (hasBackup) ...[
@@ -191,6 +324,88 @@ class _SettingsViewState extends State<SettingsView> {
         ),
       ),
     );
+  }
+}
+
+class _SmartListRow extends StatelessWidget {
+  const _SmartListRow({
+    required this.icon,
+    required this.label,
+    this.visibility,
+    this.onTap,
+  });
+
+  final Widget icon;
+  final String label;
+  final SmartListVisibility? visibility;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = CupertinoDynamicColor.resolve(
+      CupertinoColors.tertiarySystemBackground,
+      context,
+    );
+    final isDisabled = onTap == null;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            SizedBox(width: 22, height: 22, child: icon),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 17,
+                  color: isDisabled
+                      ? CupertinoColors.secondaryLabel.resolveFrom(context)
+                      : CupertinoColors.label.resolveFrom(context),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isDisabled
+                  ? 'Always shown'
+                  : _visibilityLabel(visibility!),
+              style: TextStyle(
+                fontSize: 15,
+                color:
+                    CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+            if (!isDisabled) ...[
+              const SizedBox(width: 4),
+              Icon(
+                CupertinoIcons.chevron_right,
+                size: 14,
+                color:
+                    CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _visibilityLabel(SmartListVisibility v) {
+    switch (v) {
+      case SmartListVisibility.show:
+        return 'Show';
+      case SmartListVisibility.showIfNotEmpty:
+        return 'If not empty';
+      case SmartListVisibility.hidden:
+        return 'Hidden';
+    }
   }
 }
 
@@ -234,7 +449,8 @@ class _DataRow extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 17,
                       color: disabled
-                          ? CupertinoColors.secondaryLabel.resolveFrom(context)
+                          ? CupertinoColors.secondaryLabel
+                              .resolveFrom(context)
                           : CupertinoColors.label.resolveFrom(context),
                     ),
                   ),
@@ -243,7 +459,8 @@ class _DataRow extends StatelessWidget {
                     sublabel,
                     style: TextStyle(
                       fontSize: 12,
-                      color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                      color: CupertinoColors.secondaryLabel
+                          .resolveFrom(context),
                     ),
                   ),
                 ],
@@ -255,7 +472,8 @@ class _DataRow extends StatelessWidget {
               Icon(
                 CupertinoIcons.chevron_right,
                 size: 16,
-                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                color:
+                    CupertinoColors.tertiaryLabel.resolveFrom(context),
               ),
           ],
         ),

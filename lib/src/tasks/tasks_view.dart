@@ -5,9 +5,10 @@ import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
 import '../folders/folder_view.dart';
 import '../folders/list_task_view.dart';
+import '../settings/settings_controller.dart';
+import '../settings/smart_list_prefs.dart';
 import '../utils/fast_route.dart';
-// KEEP: import for Completed smart list — re-enable when the list is shown again.
-// import 'completed_view.dart';
+import 'completed_view.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
 import 'today_view.dart';
@@ -19,6 +20,7 @@ class TasksView extends StatefulWidget {
     super.key,
     required this.controller,
     required this.folderController,
+    required this.settingsController,
     required this.activeListId,
     required this.activeDueDate,
     required this.collapseSignal,
@@ -26,6 +28,7 @@ class TasksView extends StatefulWidget {
 
   final TaskController controller;
   final FolderController folderController;
+  final SettingsController settingsController;
   final ValueNotifier<String?> activeListId;
   final ValueNotifier<DateTime?> activeDueDate;
   final ValueNotifier<int> collapseSignal;
@@ -205,6 +208,17 @@ class _TasksViewState extends State<TasksView> {
     );
   }
 
+  static bool _isVisible(SmartListVisibility vis, bool hasContent) {
+    switch (vis) {
+      case SmartListVisibility.show:
+        return true;
+      case SmartListVisibility.showIfNotEmpty:
+        return hasContent;
+      case SmartListVisibility.hidden:
+        return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -221,8 +235,11 @@ class _TasksViewState extends State<TasksView> {
         child: Stack(
           children: [
             ListenableBuilder(
-              listenable: Listenable.merge(
-                  [widget.controller, widget.folderController]),
+              listenable: Listenable.merge([
+                widget.controller,
+                widget.folderController,
+                widget.settingsController,
+              ]),
               builder: (context, _) {
                 final rootFolders =
                     widget.folderController.foldersIn(null);
@@ -230,12 +247,24 @@ class _TasksViewState extends State<TasksView> {
                 final todayCount = widget.controller.todayUncompletedCount;
                 final upcomingCount =
                     widget.controller.upcomingUncompletedCount;
-                // KEEP: re-enable when Completed smart list is shown again.
-                // final completedCount = widget.controller.completedTasksCount;
-                final hasTrash =
+                final completedCount =
+                    widget.controller.completedTasksCount;
+                final hasTrashContent =
                     widget.controller.trashedTasks.isNotEmpty ||
                         widget.folderController.trashedFolders.isNotEmpty ||
                         widget.folderController.trashedLists.isNotEmpty;
+
+                final prefs =
+                    widget.settingsController.smartListPrefs;
+                final showToday =
+                    _isVisible(prefs.today, todayCount > 0);
+                final showUpcoming =
+                    _isVisible(prefs.upcoming, upcomingCount > 0);
+                final showCompleted =
+                    _isVisible(prefs.completed, completedCount > 0);
+                final showTrash =
+                    _isVisible(prefs.trash, hasTrashContent);
+                final showBottomSection = showCompleted || showTrash;
 
                 return CustomScrollView(
                   slivers: [
@@ -246,43 +275,52 @@ class _TasksViewState extends State<TasksView> {
                           _ListItem(
                             iconAsset: 'assets/icons/inbox.png',
                             label: 'Inbox',
-                            count: widget.controller.inboxUncompletedCount,
+                            count: widget
+                                .controller.inboxUncompletedCount,
                             onTap: () => Navigator.of(context).push(
                               FastRoute<void>(
                                 builder: (_) => InboxView(
                                   controller: widget.controller,
-                                  folderController: widget.folderController,
+                                  folderController:
+                                      widget.folderController,
                                 ),
                               ),
                             ),
                           ),
-                          _ListItem(
-                            iconAsset: 'assets/icons/today.png',
-                            label: 'Today',
-                            count: todayCount > 0 ? todayCount : null,
-                            onTap: () => Navigator.of(context).push(
-                              FastRoute<void>(
-                                builder: (_) => TodayView(
-                                  controller: widget.controller,
-                                  folderController: widget.folderController,
-                                  activeDueDate: widget.activeDueDate,
+                          if (showToday)
+                            _ListItem(
+                              iconAsset: 'assets/icons/today.png',
+                              label: 'Today',
+                              count:
+                                  todayCount > 0 ? todayCount : null,
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => TodayView(
+                                    controller: widget.controller,
+                                    folderController:
+                                        widget.folderController,
+                                    activeDueDate: widget.activeDueDate,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          _ListItem(
-                            iconAsset: 'assets/icons/upcoming.png',
-                            label: 'Upcoming',
-                            count: upcomingCount > 0 ? upcomingCount : null,
-                            onTap: () => Navigator.of(context).push(
-                              FastRoute<void>(
-                                builder: (_) => UpcomingView(
-                                  controller: widget.controller,
-                                  folderController: widget.folderController,
+                          if (showUpcoming)
+                            _ListItem(
+                              iconAsset: 'assets/icons/upcoming.png',
+                              label: 'Upcoming',
+                              count: upcomingCount > 0
+                                  ? upcomingCount
+                                  : null,
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => UpcomingView(
+                                    controller: widget.controller,
+                                    folderController:
+                                        widget.folderController,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
                           // Separator between smart lists and user folders/lists
                           Padding(
                             padding: const EdgeInsets.symmetric(
@@ -365,8 +403,8 @@ class _TasksViewState extends State<TasksView> {
                         proxyDecorator: _proxyDecorator,
                         itemBuilder: (context, index) {
                           final l = rootLists[index];
-                          final count =
-                              widget.controller.uncompletedCountForList(l.id);
+                          final count = widget.controller
+                              .uncompletedCountForList(l.id);
                           return ReorderableDelayedDragStartListener(
                             key: ValueKey('list_${l.id}'),
                             index: index,
@@ -380,7 +418,8 @@ class _TasksViewState extends State<TasksView> {
                               onDismissed: (_) async {
                                 await widget.controller
                                     .deleteTasksForList(l.id);
-                                await widget.folderController.deleteList(l.id);
+                                await widget.folderController
+                                    .deleteList(l.id);
                               },
                               child: _ListItem(
                                 iconAsset: 'assets/icons/list.png',
@@ -406,7 +445,7 @@ class _TasksViewState extends State<TasksView> {
                       ),
 
                     // Bottom section: Completed + Trash smart lists
-                    if (hasTrash)
+                    if (showBottomSection)
                       SliverToBoxAdapter(
                         child: Column(
                           children: [
@@ -419,46 +458,49 @@ class _TasksViewState extends State<TasksView> {
                                     .resolveFrom(context),
                               ),
                             ),
-                            // KEEP: Completed smart list — hidden for now, will be re-enabled later.
-                            // if (completedCount > 0)
-                            //   _ListItem(
-                            //     iconWidget: const Icon(
-                            //       CupertinoIcons.checkmark_circle_fill,
-                            //       size: 22,
-                            //       color: Color(0xFF34C759),
-                            //     ),
-                            //     label: 'Completed',
-                            //     onTap: () => Navigator.of(context).push(
-                            //       FastRoute<void>(
-                            //         builder: (_) => CompletedView(
-                            //           controller: widget.controller,
-                            //           folderController: widget.folderController,
-                            //         ),
-                            //       ),
-                            //     ),
-                            //   ),
-                            _ListItem(
-                              iconWidget: Icon(
-                                CupertinoIcons.trash,
-                                size: 22,
-                                color: CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
-                              ),
-                              label: 'Trash',
-                              onTap: () => Navigator.of(context).push(
-                                FastRoute<void>(
-                                  builder: (_) => TrashView(
-                                    taskController: widget.controller,
-                                    folderController: widget.folderController,
+                            if (showCompleted)
+                              _ListItem(
+                                iconWidget: const Icon(
+                                  CupertinoIcons.checkmark_circle_fill,
+                                  size: 22,
+                                  color: Color(0xFF34C759),
+                                ),
+                                label: 'Completed',
+                                onTap: () => Navigator.of(context).push(
+                                  FastRoute<void>(
+                                    builder: (_) => CompletedView(
+                                      controller: widget.controller,
+                                      folderController:
+                                          widget.folderController,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                            if (showTrash)
+                              _ListItem(
+                                iconWidget: Icon(
+                                  CupertinoIcons.trash,
+                                  size: 22,
+                                  color: CupertinoColors.secondaryLabel
+                                      .resolveFrom(context),
+                                ),
+                                label: 'Trash',
+                                onTap: () => Navigator.of(context).push(
+                                  FastRoute<void>(
+                                    builder: (_) => TrashView(
+                                      taskController: widget.controller,
+                                      folderController:
+                                          widget.folderController,
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
 
-                    const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                    const SliverToBoxAdapter(
+                        child: SizedBox(height: 80)),
                   ],
                 );
               },
@@ -544,67 +586,67 @@ class _ListItem extends StatelessWidget {
 
     return IntrinsicHeight(
       child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onTap,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                  16 + indent, 9, onExpand != null ? 4 : 16, 9),
-              child: Row(
-                children: [
-                  SizedBox(width: 22, height: 22, child: icon),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: isFolder
-                            ? FontWeight.w500
-                            : FontWeight.normal,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                    16 + indent, 9, onExpand != null ? 4 : 16, 9),
+                child: Row(
+                  children: [
+                    SizedBox(width: 22, height: 22, child: icon),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: isFolder
+                              ? FontWeight.w500
+                              : FontWeight.normal,
+                        ),
                       ),
                     ),
-                  ),
-                  if (count != null && count! > 0) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      '$count',
-                      style: TextStyle(
-                        color: CupertinoColors.secondaryLabel
-                            .resolveFrom(context),
+                    if (count != null && count! > 0) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '$count',
+                        style: TextStyle(
+                          color: CupertinoColors.secondaryLabel
+                              .resolveFrom(context),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
-              ),
-            ),
-          ),
-        ),
-        if (onExpand != null)
-          GestureDetector(
-            onTap: onExpand,
-            behavior: HitTestBehavior.opaque,
-            child: SizedBox(
-              width: 48,
-              child: Center(
-                child: AnimatedRotation(
-                  turns: isExpanded ? 0.25 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: Icon(
-                    CupertinoIcons.chevron_right,
-                    size: 14,
-                    color:
-                        CupertinoColors.secondaryLabel.resolveFrom(context),
-                  ),
                 ),
               ),
             ),
           ),
-      ],
-    ),
+          if (onExpand != null)
+            GestureDetector(
+              onTap: onExpand,
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
+                width: 48,
+                child: Center(
+                  child: AnimatedRotation(
+                    turns: isExpanded ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      CupertinoIcons.chevron_right,
+                      size: 14,
+                      color: CupertinoColors.secondaryLabel
+                          .resolveFrom(context),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -622,7 +664,8 @@ class _CircleAddButton extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: CupertinoColors.secondarySystemBackground.resolveFrom(context),
+          color: CupertinoColors.secondarySystemBackground
+              .resolveFrom(context),
           shape: BoxShape.circle,
         ),
         child: Icon(

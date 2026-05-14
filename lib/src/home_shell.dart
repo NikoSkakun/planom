@@ -246,6 +246,7 @@ class _HomeShellState extends State<HomeShell> {
                 0 => TasksView(
                     controller: widget.taskController,
                     folderController: widget.folderController,
+                    settingsController: widget.settingsController,
                     activeListId: _activeListId,
                     activeDueDate: _activeDueDate,
                     collapseSignal: _tasksCollapseSignal,

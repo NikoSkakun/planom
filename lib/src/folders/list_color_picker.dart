@@ -158,11 +158,32 @@ class _PickerSheet extends StatefulWidget {
 
 class _PickerSheetState extends State<_PickerSheet> {
   late int? _selected;
+  bool _customColorSelected = false;
 
   @override
   void initState() {
     super.initState();
     _selected = widget.currentColor;
+  }
+
+  Future<void> _showCustomPicker() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: const Color(0x00000000),
+      builder: (_) => _CustomColorPickerSheet(
+        initialColor: _selected,
+        onSelected: (c) {
+          _customColorSelected = true;
+          setState(() => _selected = c);
+          widget.onSelected(c);
+        },
+      ),
+    );
+    if (mounted && _customColorSelected) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
   }
 
   @override
@@ -203,8 +224,194 @@ class _PickerSheetState extends State<_PickerSheet> {
               Navigator.of(context, rootNavigator: true).pop();
             },
           ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _showCustomPicker,
+            child: const Text(
+              'Other…',
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFFFF4D00),
+              ),
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+// ── Custom color picker ───────────────────────────────────────────────────────
+
+class _CustomColorPickerSheet extends StatefulWidget {
+  const _CustomColorPickerSheet({
+    required this.initialColor,
+    required this.onSelected,
+  });
+
+  final int? initialColor;
+  final void Function(int color) onSelected;
+
+  @override
+  State<_CustomColorPickerSheet> createState() =>
+      _CustomColorPickerSheetState();
+}
+
+class _CustomColorPickerSheetState extends State<_CustomColorPickerSheet> {
+  late double _r, _g, _b;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialColor != null) {
+      final c = Color(widget.initialColor!);
+      _r = c.red.toDouble();
+      _g = c.green.toDouble();
+      _b = c.blue.toDouble();
+    } else {
+      _r = 255;
+      _g = 77;
+      _b = 0;
+    }
+  }
+
+  int get _currentColor =>
+      Color.fromARGB(255, _r.round(), _g.round(), _b.round()).value;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = CupertinoColors.systemBackground.resolveFrom(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          20, 12, 20, MediaQuery.paddingOf(context).bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: CupertinoColors.separator.resolveFrom(context),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              'Custom Color',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            height: 56,
+            decoration: BoxDecoration(
+              color: Color(_currentColor),
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _RGBSlider(
+            label: 'R',
+            value: _r,
+            activeColor: const Color(0xFFFF3B30),
+            onChanged: (v) => setState(() => _r = v),
+          ),
+          const SizedBox(height: 12),
+          _RGBSlider(
+            label: 'G',
+            value: _g,
+            activeColor: const Color(0xFF34C759),
+            onChanged: (v) => setState(() => _g = v),
+          ),
+          const SizedBox(height: 12),
+          _RGBSlider(
+            label: 'B',
+            value: _b,
+            activeColor: const Color(0xFF007AFF),
+            onChanged: (v) => setState(() => _b = v),
+          ),
+          const SizedBox(height: 24),
+          CupertinoButton(
+            color: const Color(0xFFFF4D00),
+            borderRadius: BorderRadius.circular(12),
+            onPressed: () {
+              widget.onSelected(_currentColor);
+              Navigator.of(context, rootNavigator: true).pop();
+            },
+            child: const Text(
+              'Select Color',
+              style: TextStyle(
+                color: CupertinoColors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RGBSlider extends StatelessWidget {
+  const _RGBSlider({
+    required this.label,
+    required this.value,
+    required this.activeColor,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final Color activeColor;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 16,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: CupertinoSlider(
+            value: value,
+            min: 0,
+            max: 255,
+            activeColor: activeColor,
+            onChanged: onChanged,
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 32,
+          child: Text(
+            value.round().toString(),
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 13,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

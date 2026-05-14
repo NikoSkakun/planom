@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../folders/move_to_sheet.dart';
 import '../models/note.dart';
 import '../utils/item_info_sheet.dart';
 import 'note_controller.dart';
@@ -25,12 +26,14 @@ class NoteDetailView extends StatefulWidget {
 class _NoteDetailViewState extends State<NoteDetailView> {
   late final TextEditingController _title;
   late final TextEditingController _content;
+  String? _folderId;
 
   @override
   void initState() {
     super.initState();
     _title = TextEditingController(text: widget.note.title);
     _content = TextEditingController(text: widget.note.content);
+    _folderId = widget.note.folderId;
   }
 
   void _showDropdown(BuildContext context) {
@@ -39,6 +42,17 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     entry = OverlayEntry(
       builder: (ctx) => _NoteOptionsDropdown(
         onDismiss: () => entry.remove(),
+        onMoveTo: () {
+          entry.remove();
+          showNoteMoveToSheet(
+            context,
+            noteController: widget.controller,
+            currentParentId: _folderId,
+            onMove: (folderId) async {
+              if (mounted) setState(() => _folderId = folderId);
+            },
+          );
+        },
         onInfo: () {
           entry.remove();
           showItemInfoSheet(
@@ -59,12 +73,22 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     if (widget.isNew) {
       if (title.isNotEmpty || content.isNotEmpty) {
         widget.controller.addNote(
-          widget.note.copyWith(title: title, content: content),
+          widget.note.copyWith(
+            title: title,
+            content: content,
+            folderId: _folderId,
+            clearFolderId: _folderId == null,
+          ),
         );
       }
     } else {
       widget.controller.updateNote(
-        widget.note.copyWith(title: title, content: content),
+        widget.note.copyWith(
+          title: title,
+          content: content,
+          folderId: _folderId,
+          clearFolderId: _folderId == null,
+        ),
       );
     }
     _title.dispose();
@@ -134,8 +158,14 @@ class _NoteDetailViewState extends State<NoteDetailView> {
 }
 
 class _NoteOptionsDropdown extends StatelessWidget {
-  const _NoteOptionsDropdown({required this.onDismiss, required this.onInfo});
+  const _NoteOptionsDropdown({
+    required this.onDismiss,
+    required this.onMoveTo,
+    required this.onInfo,
+  });
+
   final VoidCallback onDismiss;
+  final VoidCallback onMoveTo;
   final VoidCallback onInfo;
 
   @override
@@ -164,37 +194,71 @@ class _NoteOptionsDropdown extends StatelessWidget {
                 ),
               ],
             ),
-            child: GestureDetector(
-              onTap: onInfo,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Info',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color:
-                              CupertinoColors.label.resolveFrom(context),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      CupertinoIcons.info,
-                      size: 17,
-                      color: CupertinoColors.secondaryLabel
-                          .resolveFrom(context),
-                    ),
-                  ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _DropdownRow(
+                  label: 'Move to',
+                  icon: CupertinoIcons.folder,
+                  onTap: onMoveTo,
                 ),
-              ),
+                Container(
+                  height: 0.5,
+                  color: CupertinoColors.separator.resolveFrom(context),
+                ),
+                _DropdownRow(
+                  label: 'Info',
+                  icon: CupertinoIcons.info,
+                  onTap: onInfo,
+                ),
+              ],
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DropdownRow extends StatelessWidget {
+  const _DropdownRow({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              icon,
+              size: 17,
+              color:
+                  CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
