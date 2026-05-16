@@ -43,6 +43,9 @@ jobs:
       - name: Install pub dependencies
         run: flutter pub get
 
+      - name: Generate localizations
+        run: flutter gen-l10n
+
       # ── iOS prebuild ──────────────────────────────────────────────────────────
       - name: Build Flutter iOS (unsigned)
         run: flutter build ios --release --no-codesign
