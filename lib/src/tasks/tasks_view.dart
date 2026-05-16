@@ -111,6 +111,17 @@ class _TasksViewState extends State<TasksView> {
     );
   }
 
+  void _showDropdown(BuildContext context) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => _TasksOptionsDropdown(
+        onDismiss: () => entry.remove(),
+      ),
+    );
+    overlay.insert(entry);
+  }
+
   static String _sortLabel(TaskSortOrder order) {
     switch (order) {
       case TaskSortOrder.defaultOrder:
@@ -227,8 +238,8 @@ class _TasksViewState extends State<TasksView> {
         middle: const Text('Tasks'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: () => _showSortSheet(context),
-          child: const Icon(CupertinoIcons.arrow_up_arrow_down, size: 20),
+          onPressed: () => _showDropdown(context),
+          child: const Icon(CupertinoIcons.ellipsis, size: 26),
         ),
       ),
       child: SafeArea(
@@ -647,6 +658,48 @@ class _ListItem extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _TasksOptionsDropdown extends StatelessWidget {
+  const _TasksOptionsDropdown({required this.onDismiss});
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDismiss,
+          child: const SizedBox.expand(),
+        ),
+        Positioned(
+          top: topOffset,
+          right: 8,
+          child: Container(
+            width: 220,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground.resolveFrom(context),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x30000000),
+                  blurRadius: 20,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
