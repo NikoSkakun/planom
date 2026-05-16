@@ -1,8 +1,11 @@
 import 'package:flutter/cupertino.dart';
 
+import '../theme/app_theme.dart';
+
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../models/task.dart';
+import '../utils/dropdown_overlay.dart';
 import '../utils/item_info_sheet.dart';
 import 'calendar_date_picker.dart';
 import 'task_controller.dart';
@@ -25,7 +28,8 @@ class TaskDetailView extends StatefulWidget {
   State<TaskDetailView> createState() => _TaskDetailViewState();
 }
 
-class _TaskDetailViewState extends State<TaskDetailView> {
+class _TaskDetailViewState extends State<TaskDetailView>
+    with DropdownOverlayMixin {
   late final TextEditingController _title;
   late final TextEditingController _note;
   late DateTime? _dueDate;
@@ -72,17 +76,15 @@ class _TaskDetailViewState extends State<TaskDetailView> {
   }
 
   void _showDropdown(BuildContext context) {
-    final overlay = Overlay.of(context);
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (ctx) => _TaskOptionsDropdown(
-        onDismiss: () => entry.remove(),
+    showDropdown(context, (dismiss) {
+      return _TaskOptionsDropdown(
+        onDismiss: dismiss,
         onMoveTo: () {
-          entry.remove();
+          dismiss();
           _pickList();
         },
         onInfo: () {
-          entry.remove();
+          dismiss();
           showItemInfoSheet(
             context,
             creationDate: widget.task.creationDate,
@@ -90,14 +92,13 @@ class _TaskDetailViewState extends State<TaskDetailView> {
           );
         },
         onDelete: () {
-          entry.remove();
+          dismiss();
           _deleted = true;
           widget.controller.deleteTask(widget.task.id);
           Navigator.of(context).pop();
         },
-      ),
-    );
-    overlay.insert(entry);
+      );
+    });
   }
 
   Future<void> _pickDate() async {
@@ -218,7 +219,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
                     CupertinoIcons.calendar,
                     size: 18,
                     color: _dueDate != null
-                        ? const Color(0xFFFF4D00)
+                        ? AppColors.accent
                         : CupertinoColors.secondaryLabel
                             .resolveFrom(context),
                   ),
@@ -230,7 +231,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
                     style: TextStyle(
                       fontSize: 15,
                       color: _dueDate != null
-                          ? const Color(0xFFFF4D00)
+                          ? AppColors.accent
                           : CupertinoColors.secondaryLabel
                               .resolveFrom(context),
                     ),
@@ -477,7 +478,7 @@ class _RoundedCheckbox extends StatelessWidget {
       height: 22,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
-        color: checked ? const Color(0xFFFF4D00) : null,
+        color: checked ? AppColors.accent : null,
         border: checked
             ? null
             : Border.all(

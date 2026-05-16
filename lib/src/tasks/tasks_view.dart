@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../theme/app_theme.dart';
+
 import '../folders/create_folder_list_sheet.dart';
 import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
@@ -9,6 +11,8 @@ import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_view.dart';
 import '../settings/smart_list_prefs.dart';
+import '../utils/confirm_dialogs.dart';
+import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import 'completed_view.dart';
 import 'inbox_view.dart';
@@ -41,7 +45,7 @@ class TasksView extends StatefulWidget {
   State<TasksView> createState() => _TasksViewState();
 }
 
-class _TasksViewState extends State<TasksView> {
+class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
   final Set<String> _expandedIds = {};
 
   @override
@@ -116,17 +120,14 @@ class _TasksViewState extends State<TasksView> {
   }
 
   void _showDropdown(BuildContext context) {
-    final overlay = Overlay.of(context);
-    late OverlayEntry entry;
-    final settingsHidden =
-        !widget.settingsController.isTabVisible(4);
-    entry = OverlayEntry(
-      builder: (ctx) => _TasksOptionsDropdown(
-        onDismiss: () => entry.remove(),
+    final settingsHidden = !widget.settingsController.isTabVisible(4);
+    showDropdown(context, (dismiss) {
+      return _TasksOptionsDropdown(
+        onDismiss: dismiss,
         showSettings: settingsHidden,
         onSettings: settingsHidden
             ? () {
-                entry.remove();
+                dismiss();
                 Navigator.of(context).push(
                   FastRoute<void>(
                     builder: (_) => SettingsView(
@@ -137,9 +138,8 @@ class _TasksViewState extends State<TasksView> {
                 );
               }
             : null,
-      ),
-    );
-    overlay.insert(entry);
+      );
+    });
   }
 
   static String _sortLabel(TaskSortOrder order) {
@@ -158,30 +158,15 @@ class _TasksViewState extends State<TasksView> {
   }
 
   Future<bool> _confirmDelete(BuildContext context, String name,
-      {required bool isFolder}) async {
-    final result = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text('Move "$name" to Trash?'),
-        content: Text(isFolder
+          {required bool isFolder}) =>
+      confirmMoveToTrash(
+        context,
+        name: name,
+        isFolder: isFolder,
+        body: isFolder
             ? 'This folder and all its contents will be moved to Trash.'
-            : 'This list and all its tasks will be moved to Trash.'),
-        actions: [
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Move to Trash'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
+            : 'This list and all its tasks will be moved to Trash.',
+      );
 
   Widget _buildFolderChildren(
       BuildContext context, String folderId, double indent) {
@@ -494,7 +479,7 @@ class _TasksViewState extends State<TasksView> {
                                 iconWidget: const Icon(
                                   CupertinoIcons.checkmark_circle_fill,
                                   size: 22,
-                                  color: Color(0xFF34C759),
+                                  color: AppColors.systemGreen,
                                 ),
                                 label: 'Completed',
                                 onTap: () => Navigator.of(context).push(

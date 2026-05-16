@@ -1,7 +1,9 @@
 import 'package:flutter/cupertino.dart';
+
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
 import '../models/app_folder.dart';
+import '../theme/app_theme.dart';
 import 'folder_controller.dart';
 
 /// Shows a hierarchical list/inbox picker. Returns the selected listId
@@ -210,7 +212,7 @@ class _PickerRow extends StatelessWidget {
           ),
           if (isSelected)
             const Icon(CupertinoIcons.checkmark,
-                size: 16, color: Color(0xFFFF4D00))
+                size: 16, color: AppColors.accent)
           else if (trailing != null)
             trailing!,
         ],

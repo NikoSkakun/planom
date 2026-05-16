@@ -45,13 +45,23 @@ class SmartListPrefs {
 
   Future<void> save() async {
     final file = await _file();
-    await file.writeAsString(jsonEncode({
-      'today': _encode(today),
-      'upcoming': _encode(upcoming),
-      'completed': _encode(completed),
-      'trash': _encode(trash),
-      'hideTabLabels': hideTabLabels,
-    }));
+    await file.writeAsString(jsonEncode(toJson()));
+  }
+
+  Map<String, dynamic> toJson() => {
+        'today': _encode(today),
+        'upcoming': _encode(upcoming),
+        'completed': _encode(completed),
+        'trash': _encode(trash),
+        'hideTabLabels': hideTabLabels,
+      };
+
+  void applyJson(Map<String, dynamic> data) {
+    today = _parse(data['today']);
+    upcoming = _parse(data['upcoming']);
+    completed = _parse(data['completed']);
+    trash = _parse(data['trash']);
+    hideTabLabels = data['hideTabLabels'] == true;
   }
 
   static SmartListVisibility _parse(dynamic value) {

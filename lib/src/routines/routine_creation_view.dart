@@ -1,7 +1,9 @@
 import 'package:flutter/cupertino.dart';
+
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
 import '../models/routine.dart';
+import '../theme/app_theme.dart';
 import '../utils/fast_route.dart';
 import 'routine_controller.dart';
 import 'routine_icons.dart';
@@ -175,7 +177,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
   @override
   Widget build(BuildContext context) {
     final bg = CupertinoColors.systemGroupedBackground.resolveFrom(context);
-    final accent = const Color(0xFFFF4D00);
+    final accent = AppColors.accent;
 
     return CupertinoPageScaffold(
       backgroundColor: bg,
@@ -540,7 +542,7 @@ class _WeekdayPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = const Color(0xFFFF4D00);
+    final accent = AppColors.accent;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
@@ -809,7 +811,7 @@ class _Option extends StatelessWidget {
             const Spacer(),
             if (selected)
               const Icon(CupertinoIcons.checkmark,
-                  size: 16, color: Color(0xFFFF4D00)),
+                  size: 16, color: AppColors.accent),
           ],
         ),
       ),
@@ -911,7 +913,7 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                           const Spacer(),
                           if (selected)
                             const Icon(CupertinoIcons.checkmark,
-                                size: 16, color: Color(0xFFFF4D00)),
+                                size: 16, color: AppColors.accent),
                         ],
                       ),
                     ),
@@ -930,7 +932,7 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                         const Spacer(),
                         if (_showCustom)
                           const Icon(CupertinoIcons.checkmark,
-                              size: 16, color: Color(0xFFFF4D00)),
+                              size: 16, color: AppColors.accent),
                       ],
                     ),
                   ),

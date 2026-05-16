@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' show showModalBottomSheet;
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../models/task.dart';
+import '../theme/app_theme.dart';
 import 'calendar_date_picker.dart';
 import 'task_controller.dart';
 
@@ -239,7 +240,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                           CupertinoIcons.calendar,
                           size: 16,
                           color: _dueDate != null
-                              ? const Color(0xFFFF4D00)
+                              ? AppColors.accent
                               : CupertinoColors.secondaryLabel
                                   .resolveFrom(context),
                         ),
@@ -251,7 +252,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                           style: TextStyle(
                             fontSize: 14,
                             color: _dueDate != null
-                                ? const Color(0xFFFF4D00)
+                                ? AppColors.accent
                                 : CupertinoColors.secondaryLabel
                                     .resolveFrom(context),
                           ),
@@ -295,7 +296,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                 color: _titleEmpty
                     ? CupertinoColors.tertiarySystemFill
                         .resolveFrom(context)
-                    : const Color(0xFFFF4D00),
+                    : AppColors.accent,
                 borderRadius: BorderRadius.circular(22),
                 onPressed: _titleEmpty ? null : _submit,
                 child: Text(
