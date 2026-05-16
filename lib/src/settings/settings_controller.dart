@@ -17,9 +17,13 @@ class SettingsController with ChangeNotifier {
   SmartListPrefs get smartListPrefs => _smartListPrefs;
   bool get hideTabLabels => _smartListPrefs.hideTabLabels;
 
-  // Tabs 1=Notes, 2=Calendar, 3=Routines. Tasks(0) and Settings(4) always on.
-  final Map<int, bool> _tabVisibility = {1: true, 2: true, 3: true};
+  // Tabs 1=Notes, 2=Calendar, 3=Routines, 4=Settings. Tasks(0) always on.
+  final Map<int, bool> _tabVisibility = {1: true, 2: true, 3: true, 4: true};
   bool isTabVisible(int index) => _tabVisibility[index] ?? true;
+
+  /// Returns the count of optional tabs (1,2,3,4) that are currently visible.
+  int get visibleOptionalTabCount =>
+      [1, 2, 3, 4].where((i) => _tabVisibility[i] == true).length;
 
   Future<void> loadSettings() async {
     _themeMode = await _settingsService.themeMode();

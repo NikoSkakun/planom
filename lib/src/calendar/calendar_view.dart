@@ -2,7 +2,11 @@ import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_controller.dart';
 import '../models/task.dart';
+import '../settings/backup_service.dart';
+import '../settings/settings_controller.dart';
+import '../settings/settings_view.dart';
 import '../tasks/task_controller.dart';
+import '../utils/fast_route.dart';
 
 class CalendarView extends StatefulWidget {
   const CalendarView({
@@ -10,11 +14,15 @@ class CalendarView extends StatefulWidget {
     required this.controller,
     required this.folderController,
     required this.resetSignal,
+    this.settingsController,
+    this.backupService,
   });
 
   final TaskController controller;
   final FolderController folderController;
   final ValueNotifier<int> resetSignal;
+  final SettingsController? settingsController;
+  final BackupService? backupService;
 
   @override
   State<CalendarView> createState() => _CalendarViewState();
@@ -87,12 +95,32 @@ class _CalendarViewState extends State<CalendarView> {
         ),
       );
 
+  void _openSettings(BuildContext context) {
+    Navigator.of(context).push(
+      FastRoute<void>(
+        builder: (_) => SettingsView(
+          controller: widget.settingsController!,
+          backupService: widget.backupService,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final sc = widget.settingsController;
+    final settingsHidden = sc != null && !sc.isTabVisible(4);
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
         middle: Text('$_visibleYear'),
+        trailing: settingsHidden
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () => _openSettings(context),
+                child: const Icon(CupertinoIcons.ellipsis, size: 26),
+              )
+            : null,
       ),
       child: SafeArea(
         child: Column(

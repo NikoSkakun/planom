@@ -150,7 +150,7 @@ class _HomeShellState extends State<HomeShell> {
       if (sc.isTabVisible(1)) 1,
       if (sc.isTabVisible(2)) 2,
       if (sc.isTabVisible(3)) 3,
-      4,
+      if (sc.isTabVisible(4)) 4,
     ];
   }
 
@@ -246,17 +246,26 @@ class _HomeShellState extends State<HomeShell> {
           activeListId: _activeListId,
           activeDueDate: _activeDueDate,
           collapseSignal: _tasksCollapseSignal,
+          backupService: widget.backupService,
         ),
       1 => NotesView(
           controller: widget.noteController,
           collapseSignal: _notesCollapseSignal,
+          settingsController: widget.settingsController,
+          backupService: widget.backupService,
         ),
       2 => CalendarView(
           controller: widget.taskController,
           folderController: widget.folderController,
           resetSignal: _calendarResetSignal,
+          settingsController: widget.settingsController,
+          backupService: widget.backupService,
         ),
-      3 => RoutinesView(controller: widget.routineController),
+      3 => RoutinesView(
+          controller: widget.routineController,
+          settingsController: widget.settingsController,
+          backupService: widget.backupService,
+        ),
       _ => SettingsView(
           controller: widget.settingsController,
           backupService: widget.backupService,

@@ -1,6 +1,9 @@
 import 'package:flutter/cupertino.dart';
 
 import '../models/note.dart';
+import '../settings/backup_service.dart';
+import '../settings/settings_controller.dart';
+import '../settings/settings_view.dart';
 import '../utils/fast_route.dart';
 import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
@@ -14,10 +17,14 @@ class NotesView extends StatefulWidget {
     super.key,
     required this.controller,
     required this.collapseSignal,
+    this.settingsController,
+    this.backupService,
   });
 
   final NoteController controller;
   final ValueNotifier<int> collapseSignal;
+  final SettingsController? settingsController;
+  final BackupService? backupService;
 
   @override
   State<NotesView> createState() => _NotesViewState();
@@ -113,12 +120,32 @@ class _NotesViewState extends State<NotesView> {
     );
   }
 
+  void _openSettings(BuildContext context) {
+    Navigator.of(context).push(
+      FastRoute<void>(
+        builder: (_) => SettingsView(
+          controller: widget.settingsController!,
+          backupService: widget.backupService,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final sc = widget.settingsController;
+    final settingsHidden = sc != null && !sc.isTabVisible(4);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: Text('Notes'),
+        middle: const Text('Notes'),
+        trailing: settingsHidden
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () => _openSettings(context),
+                child: const Icon(CupertinoIcons.ellipsis, size: 26),
+              )
+            : null,
       ),
       child: SafeArea(
         child: Stack(

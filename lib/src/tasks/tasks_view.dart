@@ -5,7 +5,9 @@ import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
 import '../folders/folder_view.dart';
 import '../folders/list_task_view.dart';
+import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
+import '../settings/settings_view.dart';
 import '../settings/smart_list_prefs.dart';
 import '../utils/fast_route.dart';
 import 'completed_view.dart';
@@ -24,6 +26,7 @@ class TasksView extends StatefulWidget {
     required this.activeListId,
     required this.activeDueDate,
     required this.collapseSignal,
+    this.backupService,
   });
 
   final TaskController controller;
@@ -32,6 +35,7 @@ class TasksView extends StatefulWidget {
   final ValueNotifier<String?> activeListId;
   final ValueNotifier<DateTime?> activeDueDate;
   final ValueNotifier<int> collapseSignal;
+  final BackupService? backupService;
 
   @override
   State<TasksView> createState() => _TasksViewState();
@@ -114,9 +118,25 @@ class _TasksViewState extends State<TasksView> {
   void _showDropdown(BuildContext context) {
     final overlay = Overlay.of(context);
     late OverlayEntry entry;
+    final settingsHidden =
+        !widget.settingsController.isTabVisible(4);
     entry = OverlayEntry(
       builder: (ctx) => _TasksOptionsDropdown(
         onDismiss: () => entry.remove(),
+        showSettings: settingsHidden,
+        onSettings: settingsHidden
+            ? () {
+                entry.remove();
+                Navigator.of(context).push(
+                  FastRoute<void>(
+                    builder: (_) => SettingsView(
+                      controller: widget.settingsController,
+                      backupService: widget.backupService,
+                    ),
+                  ),
+                );
+              }
+            : null,
       ),
     );
     overlay.insert(entry);
@@ -663,13 +683,27 @@ class _ListItem extends StatelessWidget {
 }
 
 class _TasksOptionsDropdown extends StatelessWidget {
-  const _TasksOptionsDropdown({required this.onDismiss});
+  const _TasksOptionsDropdown({
+    required this.onDismiss,
+    this.showSettings = false,
+    this.onSettings,
+  });
 
   final VoidCallback onDismiss;
+  final bool showSettings;
+  final VoidCallback? onSettings;
 
   @override
   Widget build(BuildContext context) {
     final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    final items = <Widget>[];
+    if (showSettings) {
+      items.add(_DropdownRow(
+        label: 'Settings',
+        icon: CupertinoIcons.gear_alt,
+        onTap: onSettings ?? () {},
+      ));
+    }
     return Stack(
       children: [
         GestureDetector(
@@ -677,29 +711,62 @@ class _TasksOptionsDropdown extends StatelessWidget {
           onTap: onDismiss,
           child: const SizedBox.expand(),
         ),
-        Positioned(
-          top: topOffset,
-          right: 8,
-          child: Container(
-            width: 220,
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x30000000),
-                  blurRadius: 20,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+        if (items.isNotEmpty)
+          Positioned(
+            top: topOffset,
+            right: 8,
+            child: Container(
+              width: 220,
+              decoration: BoxDecoration(
+                color:
+                    CupertinoColors.systemBackground.resolveFrom(context),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x30000000),
+                    blurRadius: 20,
+                    offset: Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: items,
+              ),
             ),
           ),
-        ),
       ],
+    );
+  }
+}
+
+class _DropdownRow extends StatelessWidget {
+  const _DropdownRow({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = color ?? CupertinoColors.label.resolveFrom(context);
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      onPressed: onTap,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: fg),
+          const SizedBox(width: 10),
+          Text(label, style: TextStyle(fontSize: 16, color: fg)),
+        ],
+      ),
     );
   }
 }
