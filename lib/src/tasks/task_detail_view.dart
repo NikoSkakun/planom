@@ -77,6 +77,10 @@ class _TaskDetailViewState extends State<TaskDetailView> {
     entry = OverlayEntry(
       builder: (ctx) => _TaskOptionsDropdown(
         onDismiss: () => entry.remove(),
+        onMoveTo: () {
+          entry.remove();
+          _pickList();
+        },
         onInfo: () {
           entry.remove();
           showItemInfoSheet(
@@ -352,10 +356,12 @@ class _PriorityPicker extends StatelessWidget {
 class _TaskOptionsDropdown extends StatelessWidget {
   const _TaskOptionsDropdown({
     required this.onDismiss,
+    required this.onMoveTo,
     required this.onInfo,
     required this.onDelete,
   });
   final VoidCallback onDismiss;
+  final VoidCallback onMoveTo;
   final VoidCallback onInfo;
   final VoidCallback onDelete;
 
@@ -389,6 +395,15 @@ class _TaskOptionsDropdown extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _DropdownRow(
+                  label: 'Move to',
+                  icon: CupertinoIcons.folder,
+                  onTap: onMoveTo,
+                ),
+                Container(
+                  height: 0.5,
+                  color: CupertinoColors.separator.resolveFrom(context),
+                ),
                 _DropdownRow(
                   label: 'Info',
                   icon: CupertinoIcons.info,
