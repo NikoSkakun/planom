@@ -306,10 +306,32 @@ class _SettingsViewState extends State<SettingsView> {
             const SizedBox(height: 8),
             ListenableBuilder(
               listenable: widget.controller,
-              builder: (ctx, _) => _ToggleRow(
-                label: 'Hide Labels',
-                value: widget.controller.hideTabLabels,
-                onChanged: widget.controller.updateHideTabLabels,
+              builder: (ctx, _) => Column(
+                children: [
+                  _ToggleRow(
+                    label: 'Hide Labels',
+                    value: widget.controller.hideTabLabels,
+                    onChanged: widget.controller.updateHideTabLabels,
+                  ),
+                  const SizedBox(height: 1),
+                  _ToggleRow(
+                    label: 'Notes',
+                    value: widget.controller.isTabVisible(1),
+                    onChanged: (v) => widget.controller.setTabVisible(1, v),
+                  ),
+                  const SizedBox(height: 1),
+                  _ToggleRow(
+                    label: 'Calendar',
+                    value: widget.controller.isTabVisible(2),
+                    onChanged: (v) => widget.controller.setTabVisible(2, v),
+                  ),
+                  const SizedBox(height: 1),
+                  _ToggleRow(
+                    label: 'Routines',
+                    value: widget.controller.isTabVisible(3),
+                    onChanged: (v) => widget.controller.setTabVisible(3, v),
+                  ),
+                ],
               ),
             ),
 

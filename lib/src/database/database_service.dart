@@ -11,7 +11,7 @@ import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 13;
+  static const _dbVersion = 14;
 
   Database? _db;
 
@@ -114,6 +114,12 @@ class DatabaseService {
             routineId TEXT NOT NULL,
             date INTEGER NOT NULL,
             amount INTEGER NOT NULL DEFAULT 0
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
           )
         ''');
       },
@@ -245,6 +251,14 @@ class DatabaseService {
         if (oldVersion < 13) {
           await db.execute(
               'ALTER TABLE tasks ADD COLUMN completionDate INTEGER');
+        }
+        if (oldVersion < 14) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS app_settings (
+              key TEXT PRIMARY KEY,
+              value TEXT NOT NULL
+            )
+          ''');
         }
       },
     );
@@ -671,6 +685,21 @@ class DatabaseService {
     await db.delete('app_lists', where: 'isDeleted = 1');
   }
 
+  // App settings — generic key/value store for app-level preferences
+  Future<List<Map<String, dynamic>>> getAppSettings() async {
+    final db = await _database;
+    return db.query('app_settings');
+  }
+
+  Future<void> setAppSetting(String key, String value) async {
+    final db = await _database;
+    await db.insert(
+      'app_settings',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
   // ── Backup / Restore ─────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> exportTasks() async {
@@ -715,8 +744,25 @@ class DatabaseService {
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
+  Future<List<Map<String, dynamic>>> exportAppSettings() async {
+    final db = await _database;
+    final rows = await db.query('app_settings');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<void> importAppSettings(List<Map<String, dynamic>> maps) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final m in maps) {
+      batch.insert('app_settings', m,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
   Future<void> clearAllData() async {
     final db = await _database;
+    await db.delete('app_settings');
     await db.delete('routine_entries');
     await db.delete('routines');
     await db.delete('notes');

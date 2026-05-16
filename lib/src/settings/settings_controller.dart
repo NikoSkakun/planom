@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../database/database_service.dart';
 import 'settings_service.dart';
 import 'smart_list_prefs.dart';
 
 class SettingsController with ChangeNotifier {
-  SettingsController(this._settingsService);
+  SettingsController(this._settingsService, this._db);
 
   final SettingsService _settingsService;
+  final DatabaseService _db;
 
   late ThemeMode _themeMode;
   ThemeMode get themeMode => _themeMode;
@@ -15,10 +17,34 @@ class SettingsController with ChangeNotifier {
   SmartListPrefs get smartListPrefs => _smartListPrefs;
   bool get hideTabLabels => _smartListPrefs.hideTabLabels;
 
+  // Tabs 1=Notes, 2=Calendar, 3=Routines. Tasks(0) and Settings(4) always on.
+  final Map<int, bool> _tabVisibility = {1: true, 2: true, 3: true};
+  bool isTabVisible(int index) => _tabVisibility[index] ?? true;
+
   Future<void> loadSettings() async {
     _themeMode = await _settingsService.themeMode();
     _smartListPrefs = await SmartListPrefs.load();
+
+    final rows = await _db.getAppSettings();
+    for (final row in rows) {
+      final key = row['key'] as String;
+      final value = row['value'] as String;
+      final match = RegExp(r'^tab_(\d+)_visible$').firstMatch(key);
+      if (match != null) {
+        final idx = int.parse(match.group(1)!);
+        if (_tabVisibility.containsKey(idx)) {
+          _tabVisibility[idx] = value == 'true';
+        }
+      }
+    }
+
     notifyListeners();
+  }
+
+  Future<void> setTabVisible(int index, bool visible) async {
+    _tabVisibility[index] = visible;
+    notifyListeners();
+    await _db.setAppSetting('tab_${index}_visible', visible.toString());
   }
 
   Future<void> updateThemeMode(ThemeMode? newThemeMode) async {

@@ -21,10 +21,10 @@ void main() async {
 
   await initFolderIconService();
 
-  final settingsController = SettingsController(SettingsService());
-  await settingsController.loadSettings();
-
   final db = DatabaseService();
+
+  final settingsController = SettingsController(SettingsService(), db);
+  await settingsController.loadSettings();
   final taskController = TaskController(db);
   await taskController.load();
 
@@ -43,6 +43,7 @@ void main() async {
     folderController: folderController,
     noteController: noteController,
     routineController: routineController,
+    settingsController: settingsController,
   );
 
   runApp(MyApp(

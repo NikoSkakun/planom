@@ -39,8 +39,7 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  late final CupertinoTabController _tabController;
-  // 5 tabs: Tasks(0) Notes(1) Calendar(2) Routines(3) Settings(4)
+  // Logical indices: 0=Tasks 1=Notes 2=Calendar 3=Routines 4=Settings
   final _navigatorKeys = List.generate(5, (_) => GlobalKey<NavigatorState>());
   late final List<_DepthObserver> _depthObservers;
   final _activeListId = ValueNotifier<String?>(null);
@@ -54,7 +53,6 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
-    _tabController = CupertinoTabController();
     _depthObservers = [
       // Tasks tab: show + unless TaskDetailView is on the stack.
       _DepthObserver(
@@ -94,7 +92,6 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
-    _tabController.dispose();
     _activeListId.dispose();
     _activeDueDate.dispose();
     _tasksCollapseSignal.dispose();
@@ -146,150 +143,184 @@ class _HomeShellState extends State<HomeShell> {
     _lastTabIndex = tappedIndex;
   }
 
+  List<int> _computeVisibleIndices() {
+    final sc = widget.settingsController;
+    return [
+      0,
+      if (sc.isTabVisible(1)) 1,
+      if (sc.isTabVisible(2)) 2,
+      if (sc.isTabVisible(3)) 3,
+      4,
+    ];
+  }
+
+  BottomNavigationBarItem _tabItem(int logicalIdx, bool hideLabels) {
+    switch (logicalIdx) {
+      case 0:
+        return BottomNavigationBarItem(
+          icon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: ImageIcon(AssetImage('assets/icons/tab_bar/tasks.png')),
+          ),
+          activeIcon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: ImageIcon(
+              AssetImage('assets/icons/tab_bar/tasks.png'),
+              color: Color(0xFFFF4D00),
+            ),
+          ),
+          label: hideLabels ? null : 'Tasks',
+        );
+      case 1:
+        return BottomNavigationBarItem(
+          icon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: ImageIcon(AssetImage('assets/icons/tab_bar/notes.png')),
+          ),
+          activeIcon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: ImageIcon(
+              AssetImage('assets/icons/tab_bar/notes.png'),
+              color: Color(0xFFFF4D00),
+            ),
+          ),
+          label: hideLabels ? null : 'Notes',
+        );
+      case 2:
+        return BottomNavigationBarItem(
+          icon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child:
+                ImageIcon(AssetImage('assets/icons/tab_bar/calendar.png')),
+          ),
+          activeIcon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: ImageIcon(
+              AssetImage('assets/icons/tab_bar/calendar.png'),
+              color: Color(0xFFFF4D00),
+            ),
+          ),
+          label: hideLabels ? null : 'Calendar',
+        );
+      case 3:
+        return BottomNavigationBarItem(
+          icon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child:
+                ImageIcon(AssetImage('assets/icons/tab_bar/routines.png')),
+          ),
+          activeIcon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: ImageIcon(
+              AssetImage('assets/icons/tab_bar/routines.png'),
+              color: Color(0xFFFF4D00),
+            ),
+          ),
+          label: hideLabels ? null : 'Routines',
+        );
+      default:
+        return BottomNavigationBarItem(
+          icon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Icon(CupertinoIcons.gear_alt, size: 24),
+          ),
+          activeIcon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Icon(
+              CupertinoIcons.gear_alt_fill,
+              size: 24,
+              color: Color(0xFFFF4D00),
+            ),
+          ),
+          label: hideLabels ? null : 'Settings',
+        );
+    }
+  }
+
+  Widget _tabContent(BuildContext context, int logicalIdx) {
+    return switch (logicalIdx) {
+      0 => TasksView(
+          controller: widget.taskController,
+          folderController: widget.folderController,
+          settingsController: widget.settingsController,
+          activeListId: _activeListId,
+          activeDueDate: _activeDueDate,
+          collapseSignal: _tasksCollapseSignal,
+        ),
+      1 => NotesView(
+          controller: widget.noteController,
+          collapseSignal: _notesCollapseSignal,
+        ),
+      2 => CalendarView(
+          controller: widget.taskController,
+          folderController: widget.folderController,
+          resetSignal: _calendarResetSignal,
+        ),
+      3 => RoutinesView(controller: widget.routineController),
+      _ => SettingsView(
+          controller: widget.settingsController,
+          backupService: widget.backupService,
+        ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: widget.settingsController,
       builder: (context, _) {
         final hideLabels = widget.settingsController.hideTabLabels;
-        return _buildScaffold(context, hideLabels);
-      },
-    );
-  }
+        final visibleIndices = _computeVisibleIndices();
 
-  Widget _buildScaffold(BuildContext context, bool hideLabels) {
-    return Stack(
-      children: [
-        CupertinoTabScaffold(
-          controller: _tabController,
-          tabBar: CupertinoTabBar(
-            activeColor: const Color(0xFF000000),
-            inactiveColor: const Color(0xFF636366),
-            backgroundColor: const CupertinoDynamicColor.withBrightness(
-              color: Color(0xF0F9F9F9),
-              darkColor: Color(0xF01D1D1D),
-            ),
-            onTap: _onTabTapped,
-            items: [
-              BottomNavigationBarItem(
-                icon: const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: ImageIcon(
-                      AssetImage('assets/icons/tab_bar/tasks.png')),
+        if (!visibleIndices.contains(_lastTabIndex)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _lastTabIndex = 0;
+              _showPlusButton.value =
+                  _depthObservers[0].trackedCount == 0;
+            }
+          });
+        }
+
+        return Stack(
+          children: [
+            CupertinoTabScaffold(
+              key: ValueKey(visibleIndices.join(',')),
+              tabBar: CupertinoTabBar(
+                activeColor: const Color(0xFF000000),
+                inactiveColor: const Color(0xFF636366),
+                backgroundColor: const CupertinoDynamicColor.withBrightness(
+                  color: Color(0xF0F9F9F9),
+                  darkColor: Color(0xF01D1D1D),
                 ),
-                activeIcon: const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: ImageIcon(
-                    AssetImage('assets/icons/tab_bar/tasks.png'),
-                    color: Color(0xFFFF4D00),
-                  ),
-                ),
-                label: hideLabels ? null : 'Tasks',
+                onTap: (visualIdx) =>
+                    _onTabTapped(visibleIndices[visualIdx]),
+                items: visibleIndices
+                    .map((i) => _tabItem(i, hideLabels))
+                    .toList(),
               ),
-              BottomNavigationBarItem(
-                icon: const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: ImageIcon(
-                      AssetImage('assets/icons/tab_bar/notes.png')),
-                ),
-                activeIcon: const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: ImageIcon(
-                    AssetImage('assets/icons/tab_bar/notes.png'),
-                    color: Color(0xFFFF4D00),
-                  ),
-                ),
-                label: hideLabels ? null : 'Notes',
-              ),
-              BottomNavigationBarItem(
-                icon: const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: ImageIcon(
-                      AssetImage('assets/icons/tab_bar/calendar.png')),
-                ),
-                activeIcon: const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: ImageIcon(
-                    AssetImage('assets/icons/tab_bar/calendar.png'),
-                    color: Color(0xFFFF4D00),
-                  ),
-                ),
-                label: hideLabels ? null : 'Calendar',
-              ),
-              BottomNavigationBarItem(
-                icon: const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: ImageIcon(
-                      AssetImage('assets/icons/tab_bar/routines.png')),
-                ),
-                activeIcon: const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: ImageIcon(
-                    AssetImage('assets/icons/tab_bar/routines.png'),
-                    color: Color(0xFFFF4D00),
-                  ),
-                ),
-                label: hideLabels ? null : 'Routines',
-              ),
-              BottomNavigationBarItem(
-                icon: const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Icon(CupertinoIcons.gear_alt, size: 24),
-                ),
-                activeIcon: const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Icon(
-                    CupertinoIcons.gear_alt_fill,
-                    size: 24,
-                    color: Color(0xFFFF4D00),
-                  ),
-                ),
-                label: hideLabels ? null : 'Settings',
-              ),
-            ],
-          ),
-          tabBuilder: (context, index) {
-            return CupertinoTabView(
-              navigatorKey: _navigatorKeys[index],
-              navigatorObservers: [_depthObservers[index]],
-              builder: (context) => switch (index) {
-                0 => TasksView(
-                    controller: widget.taskController,
-                    folderController: widget.folderController,
-                    settingsController: widget.settingsController,
-                    activeListId: _activeListId,
-                    activeDueDate: _activeDueDate,
-                    collapseSignal: _tasksCollapseSignal,
-                  ),
-                1 => NotesView(
-                    controller: widget.noteController,
-                    collapseSignal: _notesCollapseSignal,
-                  ),
-                2 => CalendarView(
-                    controller: widget.taskController,
-                    folderController: widget.folderController,
-                    resetSignal: _calendarResetSignal,
-                  ),
-                3 => RoutinesView(controller: widget.routineController),
-                _ => SettingsView(
-                    controller: widget.settingsController,
-                    backupService: widget.backupService,
-                  ),
+              tabBuilder: (context, visualIdx) {
+                final logicalIdx = visibleIndices[visualIdx];
+                return CupertinoTabView(
+                  navigatorKey: _navigatorKeys[logicalIdx],
+                  navigatorObservers: [_depthObservers[logicalIdx]],
+                  builder: (ctx) => _tabContent(ctx, logicalIdx),
+                );
               },
-            );
-          },
-        ),
-        ValueListenableBuilder<bool>(
-          valueListenable: _showPlusButton,
-          builder: (context, show, child) => show
-              ? Positioned(
-                  right: 20,
-                  bottom: 50 + MediaQuery.paddingOf(context).bottom + 12,
-                  child: _PlusButton(onPressed: _onPlusPressed),
-                )
-              : const SizedBox.shrink(),
-        ),
-      ],
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: _showPlusButton,
+              builder: (context, show, child) => show
+                  ? Positioned(
+                      right: 20,
+                      bottom: 50 + MediaQuery.paddingOf(context).bottom + 12,
+                      child: _PlusButton(onPressed: _onPlusPressed),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        );
+      },
     );
   }
 }

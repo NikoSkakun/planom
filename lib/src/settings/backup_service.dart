@@ -12,6 +12,7 @@ import '../folders/folder_icon_picker.dart';
 import '../notes/note_controller.dart';
 import '../routines/routine_controller.dart';
 import '../tasks/task_controller.dart';
+import 'settings_controller.dart';
 
 class BackupService {
   BackupService({
@@ -20,6 +21,7 @@ class BackupService {
     required this.folderController,
     required this.noteController,
     required this.routineController,
+    required this.settingsController,
   });
 
   final DatabaseService db;
@@ -27,6 +29,7 @@ class BackupService {
   final FolderController folderController;
   final NoteController noteController;
   final RoutineController routineController;
+  final SettingsController settingsController;
 
   Future<void> exportBackup() async {
     final docsPath = (await getApplicationDocumentsDirectory()).path;
@@ -54,6 +57,7 @@ class BackupService {
       'notes': await db.exportNotes(),
       'routines': await db.exportRoutines(),
       'routine_entries': await db.exportRoutineEntries(),
+      'app_settings': await db.exportAppSettings(),
     };
 
     final json = const JsonEncoder.withIndent('  ').convert(payload);
@@ -114,11 +118,13 @@ class BackupService {
     await db.importNotes(asMaps(data['notes']));
     await db.importRoutines(asMaps(data['routines']));
     await db.importRoutineEntries(asMaps(data['routine_entries']));
+    await db.importAppSettings(asMaps(data['app_settings']));
 
     await taskController.load();
     await folderController.load();
     await noteController.load();
     await routineController.load();
+    await settingsController.loadSettings();
 
     return true;
   }
