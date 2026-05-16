@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 
 import '../models/app_folder.dart';
 import '../tasks/task_controller.dart';
+import '../utils/confirm_dialogs.dart';
+import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import 'create_folder_list_sheet.dart' show showCreateFolderListSheet, showRenameSheet;
@@ -28,7 +30,8 @@ class FolderView extends StatefulWidget {
   State<FolderView> createState() => _FolderViewState();
 }
 
-class _FolderViewState extends State<FolderView> {
+class _FolderViewState extends State<FolderView>
+    with DropdownOverlayMixin {
   late AppFolder _currentFolder;
   final Set<String> _expandedIds = {};
 
@@ -100,30 +103,15 @@ class _FolderViewState extends State<FolderView> {
     );
   }
 
-  Future<bool> _confirmDelete(String name, {required bool isFolder}) async {
-    final result = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text('Move "$name" to Trash?'),
-        content: Text(isFolder
+  Future<bool> _confirmDelete(String name, {required bool isFolder}) =>
+      confirmMoveToTrash(
+        context,
+        name: name,
+        isFolder: isFolder,
+        body: isFolder
             ? 'This folder and all its contents will be moved to Trash.'
-            : 'This list and all its tasks will be moved to Trash.'),
-        actions: [
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Move to Trash'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
+            : 'This list and all its tasks will be moved to Trash.',
+      );
 
   Widget _proxyDecorator(
       Widget child, int index, Animation<double> animation) {
@@ -142,14 +130,11 @@ class _FolderViewState extends State<FolderView> {
   }
 
   void _showDropdown(BuildContext context) {
-    final overlay = Overlay.of(context);
-    late OverlayEntry entry;
-
-    entry = OverlayEntry(
-      builder: (ctx) => _FolderOptionsDropdown(
-        onDismiss: () => entry.remove(),
+    showDropdown(context, (dismiss) {
+      return _FolderOptionsDropdown(
+        onDismiss: dismiss,
         onRename: () {
-          entry.remove();
+          dismiss();
           showRenameSheet(
             context,
             currentName: _currentFolder.name,
@@ -161,7 +146,7 @@ class _FolderViewState extends State<FolderView> {
           );
         },
         onChangeIcon: () {
-          entry.remove();
+          dismiss();
           showFolderIconPickerSheet(
             context,
             currentIconId: _currentFolder.iconId,
@@ -177,7 +162,7 @@ class _FolderViewState extends State<FolderView> {
           );
         },
         onMoveTo: () {
-          entry.remove();
+          dismiss();
           showMoveToSheet(
             context,
             folderController: widget.folderController,
@@ -193,17 +178,15 @@ class _FolderViewState extends State<FolderView> {
           );
         },
         onInfo: () {
-          entry.remove();
+          dismiss();
           showItemInfoSheet(context, creationDate: _currentFolder.creationDate);
         },
         onDelete: () {
-          entry.remove();
+          dismiss();
           _deleteThisFolder(context);
         },
-      ),
-    );
-
-    overlay.insert(entry);
+      );
+    });
   }
 
   Future<void> _deleteThisFolder(BuildContext context) async {

@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../theme/app_theme.dart';
+
 import '../models/task.dart';
 import 'calendar_date_picker.dart';
 
@@ -189,7 +191,7 @@ class _RoundedCheckbox extends StatelessWidget {
       height: 20,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(5),
-        color: checked ? const Color(0xFFFF4D00) : null,
+        color: checked ? AppColors.accent : null,
         border: checked
             ? null
             : Border.all(color: borderColor, width: 1.5),

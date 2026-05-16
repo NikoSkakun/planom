@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../folders/move_to_sheet.dart';
 import '../models/note.dart';
+import '../utils/dropdown_overlay.dart';
 import '../utils/item_info_sheet.dart';
 import 'note_controller.dart';
 
@@ -23,7 +24,8 @@ class NoteDetailView extends StatefulWidget {
   State<NoteDetailView> createState() => _NoteDetailViewState();
 }
 
-class _NoteDetailViewState extends State<NoteDetailView> {
+class _NoteDetailViewState extends State<NoteDetailView>
+    with DropdownOverlayMixin {
   late final TextEditingController _title;
   late final TextEditingController _content;
   String? _folderId;
@@ -38,13 +40,11 @@ class _NoteDetailViewState extends State<NoteDetailView> {
   }
 
   void _showDropdown(BuildContext context) {
-    final overlay = Overlay.of(context);
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (ctx) => _NoteOptionsDropdown(
-        onDismiss: () => entry.remove(),
+    showDropdown(context, (dismiss) {
+      return _NoteOptionsDropdown(
+        onDismiss: dismiss,
         onMoveTo: () {
-          entry.remove();
+          dismiss();
           showNoteMoveToSheet(
             context,
             noteController: widget.controller,
@@ -55,7 +55,7 @@ class _NoteDetailViewState extends State<NoteDetailView> {
           );
         },
         onInfo: () {
-          entry.remove();
+          dismiss();
           showItemInfoSheet(
             context,
             creationDate: widget.note.creationDate,
@@ -63,14 +63,13 @@ class _NoteDetailViewState extends State<NoteDetailView> {
           );
         },
         onDelete: () {
-          entry.remove();
+          dismiss();
           _deleted = true;
           widget.controller.deleteNote(widget.note.id);
           Navigator.of(context).pop();
         },
-      ),
-    );
-    overlay.insert(entry);
+      );
+    });
   }
 
   @override

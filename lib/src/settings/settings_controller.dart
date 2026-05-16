@@ -65,6 +65,13 @@ class SettingsController with ChangeNotifier {
     await _smartListPrefs.save();
   }
 
+  /// Replaces in-memory smart-list prefs from a backup map and persists them.
+  Future<void> importSmartListPrefs(Map<String, dynamic> data) async {
+    _smartListPrefs.applyJson(data);
+    notifyListeners();
+    await _smartListPrefs.save();
+  }
+
   Future<void> updateSmartListVisibility(
       String key, SmartListVisibility value) async {
     switch (key) {

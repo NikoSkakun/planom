@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../theme/app_theme.dart';
+
 // Formats a task date (and optional time) for display.
 String formatTaskDate(DateTime d, {int? doTime}) {
   const months = [
@@ -106,7 +108,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
   @override
   Widget build(BuildContext context) {
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
-    const accent = Color(0xFFFF4D00);
+    const accent = AppColors.accent;
     const pageHeight = 320.0;
 
     return Center(

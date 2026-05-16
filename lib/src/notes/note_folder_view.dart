@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../folders/folder_icon_picker.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
+import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../folders/create_folder_list_sheet.dart' show showRenameSheet;
@@ -26,7 +27,8 @@ class NoteFolderView extends StatefulWidget {
   State<NoteFolderView> createState() => _NoteFolderViewState();
 }
 
-class _NoteFolderViewState extends State<NoteFolderView> {
+class _NoteFolderViewState extends State<NoteFolderView>
+    with DropdownOverlayMixin {
   late NoteFolder _currentFolder;
   final Set<String> _expandedIds = {};
 
@@ -107,14 +109,11 @@ class _NoteFolderViewState extends State<NoteFolderView> {
   }
 
   void _showDropdown(BuildContext context) {
-    final overlay = Overlay.of(context);
-    late OverlayEntry entry;
-
-    entry = OverlayEntry(
-      builder: (ctx) => _NoteFolderOptionsDropdown(
-        onDismiss: () => entry.remove(),
+    showDropdown(context, (dismiss) {
+      return _NoteFolderOptionsDropdown(
+        onDismiss: dismiss,
         onRename: () {
-          entry.remove();
+          dismiss();
           showRenameSheet(
             context,
             currentName: _currentFolder.name,
@@ -126,7 +125,7 @@ class _NoteFolderViewState extends State<NoteFolderView> {
           );
         },
         onChangeIcon: () {
-          entry.remove();
+          dismiss();
           showFolderIconPickerSheet(
             context,
             currentIconId: _currentFolder.iconId,
@@ -142,7 +141,7 @@ class _NoteFolderViewState extends State<NoteFolderView> {
           );
         },
         onMoveTo: () {
-          entry.remove();
+          dismiss();
           showNoteMoveToSheet(
             context,
             noteController: widget.controller,
@@ -158,18 +157,16 @@ class _NoteFolderViewState extends State<NoteFolderView> {
           );
         },
         onInfo: () {
-          entry.remove();
+          dismiss();
           showItemInfoSheet(context, creationDate: _currentFolder.creationDate);
         },
         onDelete: () {
-          entry.remove();
+          dismiss();
           widget.controller.deleteFolderDeep(_currentFolder.id);
           if (mounted) Navigator.of(context).pop();
         },
-      ),
-    );
-
-    overlay.insert(entry);
+      );
+    });
   }
 
   @override

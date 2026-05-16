@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../theme/app_theme.dart';
+
 import '../models/app_folder.dart';
 import '../models/note_folder.dart';
 import '../notes/note_controller.dart';
@@ -422,7 +424,7 @@ class _DestinationRow extends StatelessWidget {
                   const Icon(
                     CupertinoIcons.checkmark,
                     size: 16,
-                    color: Color(0xFFFF4D00),
+                    color: AppColors.accent,
                   ),
               ],
             ),

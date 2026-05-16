@@ -58,6 +58,9 @@ class BackupService {
       'routines': await db.exportRoutines(),
       'routine_entries': await db.exportRoutineEntries(),
       'app_settings': await db.exportAppSettings(),
+      // Smart-list visibility + hideTabLabels live in a JSON file in the docs
+      // directory, not the DB, so we include their raw map here.
+      'smart_list_prefs': settingsController.smartListPrefs.toJson(),
     };
 
     final json = const JsonEncoder.withIndent('  ').convert(payload);
@@ -119,6 +122,12 @@ class BackupService {
     await db.importRoutines(asMaps(data['routines']));
     await db.importRoutineEntries(asMaps(data['routine_entries']));
     await db.importAppSettings(asMaps(data['app_settings']));
+
+    // Smart-list prefs were added in a later format revision; ignore if absent.
+    final smartListMap = data['smart_list_prefs'];
+    if (smartListMap is Map<String, dynamic>) {
+      await settingsController.importSmartListPrefs(smartListMap);
+    }
 
     await taskController.load();
     await folderController.load();

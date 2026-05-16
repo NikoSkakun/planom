@@ -4,6 +4,8 @@ import '../models/routine.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_view.dart';
+import '../theme/app_theme.dart';
+import '../utils/confirm_dialogs.dart';
 import '../utils/fast_route.dart';
 import 'routine_controller.dart';
 import 'routine_creation_view.dart';
@@ -268,31 +270,12 @@ class _TodayRoutineRow extends StatelessWidget {
     );
   }
 
-  Future<bool> _confirmDelete(BuildContext context) async {
-    return await showCupertinoDialog<bool>(
-          context: context,
-          builder: (_) => CupertinoAlertDialog(
-            title: const Text('Delete Routine'),
-            content: Text(
-                'Delete "${routine.name}"? This will also remove all recorded history.'),
-            actions: [
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(true),
-                child: const Text('Delete'),
-              ),
-              CupertinoDialogAction(
-                isDefaultAction: true,
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(false),
-                child: const Text('Cancel'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
+  Future<bool> _confirmDelete(BuildContext context) => confirmHardDelete(
+        context,
+        title: 'Delete Routine',
+        body:
+            'Delete "${routine.name}"? This will also remove all recorded history.',
+      );
 
   void _showOptions(BuildContext context) {
     showCupertinoModalPopup<void>(
@@ -437,31 +420,12 @@ class _AllRoutineRow extends StatelessWidget {
     return days.map((d) => labels[d]).join(', ');
   }
 
-  Future<bool> _confirmDelete(BuildContext context) async {
-    return await showCupertinoDialog<bool>(
-          context: context,
-          builder: (_) => CupertinoAlertDialog(
-            title: const Text('Delete Routine'),
-            content: Text(
-                'Delete "${routine.name}"? This will also remove all recorded history.'),
-            actions: [
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(true),
-                child: const Text('Delete'),
-              ),
-              CupertinoDialogAction(
-                isDefaultAction: true,
-                onPressed: () =>
-                    Navigator.of(context, rootNavigator: true).pop(false),
-                child: const Text('Cancel'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
+  Future<bool> _confirmDelete(BuildContext context) => confirmHardDelete(
+        context,
+        title: 'Delete Routine',
+        body:
+            'Delete "${routine.name}"? This will also remove all recorded history.',
+      );
 }
 
 // ── Shared widgets ────────────────────────────────────────────────────────────
@@ -513,7 +477,7 @@ class _ProgressBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: isCompleted
-            ? const Color(0xFF34C759).withOpacity(0.15)
+            ? AppColors.systemGreen.withOpacity(0.15)
             : CupertinoColors.tertiarySystemFill.resolveFrom(context),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -523,7 +487,7 @@ class _ProgressBadge extends StatelessWidget {
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: isCompleted
-              ? const Color(0xFF34C759)
+              ? AppColors.systemGreen
               : CupertinoColors.secondaryLabel.resolveFrom(context),
         ),
       ),

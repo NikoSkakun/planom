@@ -169,18 +169,11 @@ class TaskController with ChangeNotifier {
     final i = _trashedTasks.indexWhere((t) => t.id == id);
     if (i == -1) return;
     final orig = _trashedTasks[i];
-    final restored = Task(
-      id: orig.id,
-      creationDate: orig.creationDate,
-      iconId: orig.iconId,
-      title: orig.title,
-      note: orig.note,
-      isCompleted: orig.isCompleted,
-      dueDate: orig.dueDate,
-      doTime: orig.doTime,
+    final restored = orig.copyWith(
       listId: targetListId,
-      priority: orig.priority,
-      sortOrder: orig.sortOrder,
+      clearListId: targetListId == null,
+      isDeleted: false,
+      clearDeletedDate: true,
     );
     await _db.restoreTask(id);
     if (targetListId != orig.listId) {

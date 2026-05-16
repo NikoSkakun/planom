@@ -103,11 +103,15 @@ class Routine extends AppItem {
         goalUnit: map['goalUnit'] as String?,
         recordAmount: map['recordAmount'] as int?,
         frequencyType: map['frequencyType'] as String,
-        weekdays: (map['weekdays'] as String?)
-            ?.split(',')
-            .map(int.parse)
-            .toList(),
+        weekdays: _parseWeekdays(map['weekdays'] as String?),
         daysAfterComplete: map['daysAfterComplete'] as int?,
         autoReset: map['autoReset'] as String,
       );
+
+  // Empty strings round-trip as `null` so an empty weekday list does not crash
+  // `int.parse('')` on the next load.
+  static List<int>? _parseWeekdays(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    return raw.split(',').map(int.parse).toList();
+  }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../theme/app_theme.dart';
+
 import '../folders/folder_controller.dart';
 import '../models/task.dart';
 import '../settings/backup_service.dart';
@@ -349,7 +351,7 @@ class _DayCell extends StatelessWidget {
               height: 26,
               decoration: _isToday
                   ? const BoxDecoration(
-                      color: Color(0xFFFF4D00),
+                      color: AppColors.accent,
                       shape: BoxShape.circle,
                     )
                   : null,
@@ -414,7 +416,7 @@ class _TaskChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final chipColor = completed
         ? CupertinoColors.systemGrey5.resolveFrom(context)
-        : (listColor ?? const Color(0xFFFF4D00));
+        : (listColor ?? AppColors.accent);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 2),

@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
+
 import 'package:flutter/material.dart' show ThemeMode;
 
+import '../theme/app_theme.dart';
 import 'backup_service.dart';
 import 'settings_controller.dart';
 import 'smart_list_prefs.dart';
@@ -11,8 +13,6 @@ class SettingsView extends StatefulWidget {
     required this.controller,
     this.backupService,
   });
-
-  static const routeName = '/settings';
 
   final SettingsController controller;
   final BackupService? backupService;
@@ -268,7 +268,7 @@ class _SettingsViewState extends State<SettingsView> {
                       icon: const Icon(
                         CupertinoIcons.checkmark_circle_fill,
                         size: 22,
-                        color: Color(0xFF34C759),
+                        color: AppColors.systemGreen,
                       ),
                       label: 'Completed',
                       visibility: prefs.completed,
@@ -534,7 +534,7 @@ class _ToggleRow extends StatelessWidget {
           CupertinoSwitch(
             value: value,
             onChanged: enabled ? onChanged : null,
-            activeColor: const Color(0xFFFF4D00),
+            activeColor: AppColors.accent,
           ),
         ],
       ),

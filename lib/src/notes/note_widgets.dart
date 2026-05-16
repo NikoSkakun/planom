@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../theme/app_theme.dart';
+
 import '../folders/folder_icon_picker.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
@@ -212,7 +214,7 @@ class NoteOrangeAddButton extends StatelessWidget {
         width: 52,
         height: 52,
         decoration: const BoxDecoration(
-          color: Color(0xFFFF4D00),
+          color: AppColors.accent,
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(

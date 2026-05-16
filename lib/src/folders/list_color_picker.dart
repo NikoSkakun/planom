@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../theme/app_theme.dart';
+
 const kListColorPresets = [
   0xFFFF3B30, // Red
   0xFFFF9500, // Orange
@@ -232,7 +234,7 @@ class _PickerSheetState extends State<_PickerSheet> {
               'Other…',
               style: TextStyle(
                 fontSize: 16,
-                color: Color(0xFFFF4D00),
+                color: AppColors.accent,
               ),
             ),
           ),
@@ -341,7 +343,7 @@ class _CustomColorPickerSheetState extends State<_CustomColorPickerSheet> {
           ),
           const SizedBox(height: 24),
           CupertinoButton(
-            color: const Color(0xFFFF4D00),
+            color: AppColors.accent,
             borderRadius: BorderRadius.circular(12),
             onPressed: () {
               widget.onSelected(_currentColor);

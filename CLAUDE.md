@@ -18,7 +18,7 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 ## Tech stack
 
 - **Framework**: Flutter / Dart, Cupertino (iOS-native) widgets throughout — no Material widgets in UI except `showModalBottomSheet` (which requires `GlobalMaterialLocalizations.delegate` already registered)
-- **Database**: `sqflite` v2, single file `planom.db`, current schema version **11**
+- **Database**: `sqflite` v2, single file `planom.db`, current schema version **14**
 - **State**: Flutter `ChangeNotifier` — no third-party state library
 - **Routing**: `FastRoute` (custom `CupertinoPageRoute` subclass with 180 ms transition, in `lib/src/utils/fast_route.dart`) used everywhere instead of bare `CupertinoPageRoute`
 - **Icons**: `cupertino_icons` package required for `CupertinoIcons`; custom PNG tab-bar icons in `assets/icons/tab_bar/` (Tasks/Notes/Calendar/Routines use PNGs; Settings tab uses `CupertinoIcons.gear_alt` / `gear_alt_fill`); list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`; use `Image.asset` (not `ImageIcon`) when original PNG colors must be preserved. Smart lists that have no PNG asset (Completed, Trash) use `CupertinoIcons` passed as `iconWidget` to `_ListItem`.
@@ -126,7 +126,7 @@ Custom photo icons for folders and lists are stored as **relative paths** (`icon
 
 ### Database (`lib/src/database/database_service.dart`)
 
-Single `DatabaseService` class, lazy-opens `planom.db` via sqflite. Current version: **11**.
+Single `DatabaseService` class, lazy-opens `planom.db` via sqflite. Current version: **14**.
 
 Migration history:
 | Version | Changes |
@@ -141,6 +141,9 @@ Migration history:
 | v9 | `folders.iconId TEXT`, `app_lists.iconId TEXT` |
 | v10 | `note_folders.iconId TEXT` |
 | v11 | `tasks.isDeleted`, `tasks.deletedDate`, `folders.isDeleted`, `folders.deletedDate`, `app_lists.isDeleted`, `app_lists.deletedDate` |
+| v12 | `note_folders.isDeleted`, `note_folders.deletedDate`, `notes.isDeleted`, `notes.deletedDate` |
+| v13 | `tasks.completionDate INTEGER` |
+| v14 | `app_settings` table (`key` TEXT PK, `value` TEXT) — persists tab visibility prefs across backups |
 
 When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 
@@ -210,18 +213,30 @@ Routine DB schema:
 - `autoReset='none'`: carries over last known amount as today's starting value; for `achieve_all` shows as done if any historical completion exists (until toggled off today)
 - Weekdays stored as `List<int>` (0=Mon … 6=Sun); Dart's `DateTime.weekday` is 1=Mon, so always subtract 1 when comparing
 
+**`NoteController`** (`lib/src/notes/note_controller.dart`)
+- Initialized in `main.dart`, passed through `MyApp` → `HomeShell` → `NotesView`
+- Owns four in-memory lists: `_notes`, `_folders`, `_trashedNotes`, `_trashedFolders`; mirrors the `FolderController` API for the notes domain
+- Soft-delete: `deleteNote(id)`, `deleteFolderDeep(id)` (recursive — no callback needed since notes have no cross-controller dependency)
+- Restore: `restoreNote(id, targetFolderId)`, `restoreFolder(id, targetParentId)` — fall back to root if the original parent is trashed
+- `permanentlyDeleteNote(id)`, `permanentlyDeleteFolder(id)`, `permanentlyDeleteAllTrashed()` — bulk hard-delete from Trash
+- Reorder helpers mirror folder/list reorder behavior
+
 **`SettingsController`** (`lib/src/settings/settings_controller.dart`)
-- Manages `ThemeMode`; mapped to `CupertinoThemeData.brightness` in `app.dart`
+- Manages `ThemeMode` (persisted via `SettingsService` → `SharedPreferences`)
+- Owns `SmartListPrefs` (visibility of Today/Upcoming/Completed/Trash smart lists + `hideTabLabels` toggle), persisted to a JSON file in the documents directory
+- Owns per-tab visibility (`_tabVisibility` map for tabs 1=Notes, 2=Calendar, 3=Routines, 4=Settings; tab 0 always on), persisted to the `app_settings` DB table so backups carry it across devices
+- `visibleOptionalTabCount` — number of optional tabs currently enabled; used to gray out the last toggle (UI prevents disabling all of them)
+- `importSmartListPrefs(map)` — invoked by `BackupService` during import to restore the JSON-backed prefs
 
 **`BackupService`** (`lib/src/settings/backup_service.dart`)
 - Not a `ChangeNotifier`; created in `main.dart` alongside controllers and passed through `MyApp` → `HomeShell` → `SettingsView`
-- `exportBackup()` — reads all 7 tables (including trashed items), collects custom icon image bytes (base64), writes a `planom_backup_YYYY-MM-DD.planom` JSON file to the temp directory, shares it via iOS share sheet. Custom iconIds are normalised to relative paths (`icons/<filename>`) in the export; image bytes are stored under a top-level `customIcons` map keyed by relative path.
-- `importBackup()` — opens the file picker, parses the JSON, writes custom icon files to `<docsDir>/icons/`, clears all DB tables, bulk-inserts all records, then calls `load()` on each controller. Returns `true` on success, `false` if the file was invalid or the picker was cancelled.
-- Backup format: JSON with `.planom` extension, `version: 1`. Top-level keys: `version`, `exportDate`, `customIcons`, `tasks`, `folders`, `app_lists`, `note_folders`, `notes`, `routines`, `routine_entries`.
+- `exportBackup()` — reads all 7 tables (including trashed items), collects custom icon image bytes (base64), serialises `SettingsController.smartListPrefs` alongside the DB rows, writes a `planom_backup_YYYY-MM-DD.planom` JSON file to the temp directory, shares it via iOS share sheet. Custom iconIds are normalised to relative paths (`icons/<filename>`) in the export; image bytes are stored under a top-level `customIcons` map keyed by relative path.
+- `importBackup()` — opens the file picker, parses the JSON, writes custom icon files to `<docsDir>/icons/`, clears all DB tables, bulk-inserts all records, restores smart-list prefs from `smart_list_prefs`, then calls `load()` on each controller. Returns `true` on success, `false` if the file was invalid or the picker was cancelled.
+- Backup format: JSON with `.planom` extension, `version: 1`. Top-level keys: `version`, `exportDate`, `customIcons`, `tasks`, `folders`, `app_lists`, `note_folders`, `notes`, `routines`, `routine_entries`, `app_settings`, `smart_list_prefs`.
 
 ### App shell (`lib/src/home_shell.dart`)
 
-`HomeShell` is a `StatefulWidget` that wraps a `CupertinoTabScaffold` (**5 tabs**: Tasks(0) / Notes(1) / Calendar(2) / Routines(3) / Settings(4)) in a `Stack` with a floating orange `+` button (52×52, `Color(0xFFFF4D00)`) above the tab bar. Key state:
+`HomeShell` is a `StatefulWidget` that wraps a `CupertinoTabScaffold` (up to **5 tabs**: Tasks(0) always-on, then Notes(1) / Calendar(2) / Routines(3) / Settings(4) — each toggleable in Settings → Tab Bar) in a `Stack` with a floating accent-colored `+` button (52×52, `AppColors.accent`) above the tab bar. `_computeVisibleIndices()` produces the logical→visual index mapping based on `SettingsController.isTabVisible`; the scaffold is keyed by `ValueKey(visibleIndices.join(','))` so a clean rebuild happens whenever the visible set changes. When the Settings tab is hidden, every other tab's root view exposes a ⋯ button (Tasks via its dropdown menu, Notes/Calendar/Routines via the nav-bar trailing icon) that pushes `SettingsView` on the current tab's navigator. Key state:
 - `_navigatorKeys`: per-tab `GlobalKey<NavigatorState>` — used to pop-to-root on same-tab re-tap
 - `_depthObservers`: per-tab `_DepthObserver extends NavigatorObserver` — tracks push/pop depth AND counts routes matching `trackedRouteName`
 - `_showPlusButton`: `ValueNotifier<bool>` toggled by `_depthObservers`; passed to `ValueListenableBuilder` that wraps the `Positioned` button
@@ -243,7 +258,7 @@ Routine DB schema:
 
 ### Navigation
 
-- `MyApp.onGenerateRoute` in `app.dart` handles the root `/` route (→ `HomeShell`) and the legacy `/settings` route (→ bare `SettingsView` without backup) using `FastRoute`
+- `MyApp.onGenerateRoute` in `app.dart` routes the root `/` to `HomeShell` (the only top-level destination) using `FastRoute`
 - In-tab navigation (e.g. Tasks → Inbox, Inbox → TaskDetail) uses `Navigator.of(context).push(FastRoute(...))` directly
 - Settings is a dedicated tab (index 4); it is no longer registered as a pushed route inside individual tab navigators
 
@@ -328,12 +343,21 @@ Routine DB schema:
 
 ### Design tokens
 
-- Accent color: `Color(0xFFFF4D00)` (orange-red)
+All colors and durations live in `lib/src/theme/app_theme.dart`. Use the constants — never hard-code these values at call sites.
+- `AppColors.accent` (`0xFFFF4D00`) — primary brand accent
+- `AppColors.systemGreen` (`0xFF34C759`) — completed indicators
+- `AppColors.shadow` (`0x30000000`) — dropdown / panel drop-shadow
+- `AppDurations.transition` (180 ms) — standard page transition; baked into `FastRoute`
 - Active tab label/icon: black (`Color(0xFF000000)`)
 - Inactive tab: `Color(0xFF636366)`
 - Checkbox: 22×22 rounded rect (radius 6), filled accent when checked
-- All transitions: 180 ms (`FastRoute`)
-- Completed smart-list icon color: `Color(0xFF34C759)` (system green)
+
+### Shared utilities (`lib/src/utils/`)
+
+- `fast_route.dart` — `FastRoute<T>` `CupertinoPageRoute` subclass with 180 ms transition. **Always use FastRoute, never bare `CupertinoPageRoute`.**
+- `dropdown_overlay.dart` — `DropdownOverlayMixin` on `State<T>`: provides `showDropdown(context, builder)` that inserts an `OverlayEntry`, exposes a `dismiss()` callback to the builder, and auto-removes the entry in `dispose()` so the overlay can't leak when the host route is popped while the menu is open.
+- `confirm_dialogs.dart` — `confirmMoveToTrash(context, name:, body:, isFolder:)` returns `Future<bool>`; the canonical "Move to Trash?" Cupertino dialog used by every soft-delete site.
+- `item_info_sheet.dart` — `showItemInfoSheet(context, ...)` modal showing creation/modified/completion dates for a task/note/folder.
 
 ### Localization
 

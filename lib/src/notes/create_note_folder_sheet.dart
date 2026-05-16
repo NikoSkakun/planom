@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
+
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
 import '../folders/folder_icon_picker.dart';
 import '../models/note_folder.dart';
+import '../theme/app_theme.dart';
 import 'note_controller.dart';
 
 void showCreateNoteFolderSheet(
@@ -134,7 +136,7 @@ class _CreateSheetState extends State<_CreateSheet> {
           ),
           const SizedBox(height: 16),
           CupertinoButton(
-            color: const Color(0xFFFF4D00),
+            color: AppColors.accent,
             borderRadius: BorderRadius.circular(12),
             onPressed: _submit,
             child: const Text(

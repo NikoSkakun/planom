@@ -4,6 +4,8 @@ import '../models/app_list.dart';
 import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
+import '../utils/confirm_dialogs.dart';
+import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import 'create_folder_list_sheet.dart';
@@ -30,7 +32,8 @@ class ListTaskView extends StatefulWidget {
   State<ListTaskView> createState() => _ListTaskViewState();
 }
 
-class _ListTaskViewState extends State<ListTaskView> {
+class _ListTaskViewState extends State<ListTaskView>
+    with DropdownOverlayMixin {
   late AppList _currentList;
 
   @override
@@ -49,14 +52,11 @@ class _ListTaskViewState extends State<ListTaskView> {
   }
 
   void _showDropdown(BuildContext context) {
-    final overlay = Overlay.of(context);
-    late OverlayEntry entry;
-
-    entry = OverlayEntry(
-      builder: (ctx) => _ListOptionsDropdown(
-        onDismiss: () => entry.remove(),
+    showDropdown(context, (dismiss) {
+      return _ListOptionsDropdown(
+        onDismiss: dismiss,
         onRename: () {
-          entry.remove();
+          dismiss();
           showRenameSheet(
             context,
             currentName: _currentList.name,
@@ -68,7 +68,7 @@ class _ListTaskViewState extends State<ListTaskView> {
           );
         },
         onChangeColor: () {
-          entry.remove();
+          dismiss();
           showListColorPickerSheet(context, _currentList.color, (color) {
             final updated = _currentList.copyWith(
               color: color,
@@ -79,7 +79,7 @@ class _ListTaskViewState extends State<ListTaskView> {
           });
         },
         onChangeIcon: () {
-          entry.remove();
+          dismiss();
           showFolderIconPickerSheet(
             context,
             currentIconId: _currentList.iconId,
@@ -95,7 +95,7 @@ class _ListTaskViewState extends State<ListTaskView> {
           );
         },
         onMoveTo: () {
-          entry.remove();
+          dismiss();
           showMoveToSheet(
             context,
             folderController: widget.folderController,
@@ -110,44 +110,23 @@ class _ListTaskViewState extends State<ListTaskView> {
           );
         },
         onInfo: () {
-          entry.remove();
+          dismiss();
           showItemInfoSheet(context, creationDate: _currentList.creationDate);
         },
         onDelete: () {
-          entry.remove();
+          dismiss();
           _deleteThisList(context);
         },
-      ),
-    );
-
-    overlay.insert(entry);
-  }
-
-  Future<bool> _confirmDelete() async {
-    final result = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text('Move "${_currentList.name}" to Trash?'),
-        content: const Text('This list and all its tasks will be moved to Trash.'),
-        actions: [
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Move to Trash'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
+      );
+    });
   }
 
   Future<void> _deleteThisList(BuildContext context) async {
-    final confirmed = await _confirmDelete();
+    final confirmed = await confirmMoveToTrash(
+      context,
+      name: _currentList.name,
+      body: 'This list and all its tasks will be moved to Trash.',
+    );
     if (!confirmed || !mounted) return;
     await widget.taskController.deleteTasksForList(_currentList.id);
     await widget.folderController.deleteList(_currentList.id);

@@ -13,6 +13,8 @@ import 'settings/settings_view.dart';
 import 'tasks/task_controller.dart';
 import 'tasks/task_creation_sheet.dart';
 import 'tasks/tasks_view.dart';
+import 'theme/app_theme.dart';
+import 'utils/fast_route.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({
@@ -104,7 +106,7 @@ class _HomeShellState extends State<HomeShell> {
   void _onPlusPressed() {
     if (_lastTabIndex == 3) {
       _navigatorKeys[3].currentState?.push(
-        CupertinoPageRoute(
+        FastRoute<void>(
           settings: const RouteSettings(name: 'routine_creation'),
           builder: (_) => RoutineCreationView(
             controller: widget.routineController,
@@ -166,7 +168,7 @@ class _HomeShellState extends State<HomeShell> {
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(
               AssetImage('assets/icons/tab_bar/tasks.png'),
-              color: Color(0xFFFF4D00),
+              color: AppColors.accent,
             ),
           ),
           label: hideLabels ? null : 'Tasks',
@@ -181,7 +183,7 @@ class _HomeShellState extends State<HomeShell> {
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(
               AssetImage('assets/icons/tab_bar/notes.png'),
-              color: Color(0xFFFF4D00),
+              color: AppColors.accent,
             ),
           ),
           label: hideLabels ? null : 'Notes',
@@ -197,7 +199,7 @@ class _HomeShellState extends State<HomeShell> {
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(
               AssetImage('assets/icons/tab_bar/calendar.png'),
-              color: Color(0xFFFF4D00),
+              color: AppColors.accent,
             ),
           ),
           label: hideLabels ? null : 'Calendar',
@@ -213,7 +215,7 @@ class _HomeShellState extends State<HomeShell> {
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(
               AssetImage('assets/icons/tab_bar/routines.png'),
-              color: Color(0xFFFF4D00),
+              color: AppColors.accent,
             ),
           ),
           label: hideLabels ? null : 'Routines',
@@ -229,7 +231,7 @@ class _HomeShellState extends State<HomeShell> {
             child: Icon(
               CupertinoIcons.gear_alt_fill,
               size: 24,
-              color: Color(0xFFFF4D00),
+              color: AppColors.accent,
             ),
           ),
           label: hideLabels ? null : 'Settings',
@@ -386,7 +388,7 @@ class _PlusButton extends StatelessWidget {
         width: 52,
         height: 52,
         decoration: const BoxDecoration(
-          color: Color(0xFFFF4D00),
+          color: AppColors.accent,
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(

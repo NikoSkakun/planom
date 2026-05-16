@@ -9,7 +9,6 @@ import 'notes/note_controller.dart';
 import 'routines/routine_controller.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
-import 'settings/settings_view.dart';
 import 'tasks/task_controller.dart';
 import 'utils/fast_route.dart';
 
@@ -57,16 +56,14 @@ class MyApp extends StatelessWidget {
           ),
           onGenerateRoute: (settings) => FastRoute<void>(
             settings: settings,
-            builder: (context) => settings.name == SettingsView.routeName
-                ? SettingsView(controller: settingsController)
-                : HomeShell(
-                    settingsController: settingsController,
-                    taskController: taskController,
-                    folderController: folderController,
-                    noteController: noteController,
-                    routineController: routineController,
-                    backupService: backupService,
-                  ),
+            builder: (context) => HomeShell(
+              settingsController: settingsController,
+              taskController: taskController,
+              folderController: folderController,
+              noteController: noteController,
+              routineController: routineController,
+              backupService: backupService,
+            ),
           ),
         );
       },

@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../theme/app_theme.dart';
+
 // Preset (iconId, displayColor) pairs.
 const kFolderIconPresets = <(String, int)>[
   ('list.bullet', 0xFFFF4D00),
@@ -104,7 +106,7 @@ Widget buildFolderItemIcon(String? iconId, {required bool isFolder}) {
       child: Icon(
         folderItemIconData(iconId),
         size: 20,
-        color: const Color(0xFFFF4D00),
+        color: AppColors.accent,
       ),
     ),
   );
