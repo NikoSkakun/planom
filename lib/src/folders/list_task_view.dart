@@ -113,10 +113,45 @@ class _ListTaskViewState extends State<ListTaskView> {
           entry.remove();
           showItemInfoSheet(context, creationDate: _currentList.creationDate);
         },
+        onDelete: () {
+          entry.remove();
+          _deleteThisList(context);
+        },
       ),
     );
 
     overlay.insert(entry);
+  }
+
+  Future<bool> _confirmDelete() async {
+    final result = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text('Move "${_currentList.name}" to Trash?'),
+        content: const Text('This list and all its tasks will be moved to Trash.'),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Move to Trash'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<void> _deleteThisList(BuildContext context) async {
+    final confirmed = await _confirmDelete();
+    if (!confirmed || !mounted) return;
+    await widget.taskController.deleteTasksForList(_currentList.id);
+    await widget.folderController.deleteList(_currentList.id);
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -211,6 +246,7 @@ class _ListOptionsDropdown extends StatelessWidget {
     required this.onChangeIcon,
     required this.onMoveTo,
     required this.onInfo,
+    required this.onDelete,
   });
 
   final VoidCallback onDismiss;
@@ -219,6 +255,7 @@ class _ListOptionsDropdown extends StatelessWidget {
   final VoidCallback onChangeIcon;
   final VoidCallback onMoveTo;
   final VoidCallback onInfo;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +292,11 @@ class _ListOptionsDropdown extends StatelessWidget {
                   label: 'Info',
                   icon: CupertinoIcons.info,
                   onTap: onInfo),
+              _DropdownItem(
+                  label: 'Delete',
+                  icon: CupertinoIcons.trash,
+                  onTap: onDelete,
+                  color: CupertinoColors.destructiveRed),
             ],
           ),
         ),
@@ -306,14 +348,18 @@ class _DropdownItem extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onTap,
+    this.color,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor =
+        color ?? CupertinoColors.label.resolveFrom(context);
     return GestureDetector(
       onTap: onTap,
       child: Padding(
@@ -323,18 +369,11 @@ class _DropdownItem extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: CupertinoColors.label.resolveFrom(context),
-                ),
+                style: TextStyle(fontSize: 15, color: effectiveColor),
               ),
             ),
             const SizedBox(width: 8),
-            Icon(
-              icon,
-              size: 17,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
+            Icon(icon, size: 17, color: effectiveColor),
           ],
         ),
       ),

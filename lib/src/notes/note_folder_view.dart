@@ -161,6 +161,11 @@ class _NoteFolderViewState extends State<NoteFolderView> {
           entry.remove();
           showItemInfoSheet(context, creationDate: _currentFolder.creationDate);
         },
+        onDelete: () {
+          entry.remove();
+          widget.controller.deleteFolderDeep(_currentFolder.id);
+          if (mounted) Navigator.of(context).pop();
+        },
       ),
     );
 
@@ -332,6 +337,7 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
     required this.onChangeIcon,
     required this.onMoveTo,
     required this.onInfo,
+    required this.onDelete,
   });
 
   final VoidCallback onDismiss;
@@ -339,6 +345,7 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
   final VoidCallback onChangeIcon;
   final VoidCallback onMoveTo;
   final VoidCallback onInfo;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -371,6 +378,11 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
                   label: 'Info',
                   icon: CupertinoIcons.info,
                   onTap: onInfo),
+              _DropdownItem(
+                  label: 'Delete',
+                  icon: CupertinoIcons.trash,
+                  onTap: onDelete,
+                  color: CupertinoColors.destructiveRed),
             ],
           ),
         ),
@@ -422,14 +434,18 @@ class _DropdownItem extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onTap,
+    this.color,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor =
+        color ?? CupertinoColors.label.resolveFrom(context);
     return GestureDetector(
       onTap: onTap,
       child: Padding(
@@ -439,18 +455,11 @@ class _DropdownItem extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: CupertinoColors.label.resolveFrom(context),
-                ),
+                style: TextStyle(fontSize: 15, color: effectiveColor),
               ),
             ),
             const SizedBox(width: 8),
-            Icon(
-              icon,
-              size: 17,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
+            Icon(icon, size: 17, color: effectiveColor),
           ],
         ),
       ),

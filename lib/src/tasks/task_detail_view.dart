@@ -33,6 +33,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
   late bool _isCompleted;
   late String? _listId;
   late int _priority;
+  bool _deleted = false;
 
   @override
   void initState() {
@@ -48,6 +49,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
 
   @override
   void dispose() {
+    if (!_deleted) {
     final title = _title.text.trim();
     if (title.isNotEmpty) {
       widget.controller.updateTask(widget.task.copyWith(
@@ -62,6 +64,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
         clearListId: _listId == null,
         priority: _priority,
       ));
+    }
     }
     _title.dispose();
     _note.dispose();
@@ -81,6 +84,12 @@ class _TaskDetailViewState extends State<TaskDetailView> {
             creationDate: widget.task.creationDate,
             completionDate: widget.task.completionDate,
           );
+        },
+        onDelete: () {
+          entry.remove();
+          _deleted = true;
+          widget.controller.deleteTask(widget.task.id);
+          Navigator.of(context).pop();
         },
       ),
     );
@@ -341,9 +350,14 @@ class _PriorityPicker extends StatelessWidget {
 }
 
 class _TaskOptionsDropdown extends StatelessWidget {
-  const _TaskOptionsDropdown({required this.onDismiss, required this.onInfo});
+  const _TaskOptionsDropdown({
+    required this.onDismiss,
+    required this.onInfo,
+    required this.onDelete,
+  });
   final VoidCallback onDismiss;
   final VoidCallback onInfo;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -361,7 +375,7 @@ class _TaskOptionsDropdown extends StatelessWidget {
           child: Container(
             constraints: const BoxConstraints(minWidth: 160),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground,
+              color: CupertinoColors.systemBackground.resolveFrom(context),
               borderRadius: BorderRadius.circular(12),
               boxShadow: const [
                 BoxShadow(
@@ -371,22 +385,68 @@ class _TaskOptionsDropdown extends StatelessWidget {
                 ),
               ],
             ),
-            child: GestureDetector(
-              onTap: onInfo,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Text(
-                  'Info',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: CupertinoColors.label.resolveFrom(context),
-                  ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _DropdownRow(
+                  label: 'Info',
+                  icon: CupertinoIcons.info,
+                  onTap: onInfo,
                 ),
-              ),
+                Container(
+                  height: 0.5,
+                  color: CupertinoColors.separator.resolveFrom(context),
+                ),
+                _DropdownRow(
+                  label: 'Delete',
+                  icon: CupertinoIcons.trash,
+                  onTap: onDelete,
+                  color: CupertinoColors.destructiveRed,
+                ),
+              ],
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DropdownRow extends StatelessWidget {
+  const _DropdownRow({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveColor =
+        color ?? CupertinoColors.label.resolveFrom(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(fontSize: 15, color: effectiveColor),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(icon, size: 17, color: effectiveColor),
+          ],
+        ),
+      ),
     );
   }
 }

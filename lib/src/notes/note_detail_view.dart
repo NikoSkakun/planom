@@ -27,6 +27,7 @@ class _NoteDetailViewState extends State<NoteDetailView> {
   late final TextEditingController _title;
   late final TextEditingController _content;
   String? _folderId;
+  bool _deleted = false;
 
   @override
   void initState() {
@@ -61,6 +62,12 @@ class _NoteDetailViewState extends State<NoteDetailView> {
             modifiedDate: widget.note.modifiedDate,
           );
         },
+        onDelete: () {
+          entry.remove();
+          _deleted = true;
+          widget.controller.deleteNote(widget.note.id);
+          Navigator.of(context).pop();
+        },
       ),
     );
     overlay.insert(entry);
@@ -68,6 +75,7 @@ class _NoteDetailViewState extends State<NoteDetailView> {
 
   @override
   void dispose() {
+    if (!_deleted) {
     final title = _title.text.trim();
     final content = _content.text.trim();
     if (widget.isNew) {
@@ -90,6 +98,7 @@ class _NoteDetailViewState extends State<NoteDetailView> {
           clearFolderId: _folderId == null,
         ),
       );
+    }
     }
     _title.dispose();
     _content.dispose();
@@ -162,11 +171,13 @@ class _NoteOptionsDropdown extends StatelessWidget {
     required this.onDismiss,
     required this.onMoveTo,
     required this.onInfo,
+    required this.onDelete,
   });
 
   final VoidCallback onDismiss;
   final VoidCallback onMoveTo;
   final VoidCallback onInfo;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -212,6 +223,16 @@ class _NoteOptionsDropdown extends StatelessWidget {
                   icon: CupertinoIcons.info,
                   onTap: onInfo,
                 ),
+                Container(
+                  height: 0.5,
+                  color: CupertinoColors.separator.resolveFrom(context),
+                ),
+                _DropdownRow(
+                  label: 'Delete',
+                  icon: CupertinoIcons.trash,
+                  onTap: onDelete,
+                  color: CupertinoColors.destructiveRed,
+                ),
               ],
             ),
           ),
@@ -226,14 +247,18 @@ class _DropdownRow extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onTap,
+    this.color,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor =
+        color ?? CupertinoColors.label.resolveFrom(context);
     return GestureDetector(
       onTap: onTap,
       child: Padding(
@@ -243,19 +268,11 @@ class _DropdownRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: CupertinoColors.label.resolveFrom(context),
-                ),
+                style: TextStyle(fontSize: 15, color: effectiveColor),
               ),
             ),
             const SizedBox(width: 8),
-            Icon(
-              icon,
-              size: 17,
-              color:
-                  CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
+            Icon(icon, size: 17, color: effectiveColor),
           ],
         ),
       ),
