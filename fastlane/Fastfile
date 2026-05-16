@@ -1,0 +1,80 @@
+default_platform(:ios)
+
+platform :ios do
+
+  # ── Helpers ──────────────────────────────────────────────────────────────────
+
+  def load_asc_api_key
+    app_store_connect_api_key(
+      key_id:        ENV["APP_STORE_CONNECT_API_KEY_ID"],
+      issuer_id:     ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+      # The .p8 content is stored as a single-line secret with literal \n characters.
+      key_content:   ENV["APP_STORE_CONNECT_API_KEY_CONTENT"].gsub("\\n", "\n"),
+      in_house:      false,
+    )
+  end
+
+  # ── Lanes ─────────────────────────────────────────────────────────────────────
+
+  desc "Sync certificates and provisioning profiles (read-only in CI)"
+  lane :sync_certs do |options|
+    api_key = load_asc_api_key
+    match(
+      type:        "appstore",
+      readonly:    is_ci,
+      api_key:     api_key,
+      git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
+    )
+  end
+
+  desc "Build and upload a new beta to TestFlight"
+  lane :beta do
+    api_key = load_asc_api_key
+
+    # Sync certs/profiles before building.
+    match(
+      type:        "appstore",
+      readonly:    is_ci,
+      api_key:     api_key,
+      git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
+    )
+
+    # Bump the build number to the current timestamp (YYYYMMDDHHMMSS) so
+    # every CI run produces a unique, monotonically increasing build number
+    # without requiring a git commit.
+    build_number = Time.now.strftime("%Y%m%d%H%M%S")
+    increment_build_number(
+      build_number: build_number,
+      xcodeproj: "ios/Runner.xcodeproj",
+    )
+
+    # Build the .ipa that Flutter already compiled (--no-codesign handed us
+    # the unsigned archive; gym re-signs it with the Match profile).
+    build_app(
+      workspace:              "ios/Runner.xcworkspace",
+      scheme:                 "Runner",
+      configuration:          "Release",
+      export_method:          "app-store",
+      export_options: {
+        provisioningProfiles: {
+          "YOUR_BUNDLE_ID" => "match AppStore YOUR_BUNDLE_ID",
+        },
+      },
+      output_directory:       "build/ios/ipa",
+      output_name:            "Planom.ipa",
+      # Suppress the Xcode build log in CI to keep output readable.
+      buildlog_path:          "build/ios/logs",
+      silent:                 is_ci,
+    )
+
+    upload_to_testflight(
+      api_key:           api_key,
+      ipa:               "build/ios/ipa/Planom.ipa",
+      skip_waiting_for_build_processing: true,
+      changelog:         "Automated build from GitHub Actions — branch: #{ENV.fetch('GITHUB_REF_NAME', 'unknown')}",
+    )
+
+    UI.success("✅  Uploaded to TestFlight — build #{build_number}")
+  end
+
+end

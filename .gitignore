@@ -41,3 +41,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# CI/CD — never commit real secrets or certs
+.env
+*.p12
+*.mobileprovision
+fastlane/report.xml
+fastlane/*.ipa

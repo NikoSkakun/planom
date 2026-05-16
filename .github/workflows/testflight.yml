@@ -1,0 +1,69 @@
+name: TestFlight
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:          # allows manual trigger from the Actions tab
+
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: true   # cancel an in-flight build if a new commit lands
+
+jobs:
+  deploy:
+    name: Build & Upload to TestFlight
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    env:
+      FLUTTER_VERSION: "3.32.0"   # pin to the version you develop with
+
+    steps:
+      # ── Source ───────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Flutter ──────────────────────────────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Install pub dependencies
+        run: flutter pub get
+
+      # ── iOS prebuild ──────────────────────────────────────────────────────────
+      - name: Build Flutter iOS (unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Install CocoaPods dependencies
+        run: pod install --project-directory=ios --repo-update
+
+      # ── Ruby / Fastlane ───────────────────────────────────────────────────────
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true   # runs `bundle install` and caches gems automatically
+
+      # ── Fastlane ─────────────────────────────────────────────────────────────
+      - name: Run Fastlane beta lane
+        env:
+          APP_STORE_CONNECT_API_KEY_ID:        ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT:   ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          MATCH_PASSWORD:                      ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL:                       ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION:       ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+        run: bundle exec fastlane beta

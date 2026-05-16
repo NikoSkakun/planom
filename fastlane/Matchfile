@@ -1,0 +1,10 @@
+git_url(ENV["MATCH_GIT_URL"])
+
+storage_mode("git")
+type("appstore")
+
+app_identifier(["YOUR_BUNDLE_ID"])
+username("YOUR_APPLE_ID")
+
+# Readonly in CI — certs are managed locally via `fastlane match appstore`
+readonly(true) if ENV["CI"]
