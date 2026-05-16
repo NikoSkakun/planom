@@ -148,6 +148,16 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.settingsController,
+      builder: (context, _) {
+        final hideLabels = widget.settingsController.hideTabLabels;
+        return _buildScaffold(context, hideLabels);
+      },
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, bool hideLabels) {
     return Stack(
       children: [
         CupertinoTabScaffold(
@@ -160,73 +170,73 @@ class _HomeShellState extends State<HomeShell> {
               darkColor: Color(0xF01D1D1D),
             ),
             onTap: _onTabTapped,
-            items: const [
+            items: [
               BottomNavigationBarItem(
-                icon: Padding(
+                icon: const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: ImageIcon(
                       AssetImage('assets/icons/tab_bar/tasks.png')),
                 ),
-                activeIcon: Padding(
+                activeIcon: const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: ImageIcon(
                     AssetImage('assets/icons/tab_bar/tasks.png'),
                     color: Color(0xFFFF4D00),
                   ),
                 ),
-                label: 'Tasks',
+                label: hideLabels ? null : 'Tasks',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
+                icon: const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: ImageIcon(
                       AssetImage('assets/icons/tab_bar/notes.png')),
                 ),
-                activeIcon: Padding(
+                activeIcon: const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: ImageIcon(
                     AssetImage('assets/icons/tab_bar/notes.png'),
                     color: Color(0xFFFF4D00),
                   ),
                 ),
-                label: 'Notes',
+                label: hideLabels ? null : 'Notes',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
+                icon: const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: ImageIcon(
                       AssetImage('assets/icons/tab_bar/calendar.png')),
                 ),
-                activeIcon: Padding(
+                activeIcon: const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: ImageIcon(
                     AssetImage('assets/icons/tab_bar/calendar.png'),
                     color: Color(0xFFFF4D00),
                   ),
                 ),
-                label: 'Calendar',
+                label: hideLabels ? null : 'Calendar',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
+                icon: const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: ImageIcon(
                       AssetImage('assets/icons/tab_bar/routines.png')),
                 ),
-                activeIcon: Padding(
+                activeIcon: const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: ImageIcon(
                     AssetImage('assets/icons/tab_bar/routines.png'),
                     color: Color(0xFFFF4D00),
                   ),
                 ),
-                label: 'Routines',
+                label: hideLabels ? null : 'Routines',
               ),
               BottomNavigationBarItem(
-                icon: Padding(
+                icon: const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Icon(CupertinoIcons.gear_alt, size: 24),
                 ),
-                activeIcon: Padding(
+                activeIcon: const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Icon(
                     CupertinoIcons.gear_alt_fill,
@@ -234,7 +244,7 @@ class _HomeShellState extends State<HomeShell> {
                     color: Color(0xFFFF4D00),
                   ),
                 ),
-                label: 'Settings',
+                label: hideLabels ? null : 'Settings',
               ),
             ],
           ),

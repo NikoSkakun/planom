@@ -293,6 +293,26 @@ class _SettingsViewState extends State<SettingsView> {
               },
             ),
 
+            // ── Tab Bar ─────────────────────────────────────────────
+            const SizedBox(height: 32),
+            Text(
+              'Tab Bar',
+              style: TextStyle(
+                fontSize: 13,
+                color: labelColor,
+                letterSpacing: -0.08,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListenableBuilder(
+              listenable: widget.controller,
+              builder: (ctx, _) => _ToggleRow(
+                label: 'Hide Labels',
+                value: widget.controller.hideTabLabels,
+                onChanged: widget.controller.updateHideTabLabels,
+              ),
+            ),
+
             if (hasBackup) ...[
               const SizedBox(height: 32),
 
@@ -406,6 +426,51 @@ class _SmartListRow extends StatelessWidget {
       case SmartListVisibility.hidden:
         return 'Hidden';
     }
+  }
+}
+
+class _ToggleRow extends StatelessWidget {
+  const _ToggleRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = CupertinoDynamicColor.resolve(
+      CupertinoColors.tertiarySystemBackground,
+      context,
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 17,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
+            ),
+          ),
+          CupertinoSwitch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: const Color(0xFFFF4D00),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -13,6 +13,7 @@ class SettingsController with ChangeNotifier {
 
   SmartListPrefs _smartListPrefs = SmartListPrefs();
   SmartListPrefs get smartListPrefs => _smartListPrefs;
+  bool get hideTabLabels => _smartListPrefs.hideTabLabels;
 
   Future<void> loadSettings() async {
     _themeMode = await _settingsService.themeMode();
@@ -26,6 +27,12 @@ class SettingsController with ChangeNotifier {
     _themeMode = newThemeMode;
     notifyListeners();
     await _settingsService.updateThemeMode(newThemeMode);
+  }
+
+  Future<void> updateHideTabLabels(bool value) async {
+    _smartListPrefs.hideTabLabels = value;
+    notifyListeners();
+    await _smartListPrefs.save();
   }
 
   Future<void> updateSmartListVisibility(

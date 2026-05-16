@@ -10,12 +10,14 @@ class SmartListPrefs {
   SmartListVisibility upcoming;
   SmartListVisibility completed;
   SmartListVisibility trash;
+  bool hideTabLabels;
 
   SmartListPrefs({
     this.today = SmartListVisibility.show,
     this.upcoming = SmartListVisibility.show,
     this.completed = SmartListVisibility.showIfNotEmpty,
     this.trash = SmartListVisibility.showIfNotEmpty,
+    this.hideTabLabels = false,
   });
 
   static Future<File> _file() async {
@@ -34,6 +36,7 @@ class SmartListPrefs {
         upcoming: _parse(data['upcoming']),
         completed: _parse(data['completed']),
         trash: _parse(data['trash']),
+        hideTabLabels: data['hideTabLabels'] == true,
       );
     } catch (_) {
       return SmartListPrefs();
@@ -47,6 +50,7 @@ class SmartListPrefs {
       'upcoming': _encode(upcoming),
       'completed': _encode(completed),
       'trash': _encode(trash),
+      'hideTabLabels': hideTabLabels,
     }));
   }
 
