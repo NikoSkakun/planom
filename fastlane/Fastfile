@@ -42,7 +42,7 @@ platform :ios do
       type:              "appstore",
       app_identifier:    "app.planom",
       git_url:           "https://x-access-token:#{ENV['MATCH_GITHUB_TOKEN']}@github.com/nikoskakun/ios-certificates",
-      readonly:          is_ci,
+
       api_key:           api_key,
       keychain_name:     "ci_build.keychain",
       keychain_password: "ci_temp_pass",
