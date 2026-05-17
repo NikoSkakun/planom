@@ -328,6 +328,14 @@ class _SettingsViewState extends State<SettingsView> {
                     ),
                     const SizedBox(height: 1),
                     _ToggleRow(
+                      label: 'Tasks',
+                      value: widget.controller.isTabVisible(0),
+                      enabled: !isDisabled(0),
+                      onChanged: (v) =>
+                          widget.controller.setTabVisible(0, v),
+                    ),
+                    const SizedBox(height: 1),
+                    _ToggleRow(
                       label: 'Notes',
                       value: widget.controller.isTabVisible(1),
                       enabled: !isDisabled(1),
