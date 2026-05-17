@@ -1,9 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show ThemeMode;
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'folders/folder_controller.dart';
+import 'localization/app_localizations.dart';
 import 'home_shell.dart';
 import 'notes/note_controller.dart';
 import 'routines/routine_controller.dart';
