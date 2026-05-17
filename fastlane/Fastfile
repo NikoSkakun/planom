@@ -41,8 +41,26 @@ platform :ios do
       output_path: Dir.tmpdir,
     )
 
-    # -allowProvisioningUpdates lets xcodebuild automatically register
-    # the provisioning profile using the App Store Connect API key.
+    # Register the App ID in the Developer Portal and create the ASC record
+    # if they don't already exist. No-op if already set up.
+    produce(
+      api_key:        api_key,
+      app_identifier: "app.planom",
+      app_name:       "Planom",
+      language:       "English",
+      skip_itc:       false,
+    )
+
+    # Fetch or create the App Store distribution provisioning profile.
+    sigh(
+      api_key:           api_key,
+      app_identifier:    "app.planom",
+      provisioning_name: "Planom App Store",
+      force:             true,
+      output_path:       Dir.tmpdir,
+    )
+
+    # -allowProvisioningUpdates lets xcodebuild pick up the profile created above.
     build_app(
       workspace:      "ios/Runner.xcworkspace",
       scheme:         "Runner",
