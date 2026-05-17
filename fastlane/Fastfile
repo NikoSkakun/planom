@@ -102,23 +102,6 @@ platform :ios do
       silent:           is_ci,
     )
 
-    # Create the App Store Connect app record if it doesn't exist yet.
-    # BundleId.create above only registers the bundle ID in the Developer Portal;
-    # upload_to_testflight requires a full ASC app record.
-    begin
-      Spaceship::ConnectAPI::App.create(
-        name:           "Planom",
-        version_string: "1.0",
-        sku:            "app-planom-001",
-        primary_locale: "en-US",
-        bundle_id:      "app.planom",
-        platforms:      ["IOS"],
-      )
-      UI.message("Created App Store Connect app record for app.planom")
-    rescue => e
-      UI.message("App Store Connect app record already exists (#{e.message})")
-    end
-
     upload_to_testflight(
       api_key:                           api_key,
       ipa:                               "build/ios/ipa/Planom.ipa",
