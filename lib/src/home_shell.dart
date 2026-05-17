@@ -51,10 +51,13 @@ class _HomeShellState extends State<HomeShell> {
   final _calendarResetSignal = ValueNotifier<int>(0);
   final _showPlusButton = ValueNotifier<bool>(true);
   int _lastTabIndex = 0;
+  late CupertinoTabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = CupertinoTabController();
+    widget.settingsController.addListener(_onSettingsChanged);
     _depthObservers = [
       // Tasks tab: show + unless TaskDetailView is on the stack.
       _DepthObserver(
@@ -94,6 +97,8 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    widget.settingsController.removeListener(_onSettingsChanged);
+    _tabController.dispose();
     _activeListId.dispose();
     _activeDueDate.dispose();
     _tasksCollapseSignal.dispose();
@@ -101,6 +106,18 @@ class _HomeShellState extends State<HomeShell> {
     _calendarResetSignal.dispose();
     _showPlusButton.dispose();
     super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    if (!mounted) return;
+    final visibleIndices = _computeVisibleIndices();
+    if (!visibleIndices.contains(_lastTabIndex)) {
+      _lastTabIndex = 0;
+      _tabController.index = 0;
+      _showPlusButton.value = _depthObservers[0].trackedCount == 0;
+    } else {
+      _tabController.index = visibleIndices.indexOf(_lastTabIndex);
+    }
   }
 
   void _onPlusPressed() {
@@ -147,13 +164,14 @@ class _HomeShellState extends State<HomeShell> {
 
   List<int> _computeVisibleIndices() {
     final sc = widget.settingsController;
-    return [
-      0,
+    final indices = [
+      if (sc.isTabVisible(0)) 0,
       if (sc.isTabVisible(1)) 1,
       if (sc.isTabVisible(2)) 2,
       if (sc.isTabVisible(3)) 3,
       if (sc.isTabVisible(4)) 4,
     ];
+    return indices.isEmpty ? [0] : indices;
   }
 
   BottomNavigationBarItem _tabItem(int logicalIdx, bool hideLabels) {
@@ -283,20 +301,10 @@ class _HomeShellState extends State<HomeShell> {
         final hideLabels = widget.settingsController.hideTabLabels;
         final visibleIndices = _computeVisibleIndices();
 
-        if (!visibleIndices.contains(_lastTabIndex)) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              _lastTabIndex = 0;
-              _showPlusButton.value =
-                  _depthObservers[0].trackedCount == 0;
-            }
-          });
-        }
-
         return Stack(
           children: [
             CupertinoTabScaffold(
-              key: ValueKey(visibleIndices.join(',')),
+              controller: _tabController,
               tabBar: CupertinoTabBar(
                 activeColor: const Color(0xFF000000),
                 inactiveColor: const Color(0xFF636366),
