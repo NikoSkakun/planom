@@ -49,7 +49,6 @@ platform :ios do
 
     # Revoke all existing iOS Distribution certificates via the ASC API so
     # cert can always create a fresh one without hitting the 2-cert limit.
-    # app_store_connect_api_key above already configured Spaceship's auth.
     existing = Spaceship::ConnectAPI::Certificate.all(
       filter: { certificateType: "IOS_DISTRIBUTION" },
     )
@@ -102,23 +101,6 @@ platform :ios do
       buildlog_path:    "build/ios/logs",
       silent:           is_ci,
     )
-
-    # Create the App Store Connect app record if it doesn't exist yet.
-    # BundleId.create above only registers the bundle ID in the Developer Portal;
-    # upload_to_testflight requires a full ASC app record.
-    begin
-      Spaceship::ConnectAPI::App.create(
-        name:           "Planom",
-        version_string: "1.0",
-        sku:            "app-planom-001",
-        primary_locale: "en-US",
-        bundle_id:      "app.planom",
-        platforms:      ["IOS"],
-      )
-      UI.message("Created App Store Connect app record for app.planom")
-    rescue => e
-      UI.message("App Store Connect app record already exists (#{e.message})")
-    end
 
     upload_to_testflight(
       api_key:                           api_key,

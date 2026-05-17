@@ -1,5 +1,1 @@
-app_identifier("YOUR_BUNDLE_ID")   # e.g. "com.yourcompany.planom"
-apple_id("YOUR_APPLE_ID")          # e.g. "you@example.com"
-
-itc_team_id("YOUR_ITC_TEAM_ID")    # App Store Connect team ID (numeric)
-team_id("YOUR_DEV_TEAM_ID")        # Developer Portal team ID (10-char alphanumeric)
+app_identifier("app.planom")
