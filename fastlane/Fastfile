@@ -24,7 +24,7 @@ platform :ios do
     # Write the key to a temp file so xcodebuild -authenticationKeyPath works.
     require "tmpdir"
     key_path = File.join(Dir.tmpdir, "AuthKey_#{api_key[:key_id]}.p8")
-    File.write(key_path, api_key[:key_content])
+    File.write(key_path, api_key[:key])
 
     # Bump the build number to the current timestamp (YYYYMMDDHHmmSS) so every
     # CI run produces a unique, monotonically increasing build number without
