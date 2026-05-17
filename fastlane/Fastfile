@@ -20,6 +20,12 @@ platform :ios do
   lane :beta do
     api_key = load_asc_api_key
 
+    # app_store_connect_api_key with key_content: does not populate filepath.
+    # Write the key to a temp file so xcodebuild -authenticationKeyPath works.
+    require "tmpdir"
+    key_path = File.join(Dir.tmpdir, "AuthKey_#{api_key[:key_id]}.p8")
+    File.write(key_path, api_key[:key_content])
+
     # Bump the build number to the current timestamp (YYYYMMDDHHmmSS) so every
     # CI run produces a unique, monotonically increasing build number without
     # requiring a git commit.
@@ -38,7 +44,7 @@ platform :ios do
       configuration:  "Release",
       export_method:  "app-store",
       xcargs:         "-allowProvisioningUpdates" \
-                      " -authenticationKeyPath #{api_key[:filepath]}" \
+                      " -authenticationKeyPath #{key_path}" \
                       " -authenticationKeyID #{api_key[:key_id]}" \
                       " -authenticationKeyIssuerID #{api_key[:issuer_id]}",
       output_directory: "build/ios/ipa",
