@@ -35,16 +35,33 @@ platform :ios do
       xcodeproj:    "ios/Runner.xcodeproj",
     )
 
-    # Ensure an iOS Distribution certificate exists; cert creates one if absent.
+    # Create a temporary keychain with a known password so cert can import
+    # and reuse the distribution certificate without spawning a UI dialog,
+    # and so it finds an existing cert rather than creating a new one each run.
+    keychain_name     = "ci_build.keychain"
+    keychain_password = "ci_temp_pass"
+    create_keychain(
+      name:               keychain_name,
+      password:           keychain_password,
+      default_keychain:   true,
+      unlock:             true,
+      timeout:            3600,
+      add_to_search_list: true,
+    )
+
+    # Ensure an iOS Distribution certificate exists; reuses an existing one
+    # from the developer account rather than creating a new one every run.
     cert(
-      api_key:     api_key,
-      output_path: Dir.tmpdir,
+      api_key:           api_key,
+      keychain_path:     "~/Library/Keychains/#{keychain_name}-db",
+      keychain_password: keychain_password,
+      output_path:       Dir.tmpdir,
     )
 
     # Register the App ID in the Developer Portal and create the ASC record
     # if they don't already exist. No-op if already set up.
+    # produce uses the api_key loaded by app_store_connect_api_key above.
     produce(
-      api_key:        api_key,
       app_identifier: "app.planom",
       app_name:       "Planom",
       language:       "English",
