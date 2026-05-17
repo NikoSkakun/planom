@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 
 import '../theme/app_theme.dart';
+import '../utils/fast_route.dart';
 import 'backup_service.dart';
 import 'settings_controller.dart';
 import 'smart_list_prefs.dart';
@@ -293,10 +294,10 @@ class _SettingsViewState extends State<SettingsView> {
               },
             ),
 
-            // ── Tab Bar ─────────────────────────────────────────────
+            // ── Tab Bar ─────────────────────────────────────────────────
             const SizedBox(height: 32),
             Text(
-              'Tab Bar',
+              'Customization',
               style: TextStyle(
                 fontSize: 13,
                 color: labelColor,
@@ -304,85 +305,15 @@ class _SettingsViewState extends State<SettingsView> {
               ),
             ),
             const SizedBox(height: 8),
-            ListenableBuilder(
-              listenable: widget.controller,
-              builder: (ctx, _) {
-                final visibleCount =
-                    widget.controller.visibleOptionalTabCount;
-                final settingsVisible =
-                    widget.controller.isTabVisible(4);
-
-                bool isDisabled(int tabIndex) {
-                  // Only one optional tab left and it's this one — gray out.
-                  return visibleCount == 1 &&
-                      widget.controller.isTabVisible(tabIndex);
-                }
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _ToggleRow(
-                      label: 'Hide Labels',
-                      value: widget.controller.hideTabLabels,
-                      onChanged: widget.controller.updateHideTabLabels,
-                    ),
-                    const SizedBox(height: 1),
-                    _ToggleRow(
-                      label: 'Tasks',
-                      value: widget.controller.isTabVisible(0),
-                      enabled: !isDisabled(0),
-                      onChanged: (v) =>
-                          widget.controller.setTabVisible(0, v),
-                    ),
-                    const SizedBox(height: 1),
-                    _ToggleRow(
-                      label: 'Notes',
-                      value: widget.controller.isTabVisible(1),
-                      enabled: !isDisabled(1),
-                      onChanged: (v) =>
-                          widget.controller.setTabVisible(1, v),
-                    ),
-                    const SizedBox(height: 1),
-                    _ToggleRow(
-                      label: 'Calendar',
-                      value: widget.controller.isTabVisible(2),
-                      enabled: !isDisabled(2),
-                      onChanged: (v) =>
-                          widget.controller.setTabVisible(2, v),
-                    ),
-                    const SizedBox(height: 1),
-                    _ToggleRow(
-                      label: 'Routines',
-                      value: widget.controller.isTabVisible(3),
-                      enabled: !isDisabled(3),
-                      onChanged: (v) =>
-                          widget.controller.setTabVisible(3, v),
-                    ),
-                    const SizedBox(height: 1),
-                    _ToggleRow(
-                      label: 'Settings',
-                      value: settingsVisible,
-                      enabled: !isDisabled(4),
-                      onChanged: (v) =>
-                          widget.controller.setTabVisible(4, v),
-                    ),
-                    if (!settingsVisible) ...[
-                      const SizedBox(height: 8),
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          'Settings is accessible from the options menu (⋯) in every other tab.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: labelColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-              },
+            _NavRow(
+              label: 'Tab Bar',
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => TabBarSettingsView(
+                    controller: widget.controller,
+                  ),
+                ),
+              ),
             ),
 
             if (hasBackup) ...[
@@ -412,6 +343,158 @@ class _SettingsViewState extends State<SettingsView> {
                 onTap: _exporting || _importing ? null : _import,
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tab Bar settings sub-page ────────────────────────────────────────────────
+
+class TabBarSettingsView extends StatelessWidget {
+  const TabBarSettingsView({super.key, required this.controller});
+
+  final SettingsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelColor = CupertinoColors.secondaryLabel.resolveFrom(context);
+
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        border: null,
+        middle: Text('Tab Bar'),
+      ),
+      child: SafeArea(
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (ctx, _) {
+            final visibleCount = controller.visibleOptionalTabCount;
+            final settingsVisible = controller.isTabVisible(4);
+
+            bool isDisabled(int tabIndex) =>
+                visibleCount == 1 && controller.isTabVisible(tabIndex);
+
+            return ListView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              children: [
+                Text(
+                  'Display',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: labelColor,
+                    letterSpacing: -0.08,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _ToggleRow(
+                  label: 'Hide Labels',
+                  value: controller.hideTabLabels,
+                  onChanged: controller.updateHideTabLabels,
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'Visible Tabs',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: labelColor,
+                    letterSpacing: -0.08,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _ToggleRow(
+                  label: 'Tasks',
+                  value: controller.isTabVisible(0),
+                  enabled: !isDisabled(0),
+                  onChanged: (v) => controller.setTabVisible(0, v),
+                ),
+                const SizedBox(height: 1),
+                _ToggleRow(
+                  label: 'Notes',
+                  value: controller.isTabVisible(1),
+                  enabled: !isDisabled(1),
+                  onChanged: (v) => controller.setTabVisible(1, v),
+                ),
+                const SizedBox(height: 1),
+                _ToggleRow(
+                  label: 'Calendar',
+                  value: controller.isTabVisible(2),
+                  enabled: !isDisabled(2),
+                  onChanged: (v) => controller.setTabVisible(2, v),
+                ),
+                const SizedBox(height: 1),
+                _ToggleRow(
+                  label: 'Routines',
+                  value: controller.isTabVisible(3),
+                  enabled: !isDisabled(3),
+                  onChanged: (v) => controller.setTabVisible(3, v),
+                ),
+                const SizedBox(height: 1),
+                _ToggleRow(
+                  label: 'Settings',
+                  value: settingsVisible,
+                  enabled: !isDisabled(4),
+                  onChanged: (v) => controller.setTabVisible(4, v),
+                ),
+                if (!settingsVisible) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      'Settings is accessible from the options menu (⋯) in every other tab.',
+                      style: TextStyle(fontSize: 13, color: labelColor),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shared row widgets ────────────────────────────────────────────────────────
+
+class _NavRow extends StatelessWidget {
+  const _NavRow({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = CupertinoDynamicColor.resolve(
+      CupertinoColors.tertiarySystemBackground,
+      context,
+    );
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 17,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
+              ),
+            ),
+            Icon(
+              CupertinoIcons.chevron_right,
+              size: 16,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
           ],
         ),
       ),
@@ -523,30 +606,30 @@ class _ToggleRow extends StatelessWidget {
     return Opacity(
       opacity: enabled ? 1.0 : 0.4,
       child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 17,
-                color: CupertinoColors.label.resolveFrom(context),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 17,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
               ),
             ),
-          ),
-          CupertinoSwitch(
-            value: value,
-            onChanged: enabled ? onChanged : null,
-            activeColor: AppColors.accent,
-          ),
-        ],
+            CupertinoSwitch(
+              value: value,
+              onChanged: enabled ? onChanged : null,
+              activeColor: AppColors.accent,
+            ),
+          ],
+        ),
       ),
-    ),
     );
   }
 }
