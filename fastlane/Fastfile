@@ -41,7 +41,7 @@ platform :ios do
     match(
       type:               "appstore",
       app_identifier:     "app.planom",
-      git_url:            ENV["MATCH_REPOSITORY"],
+      git_url:            ENV["MATCH_REPOSITORY"].gsub(/[<>\s]/, ""),
       git_basic_authorization: Base64.strict_encode64(
         "#{ENV['MATCH_GITHUB_USER']}:#{ENV['MATCH_GITHUB_TOKEN']}"
       ),
