@@ -35,6 +35,15 @@ platform :ios do
       xcodeproj:    "ios/Runner.xcodeproj",
     )
 
+    create_keychain(
+      name:               "ci_build.keychain",
+      password:           "ci_temp_pass",
+      default_keychain:   true,
+      unlock:             true,
+      timeout:            3600,
+      add_to_search_list: true,
+    )
+
     # Fetch (or create on first run) the distribution certificate and
     # provisioning profile from the private certificates repo.
     # Match stores them encrypted; MATCH_PASSWORD is the decryption key.
