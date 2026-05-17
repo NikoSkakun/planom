@@ -35,9 +35,7 @@ platform :ios do
       xcodeproj:    "ios/Runner.xcodeproj",
     )
 
-    # Set up a temporary keychain, then fetch or create the iOS Distribution
-    # certificate. force: true revokes the oldest cert when the 2-cert Apple
-    # limit is reached, so CI is always self-managing with no manual cleanup.
+    # Set up a temporary keychain for certificate import.
     keychain_name     = "ci_build.keychain"
     keychain_password = "ci_temp_pass"
     create_keychain(
@@ -49,11 +47,21 @@ platform :ios do
       add_to_search_list: true,
     )
 
+    # Revoke all existing iOS Distribution certificates via the ASC API so
+    # cert can always create a fresh one without hitting the 2-cert limit.
+    # app_store_connect_api_key above already configured Spaceship's auth.
+    existing = Spaceship::ConnectAPI::Certificate.all(
+      filter: { certificateType: "IOS_DISTRIBUTION" },
+    )
+    existing.each do |c|
+      UI.message("Revoking distribution certificate #{c.id}...")
+      c.delete!
+    end
+
     cert(
       api_key:           api_key,
       keychain_path:     "~/Library/Keychains/#{keychain_name}-db",
       keychain_password: keychain_password,
-      force:             true,
       output_path:       Dir.tmpdir,
     )
 
