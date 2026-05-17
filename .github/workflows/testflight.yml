@@ -12,7 +12,7 @@ concurrency:
 jobs:
   deploy:
     name: Build & Upload to TestFlight
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 60
 
     env:
@@ -42,6 +42,10 @@ jobs:
 
       - name: Install pub dependencies
         run: flutter pub get
+
+      # ── Xcode ────────────────────────────────────────────────────────────────
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.0.app
 
       # ── iOS prebuild ──────────────────────────────────────────────────────────
       - name: Build Flutter iOS (unsigned)
