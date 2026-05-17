@@ -35,9 +35,10 @@ platform :ios do
       xcodeproj:    "ios/Runner.xcodeproj",
     )
 
-    # Create a temporary keychain with a known password so cert can import
-    # and reuse the distribution certificate without spawning a UI dialog,
-    # and so it finds an existing cert rather than creating a new one each run.
+    # Set up a temporary keychain and import the distribution certificate
+    # from the DIST_CERT_P12_B64 secret (base64-encoded .p12 file).
+    # This avoids using cert/get_certificates, which creates a new Apple
+    # certificate on every run and hits the 2-cert limit within 2 runs.
     keychain_name     = "ci_build.keychain"
     keychain_password = "ci_temp_pass"
     create_keychain(
@@ -49,13 +50,14 @@ platform :ios do
       add_to_search_list: true,
     )
 
-    # Ensure an iOS Distribution certificate exists; reuses an existing one
-    # from the developer account rather than creating a new one every run.
-    cert(
-      api_key:           api_key,
-      keychain_path:     "~/Library/Keychains/#{keychain_name}-db",
-      keychain_password: keychain_password,
-      output_path:       Dir.tmpdir,
+    require "base64"
+    p12_path = File.join(Dir.tmpdir, "distribution.p12")
+    File.open(p12_path, "wb") { |f| f.write(Base64.decode64(ENV["DIST_CERT_P12_B64"])) }
+    import_certificate(
+      certificate_path:     p12_path,
+      certificate_password: ENV.fetch("DIST_CERT_PASSWORD", ""),
+      keychain_name:        keychain_name,
+      keychain_password:    keychain_password,
     )
 
     # Register the App ID in the Developer Portal and create the ASC record
