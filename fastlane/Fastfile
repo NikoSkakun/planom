@@ -35,9 +35,14 @@ platform :ios do
       xcodeproj:    "ios/Runner.xcodeproj",
     )
 
-    # -allowProvisioningUpdates lets xcodebuild automatically download or
-    # create the distribution certificate and provisioning profile using the
-    # App Store Connect API key. No separate cert/sigh step needed.
+    # Ensure an iOS Distribution certificate exists; cert creates one if absent.
+    cert(
+      api_key:     api_key,
+      output_path: Dir.tmpdir,
+    )
+
+    # -allowProvisioningUpdates lets xcodebuild automatically register
+    # the provisioning profile using the App Store Connect API key.
     build_app(
       workspace:      "ios/Runner.xcworkspace",
       scheme:         "Runner",
