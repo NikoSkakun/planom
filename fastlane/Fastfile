@@ -65,15 +65,18 @@ platform :ios do
       output_path:       Dir.tmpdir,
     )
 
-    # Register the App ID in the Developer Portal and create the ASC record
-    # if they don't already exist. No-op if already set up.
-    # produce uses the api_key loaded by app_store_connect_api_key above.
-    produce(
-      app_identifier: "app.planom",
-      app_name:       "Planom",
-      language:       "English",
-      skip_itc:       false,
-    )
+    # Register the App ID via the ASC Connect API (uses the api_key already
+    # configured above — no Apple ID password required, unlike produce).
+    begin
+      Spaceship::ConnectAPI::BundleId.create(
+        name:      "Planom",
+        identifier: "app.planom",
+        platform:   "IOS",
+      )
+      UI.message("Registered App ID app.planom")
+    rescue => e
+      UI.message("App ID app.planom already exists (#{e.message})")
+    end
 
     # Fetch or create the App Store distribution provisioning profile.
     sigh(
