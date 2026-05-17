@@ -39,16 +39,13 @@ platform :ios do
     # provisioning profile from the private certificates repo.
     # Match stores them encrypted; MATCH_PASSWORD is the decryption key.
     match(
-      type:               "appstore",
-      app_identifier:     "app.planom",
-      git_url:            ENV["MATCH_REPOSITORY"].gsub(/[<>\s]/, ""),
-      git_basic_authorization: Base64.strict_encode64(
-        "#{ENV['MATCH_GITHUB_USER']}:#{ENV['MATCH_GITHUB_TOKEN']}"
-      ),
-      readonly:           is_ci,
-      api_key:            api_key,
-      keychain_name:      "ci_build.keychain",
-      keychain_password:  "ci_temp_pass",
+      type:              "appstore",
+      app_identifier:    "app.planom",
+      git_url:           "https://x-access-token:#{ENV['MATCH_GITHUB_TOKEN']}@github.com/nikoskakun/ios-certificates",
+      readonly:          is_ci,
+      api_key:           api_key,
+      keychain_name:     "ci_build.keychain",
+      keychain_password: "ci_temp_pass",
     )
 
     build_app(
