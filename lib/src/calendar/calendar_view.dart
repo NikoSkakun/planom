@@ -111,7 +111,7 @@ class _CalendarViewState extends State<CalendarView> {
       final maxExtent = _scrollCtrl.position.maxScrollExtent;
       final minExtent = _scrollCtrl.position.minScrollExtent;
       final clamped = target.clamp(minExtent, maxExtent);
-      await _scrollCtrl.animateTo(
+      _scrollCtrl.animateTo(
         clamped,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
