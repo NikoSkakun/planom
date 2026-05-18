@@ -16,14 +16,14 @@ import 'event_detail_view.dart';
 
 /// Modal day view: a vertical timeline showing tasks and events for [date].
 /// Untimed items are listed at the top; timed items are placed at their time.
-void showDayViewSheet(
+Future<void> showDayViewSheet(
   BuildContext context, {
   required DateTime date,
   required TaskController taskController,
   required EventController eventController,
   required FolderController folderController,
 }) {
-  showModalBottomSheet<void>(
+  return showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
