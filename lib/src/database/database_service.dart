@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
+import '../models/event.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 import '../models/routine.dart';
@@ -11,7 +12,7 @@ import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 14;
+  static const _dbVersion = 15;
 
   Database? _db;
 
@@ -120,6 +121,20 @@ class DatabaseService {
           CREATE TABLE app_settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE events (
+            id TEXT PRIMARY KEY,
+            creationDate INTEGER NOT NULL,
+            iconId TEXT NOT NULL,
+            title TEXT NOT NULL,
+            note TEXT,
+            date INTEGER NOT NULL,
+            doTime INTEGER,
+            duration INTEGER,
+            isDeleted INTEGER NOT NULL DEFAULT 0,
+            deletedDate INTEGER
           )
         ''');
       },
@@ -257,6 +272,22 @@ class DatabaseService {
             CREATE TABLE IF NOT EXISTS app_settings (
               key TEXT PRIMARY KEY,
               value TEXT NOT NULL
+            )
+          ''');
+        }
+        if (oldVersion < 15) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS events (
+              id TEXT PRIMARY KEY,
+              creationDate INTEGER NOT NULL,
+              iconId TEXT NOT NULL,
+              title TEXT NOT NULL,
+              note TEXT,
+              date INTEGER NOT NULL,
+              doTime INTEGER,
+              duration INTEGER,
+              isDeleted INTEGER NOT NULL DEFAULT 0,
+              deletedDate INTEGER
             )
           ''');
         }
@@ -670,6 +701,47 @@ class DatabaseService {
         where: 'id = ?', whereArgs: [entry.id]);
   }
 
+  // Events — calendar-only entity
+  Future<List<Event>> getEvents() async {
+    final db = await _database;
+    final rows = await db.query('events',
+        where: 'isDeleted = 0', orderBy: 'date ASC');
+    return rows.map(Event.fromMap).toList();
+  }
+
+  Future<void> insertEvent(Event event) async {
+    final db = await _database;
+    await db.insert('events', event.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateEvent(Event event) async {
+    final db = await _database;
+    await db.update('events', event.toMap(),
+        where: 'id = ?', whereArgs: [event.id]);
+  }
+
+  Future<void> permanentlyDeleteEvent(String id) async {
+    final db = await _database;
+    await db.delete('events', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> exportEvents() async {
+    final db = await _database;
+    final rows = await db.query('events');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<void> importEvents(List<Map<String, dynamic>> maps) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final m in maps) {
+      batch.insert('events', m,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
   Future<void> clearTrashedTasks() async {
     final db = await _database;
     await db.delete('tasks', where: 'isDeleted = 1');
@@ -762,6 +834,7 @@ class DatabaseService {
 
   Future<void> clearAllData() async {
     final db = await _database;
+    await db.delete('events');
     await db.delete('app_settings');
     await db.delete('routine_entries');
     await db.delete('routines');

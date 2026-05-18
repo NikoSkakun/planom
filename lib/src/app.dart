@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'calendar/event_controller.dart';
 import 'folders/folder_controller.dart';
 import 'localization/app_localizations.dart';
 import 'home_shell.dart';
@@ -20,6 +21,7 @@ class MyApp extends StatelessWidget {
     required this.folderController,
     required this.noteController,
     required this.routineController,
+    required this.eventController,
     required this.backupService,
   });
 
@@ -28,6 +30,7 @@ class MyApp extends StatelessWidget {
   final FolderController folderController;
   final NoteController noteController;
   final RoutineController routineController;
+  final EventController eventController;
   final BackupService backupService;
 
   @override
@@ -62,6 +65,7 @@ class MyApp extends StatelessWidget {
               folderController: folderController,
               noteController: noteController,
               routineController: routineController,
+              eventController: eventController,
               backupService: backupService,
             ),
           ),

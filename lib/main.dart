@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'src/app.dart';
+import 'src/calendar/event_controller.dart';
 import 'src/database/database_service.dart';
 import 'src/folders/folder_controller.dart';
 import 'src/folders/folder_icon_picker.dart';
@@ -37,12 +38,16 @@ void main() async {
   final routineController = RoutineController(db);
   await routineController.load();
 
+  final eventController = EventController(db);
+  await eventController.load();
+
   final backupService = BackupService(
     db: db,
     taskController: taskController,
     folderController: folderController,
     noteController: noteController,
     routineController: routineController,
+    eventController: eventController,
     settingsController: settingsController,
   );
 
@@ -52,6 +57,7 @@ void main() async {
     folderController: folderController,
     noteController: noteController,
     routineController: routineController,
+    eventController: eventController,
     backupService: backupService,
   ));
 }

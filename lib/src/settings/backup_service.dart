@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../calendar/event_controller.dart';
 import '../database/database_service.dart';
 import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
@@ -21,6 +22,7 @@ class BackupService {
     required this.folderController,
     required this.noteController,
     required this.routineController,
+    required this.eventController,
     required this.settingsController,
   });
 
@@ -29,6 +31,7 @@ class BackupService {
   final FolderController folderController;
   final NoteController noteController;
   final RoutineController routineController;
+  final EventController eventController;
   final SettingsController settingsController;
 
   Future<void> exportBackup() async {
@@ -57,6 +60,7 @@ class BackupService {
       'notes': await db.exportNotes(),
       'routines': await db.exportRoutines(),
       'routine_entries': await db.exportRoutineEntries(),
+      'events': await db.exportEvents(),
       'app_settings': await db.exportAppSettings(),
       // Smart-list visibility + hideTabLabels live in a JSON file in the docs
       // directory, not the DB, so we include their raw map here.
@@ -121,6 +125,7 @@ class BackupService {
     await db.importNotes(asMaps(data['notes']));
     await db.importRoutines(asMaps(data['routines']));
     await db.importRoutineEntries(asMaps(data['routine_entries']));
+    await db.importEvents(asMaps(data['events']));
     await db.importAppSettings(asMaps(data['app_settings']));
 
     // Smart-list prefs were added in a later format revision; ignore if absent.
@@ -133,6 +138,7 @@ class BackupService {
     await folderController.load();
     await noteController.load();
     await routineController.load();
+    await eventController.load();
     await settingsController.loadSettings();
 
     return true;

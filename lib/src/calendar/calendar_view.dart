@@ -3,28 +3,35 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_theme.dart';
 
 import '../folders/folder_controller.dart';
+import '../models/event.dart';
 import '../models/task.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_view.dart';
 import '../tasks/task_controller.dart';
 import '../utils/fast_route.dart';
+import 'day_view_sheet.dart';
+import 'event_controller.dart';
 
 class CalendarView extends StatefulWidget {
   const CalendarView({
     super.key,
     required this.controller,
     required this.folderController,
+    required this.eventController,
     required this.resetSignal,
     this.settingsController,
     this.backupService,
+    this.onDaySelected,
   });
 
   final TaskController controller;
   final FolderController folderController;
+  final EventController eventController;
   final ValueNotifier<int> resetSignal;
   final SettingsController? settingsController;
   final BackupService? backupService;
+  final ValueChanged<DateTime?>? onDaySelected;
 
   @override
   State<CalendarView> createState() => _CalendarViewState();
@@ -86,14 +93,58 @@ class _CalendarViewState extends State<CalendarView> {
     return DateTime(e ~/ 12, e % 12 + 1, 1);
   }
 
+  /// Scrolls so that the row containing [date] sits near the top of the
+  /// visible calendar area, then opens the day sheet.
+  Future<void> _openDay(DateTime date) async {
+    final monthsFromNow =
+        (date.year - _now.year) * 12 + (date.month - _now.month);
+    final firstWeekday =
+        DateTime(date.year, date.month, 1).weekday - 1; // 0..6
+    final weekIndex = (firstWeekday + date.day - 1) ~/ 7;
+
+    // Approximate: month header ~30px, each week row ~88px.
+    const headerPx = 30.0;
+    const weekPx = 88.0;
+    final target = monthsFromNow * _avgMonthPx + headerPx + weekIndex * weekPx;
+
+    if (_scrollCtrl.hasClients) {
+      final maxExtent = _scrollCtrl.position.maxScrollExtent;
+      final minExtent = _scrollCtrl.position.minScrollExtent;
+      final clamped = target.clamp(minExtent, maxExtent);
+      await _scrollCtrl.animateTo(
+        clamped,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+    if (!mounted) return;
+
+    widget.onDaySelected?.call(date);
+
+    await showDayViewSheet(
+      context,
+      date: date,
+      taskController: widget.controller,
+      eventController: widget.eventController,
+      folderController: widget.folderController,
+    );
+    if (!mounted) return;
+    widget.onDaySelected?.call(null);
+  }
+
   Widget _buildMonth(DateTime month) => ListenableBuilder(
-        listenable:
-            Listenable.merge([widget.controller, widget.folderController]),
+        listenable: Listenable.merge([
+          widget.controller,
+          widget.folderController,
+          widget.eventController,
+        ]),
         builder: (context, _) => _MonthSection(
           month: month,
           today: _now,
           controller: widget.controller,
           folderController: widget.folderController,
+          eventController: widget.eventController,
+          onDayTap: _openDay,
         ),
       );
 
@@ -199,12 +250,16 @@ class _MonthSection extends StatelessWidget {
     required this.today,
     required this.controller,
     required this.folderController,
+    required this.eventController,
+    required this.onDayTap,
   });
 
   final DateTime month;
   final DateTime today;
   final TaskController controller;
   final FolderController folderController;
+  final EventController eventController;
+  final ValueChanged<DateTime> onDayTap;
 
   static const _monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -247,6 +302,8 @@ class _MonthSection extends StatelessWidget {
             today: today,
             controller: controller,
             folderController: folderController,
+            eventController: eventController,
+            onDayTap: onDayTap,
           ),
       ],
     );
@@ -261,12 +318,16 @@ class _WeekRow extends StatelessWidget {
     required this.today,
     required this.controller,
     required this.folderController,
+    required this.eventController,
+    required this.onDayTap,
   });
 
   final List<DateTime?> days;
   final DateTime today;
   final TaskController controller;
   final FolderController folderController;
+  final EventController eventController;
+  final ValueChanged<DateTime> onDayTap;
 
   @override
   Widget build(BuildContext context) {
@@ -280,6 +341,8 @@ class _WeekRow extends StatelessWidget {
                     today: today,
                     controller: controller,
                     folderController: folderController,
+                    eventController: eventController,
+                    onTap: day == null ? null : () => onDayTap(day),
                   ),
                 ))
             .toList(),
@@ -296,12 +359,16 @@ class _DayCell extends StatelessWidget {
     required this.today,
     required this.controller,
     required this.folderController,
+    required this.eventController,
+    required this.onTap,
   });
 
   final DateTime? date;
   final DateTime today;
   final TaskController controller;
   final FolderController folderController;
+  final EventController eventController;
+  final VoidCallback? onTap;
 
   bool get _isToday =>
       date != null &&
@@ -328,75 +395,106 @@ class _DayCell extends StatelessWidget {
     final allTasks = controller.tasksForDate(date!);
     final uncompleted = allTasks.where((t) => !t.isCompleted).toList();
     final completed = allTasks.where((t) => t.isCompleted).toList();
-    final tasks = [...uncompleted, ...completed];
+    final events = eventController.eventsForDate(date!);
 
-    return Container(
-      constraints: const BoxConstraints(minHeight: 88),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: CupertinoColors.separator.resolveFrom(context),
-            width: 0.5,
+    // Order: events first, then incomplete tasks, then completed tasks.
+    final chips = <_ChipData>[
+      for (final e in events) _ChipData.event(e),
+      for (final t in uncompleted) _ChipData.task(t, false),
+      for (final t in completed) _ChipData.task(t, true),
+    ];
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 88),
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: CupertinoColors.separator.resolveFrom(context),
+              width: 0.5,
+            ),
           ),
         ),
-      ),
-      padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-              width: 26,
-              height: 26,
-              decoration: _isToday
-                  ? const BoxDecoration(
-                      color: AppColors.accent,
-                      shape: BoxShape.circle,
-                    )
-                  : null,
-              child: Center(
-                child: Text(
-                  '${date!.day}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight:
-                        _isToday ? FontWeight.w700 : FontWeight.normal,
-                    color: _isToday
-                        ? CupertinoColors.white
-                        : CupertinoColors.label.resolveFrom(context),
+        padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                width: 26,
+                height: 26,
+                decoration: _isToday
+                    ? const BoxDecoration(
+                        color: AppColors.accent,
+                        shape: BoxShape.circle,
+                      )
+                    : null,
+                child: Center(
+                  child: Text(
+                    '${date!.day}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                          _isToday ? FontWeight.w700 : FontWeight.normal,
+                      color: _isToday
+                          ? CupertinoColors.white
+                          : CupertinoColors.label.resolveFrom(context),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 2),
-          ...tasks.take(3).map((t) {
-            final listColor = t.listId != null
-                ? folderController.listById(t.listId!)?.color
-                : null;
-            return _TaskChip(
-              task: t,
-              completed: t.isCompleted,
-              listColor: listColor != null ? Color(listColor) : null,
-            );
-          }),
-          if (tasks.length > 3)
-            Padding(
-              padding: const EdgeInsets.only(left: 2),
-              child: Text(
-                '+${tasks.length - 3}',
-                style: TextStyle(
-                  fontSize: 9,
-                  color:
-                      CupertinoColors.secondaryLabel.resolveFrom(context),
+            const SizedBox(height: 2),
+            ...chips.take(3).map((c) {
+              if (c.isEvent) {
+                return _EventChip(title: c.event!.title);
+              }
+              final listColor = c.task!.listId != null
+                  ? folderController.listById(c.task!.listId!)?.color
+                  : null;
+              return _TaskChip(
+                task: c.task!,
+                completed: c.completed,
+                listColor: listColor != null ? Color(listColor) : null,
+              );
+            }),
+            if (chips.length > 3)
+              Padding(
+                padding: const EdgeInsets.only(left: 2),
+                child: Text(
+                  '+${chips.length - 3}',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color:
+                        CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+class _ChipData {
+  _ChipData.task(Task t, bool c)
+      : task = t,
+        event = null,
+        completed = c;
+  _ChipData.event(Event e)
+      : task = null,
+        event = e,
+        completed = false;
+
+  final Task? task;
+  final Event? event;
+  final bool completed;
+
+  bool get isEvent => event != null;
 }
 
 // ─── Task chip ────────────────────────────────────────────────────────────────
@@ -435,6 +533,31 @@ class _TaskChip extends StatelessWidget {
               ? CupertinoColors.secondaryLabel.resolveFrom(context)
               : CupertinoColors.white,
         ),
+      ),
+    );
+  }
+}
+
+class _EventChip extends StatelessWidget {
+  const _EventChip({required this.title});
+  final String title;
+
+  static const _color = Color(0xFF0A84FF);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      decoration: BoxDecoration(
+        color: _color,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 9, color: CupertinoColors.white),
       ),
     );
   }

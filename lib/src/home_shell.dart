@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 
 import 'calendar/calendar_view.dart';
+import 'calendar/event_controller.dart';
+import 'calendar/event_creation_sheet.dart';
 import 'folders/folder_controller.dart';
 import 'notes/note_controller.dart';
 import 'notes/notes_view.dart';
@@ -24,6 +26,7 @@ class HomeShell extends StatefulWidget {
     required this.folderController,
     required this.noteController,
     required this.routineController,
+    required this.eventController,
     required this.backupService,
   });
 
@@ -34,6 +37,7 @@ class HomeShell extends StatefulWidget {
   final FolderController folderController;
   final NoteController noteController;
   final RoutineController routineController;
+  final EventController eventController;
   final BackupService backupService;
 
   @override
@@ -130,15 +134,61 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ),
       );
-    } else {
-      showTaskCreationSheet(
-        context,
-        widget.taskController,
-        widget.folderController,
-        initialListId: _activeListId.value,
-        initialDueDate: _activeDueDate.value,
-      );
+      return;
     }
+
+    // On Calendar tab with a selected day: choose Task vs Event.
+    if (_lastTabIndex == 2 && _activeDueDate.value != null) {
+      _showCalendarItemPicker(_activeDueDate.value!);
+      return;
+    }
+
+    showTaskCreationSheet(
+      context,
+      widget.taskController,
+      widget.folderController,
+      initialListId: _activeListId.value,
+      initialDueDate: _activeDueDate.value,
+    );
+  }
+
+  void _showCalendarItemPicker(DateTime date) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('Add to Calendar'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              showTaskCreationSheet(
+                context,
+                widget.taskController,
+                widget.folderController,
+                initialDueDate: date,
+              );
+            },
+            child: const Text('Task'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              showEventCreationSheet(
+                context,
+                widget.eventController,
+                initialDate: date,
+              );
+            },
+            child: const Text('Event'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
   }
 
   void _onTabTapped(int tappedIndex) {
@@ -277,9 +327,11 @@ class _HomeShellState extends State<HomeShell> {
       2 => CalendarView(
           controller: widget.taskController,
           folderController: widget.folderController,
+          eventController: widget.eventController,
           resetSignal: _calendarResetSignal,
           settingsController: widget.settingsController,
           backupService: widget.backupService,
+          onDaySelected: (d) => _activeDueDate.value = d,
         ),
       3 => RoutinesView(
           controller: widget.routineController,
