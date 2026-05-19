@@ -5,6 +5,7 @@ import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import '../models/task.dart';
 import 'task_controller.dart';
+import 'task_row.dart' show RoundedCheckbox;
 
 class TrashView extends StatelessWidget {
   const TrashView({
@@ -278,7 +279,7 @@ class _TrashEntry {
         id = 'task_${t.id}',
         label = t.title,
         deletedDate = t.deletedDate,
-        icon = CupertinoIcons.checkmark_square;
+        icon = null;
 
   _TrashEntry.list(AppList l)
       : task = null,
@@ -304,7 +305,7 @@ class _TrashEntry {
   final String id;
   final String label;
   final DateTime? deletedDate;
-  final IconData icon;
+  final IconData? icon;
 }
 
 // ── Widgets ──────────────────────────────────────────────────────────────────
@@ -344,15 +345,23 @@ class _TrashRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final task = entry.task;
+    final Widget leadingIcon = task != null
+        ? RoundedCheckbox(
+            checked: task.isCompleted,
+            priority: task.priority,
+          )
+        : Icon(
+            entry.icon,
+            size: 20,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
       child: Row(
         children: [
-          Icon(
-            entry.icon,
-            size: 20,
-            color: CupertinoColors.secondaryLabel.resolveFrom(context),
-          ),
+          leadingIcon,
           const SizedBox(width: 12),
           Expanded(
             child: Text(

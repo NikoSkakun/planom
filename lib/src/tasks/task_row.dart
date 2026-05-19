@@ -68,7 +68,7 @@ class TaskRow extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _RoundedCheckbox(
+                RoundedCheckbox(
                   checked: task.isCompleted,
                   priority: task.priority,
                 ),
@@ -174,8 +174,8 @@ class TaskRow extends StatelessWidget {
   }
 }
 
-class _RoundedCheckbox extends StatelessWidget {
-  const _RoundedCheckbox({required this.checked, this.priority = 0});
+class RoundedCheckbox extends StatelessWidget {
+  const RoundedCheckbox({super.key, required this.checked, this.priority = 0});
 
   final bool checked;
   final int priority;
