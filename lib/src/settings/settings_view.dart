@@ -513,7 +513,7 @@ class _SpaceRow extends StatelessWidget {
             Icon(
               CupertinoIcons.circle_fill,
               size: 10,
-              color: isActive ? AppColors.accent : CupertinoColors.clear,
+              color: isActive ? AppColors.accent : CupertinoColors.transparent,
             ),
           const SizedBox(width: 10),
           Expanded(
