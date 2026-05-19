@@ -55,6 +55,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
   FocusNode? _activeFocus;
   DateTime? _dueDate;
   int? _doTime;
+  int? _duration;
   late String? _listId;
   int _priority = 0;
   bool _titleEmpty = true;
@@ -96,6 +97,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
       note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
       dueDate: _dueDate,
       doTime: _doTime,
+      duration: _duration,
       listId: _listId,
       priority: _priority,
     ));
@@ -126,6 +128,14 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     );
     if (!mounted) return;
     setState(() => _listId = result);
+    saved?.requestFocus();
+  }
+
+  Future<void> _pickDuration() async {
+    final saved = _activeFocus;
+    final result = await _showDurationPicker(context, _duration);
+    if (!mounted) return;
+    setState(() => _duration = result);
     saved?.requestFocus();
   }
 
@@ -288,6 +298,34 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 14),
+                  // Duration picker
+                  GestureDetector(
+                    onTap: _pickDuration,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.timer,
+                          size: 16,
+                          color: _duration != null
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        if (_duration != null) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDuration(_duration!),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.accent,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
               CupertinoButton(
@@ -316,4 +354,44 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
       ),
     );
   }
+}
+
+String _formatDuration(int minutes) {
+  if (minutes < 60) return '${minutes}m';
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (m == 0) return '${h}h';
+  return '${h}h ${m}m';
+}
+
+Future<int?> _showDurationPicker(BuildContext context, int? current) async {
+  const presets = [15, 30, 45, 60, 90, 120, 180, 240];
+  return showCupertinoModalPopup<int?>(
+    context: context,
+    builder: (ctx) => CupertinoActionSheet(
+      title: const Text('Duration'),
+      actions: [
+        for (final m in presets)
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(ctx).pop(m),
+            child: Text(_formatDuration(m)),
+          ),
+        if (current != null)
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(ctx).pop(-1),
+            child: const Text('Clear'),
+          ),
+      ],
+      cancelButton: CupertinoActionSheetAction(
+        isDefaultAction: true,
+        onPressed: () => Navigator.of(ctx).pop(),
+        child: const Text('Cancel'),
+      ),
+    ),
+  ).then((v) {
+    if (v == null) return current;
+    if (v == -1) return null;
+    return v;
+  });
 }

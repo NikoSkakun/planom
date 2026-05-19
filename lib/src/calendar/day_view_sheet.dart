@@ -14,8 +14,6 @@ import 'event_controller.dart';
 import 'event_creation_sheet.dart';
 import 'event_detail_view.dart';
 
-/// Modal day view: a vertical timeline showing tasks and events for [date].
-/// Untimed items are listed at the top; timed items are placed at their time.
 Future<void> showDayViewSheet(
   BuildContext context, {
   required DateTime date,
@@ -37,7 +35,7 @@ Future<void> showDayViewSheet(
   );
 }
 
-class DayViewSheet extends StatelessWidget {
+class DayViewSheet extends StatefulWidget {
   const DayViewSheet({
     super.key,
     required this.date,
@@ -51,9 +49,6 @@ class DayViewSheet extends StatelessWidget {
   final EventController eventController;
   final FolderController folderController;
 
-  static const _hourHeight = 60.0;
-  static const _gutterWidth = 56.0;
-
   static const _months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
@@ -62,6 +57,91 @@ class DayViewSheet extends StatelessWidget {
     'Monday', 'Tuesday', 'Wednesday', 'Thursday',
     'Friday', 'Saturday', 'Sunday',
   ];
+
+  @override
+  State<DayViewSheet> createState() => _DayViewSheetState();
+}
+
+class _DayViewSheetState extends State<DayViewSheet> {
+  OverlayEntry? _pickerEntry;
+
+  @override
+  void dispose() {
+    _pickerEntry?.remove();
+    _pickerEntry = null;
+    super.dispose();
+  }
+
+  void _showAddPicker(BuildContext context) {
+    _pickerEntry?.remove();
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(builder: (_) {
+      void dismiss() {
+        if (_pickerEntry == entry) _pickerEntry = null;
+        entry.remove();
+      }
+
+      return Stack(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: dismiss,
+            child: const SizedBox.expand(),
+          ),
+          Positioned(
+            bottom: MediaQuery.paddingOf(context).bottom + 72,
+            right: 20,
+            child: _AddPickerMenu(
+              onTask: () {
+                dismiss();
+                showTaskCreationSheet(
+                  context,
+                  widget.taskController,
+                  widget.folderController,
+                  initialDueDate: widget.date,
+                );
+              },
+              onEvent: () {
+                dismiss();
+                showEventCreationSheet(
+                  context,
+                  widget.eventController,
+                  initialDate: widget.date,
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    });
+    _pickerEntry = entry;
+    overlay.insert(entry);
+  }
+
+  void _openTask(Task task) {
+    Navigator.of(context).push(
+      FastRoute<void>(
+        settings: const RouteSettings(name: TaskDetailView.routeName),
+        builder: (_) => TaskDetailView(
+          task: task,
+          controller: widget.taskController,
+          folderController: widget.folderController,
+        ),
+      ),
+    );
+  }
+
+  void _openEvent(Event event) {
+    Navigator.of(context).push(
+      FastRoute<void>(
+        builder: (_) => EventDetailView(
+          event: event,
+          controller: widget.eventController,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,336 +153,257 @@ class DayViewSheet extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: bg,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: Column(
+      child: Stack(
         children: [
-          const SizedBox(height: 8),
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
+          Column(
+            children: [
+              const SizedBox(height: 8),
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.separator.resolveFrom(context),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${widget.date.day}',
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '${DayViewSheet._months[widget.date.month - 1]}\n'
+                        '${DayViewSheet._weekdays[widget.date.weekday - 1]}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.2,
+                          color: CupertinoColors.secondaryLabel
+                              .resolveFrom(context),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                height: 0.5,
                 color: CupertinoColors.separator.resolveFrom(context),
-                borderRadius: BorderRadius.circular(2),
+              ),
+              Expanded(
+                child: ListenableBuilder(
+                  listenable: Listenable.merge([
+                    widget.taskController,
+                    widget.eventController,
+                    widget.folderController,
+                  ]),
+                  builder: (ctx, _) => _buildList(ctx),
+                ),
+              ),
+              SizedBox(height: mq.padding.bottom + 72),
+            ],
+          ),
+          // Floating + button — bottom right
+          Positioned(
+            bottom: mq.padding.bottom + 16,
+            right: 20,
+            child: GestureDetector(
+              onTap: () => _showAddPicker(context),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: AppColors.accent,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  CupertinoIcons.plus,
+                  color: CupertinoColors.white,
+                  size: 22,
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${date.day}',
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    '${_months[date.month - 1]}\n${_weekdays[date.weekday - 1]}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.2,
-                      color: CupertinoColors.secondaryLabel
-                          .resolveFrom(context),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: () => _showAddPicker(context),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: const BoxDecoration(
-                        color: AppColors.accent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        CupertinoIcons.plus,
-                        color: CupertinoColors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildList(BuildContext context) {
+    final tasks = widget.taskController.tasksForDate(widget.date);
+    final events = widget.eventController.eventsForDate(widget.date);
+
+    // Untimed first (tasks then events), then timed sorted by doTime.
+    final untimedTasks = tasks.where((t) => t.doTime == null).toList();
+    final untimedEvents = events.where((e) => e.doTime == null).toList();
+    final timedItems = <_TimedItem>[
+      for (final t in tasks.where((t) => t.doTime != null))
+        _TimedItem.task(t),
+      for (final e in events.where((e) => e.doTime != null))
+        _TimedItem.event(e),
+    ]..sort((a, b) => a.doTime.compareTo(b.doTime));
+
+    final isEmpty =
+        untimedTasks.isEmpty && untimedEvents.isEmpty && timedItems.isEmpty;
+
+    if (isEmpty) {
+      return Center(
+        child: Text(
+          'No tasks or events',
+          style: TextStyle(
+            fontSize: 15,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
           ),
-          const SizedBox(height: 12),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+      children: [
+        for (final t in untimedTasks) ...[
+          _TaskCard(
+            task: t,
+            folderController: widget.folderController,
+            onTap: () => _openTask(t),
+            onToggle: () => widget.taskController.toggleCompleted(t.id),
+          ),
+          const SizedBox(height: 8),
+        ],
+        for (final e in untimedEvents) ...[
+          _EventCard(event: e, onTap: () => _openEvent(e)),
+          const SizedBox(height: 8),
+        ],
+        if (timedItems.isNotEmpty && (untimedTasks.isNotEmpty || untimedEvents.isNotEmpty))
+          const SizedBox(height: 4),
+        for (final item in timedItems) ...[
+          if (item.task != null)
+            _TaskCard(
+              task: item.task!,
+              folderController: widget.folderController,
+              onTap: () => _openTask(item.task!),
+              onToggle: () =>
+                  widget.taskController.toggleCompleted(item.task!.id),
+            )
+          else
+            _EventCard(event: item.event!, onTap: () => _openEvent(item.event!)),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+}
+
+// ─── Add picker dropdown ──────────────────────────────────────────────────────
+
+class _AddPickerMenu extends StatelessWidget {
+  const _AddPickerMenu({required this.onTask, required this.onEvent});
+
+  final VoidCallback onTask;
+  final VoidCallback onEvent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 160,
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 20,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _PickerRow(
+            label: 'Task',
+            icon: CupertinoIcons.checkmark_square,
+            onTap: onTask,
+          ),
           Container(
             height: 0.5,
             color: CupertinoColors.separator.resolveFrom(context),
           ),
-          Expanded(
-            child: ListenableBuilder(
-              listenable: Listenable.merge(
-                  [taskController, eventController, folderController]),
-              builder: (ctx, _) => _buildTimeline(ctx),
-            ),
+          _PickerRow(
+            label: 'Event',
+            icon: CupertinoIcons.calendar,
+            onTap: onEvent,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTimeline(BuildContext context) {
-    final tasks = taskController.tasksForDate(date);
-    final events = eventController.eventsForDate(date);
-
-    final untimedTasks = tasks.where((t) => t.doTime == null).toList();
-    final untimedEvents = events.where((e) => e.doTime == null).toList();
-    final timedTasks = tasks.where((t) => t.doTime != null).toList();
-    final timedEvents = events.where((e) => e.doTime != null).toList();
-
-    final hasUntimed = untimedTasks.isNotEmpty || untimedEvents.isNotEmpty;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (hasUntimed) ...[
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(20, 12, 20, 6),
-              child: Text(
-                'Untimed',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
-                  color: CupertinoColors.secondaryLabel
-                      .resolveFrom(context),
-                ),
-              ),
-            ),
-            for (final t in untimedTasks)
-              Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(20, 0, 20, 6),
-                child: _TaskCard(
-                  task: t,
-                  folderController: folderController,
-                  onTap: () => _openTask(context, t),
-                  onToggle: () => taskController.toggleCompleted(t.id),
-                ),
-              ),
-            for (final e in untimedEvents)
-              Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(20, 0, 20, 6),
-                child: _EventCard(
-                  event: e,
-                  onTap: () => _openEvent(context, e),
-                ),
-              ),
-            const SizedBox(height: 8),
-          ],
-          _HourGrid(
-            hourHeight: _hourHeight,
-            gutterWidth: _gutterWidth,
-            timedTasks: timedTasks,
-            timedEvents: timedEvents,
-            folderController: folderController,
-            onTaskTap: (t) => _openTask(context, t),
-            onEventTap: (e) => _openEvent(context, e),
-            onTaskToggle: (t) => taskController.toggleCompleted(t.id),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openTask(BuildContext context, Task task) {
-    Navigator.of(context).push(
-      FastRoute<void>(
-        settings: const RouteSettings(name: TaskDetailView.routeName),
-        builder: (_) => TaskDetailView(
-          task: task,
-          controller: taskController,
-          folderController: folderController,
-        ),
-      ),
-    );
-  }
-
-  void _openEvent(BuildContext context, Event event) {
-    Navigator.of(context).push(
-      FastRoute<void>(
-        builder: (_) => EventDetailView(
-          event: event,
-          controller: eventController,
-        ),
-      ),
-    );
-  }
-
-  void _showAddPicker(BuildContext context) {
-    showCupertinoModalPopup<void>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('Add to this day'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              showTaskCreationSheet(
-                context,
-                taskController,
-                folderController,
-                initialDueDate: date,
-              );
-            },
-            child: const Text('Task'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              showEventCreationSheet(
-                context,
-                eventController,
-                initialDate: date,
-              );
-            },
-            child: const Text('Event'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
-        ),
       ),
     );
   }
 }
 
-// ─── Hour grid ────────────────────────────────────────────────────────────────
-
-class _HourGrid extends StatelessWidget {
-  const _HourGrid({
-    required this.hourHeight,
-    required this.gutterWidth,
-    required this.timedTasks,
-    required this.timedEvents,
-    required this.folderController,
-    required this.onTaskTap,
-    required this.onEventTap,
-    required this.onTaskToggle,
+class _PickerRow extends StatelessWidget {
+  const _PickerRow({
+    required this.label,
+    required this.icon,
+    required this.onTap,
   });
 
-  final double hourHeight;
-  final double gutterWidth;
-  final List<Task> timedTasks;
-  final List<Event> timedEvents;
-  final FolderController folderController;
-  final void Function(Task) onTaskTap;
-  final void Function(Event) onEventTap;
-  final void Function(Task) onTaskToggle;
-
-  static const _hours = 24;
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final totalHeight = _hours * hourHeight;
-    final separator = CupertinoColors.separator.resolveFrom(context);
-    final labelColor =
-        CupertinoColors.tertiaryLabel.resolveFrom(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: SizedBox(
-        height: totalHeight,
-        child: Stack(
-          children: [
-            // Hour lines + labels
-            for (var h = 0; h < _hours; h++)
-              Positioned(
-                top: h * hourHeight,
-                left: 0,
-                right: 0,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: gutterWidth,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 0),
-                        child: Text(
-                          _hourLabel(h),
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                              fontSize: 11, color: labelColor),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Container(
-                          height: 0.5,
-                          color: separator,
-                          margin: const EdgeInsets.only(top: 6)),
-                    ),
-                  ],
-                ),
-              ),
-            // Timed events
-            for (final e in timedEvents)
-              _positionedItem(
-                e.doTime!,
-                e.duration ?? 60,
-                _EventCard(event: e, onTap: () => onEventTap(e)),
-              ),
-            // Timed tasks
-            for (final t in timedTasks)
-              _positionedItem(
-                t.doTime!,
-                30,
-                _TaskCard(
-                  task: t,
-                  folderController: folderController,
-                  onTap: () => onTaskTap(t),
-                  onToggle: () => onTaskToggle(t),
-                ),
-              ),
-          ],
-        ),
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      onPressed: onTap,
+      child: Row(
+        children: [
+          Icon(icon, size: 18,
+              color: CupertinoColors.label.resolveFrom(context)),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 16,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _positionedItem(int doTime, int durationMin, Widget child) {
-    final top = (doTime / 60.0) * hourHeight;
-    final h = (durationMin / 60.0) * hourHeight;
-    return Positioned(
-      top: top,
-      left: gutterWidth + 8,
-      right: 0,
-      height: h.clamp(28.0, double.infinity),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 2),
-        child: child,
-      ),
-    );
-  }
+// ─── Helper types ─────────────────────────────────────────────────────────────
 
-  String _hourLabel(int h) {
-    if (h == 0) return '12 AM';
-    if (h == 12) return '12 PM';
-    return h < 12 ? '$h AM' : '${h - 12} PM';
-  }
+class _TimedItem {
+  _TimedItem.task(this.task)
+      : event = null,
+        doTime = task!.doTime!;
+  _TimedItem.event(this.event)
+      : task = null,
+        doTime = event!.doTime!;
+
+  final Task? task;
+  final Event? event;
+  final int doTime;
 }
 
 // ─── Task / Event cards ──────────────────────────────────────────────────────
@@ -420,6 +421,14 @@ class _TaskCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onToggle;
 
+  static String _dur(int m) {
+    if (m < 60) return '${m}m';
+    final h = m ~/ 60;
+    final r = m % 60;
+    if (r == 0) return '${h}h';
+    return '${h}h ${r}m';
+  }
+
   @override
   Widget build(BuildContext context) {
     final listColor = task.listId != null
@@ -433,8 +442,7 @@ class _TaskCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(8),
@@ -478,14 +486,16 @@ class _TaskCard extends StatelessWidget {
                           ? TextDecoration.lineThrough
                           : null,
                       color: task.isCompleted
-                          ? CupertinoColors.secondaryLabel
-                              .resolveFrom(context)
+                          ? CupertinoColors.secondaryLabel.resolveFrom(context)
                           : CupertinoColors.label.resolveFrom(context),
                     ),
                   ),
-                  if (task.doTime != null)
+                  if (task.doTime != null || task.duration != null)
                     Text(
-                      formatDoTime(task.doTime!),
+                      [
+                        if (task.doTime != null) formatDoTime(task.doTime!),
+                        if (task.duration != null) _dur(task.duration!),
+                      ].join(' · '),
                       style: TextStyle(
                         fontSize: 11,
                         color: CupertinoColors.secondaryLabel
@@ -510,13 +520,20 @@ class _EventCard extends StatelessWidget {
 
   static const _accent = Color(0xFF0A84FF);
 
+  static String _dur(int m) {
+    if (m < 60) return '${m}m';
+    final h = m ~/ 60;
+    final r = m % 60;
+    if (r == 0) return '${h}h';
+    return '${h}h ${r}m';
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: _accent.withOpacity(0.12),
           borderRadius: BorderRadius.circular(8),
@@ -530,8 +547,7 @@ class _EventCard extends StatelessWidget {
               event.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w500),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),
             if (event.doTime != null)
               Text(
@@ -540,8 +556,7 @@ class _EventCard extends StatelessWidget {
                     : formatDoTime(event.doTime!),
                 style: TextStyle(
                   fontSize: 11,
-                  color: CupertinoColors.secondaryLabel
-                      .resolveFrom(context),
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
           ],
@@ -549,12 +564,104 @@ class _EventCard extends StatelessWidget {
       ),
     );
   }
-
-  static String _dur(int m) {
-    if (m < 60) return '${m}m';
-    final h = m ~/ 60;
-    final r = m % 60;
-    if (r == 0) return '${h}h';
-    return '${h}h ${r}m';
-  }
 }
+
+// ─── Hour grid (kept for future use) ─────────────────────────────────────────
+
+// class _HourGrid extends StatelessWidget {
+//   const _HourGrid({
+//     required this.hourHeight,
+//     required this.gutterWidth,
+//     required this.timedTasks,
+//     required this.timedEvents,
+//     required this.folderController,
+//     required this.onTaskTap,
+//     required this.onEventTap,
+//     required this.onTaskToggle,
+//   });
+//
+//   final double hourHeight;
+//   final double gutterWidth;
+//   final List<Task> timedTasks;
+//   final List<Event> timedEvents;
+//   final FolderController folderController;
+//   final void Function(Task) onTaskTap;
+//   final void Function(Event) onEventTap;
+//   final void Function(Task) onTaskToggle;
+//
+//   static const _hours = 24;
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final totalHeight = _hours * hourHeight;
+//     final separator = CupertinoColors.separator.resolveFrom(context);
+//     final labelColor = CupertinoColors.tertiaryLabel.resolveFrom(context);
+//
+//     return Padding(
+//       padding: const EdgeInsets.symmetric(horizontal: 20),
+//       child: SizedBox(
+//         height: totalHeight,
+//         child: Stack(
+//           children: [
+//             for (var h = 0; h < _hours; h++)
+//               Positioned(
+//                 top: h * hourHeight,
+//                 left: 0,
+//                 right: 0,
+//                 child: Row(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     SizedBox(
+//                       width: gutterWidth,
+//                       child: Text(
+//                         _hourLabel(h),
+//                         textAlign: TextAlign.right,
+//                         style: TextStyle(fontSize: 11, color: labelColor),
+//                       ),
+//                     ),
+//                     const SizedBox(width: 8),
+//                     Expanded(
+//                       child: Container(
+//                         height: 0.5,
+//                         color: separator,
+//                         margin: const EdgeInsets.only(top: 6),
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//             for (final e in timedEvents)
+//               _positionedItem(e.doTime!, e.duration ?? 60,
+//                   _EventCard(event: e, onTap: () => onEventTap(e))),
+//             for (final t in timedTasks)
+//               _positionedItem(t.doTime!, 30,
+//                   _TaskCard(
+//                     task: t,
+//                     folderController: folderController,
+//                     onTap: () => onTaskTap(t),
+//                     onToggle: () => onTaskToggle(t),
+//                   )),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+//
+//   Widget _positionedItem(int doTime, int durationMin, Widget child) {
+//     final top = (doTime / 60.0) * hourHeight;
+//     final h = (durationMin / 60.0) * hourHeight;
+//     return Positioned(
+//       top: top,
+//       left: gutterWidth + 8,
+//       right: 0,
+//       height: h.clamp(28.0, double.infinity),
+//       child: Padding(padding: const EdgeInsets.only(bottom: 2), child: child),
+//     );
+//   }
+//
+//   String _hourLabel(int h) {
+//     if (h == 0) return '12 AM';
+//     if (h == 12) return '12 PM';
+//     return h < 12 ? '$h AM' : '${h - 12} PM';
+//   }
+// }

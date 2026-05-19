@@ -424,25 +424,24 @@ class _DayCell extends StatelessWidget {
             Align(
               alignment: Alignment.topCenter,
               child: Container(
-                width: 26,
-                height: 26,
+                padding: _isToday
+                    ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2)
+                    : const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: _isToday
-                    ? const BoxDecoration(
+                    ? BoxDecoration(
                         color: AppColors.accent,
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(20),
                       )
                     : null,
-                child: Center(
-                  child: Text(
-                    '${date!.day}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight:
-                          _isToday ? FontWeight.w700 : FontWeight.normal,
-                      color: _isToday
-                          ? CupertinoColors.white
-                          : CupertinoColors.label.resolveFrom(context),
-                    ),
+                child: Text(
+                  '${date!.day}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight:
+                        _isToday ? FontWeight.w700 : FontWeight.normal,
+                    color: _isToday
+                        ? CupertinoColors.white
+                        : CupertinoColors.label.resolveFrom(context),
                   ),
                 ),
               ),

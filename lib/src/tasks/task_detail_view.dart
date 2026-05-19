@@ -34,6 +34,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
   late final TextEditingController _note;
   late DateTime? _dueDate;
   late int? _doTime;
+  late int? _duration;
   late bool _isCompleted;
   late String? _listId;
   late int _priority;
@@ -46,6 +47,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _note = TextEditingController(text: widget.task.note ?? '');
     _dueDate = widget.task.dueDate;
     _doTime = widget.task.doTime;
+    _duration = widget.task.duration;
     _isCompleted = widget.task.isCompleted;
     _listId = widget.task.listId;
     _priority = widget.task.priority;
@@ -63,6 +65,8 @@ class _TaskDetailViewState extends State<TaskDetailView>
         clearDueDate: _dueDate == null,
         doTime: _doTime,
         clearDoTime: _doTime == null,
+        duration: _duration,
+        clearDuration: _duration == null,
         isCompleted: _isCompleted,
         listId: _listId,
         clearListId: _listId == null,
@@ -122,6 +126,12 @@ class _TaskDetailViewState extends State<TaskDetailView>
     );
     if (!mounted) return;
     setState(() => _listId = result);
+  }
+
+  Future<void> _pickDuration() async {
+    final result = await _showDurationPicker(context, _duration);
+    if (!mounted) return;
+    setState(() => _duration = result);
   }
 
   String get _listLabel {
@@ -268,6 +278,37 @@ class _TaskDetailViewState extends State<TaskDetailView>
                     size: 14,
                     color: CupertinoColors.secondaryLabel
                         .resolveFrom(context),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Duration picker row
+            _SectionCard(
+              onTap: _pickDuration,
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.timer,
+                    size: 18,
+                    color: _duration != null
+                        ? AppColors.accent
+                        : CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    _duration != null
+                        ? _formatDuration(_duration!)
+                        : 'No Duration',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: _duration != null
+                          ? AppColors.accent
+                          : CupertinoColors.secondaryLabel
+                              .resolveFrom(context),
+                    ),
                   ),
                 ],
               ),
@@ -493,4 +534,44 @@ class _RoundedCheckbox extends StatelessWidget {
           : null,
     );
   }
+}
+
+String _formatDuration(int minutes) {
+  if (minutes < 60) return '${minutes}m';
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (m == 0) return '${h}h';
+  return '${h}h ${m}m';
+}
+
+Future<int?> _showDurationPicker(BuildContext context, int? current) async {
+  const presets = [15, 30, 45, 60, 90, 120, 180, 240];
+  return showCupertinoModalPopup<int?>(
+    context: context,
+    builder: (ctx) => CupertinoActionSheet(
+      title: const Text('Duration'),
+      actions: [
+        for (final m in presets)
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(ctx).pop(m),
+            child: Text(_formatDuration(m)),
+          ),
+        if (current != null)
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(ctx).pop(-1),
+            child: const Text('Clear'),
+          ),
+      ],
+      cancelButton: CupertinoActionSheetAction(
+        isDefaultAction: true,
+        onPressed: () => Navigator.of(ctx).pop(),
+        child: const Text('Cancel'),
+      ),
+    ),
+  ).then((v) {
+    if (v == null) return current;
+    if (v == -1) return null;
+    return v;
+  });
 }

@@ -11,6 +11,7 @@ class Task extends AppItem {
   final bool isCompleted;
   final DateTime? dueDate;
   final int? doTime; // minutes since midnight (0–1439), null = no time set
+  final int? duration; // minutes; null = no defined duration
   final String? listId;
   final int priority; // TaskPriority.index
   final int sortOrder; // 0 = not yet manually sorted; >0 = user-defined position
@@ -27,6 +28,7 @@ class Task extends AppItem {
     this.isCompleted = false,
     this.dueDate,
     this.doTime,
+    this.duration,
     this.listId,
     this.priority = 0,
     this.sortOrder = 0,
@@ -47,6 +49,8 @@ class Task extends AppItem {
     bool clearDueDate = false,
     int? doTime,
     bool clearDoTime = false,
+    int? duration,
+    bool clearDuration = false,
     String? listId,
     bool clearListId = false,
     int? priority,
@@ -66,6 +70,7 @@ class Task extends AppItem {
       isCompleted: isCompleted ?? this.isCompleted,
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       doTime: clearDoTime ? null : (doTime ?? this.doTime),
+      duration: clearDuration ? null : (duration ?? this.duration),
       listId: clearListId ? null : (listId ?? this.listId),
       priority: priority ?? this.priority,
       sortOrder: sortOrder ?? this.sortOrder,
@@ -84,6 +89,7 @@ class Task extends AppItem {
         'isCompleted': isCompleted ? 1 : 0,
         'dueDate': dueDate?.millisecondsSinceEpoch,
         'doTime': doTime,
+        'duration': duration,
         'listId': listId,
         'priority': priority,
         'sortOrder': sortOrder,
@@ -104,6 +110,7 @@ class Task extends AppItem {
             ? DateTime.fromMillisecondsSinceEpoch(map['dueDate'] as int)
             : null,
         doTime: map['doTime'] as int?,
+        duration: map['duration'] as int?,
         listId: map['listId'] as String?,
         priority: map['priority'] as int? ?? 0,
         sortOrder: map['sortOrder'] as int? ?? 0,

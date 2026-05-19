@@ -12,7 +12,7 @@ import '../models/task.dart';
 
 class DatabaseService {
   static const _dbName = 'planom.db';
-  static const _dbVersion = 15;
+  static const _dbVersion = 16;
 
   Database? _db;
 
@@ -34,6 +34,7 @@ class DatabaseService {
             isCompleted INTEGER NOT NULL DEFAULT 0,
             dueDate INTEGER,
             doTime INTEGER,
+            duration INTEGER,
             listId TEXT,
             priority INTEGER NOT NULL DEFAULT 0,
             sortOrder INTEGER NOT NULL DEFAULT 0,
@@ -290,6 +291,10 @@ class DatabaseService {
               deletedDate INTEGER
             )
           ''');
+        }
+        if (oldVersion < 16) {
+          await db.execute(
+              'ALTER TABLE tasks ADD COLUMN duration INTEGER');
         }
       },
     );
