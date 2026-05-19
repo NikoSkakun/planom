@@ -141,18 +141,18 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   @override
   Widget build(BuildContext context) {
-    return Listener(
-      behavior: HitTestBehavior.translucent,
-      // Pre-dismiss the keyboard the moment the user starts an iOS
-      // back-swipe (touchdown near the left edge). This lets viewInsets
-      // settle BEFORE the page slides, removing the layout-stretch glitch
-      // caused by the keyboard dismissing mid-transition.
-      onPointerDown: (event) {
-        if (event.position.dx <= 20) {
-          FocusManager.instance.primaryFocus?.unfocus();
-        }
-      },
-      child: CupertinoPageScaffold(
+    // Manually pad for the keyboard so the SCAFFOLD itself never resizes
+    // when the keyboard appears/dismisses. This is what fixes the
+    // back-swipe glitch: when the user starts a back-swipe with the
+    // keyboard open, the keyboard dismisses mid-transition. With the
+    // scaffold auto-resizing, the page rectangle would grow as the
+    // keyboard slid down, producing a visible "white plane" appearing
+    // from the top during the slide. Keeping the scaffold at full size
+    // means the bottom inset only affects the inner padding, which the
+    // page transition does not see.
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    return CupertinoPageScaffold(
+      resizeToAvoidBottomInset: false,
       navigationBar: CupertinoNavigationBar(
         border: null,
         trailing: widget.isNew
@@ -164,49 +164,52 @@ class _NoteDetailViewState extends State<NoteDetailView>
               ),
       ),
       child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: CupertinoTextField(
-                controller: _title,
-                placeholder: 'Title',
-                autofocus: widget.isNew,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-                decoration: const BoxDecoration(),
-                maxLines: null,
-                textInputAction: TextInputAction.next,
-                textCapitalization: TextCapitalization.sentences,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                height: 0.5,
-                color: CupertinoColors.separator,
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: keyboard),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: CupertinoTextField(
-                  controller: _content,
-                  placeholder: 'Note',
-                  style: const TextStyle(fontSize: 16),
+                  controller: _title,
+                  placeholder: 'Title',
+                  autofocus: widget.isNew,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
                   decoration: const BoxDecoration(),
                   maxLines: null,
-                  expands: true,
-                  textAlignVertical: TextAlignVertical.top,
+                  textInputAction: TextInputAction.next,
                   textCapitalization: TextCapitalization.sentences,
                 ),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  height: 0.5,
+                  color: CupertinoColors.separator,
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                  child: CupertinoTextField(
+                    controller: _content,
+                    placeholder: 'Note',
+                    style: const TextStyle(fontSize: 16),
+                    decoration: const BoxDecoration(),
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    textCapitalization: TextCapitalization.sentences,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
