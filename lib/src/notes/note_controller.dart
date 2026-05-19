@@ -213,8 +213,8 @@ class NoteController with ChangeNotifier {
       final idx = _folders.indexWhere((f) => f.id == updated.id);
       if (idx != -1) _folders[idx] = updated;
     }
-    await _db.updateNoteFolderSortOrders(scope);
     notifyListeners();
+    await _db.updateNoteFolderSortOrders(scope);
   }
 
   /// Reorders notes within [folderId] scope.
@@ -234,8 +234,8 @@ class NoteController with ChangeNotifier {
       final idx = _notes.indexWhere((n) => n.id == updated.id);
       if (idx != -1) _notes[idx] = updated;
     }
-    await _db.updateNoteSortOrders(scope);
     notifyListeners();
+    await _db.updateNoteSortOrders(scope);
   }
 
   static void _sortFoldersByDefault(List<NoteFolder> list) {

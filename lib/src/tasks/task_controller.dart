@@ -208,8 +208,11 @@ class TaskController with ChangeNotifier {
       if (idx != -1) _tasks[idx] = updated;
     }
 
-    await _db.updateTaskSortOrders(displayed);
+    // Notify before awaiting the DB so SliverReorderableList sees the new
+    // order on its next frame — otherwise the dropped item flashes back to
+    // its original slot until the write completes.
     notifyListeners();
+    await _db.updateTaskSortOrders(displayed);
   }
 
   // ── Sorting helpers ──────────────────────────────────────────────────────

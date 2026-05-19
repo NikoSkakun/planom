@@ -185,8 +185,8 @@ class FolderController with ChangeNotifier {
       final idx = _folders.indexWhere((f) => f.id == updated.id);
       if (idx != -1) _folders[idx] = updated;
     }
-    await _db.updateFolderSortOrders(scope);
     notifyListeners();
+    await _db.updateFolderSortOrders(scope);
   }
 
   /// Reorders lists within [folderId] scope.
@@ -207,8 +207,8 @@ class FolderController with ChangeNotifier {
       final idx = _lists.indexWhere((l) => l.id == updated.id);
       if (idx != -1) _lists[idx] = updated;
     }
-    await _db.updateListSortOrders(scope);
     notifyListeners();
+    await _db.updateListSortOrders(scope);
   }
 
   /// Recursively soft-deletes a folder, all nested subfolders, all lists inside
