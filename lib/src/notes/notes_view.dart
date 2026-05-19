@@ -147,198 +147,200 @@ class _NotesViewState extends State<NotesView> {
               )
             : null,
       ),
-      child: SafeArea(
-        child: Stack(
-          children: [
-            ListenableBuilder(
-              listenable: widget.controller,
-              builder: (context, _) {
-                final folders = widget.controller.foldersIn(null);
-                final notes = widget.controller.notesIn(null);
-                final hasTrash =
-                    widget.controller.trashedNotes.isNotEmpty ||
-                        widget.controller.trashedFolders.isNotEmpty;
-                if (folders.isEmpty && notes.isEmpty && !hasTrash) {
-                  return const Center(
-                    child: Text(
-                      'No notes',
-                      style: TextStyle(
-                          color: CupertinoColors.secondaryLabel),
-                    ),
-                  );
-                }
-                return CustomScrollView(
-                  slivers: [
-                    const SliverToBoxAdapter(child: SizedBox(height: 8)),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: SafeArea(
+              child: ListenableBuilder(
+                listenable: widget.controller,
+                builder: (context, _) {
+                  final folders = widget.controller.foldersIn(null);
+                  final notes = widget.controller.notesIn(null);
+                  final hasTrash =
+                      widget.controller.trashedNotes.isNotEmpty ||
+                          widget.controller.trashedFolders.isNotEmpty;
+                  if (folders.isEmpty && notes.isEmpty && !hasTrash) {
+                    return const Center(
+                      child: Text(
+                        'No notes',
+                        style: TextStyle(
+                            color: CupertinoColors.secondaryLabel),
+                      ),
+                    );
+                  }
+                  return CustomScrollView(
+                    slivers: [
+                      const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-                    // Reorderable note folders
-                    if (folders.isNotEmpty)
-                      SliverReorderableList(
-                        itemCount: folders.length,
-                        onReorder: (old, neo) =>
-                            widget.controller.reorderNoteFolders(
-                                null, old, neo),
-                        proxyDecorator: _proxyDecorator,
-                        itemBuilder: (context, index) {
-                          final f = folders[index];
-                          return ReorderableDelayedDragStartListener(
-                            key: ValueKey('nf_${f.id}'),
-                            index: index,
-                            child: Dismissible(
-                              key: ValueKey(f.id),
-                              direction: DismissDirection.endToStart,
-                              background: const NoteDeleteBackground(),
-                              onDismissed: (_) =>
-                                  widget.controller.deleteFolderDeep(f.id),
-                              child: Column(
-                                children: [
-                                  NoteFolderRow(
-                                    folder: f,
-                                    noteCount: widget.controller
-                                        .notesIn(f.id)
-                                        .length,
-                                    onTap: () =>
-                                        Navigator.of(context).push(
-                                      FastRoute<void>(
-                                        builder: (_) => NoteFolderView(
-                                          folder: f,
-                                          controller: widget.controller,
+                      // Reorderable note folders
+                      if (folders.isNotEmpty)
+                        SliverReorderableList(
+                          itemCount: folders.length,
+                          onReorder: (old, neo) =>
+                              widget.controller.reorderNoteFolders(
+                                  null, old, neo),
+                          proxyDecorator: _proxyDecorator,
+                          itemBuilder: (context, index) {
+                            final f = folders[index];
+                            return ReorderableDelayedDragStartListener(
+                              key: ValueKey('nf_${f.id}'),
+                              index: index,
+                              child: Dismissible(
+                                key: ValueKey(f.id),
+                                direction: DismissDirection.endToStart,
+                                background: const NoteDeleteBackground(),
+                                onDismissed: (_) =>
+                                    widget.controller.deleteFolderDeep(f.id),
+                                child: Column(
+                                  children: [
+                                    NoteFolderRow(
+                                      folder: f,
+                                      noteCount: widget.controller
+                                          .notesIn(f.id)
+                                          .length,
+                                      onTap: () =>
+                                          Navigator.of(context).push(
+                                        FastRoute<void>(
+                                          builder: (_) => NoteFolderView(
+                                            folder: f,
+                                            controller: widget.controller,
+                                          ),
                                         ),
                                       ),
+                                      onExpand: () => _toggle(f.id),
+                                      isExpanded: _expandedIds.contains(f.id),
                                     ),
-                                    onExpand: () => _toggle(f.id),
-                                    isExpanded: _expandedIds.contains(f.id),
-                                  ),
-                                  if (_expandedIds.contains(f.id))
-                                    _buildFolderChildren(context, f.id, 24),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-
-                    // Reorderable notes
-                    if (notes.isNotEmpty)
-                      SliverReorderableList(
-                        itemCount: notes.length,
-                        onReorder: (old, neo) =>
-                            widget.controller.reorderNotes(null, old, neo),
-                        proxyDecorator: _proxyDecorator,
-                        itemBuilder: (context, index) {
-                          final n = notes[index];
-                          return ReorderableDelayedDragStartListener(
-                            key: ValueKey('note_${n.id}'),
-                            index: index,
-                            child: Dismissible(
-                              key: ValueKey(n.id),
-                              direction: DismissDirection.endToStart,
-                              background: const NoteDeleteBackground(),
-                              onDismissed: (_) =>
-                                  widget.controller.deleteNote(n.id),
-                              child: NoteRow(
-                                note: n,
-                                onTap: () =>
-                                    Navigator.of(context).push(
-                                  FastRoute<void>(
-                                    settings: const RouteSettings(
-                                        name: NoteDetailView.routeName),
-                                    builder: (_) => NoteDetailView(
-                                      note: n,
-                                      controller: widget.controller,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-
-                    if (hasTrash)
-                      SliverToBoxAdapter(
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              child: Container(
-                                height: 0.5,
-                                color: CupertinoColors.separator
-                                    .resolveFrom(context),
-                              ),
-                            ),
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () => Navigator.of(context).push(
-                                FastRoute<void>(
-                                  builder: (_) => NoteTrashView(
-                                      controller: widget.controller),
-                                ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 9),
-                                child: Row(
-                                  children: [
-                                    SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: Icon(
-                                        CupertinoIcons.trash,
-                                        size: 22,
-                                        color: CupertinoColors.secondaryLabel
-                                            .resolveFrom(context),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    const Expanded(
-                                      child: Text(
-                                        'Trash',
-                                        style: TextStyle(fontSize: 17),
-                                      ),
-                                    ),
+                                    if (_expandedIds.contains(f.id))
+                                      _buildFolderChildren(context, f.id, 24),
                                   ],
                                 ),
                               ),
-                            ),
-                          ],
+                            );
+                          },
                         ),
-                      ),
 
-                    const SliverToBoxAdapter(
-                        child: SizedBox(height: 80)),
-                  ],
-                );
-              },
-            ),
-            Positioned(
-              left: 20,
-              bottom: 16,
-              child: NoteFolderCircleButton(
-                onPressed: () =>
-                    showCreateNoteFolderSheet(context, widget.controller),
+                      // Reorderable notes
+                      if (notes.isNotEmpty)
+                        SliverReorderableList(
+                          itemCount: notes.length,
+                          onReorder: (old, neo) =>
+                              widget.controller.reorderNotes(null, old, neo),
+                          proxyDecorator: _proxyDecorator,
+                          itemBuilder: (context, index) {
+                            final n = notes[index];
+                            return ReorderableDelayedDragStartListener(
+                              key: ValueKey('note_${n.id}'),
+                              index: index,
+                              child: Dismissible(
+                                key: ValueKey(n.id),
+                                direction: DismissDirection.endToStart,
+                                background: const NoteDeleteBackground(),
+                                onDismissed: (_) =>
+                                    widget.controller.deleteNote(n.id),
+                                child: NoteRow(
+                                  note: n,
+                                  onTap: () =>
+                                      Navigator.of(context).push(
+                                    FastRoute<void>(
+                                      settings: const RouteSettings(
+                                          name: NoteDetailView.routeName),
+                                      builder: (_) => NoteDetailView(
+                                        note: n,
+                                        controller: widget.controller,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                      if (hasTrash)
+                        SliverToBoxAdapter(
+                          child: Column(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                                child: Container(
+                                  height: 0.5,
+                                  color: CupertinoColors.separator
+                                      .resolveFrom(context),
+                                ),
+                              ),
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => Navigator.of(context).push(
+                                  FastRoute<void>(
+                                    builder: (_) => NoteTrashView(
+                                        controller: widget.controller),
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 9),
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: Icon(
+                                          CupertinoIcons.trash,
+                                          size: 22,
+                                          color: CupertinoColors.secondaryLabel
+                                              .resolveFrom(context),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      const Expanded(
+                                        child: Text(
+                                          'Trash',
+                                          style: TextStyle(fontSize: 17),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      const SliverToBoxAdapter(
+                          child: SizedBox(height: 80)),
+                    ],
+                  );
+                },
               ),
             ),
-            Positioned(
-              right: 20,
-              bottom: 16,
-              child: NoteOrangeAddButton(
-                onPressed: () => Navigator.of(context).push(
-                  FastRoute<void>(
-                    settings: const RouteSettings(
-                        name: NoteDetailView.routeName),
-                    builder: (_) => NoteDetailView(
-                      note: Note(title: '', content: ''),
-                      controller: widget.controller,
-                      isNew: true,
-                    ),
+          ),
+          Positioned(
+            left: 20,
+            bottom: 16,
+            child: NoteFolderCircleButton(
+              onPressed: () =>
+                  showCreateNoteFolderSheet(context, widget.controller),
+            ),
+          ),
+          Positioned(
+            right: 20,
+            bottom: 16,
+            child: NoteOrangeAddButton(
+              onPressed: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  settings: const RouteSettings(
+                      name: NoteDetailView.routeName),
+                  builder: (_) => NoteDetailView(
+                    note: Note(title: '', content: ''),
+                    controller: widget.controller,
+                    isNew: true,
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
