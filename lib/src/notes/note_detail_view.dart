@@ -135,7 +135,18 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      // Pre-dismiss the keyboard the moment the user starts an iOS
+      // back-swipe (touchdown near the left edge). This lets viewInsets
+      // settle BEFORE the page slides, removing the layout-stretch glitch
+      // caused by the keyboard dismissing mid-transition.
+      onPointerDown: (event) {
+        if (event.position.dx <= 20) {
+          FocusManager.instance.primaryFocus?.unfocus();
+        }
+      },
+      child: CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
         trailing: widget.isNew
@@ -189,6 +200,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
             ),
           ],
         ),
+      ),
       ),
     );
   }
