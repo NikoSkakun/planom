@@ -448,7 +448,7 @@ class _TaskOptionsDropdown extends StatelessWidget {
           top: topOffset,
           right: 8,
           child: Container(
-            constraints: const BoxConstraints(minWidth: 160),
+            width: 220,
             decoration: BoxDecoration(
               color: CupertinoColors.systemBackground.resolveFrom(context),
               borderRadius: BorderRadius.circular(12),
@@ -512,24 +512,16 @@ class _DropdownRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveColor =
-        color ?? CupertinoColors.label.resolveFrom(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(fontSize: 15, color: effectiveColor),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(icon, size: 17, color: effectiveColor),
-          ],
-        ),
+    final fg = color ?? CupertinoColors.label.resolveFrom(context);
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      onPressed: onTap,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: fg),
+          const SizedBox(width: 10),
+          Text(label, style: TextStyle(fontSize: 16, color: fg)),
+        ],
       ),
     );
   }
