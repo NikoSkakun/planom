@@ -122,16 +122,18 @@ class NoteRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasBody = note.content.isNotEmpty;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Padding(
         padding: EdgeInsets.fromLTRB(16 + indent, 9, 16, 9),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              hasBody ? CrossAxisAlignment.start : CrossAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: EdgeInsets.only(top: hasBody ? 2 : 0),
               child: Icon(
                 CupertinoIcons.doc_text,
                 size: 22,
@@ -142,6 +144,7 @@ class NoteRow extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     note.title.isEmpty ? 'Untitled' : note.title,
@@ -154,7 +157,7 @@ class NoteRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (note.content.isNotEmpty)
+                  if (hasBody)
                     Text(
                       note.content,
                       maxLines: 1,
