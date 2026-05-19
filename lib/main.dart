@@ -1,17 +1,13 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'src/app.dart';
-import 'src/calendar/event_controller.dart';
 import 'src/database/database_service.dart';
-import 'src/folders/folder_controller.dart';
 import 'src/folders/folder_icon_picker.dart';
-import 'src/notes/note_controller.dart';
-import 'src/routines/routine_controller.dart';
-import 'src/settings/backup_service.dart';
 import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
-import 'src/tasks/task_controller.dart';
+import 'src/spaces/space_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,42 +18,34 @@ void main() async {
 
   await initFolderIconService();
 
-  final db = DatabaseService();
+  // Global DB — only for app_settings (tab visibility, etc.) via
+  // SettingsController. Per-space data lives in space-specific DB files.
+  final globalDb = DatabaseService();
 
-  final settingsController = SettingsController(SettingsService(), db);
+  final settingsController = SettingsController(SettingsService(), globalDb);
   await settingsController.loadSettings();
-  final taskController = TaskController(db);
-  await taskController.load();
 
-  final folderController = FolderController(db);
-  await folderController.load();
+  final spaceManager = SpaceManager(settingsController: settingsController);
+  await spaceManager.load();
 
-  final noteController = NoteController(db);
-  await noteController.load();
-
-  final routineController = RoutineController(db);
-  await routineController.load();
-
-  final eventController = EventController(db);
-  await eventController.load();
-
-  final backupService = BackupService(
-    db: db,
-    taskController: taskController,
-    folderController: folderController,
-    noteController: noteController,
-    routineController: routineController,
-    eventController: eventController,
-    settingsController: settingsController,
+  runApp(
+    ListenableBuilder(
+      listenable: spaceManager,
+      builder: (context, _) => SpaceManagerProvider(
+        spaceManager: spaceManager,
+        child: MyApp(
+          // New key on every space switch forces a full widget-tree rebuild,
+          // giving each space a completely fresh navigator + scroll state.
+          key: ValueKey(spaceManager.activeSpaceId),
+          settingsController: settingsController,
+          taskController: spaceManager.taskController,
+          folderController: spaceManager.folderController,
+          noteController: spaceManager.noteController,
+          routineController: spaceManager.routineController,
+          eventController: spaceManager.eventController,
+          backupService: spaceManager.backupService,
+        ),
+      ),
+    ),
   );
-
-  runApp(MyApp(
-    settingsController: settingsController,
-    taskController: taskController,
-    folderController: folderController,
-    noteController: noteController,
-    routineController: routineController,
-    eventController: eventController,
-    backupService: backupService,
-  ));
 }

@@ -11,7 +11,9 @@ import '../models/routine_entry.dart';
 import '../models/task.dart';
 
 class DatabaseService {
-  static const _dbName = 'planom.db';
+  DatabaseService({this.dbName = 'planom.db'});
+
+  final String dbName;
   static const _dbVersion = 16;
 
   Database? _db;
@@ -21,7 +23,7 @@ class DatabaseService {
   Future<Database> _open() async {
     final dbPath = await getDatabasesPath();
     return openDatabase(
-      join(dbPath, _dbName),
+      join(dbPath, dbName),
       version: _dbVersion,
       onCreate: (db, _) async {
         await db.execute('''
@@ -915,5 +917,10 @@ class DatabaseService {
           conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
+  }
+
+  Future<void> close() async {
+    await _db?.close();
+    _db = null;
   }
 }

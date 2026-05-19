@@ -2,7 +2,9 @@ import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart' show ThemeMode;
 
+import '../spaces/space_manager.dart';
 import '../theme/app_theme.dart';
+import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import 'backup_service.dart';
 import 'settings_controller.dart';
@@ -22,7 +24,7 @@ class SettingsView extends StatefulWidget {
   State<SettingsView> createState() => _SettingsViewState();
 }
 
-class _SettingsViewState extends State<SettingsView> {
+class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
   bool _exporting = false;
   bool _importing = false;
 
@@ -119,6 +121,55 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
+  void _showSpacesMenu(BuildContext context) {
+    final spaceManager = SpaceManagerProvider.of(context);
+    showDropdown(context, (dismiss) {
+      return _SpacesDropdown(
+        spaceManager: spaceManager,
+        onDismiss: dismiss,
+        onAddSpace: () {
+          dismiss();
+          _showAddSpaceDialog(context, spaceManager);
+        },
+      );
+    });
+  }
+
+  void _showAddSpaceDialog(BuildContext context, SpaceManager spaceManager) {
+    final ctrl = TextEditingController();
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('New Space'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: ctrl,
+            placeholder: 'Space name',
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () {
+              final name = ctrl.text.trim();
+              if (name.isEmpty) return;
+              Navigator.of(ctx).pop();
+              spaceManager.addSpace(name);
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    ).then((_) => ctrl.dispose());
+  }
+
   void _showVisibilityPicker(
       BuildContext context, String key, SmartListVisibility current) {
     showCupertinoModalPopup<void>(
@@ -183,9 +234,14 @@ class _SettingsViewState extends State<SettingsView> {
     final hasBackup = widget.backupService != null;
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: Text('Settings'),
+        middle: const Text('Settings'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => _showSpacesMenu(context),
+          child: const Icon(CupertinoIcons.ellipsis, size: 26),
+        ),
       ),
       child: SafeArea(
         child: ListView(
@@ -345,6 +401,134 @@ class _SettingsViewState extends State<SettingsView> {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Spaces dropdown ──────────────────────────────────────────────────────────
+
+class _SpacesDropdown extends StatelessWidget {
+  const _SpacesDropdown({
+    required this.spaceManager,
+    required this.onDismiss,
+    required this.onAddSpace,
+  });
+
+  final SpaceManager spaceManager;
+  final VoidCallback onDismiss;
+  final VoidCallback onAddSpace;
+
+  @override
+  Widget build(BuildContext context) {
+    final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    final spaces = spaceManager.spaces;
+    final activeId = spaceManager.activeSpaceId;
+
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDismiss,
+          child: const SizedBox.expand(),
+        ),
+        Positioned(
+          top: topOffset,
+          right: 8,
+          child: Container(
+            width: 220,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground.resolveFrom(context),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 20,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final space in spaces) ...[
+                  _SpaceRow(
+                    name: space.name,
+                    isActive: space.id == activeId,
+                    onTap: () {
+                      onDismiss();
+                      spaceManager.switchSpace(space.id);
+                    },
+                  ),
+                  if (space != spaces.last)
+                    Container(
+                      height: 0.5,
+                      color: CupertinoColors.separator.resolveFrom(context),
+                    ),
+                ],
+                Container(
+                  height: 0.5,
+                  color: CupertinoColors.separator.resolveFrom(context),
+                ),
+                _SpaceRow(
+                  name: 'New Space',
+                  icon: CupertinoIcons.plus,
+                  isActive: false,
+                  onTap: onAddSpace,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SpaceRow extends StatelessWidget {
+  const _SpaceRow({
+    required this.name,
+    required this.isActive,
+    required this.onTap,
+    this.icon,
+  });
+
+  final String name;
+  final bool isActive;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = CupertinoColors.label.resolveFrom(context);
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      onPressed: onTap,
+      child: Row(
+        children: [
+          if (icon != null)
+            Icon(icon, size: 18, color: fg)
+          else
+            Icon(
+              CupertinoIcons.circle_fill,
+              size: 10,
+              color: isActive ? AppColors.accent : CupertinoColors.clear,
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(fontSize: 16, color: fg),
+            ),
+          ),
+          if (isActive)
+            Icon(
+              CupertinoIcons.checkmark,
+              size: 16,
+              color: AppColors.accent,
+            ),
+        ],
       ),
     );
   }
