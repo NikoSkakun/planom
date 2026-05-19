@@ -73,10 +73,11 @@ platform :ios do
     )
 
     upload_to_testflight(
-      api_key:                           api_key,
-      ipa:                               "build/ios/ipa/Planom.ipa",
-      skip_waiting_for_build_processing: true,
-      changelog:                         "Automated build from GitHub Actions — branch: #{ENV.fetch('GITHUB_REF_NAME', 'unknown')}",
+      api_key:              api_key,
+      ipa:                  "build/ios/ipa/Planom.ipa",
+      groups:               ["Dev"],
+      distribute_external:  false,
+      changelog:            "Automated build from GitHub Actions — branch: #{ENV.fetch('GITHUB_REF_NAME', 'unknown')}",
     )
 
     UI.success("✅  Uploaded to TestFlight — build #{build_number}")
