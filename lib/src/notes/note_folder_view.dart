@@ -181,149 +181,147 @@ class _NoteFolderViewState extends State<NoteFolderView>
           child: const Icon(CupertinoIcons.ellipsis, size: 26),
         ),
       ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: SafeArea(
-              child: ListenableBuilder(
-                listenable: widget.controller,
-                builder: (context, _) {
-                  final subFolders =
-                      widget.controller.foldersIn(_currentFolder.id);
-                  final notes = widget.controller.notesIn(_currentFolder.id);
-                  if (subFolders.isEmpty && notes.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No notes',
-                        style: TextStyle(
-                            color: CupertinoColors.secondaryLabel),
-                      ),
-                    );
-                  }
-                  return CustomScrollView(
-                    slivers: [
-                      const SliverToBoxAdapter(
-                          child: SizedBox(height: 8)),
+      child: SafeArea(
+        child: Stack(
+          children: [
+            ListenableBuilder(
+              listenable: widget.controller,
+              builder: (context, _) {
+                final subFolders =
+                    widget.controller.foldersIn(_currentFolder.id);
+                final notes = widget.controller.notesIn(_currentFolder.id);
+                if (subFolders.isEmpty && notes.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No notes',
+                      style: TextStyle(
+                          color: CupertinoColors.secondaryLabel),
+                    ),
+                  );
+                }
+                return CustomScrollView(
+                  slivers: [
+                    const SliverToBoxAdapter(
+                        child: SizedBox(height: 8)),
 
-                      if (subFolders.isNotEmpty)
-                        SliverReorderableList(
-                          itemCount: subFolders.length,
-                          onReorder: (old, neo) =>
-                              widget.controller.reorderNoteFolders(
-                                  _currentFolder.id, old, neo),
-                          proxyDecorator: _proxyDecorator,
-                          itemBuilder: (context, index) {
-                            final f = subFolders[index];
-                            return ReorderableDelayedDragStartListener(
-                              key: ValueKey('sf_${f.id}'),
-                              index: index,
-                              child: Dismissible(
-                                key: ValueKey(f.id),
-                                direction: DismissDirection.endToStart,
-                                background: const NoteDeleteBackground(),
-                                onDismissed: (_) =>
-                                    widget.controller.deleteFolderDeep(f.id),
-                                child: Column(
-                                  children: [
-                                    NoteFolderRow(
-                                      folder: f,
-                                      noteCount:
-                                          widget.controller.notesIn(f.id).length,
-                                      onTap: () => Navigator.of(context).push(
-                                        FastRoute<void>(
-                                          builder: (_) => NoteFolderView(
-                                            folder: f,
-                                            controller: widget.controller,
-                                          ),
+                    if (subFolders.isNotEmpty)
+                      SliverReorderableList(
+                        itemCount: subFolders.length,
+                        onReorder: (old, neo) =>
+                            widget.controller.reorderNoteFolders(
+                                _currentFolder.id, old, neo),
+                        proxyDecorator: _proxyDecorator,
+                        itemBuilder: (context, index) {
+                          final f = subFolders[index];
+                          return ReorderableDelayedDragStartListener(
+                            key: ValueKey('sf_${f.id}'),
+                            index: index,
+                            child: Dismissible(
+                              key: ValueKey(f.id),
+                              direction: DismissDirection.endToStart,
+                              background: const NoteDeleteBackground(),
+                              onDismissed: (_) =>
+                                  widget.controller.deleteFolderDeep(f.id),
+                              child: Column(
+                                children: [
+                                  NoteFolderRow(
+                                    folder: f,
+                                    noteCount:
+                                        widget.controller.notesIn(f.id).length,
+                                    onTap: () => Navigator.of(context).push(
+                                      FastRoute<void>(
+                                        builder: (_) => NoteFolderView(
+                                          folder: f,
+                                          controller: widget.controller,
                                         ),
                                       ),
-                                      onExpand: () => _toggle(f.id),
-                                      isExpanded: _expandedIds.contains(f.id),
                                     ),
-                                    if (_expandedIds.contains(f.id))
-                                      _buildFolderChildren(context, f.id, 24),
-                                  ],
-                                ),
+                                    onExpand: () => _toggle(f.id),
+                                    isExpanded: _expandedIds.contains(f.id),
+                                  ),
+                                  if (_expandedIds.contains(f.id))
+                                    _buildFolderChildren(context, f.id, 24),
+                                ],
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          );
+                        },
+                      ),
 
-                      if (notes.isNotEmpty)
-                        SliverReorderableList(
-                          itemCount: notes.length,
-                          onReorder: (old, neo) =>
-                              widget.controller.reorderNotes(
-                                  _currentFolder.id, old, neo),
-                          proxyDecorator: _proxyDecorator,
-                          itemBuilder: (context, index) {
-                            final n = notes[index];
-                            return ReorderableDelayedDragStartListener(
-                              key: ValueKey('fn_${n.id}'),
-                              index: index,
-                              child: Dismissible(
-                                key: ValueKey(n.id),
-                                direction: DismissDirection.endToStart,
-                                background: const NoteDeleteBackground(),
-                                onDismissed: (_) =>
-                                    widget.controller.deleteNote(n.id),
-                                child: NoteRow(
-                                  note: n,
-                                  onTap: () =>
-                                      Navigator.of(context).push(
-                                    FastRoute<void>(
-                                      settings: const RouteSettings(
-                                          name: NoteDetailView.routeName),
-                                      builder: (_) => NoteDetailView(
-                                        note: n,
-                                        controller: widget.controller,
-                                      ),
+                    if (notes.isNotEmpty)
+                      SliverReorderableList(
+                        itemCount: notes.length,
+                        onReorder: (old, neo) =>
+                            widget.controller.reorderNotes(
+                                _currentFolder.id, old, neo),
+                        proxyDecorator: _proxyDecorator,
+                        itemBuilder: (context, index) {
+                          final n = notes[index];
+                          return ReorderableDelayedDragStartListener(
+                            key: ValueKey('fn_${n.id}'),
+                            index: index,
+                            child: Dismissible(
+                              key: ValueKey(n.id),
+                              direction: DismissDirection.endToStart,
+                              background: const NoteDeleteBackground(),
+                              onDismissed: (_) =>
+                                  widget.controller.deleteNote(n.id),
+                              child: NoteRow(
+                                note: n,
+                                onTap: () =>
+                                    Navigator.of(context).push(
+                                  FastRoute<void>(
+                                    settings: const RouteSettings(
+                                        name: NoteDetailView.routeName),
+                                    builder: (_) => NoteDetailView(
+                                      note: n,
+                                      controller: widget.controller,
                                     ),
                                   ),
                                 ),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          );
+                        },
+                      ),
 
-                      const SliverToBoxAdapter(
-                          child: SizedBox(height: 80)),
-                    ],
-                  );
-                },
+                    const SliverToBoxAdapter(
+                        child: SizedBox(height: 80)),
+                  ],
+                );
+              },
+            ),
+            Positioned(
+              left: 20,
+              bottom: 16,
+              child: NoteFolderCircleButton(
+                onPressed: () => showCreateNoteFolderSheet(
+                  context,
+                  widget.controller,
+                  parentFolderId: _currentFolder.id,
+                ),
               ),
             ),
-          ),
-          Positioned(
-            left: 20,
-            bottom: 16,
-            child: NoteFolderCircleButton(
-              onPressed: () => showCreateNoteFolderSheet(
-                context,
-                widget.controller,
-                parentFolderId: _currentFolder.id,
-              ),
-            ),
-          ),
-          Positioned(
-            right: 20,
-            bottom: 16,
-            child: NoteOrangeAddButton(
-              onPressed: () => Navigator.of(context).push(
-                FastRoute<void>(
-                  settings: const RouteSettings(
-                      name: NoteDetailView.routeName),
-                  builder: (_) => NoteDetailView(
-                    note: Note(
-                        title: '', content: '', folderId: _currentFolder.id),
-                    controller: widget.controller,
-                    isNew: true,
+            Positioned(
+              right: 20,
+              bottom: 16,
+              child: NoteOrangeAddButton(
+                onPressed: () => Navigator.of(context).push(
+                  FastRoute<void>(
+                    settings: const RouteSettings(
+                        name: NoteDetailView.routeName),
+                    builder: (_) => NoteDetailView(
+                      note: Note(
+                          title: '', content: '', folderId: _currentFolder.id),
+                      controller: widget.controller,
+                      isNew: true,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
