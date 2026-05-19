@@ -6,8 +6,12 @@ import '../models/app_folder.dart';
 import '../theme/app_theme.dart';
 import 'folder_controller.dart';
 
+// Sentinel popped when Inbox is selected; maps to a null listId in the result.
+const _kInboxSentinel = '';
+
 /// Shows a hierarchical list/inbox picker. Returns the selected listId
-/// (null = Inbox), or returns nothing if dismissed without selection.
+/// (null = Inbox). If the sheet is dismissed without a selection the
+/// current value is returned unchanged.
 Future<String?> showListPickerSheet(
   BuildContext context,
   FolderController folderController,
@@ -23,6 +27,10 @@ Future<String?> showListPickerSheet(
       currentListId: currentListId,
     ),
   );
+  // null means the sheet was swiped away without a selection — no change.
+  if (result == null) return currentListId;
+  // Empty string sentinel means the user explicitly chose Inbox.
+  if (result == _kInboxSentinel) return null;
   return result;
 }
 
@@ -131,7 +139,7 @@ class _ListPickerSheetState extends State<_ListPickerSheet> {
                     label: 'Inbox',
                     isSelected: widget.currentListId == null,
                     onTap: () => Navigator.of(context, rootNavigator: true)
-                        .pop(null),
+                        .pop(_kInboxSentinel),
                     trailing: null,
                   ),
                 // Folders — drill in
