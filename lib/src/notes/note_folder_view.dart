@@ -182,10 +182,10 @@ class _NoteFolderViewState extends State<NoteFolderView>
         ),
       ),
       child: Stack(
-        fit: StackFit.expand,
         children: [
-          SafeArea(
-            child: ListenableBuilder(
+          Positioned.fill(
+            child: SafeArea(
+              child: ListenableBuilder(
                 listenable: widget.controller,
                 builder: (context, _) {
                   final subFolders =
@@ -293,6 +293,7 @@ class _NoteFolderViewState extends State<NoteFolderView>
                 },
               ),
             ),
+          ),
           Positioned(
             left: 20,
             bottom: 16,

@@ -148,10 +148,10 @@ class _NotesViewState extends State<NotesView> {
             : null,
       ),
       child: Stack(
-        fit: StackFit.expand,
         children: [
-          SafeArea(
-            child: ListenableBuilder(
+          Positioned.fill(
+            child: SafeArea(
+              child: ListenableBuilder(
                 listenable: widget.controller,
                 builder: (context, _) {
                   final folders = widget.controller.foldersIn(null);
@@ -314,6 +314,7 @@ class _NotesViewState extends State<NotesView> {
                 },
               ),
             ),
+          ),
           Positioned(
             left: 20,
             bottom: 16,
