@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' show showModalBottomSheet;
 import '../models/app_folder.dart';
 import '../theme/app_theme.dart';
 import 'folder_controller.dart';
+import 'folder_icon_picker.dart';
 
 // Sentinel popped when Inbox is selected; maps to a null listId in the result.
 const _kInboxSentinel = '';
@@ -135,7 +136,8 @@ class _ListPickerSheetState extends State<_ListPickerSheet> {
                 // Inbox only at root level
                 if (isRoot)
                   _PickerRow(
-                    iconAsset: 'assets/icons/inbox.png',
+                    icon: Image.asset('assets/icons/inbox.png',
+                        width: 22, height: 22),
                     label: 'Inbox',
                     isSelected: widget.currentListId == null,
                     onTap: () => Navigator.of(context, rootNavigator: true)
@@ -144,7 +146,11 @@ class _ListPickerSheetState extends State<_ListPickerSheet> {
                   ),
                 // Folders — drill in
                 ...folders.map((f) => _PickerRow(
-                      iconAsset: 'assets/icons/folder.png',
+                      icon: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: buildFolderItemIcon(f.iconId, isFolder: true),
+                      ),
                       label: f.name,
                       isSelected: false,
                       onTap: () => _enter(f),
@@ -157,7 +163,11 @@ class _ListPickerSheetState extends State<_ListPickerSheet> {
                     )),
                 // Lists — select
                 ...lists.map((l) => _PickerRow(
-                      iconAsset: 'assets/icons/list.png',
+                      icon: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: buildFolderItemIcon(l.iconId, isFolder: false),
+                      ),
                       label: l.name,
                       isSelected: widget.currentListId == l.id,
                       onTap: () => Navigator.of(context, rootNavigator: true)
@@ -187,14 +197,14 @@ class _ListPickerSheetState extends State<_ListPickerSheet> {
 
 class _PickerRow extends StatelessWidget {
   const _PickerRow({
-    required this.iconAsset,
+    required this.icon,
     required this.label,
     required this.isSelected,
     required this.onTap,
     required this.trailing,
   });
 
-  final String iconAsset;
+  final Widget icon;
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
@@ -207,7 +217,7 @@ class _PickerRow extends StatelessWidget {
       onPressed: onTap,
       child: Row(
         children: [
-          Image.asset(iconAsset, width: 22, height: 22),
+          icon,
           const SizedBox(width: 12),
           Expanded(
             child: Text(
