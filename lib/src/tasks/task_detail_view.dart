@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/widgets.dart' show WidgetsBindingObserver, AppLifecycleState;
 
 import '../theme/app_theme.dart';
 
@@ -29,7 +32,7 @@ class TaskDetailView extends StatefulWidget {
 }
 
 class _TaskDetailViewState extends State<TaskDetailView>
-    with DropdownOverlayMixin {
+    with DropdownOverlayMixin, WidgetsBindingObserver {
   late final TextEditingController _title;
   late final TextEditingController _note;
   late DateTime? _dueDate;
@@ -39,6 +42,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
   late String? _listId;
   late int _priority;
   bool _deleted = false;
+  Timer? _autosaveTimer;
 
   @override
   void initState() {
@@ -51,29 +55,52 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _isCompleted = widget.task.isCompleted;
     _listId = widget.task.listId;
     _priority = widget.task.priority;
+    _title.addListener(_scheduleAutosave);
+    _note.addListener(_scheduleAutosave);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _scheduleAutosave() {
+    _autosaveTimer?.cancel();
+    _autosaveTimer = Timer(const Duration(seconds: 3), _save);
+  }
+
+  void _save() {
+    if (_deleted) return;
+    final title = _title.text.trim();
+    if (title.isEmpty) return;
+    widget.controller.updateTask(widget.task.copyWith(
+      title: title,
+      note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+      dueDate: _dueDate,
+      clearDueDate: _dueDate == null,
+      doTime: _doTime,
+      clearDoTime: _doTime == null,
+      duration: _duration,
+      clearDuration: _duration == null,
+      isCompleted: _isCompleted,
+      listId: _listId,
+      clearListId: _listId == null,
+      priority: _priority,
+    ));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _autosaveTimer?.cancel();
+      _save();
+    }
   }
 
   @override
   void dispose() {
-    if (!_deleted) {
-    final title = _title.text.trim();
-    if (title.isNotEmpty) {
-      widget.controller.updateTask(widget.task.copyWith(
-        title: title,
-        note: _note.text.trim().isEmpty ? null : _note.text.trim(),
-        dueDate: _dueDate,
-        clearDueDate: _dueDate == null,
-        doTime: _doTime,
-        clearDoTime: _doTime == null,
-        duration: _duration,
-        clearDuration: _duration == null,
-        isCompleted: _isCompleted,
-        listId: _listId,
-        clearListId: _listId == null,
-        priority: _priority,
-      ));
-    }
-    }
+    _autosaveTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _save();
     _title.dispose();
     _note.dispose();
     super.dispose();

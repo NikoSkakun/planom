@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/widgets.dart' show WidgetsBindingObserver, AppLifecycleState;
 
 import '../folders/move_to_sheet.dart';
 import '../models/note.dart';
@@ -25,11 +28,13 @@ class NoteDetailView extends StatefulWidget {
 }
 
 class _NoteDetailViewState extends State<NoteDetailView>
-    with DropdownOverlayMixin {
+    with DropdownOverlayMixin, WidgetsBindingObserver {
   late final TextEditingController _title;
   late final TextEditingController _content;
   String? _folderId;
   bool _deleted = false;
+  bool _persistedNew = false;
+  Timer? _autosaveTimer;
 
   @override
   void initState() {
@@ -37,6 +42,52 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _title = TextEditingController(text: widget.note.title);
     _content = TextEditingController(text: widget.note.content);
     _folderId = widget.note.folderId;
+    _title.addListener(_scheduleAutosave);
+    _content.addListener(_scheduleAutosave);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _scheduleAutosave() {
+    _autosaveTimer?.cancel();
+    _autosaveTimer = Timer(const Duration(seconds: 3), _save);
+  }
+
+  void _save() {
+    if (_deleted) return;
+    final title = _title.text.trim();
+    final content = _content.text.trim();
+    if (widget.isNew && !_persistedNew) {
+      if (title.isEmpty && content.isEmpty) return;
+      widget.controller.addNote(
+        widget.note.copyWith(
+          title: title,
+          content: content,
+          folderId: _folderId,
+          clearFolderId: _folderId == null,
+        ),
+      );
+      _persistedNew = true;
+    } else {
+      widget.controller.updateNote(
+        widget.note.copyWith(
+          title: title,
+          content: content,
+          folderId: _folderId,
+          clearFolderId: _folderId == null,
+        ),
+      );
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _autosaveTimer?.cancel();
+      _save();
+    }
   }
 
   void _showDropdown(BuildContext context) {
@@ -74,31 +125,9 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   @override
   void dispose() {
-    if (!_deleted) {
-    final title = _title.text.trim();
-    final content = _content.text.trim();
-    if (widget.isNew) {
-      if (title.isNotEmpty || content.isNotEmpty) {
-        widget.controller.addNote(
-          widget.note.copyWith(
-            title: title,
-            content: content,
-            folderId: _folderId,
-            clearFolderId: _folderId == null,
-          ),
-        );
-      }
-    } else {
-      widget.controller.updateNote(
-        widget.note.copyWith(
-          title: title,
-          content: content,
-          folderId: _folderId,
-          clearFolderId: _folderId == null,
-        ),
-      );
-    }
-    }
+    _autosaveTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _save();
     _title.dispose();
     _content.dispose();
     super.dispose();
