@@ -62,13 +62,11 @@ platform :ios do
       scheme:         "Runner",
       configuration:  "Release",
       export_method:  "app-store",
-      # Force manual signing with the Match-installed profile. Without this,
-      # Xcode honors the project's CODE_SIGN_STYLE=Automatic setting and tries
-      # to auto-create a fresh dev cert through -allowProvisioningUpdates,
-      # which fails once the account hits its certificate limit.
+      # Force manual signing on the Runner target only. PROVISIONING_PROFILE_SPECIFIER
+      # is intentionally omitted here — gym injects it per-app-id via export_options.
+      # Pod targets are excluded from signing via Podfile CODE_SIGNING_ALLOWED=NO.
       xcargs:         "CODE_SIGN_STYLE=Manual" \
                       " DEVELOPMENT_TEAM=GH6HRY4EWZ" \
-                      " PROVISIONING_PROFILE_SPECIFIER='match AppStore app.planom'" \
                       " CODE_SIGN_IDENTITY='Apple Distribution'" \
                       " -authenticationKeyPath #{key_path}" \
                       " -authenticationKeyID #{api_key[:key_id]}" \
