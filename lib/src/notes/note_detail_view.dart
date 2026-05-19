@@ -67,16 +67,22 @@ class _NoteDetailViewState extends State<NoteDetailView>
         ),
       );
       _persistedNew = true;
-    } else {
-      widget.controller.updateNote(
-        widget.note.copyWith(
-          title: title,
-          content: content,
-          folderId: _folderId,
-          clearFolderId: _folderId == null,
-        ),
-      );
+      return;
     }
+    // Skip the write when nothing actually changed — otherwise copyWith bumps
+    // modifiedDate and the note jumps to the top of its list on next sort.
+    final changed = title != widget.note.title ||
+        content != widget.note.content ||
+        _folderId != widget.note.folderId;
+    if (!changed) return;
+    widget.controller.updateNote(
+      widget.note.copyWith(
+        title: title,
+        content: content,
+        folderId: _folderId,
+        clearFolderId: _folderId == null,
+      ),
+    );
   }
 
   @override
