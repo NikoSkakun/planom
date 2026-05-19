@@ -62,7 +62,14 @@ platform :ios do
       scheme:         "Runner",
       configuration:  "Release",
       export_method:  "app-store",
-      xcargs:         "-allowProvisioningUpdates" \
+      # Force manual signing with the Match-installed profile. Without this,
+      # Xcode honors the project's CODE_SIGN_STYLE=Automatic setting and tries
+      # to auto-create a fresh dev cert through -allowProvisioningUpdates,
+      # which fails once the account hits its certificate limit.
+      xcargs:         "CODE_SIGN_STYLE=Manual" \
+                      " DEVELOPMENT_TEAM=GH6HRY4EWZ" \
+                      " PROVISIONING_PROFILE_SPECIFIER='match AppStore app.planom'" \
+                      " CODE_SIGN_IDENTITY='Apple Distribution'" \
                       " -authenticationKeyPath #{key_path}" \
                       " -authenticationKeyID #{api_key[:key_id]}" \
                       " -authenticationKeyIssuerID #{api_key[:issuer_id]}",
