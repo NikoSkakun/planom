@@ -6,6 +6,55 @@ import '../folders/folder_icon_picker.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 
+List<InlineSpan> _parseInlineMarkdown(String text, TextStyle base) {
+  final spans = <InlineSpan>[];
+  final pattern = RegExp(
+    r'\*\*([^*]+)\*\*'        // **bold**
+    r'|\*([^*]+)\*'            // *italic*
+    r'|~~([^~]+)~~'            // ~~strikethrough~~
+    r'|`([^`]+)`'              // `code`
+    r'|\[([^\]]*)\]\([^)]*\)', // [text](url)
+  );
+  int last = 0;
+  for (final m in pattern.allMatches(text)) {
+    if (m.start > last) {
+      spans.add(TextSpan(text: text.substring(last, m.start), style: base));
+    }
+    if (m.group(1) != null) {
+      spans.add(TextSpan(text: m.group(1), style: base.copyWith(fontWeight: FontWeight.w700)));
+    } else if (m.group(2) != null) {
+      spans.add(TextSpan(text: m.group(2), style: base.copyWith(fontStyle: FontStyle.italic)));
+    } else if (m.group(3) != null) {
+      spans.add(TextSpan(text: m.group(3), style: base.copyWith(decoration: TextDecoration.lineThrough)));
+    } else if (m.group(4) != null) {
+      spans.add(TextSpan(text: m.group(4), style: base.copyWith(fontFamily: 'Menlo', fontSize: 12.0)));
+    } else if (m.group(5) != null) {
+      spans.add(TextSpan(text: m.group(5), style: base));
+    }
+    last = m.end;
+  }
+  if (last < text.length) {
+    spans.add(TextSpan(text: text.substring(last), style: base));
+  }
+  return spans;
+}
+
+Widget _buildFirstLinePreview(String content, TextStyle base) {
+  var line = content.split('\n').first;
+  final isHeading = RegExp(r'^#{1,6} ').hasMatch(line);
+  line = line.replaceFirst(RegExp(r'^#{1,6} '), '');
+  line = line.replaceFirst(RegExp(r'^[-*+] '), '');
+  line = line.replaceFirst(RegExp(r'^\d+\. '), '');
+  line = line.replaceFirst(RegExp(r'^> ?'), '');
+  final effectiveBase =
+      isHeading ? base.copyWith(fontWeight: FontWeight.w700) : base;
+  return Text.rich(
+    TextSpan(children: _parseInlineMarkdown(line, effectiveBase)),
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+  );
+}
+
 class NoteDeleteBackground extends StatelessWidget {
   const NoteDeleteBackground({super.key});
 
@@ -158,11 +207,9 @@ class NoteRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (hasBody)
-                    Text(
+                    _buildFirstLinePreview(
                       note.content,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      TextStyle(
                         fontSize: 13,
                         color: CupertinoColors.secondaryLabel
                             .resolveFrom(context),

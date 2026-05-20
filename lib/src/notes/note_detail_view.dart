@@ -231,6 +231,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
                         fontWeight: FontWeight.w700,
                       ),
                       decoration: const BoxDecoration(),
+                      padding: EdgeInsets.zero,
                       maxLines: null,
                       textInputAction: TextInputAction.next,
                       textCapitalization: TextCapitalization.sentences,

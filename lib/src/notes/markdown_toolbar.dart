@@ -109,55 +109,61 @@ class MarkdownToolbar extends StatelessWidget {
         top: false,
         child: SizedBox(
           height: 44,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Row(
             children: [
-              _ToolbarTextButton(
-                label: 'H1',
-                onTap: () => _linePrefix('# '),
+              Expanded(
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  children: [
+                    _ToolbarTextButton(
+                      label: 'H1',
+                      onTap: () => _linePrefix('# '),
+                    ),
+                    _ToolbarTextButton(
+                      label: 'H2',
+                      onTap: () => _linePrefix('## '),
+                    ),
+                    _ToolbarTextButton(
+                      label: 'H3',
+                      onTap: () => _linePrefix('### '),
+                    ),
+                    _ToolbarButton(
+                      icon: CupertinoIcons.bold,
+                      onTap: () => _wrap('**', '**', placeholder: 'bold'),
+                    ),
+                    _ToolbarButton(
+                      icon: CupertinoIcons.italic,
+                      onTap: () => _wrap('*', '*', placeholder: 'italic'),
+                    ),
+                    _ToolbarButton(
+                      icon: CupertinoIcons.strikethrough,
+                      onTap: () => _wrap('~~', '~~', placeholder: 'text'),
+                    ),
+                    _ToolbarButton(
+                      icon: CupertinoIcons.list_bullet,
+                      onTap: () => _linePrefix('- '),
+                    ),
+                    _ToolbarButton(
+                      icon: CupertinoIcons.list_number,
+                      onTap: () => _linePrefix('1. '),
+                    ),
+                    _ToolbarButton(
+                      icon: CupertinoIcons.quote_bubble,
+                      onTap: () => _linePrefix('> '),
+                    ),
+                    _ToolbarButton(
+                      icon: CupertinoIcons.chevron_left_slash_chevron_right,
+                      onTap: () => _wrap('`', '`', placeholder: 'code'),
+                    ),
+                    _ToolbarButton(
+                      icon: CupertinoIcons.link,
+                      onTap: () => _insertLink(context),
+                    ),
+                  ],
+                ),
               ),
-              _ToolbarTextButton(
-                label: 'H2',
-                onTap: () => _linePrefix('## '),
-              ),
-              _ToolbarTextButton(
-                label: 'H3',
-                onTap: () => _linePrefix('### '),
-              ),
-              _ToolbarButton(
-                icon: CupertinoIcons.bold,
-                onTap: () => _wrap('**', '**', placeholder: 'bold'),
-              ),
-              _ToolbarButton(
-                icon: CupertinoIcons.italic,
-                onTap: () => _wrap('*', '*', placeholder: 'italic'),
-              ),
-              _ToolbarButton(
-                icon: CupertinoIcons.strikethrough,
-                onTap: () => _wrap('~~', '~~', placeholder: 'text'),
-              ),
-              _ToolbarButton(
-                icon: CupertinoIcons.list_bullet,
-                onTap: () => _linePrefix('- '),
-              ),
-              _ToolbarButton(
-                icon: CupertinoIcons.list_number,
-                onTap: () => _linePrefix('1. '),
-              ),
-              _ToolbarButton(
-                icon: CupertinoIcons.quote_bubble,
-                onTap: () => _linePrefix('> '),
-              ),
-              _ToolbarButton(
-                icon: CupertinoIcons.chevron_left_slash_chevron_right,
-                onTap: () => _wrap('`', '`', placeholder: 'code'),
-              ),
-              _ToolbarButton(
-                icon: CupertinoIcons.link,
-                onTap: () => _insertLink(context),
-              ),
-              const SizedBox(width: 4),
+              Container(width: 0.5, color: border),
               _ToolbarButton(
                 icon: CupertinoIcons.keyboard_chevron_compact_down,
                 onTap: () => focusNode.unfocus(),
