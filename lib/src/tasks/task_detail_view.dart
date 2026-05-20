@@ -169,7 +169,6 @@ class _TaskDetailViewState extends State<TaskDetailView>
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      resizeToAvoidBottomInset: false,
       navigationBar: CupertinoNavigationBar(
         border: null,
         trailing: CupertinoButton(
@@ -341,7 +340,6 @@ class _TaskDetailViewState extends State<TaskDetailView>
                 ],
               ),
             ),
-            SizedBox(height: MediaQuery.viewInsetsOf(context).bottom),
           ],
         ),
       ),

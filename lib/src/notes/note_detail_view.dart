@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' show max;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/widgets.dart' show WidgetsBindingObserver, AppLifecycleState;
@@ -204,10 +203,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
   @override
   Widget build(BuildContext context) {
     final showToolbar = _contentFocus.hasFocus;
-    final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
-    final safeBottom = MediaQuery.paddingOf(context).bottom;
     return CupertinoPageScaffold(
-      resizeToAvoidBottomInset: false,
       navigationBar: CupertinoNavigationBar(
         border: null,
         trailing: widget.isNew
@@ -261,7 +257,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
               onPromptLink: (selected) =>
                   showLinkPromptDialog(context, initialText: selected),
             ),
-          SizedBox(height: max(keyboardHeight, safeBottom)),
         ],
       ),
     );
