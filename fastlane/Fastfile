@@ -111,8 +111,12 @@ platform :ios do
 
     beta_group = app.get_beta_groups.find { |g| g.name == "Dev" }
     if beta_group
-      build_obj.add_beta_groups(beta_groups: [beta_group])
-      UI.success("✅  Build #{build_number} added to TestFlight group 'Dev'")
+      begin
+        build_obj.add_beta_groups(beta_groups: [beta_group])
+        UI.success("✅  Build #{build_number} added to TestFlight group 'Dev'")
+      rescue => e
+        UI.important("ℹ️  Group 'Dev' is internal — internal groups receive all builds automatically. (#{e.message})")
+      end
     else
       UI.important("⚠️  TestFlight group 'Dev' not found — build uploaded but not distributed")
     end
