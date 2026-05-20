@@ -100,12 +100,13 @@ platform :ios do
     app = Spaceship::ConnectAPI::App.find("app.planom")
     UI.user_error!("Could not find app app.planom") unless app
 
-    builds = Spaceship::ConnectAPI::Build.all(
+    # Build.all's `version:` param filters by marketing version (e.g. "1.0.0"),
+    # NOT by build number. Omit it and find the right build by `b.version`,
+    # which IS the build number (CFBundleVersion) on each Build object.
+    build_obj = Spaceship::ConnectAPI::Build.all(
       app_id:   app.id,
-      version:  build_number,
       platform: "IOS",
-    )
-    build_obj = builds.first
+    ).find { |b| b.version == build_number }
     UI.user_error!("Build #{build_number} not found in ASC after upload") unless build_obj
 
     beta_group = app.get_beta_groups.find { |g| g.name == "Dev" }
