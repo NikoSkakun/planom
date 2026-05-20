@@ -7,6 +7,8 @@ import '../folders/move_to_sheet.dart';
 import '../models/note.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/item_info_sheet.dart';
+import 'markdown_toolbar.dart';
+import 'markdown_view.dart';
 import 'note_controller.dart';
 
 class NoteDetailView extends StatefulWidget {
@@ -31,6 +33,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
     with DropdownOverlayMixin, WidgetsBindingObserver {
   late final TextEditingController _title;
   late final TextEditingController _content;
+  final FocusNode _contentFocus = FocusNode();
   String? _folderId;
   bool _deleted = false;
   bool _persistedNew = false;
@@ -44,7 +47,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _folderId = widget.note.folderId;
     _title.addListener(_scheduleAutosave);
     _content.addListener(_scheduleAutosave);
+    _contentFocus.addListener(_onFocusChanged);
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _onFocusChanged() {
+    // Toolbar visibility is driven by focus; trigger a rebuild on every change.
+    if (mounted) setState(() {});
   }
 
   void _scheduleAutosave() {
@@ -134,13 +143,57 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _autosaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _save();
+    _contentFocus.removeListener(_onFocusChanged);
+    _contentFocus.dispose();
     _title.dispose();
     _content.dispose();
     super.dispose();
   }
 
+  Widget _buildContentArea() {
+    final isEditing = _contentFocus.hasFocus || widget.isNew;
+    if (isEditing) {
+      return CupertinoTextField(
+        controller: _content,
+        focusNode: _contentFocus,
+        placeholder: 'Note',
+        style: const TextStyle(fontSize: 16),
+        decoration: const BoxDecoration(),
+        maxLines: null,
+        expands: true,
+        textAlignVertical: TextAlignVertical.top,
+        textCapitalization: TextCapitalization.sentences,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      );
+    }
+    if (_content.text.trim().isEmpty) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _contentFocus.requestFocus(),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Text(
+              'Note',
+              style: TextStyle(
+                fontSize: 16,
+                color: CupertinoColors.placeholderText.resolveFrom(context),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return MarkdownView(
+      data: _content.text,
+      onTap: () => _contentFocus.requestFocus(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final showToolbar = _contentFocus.hasFocus;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
@@ -152,49 +205,49 @@ class _NoteDetailViewState extends State<NoteDetailView>
                 child: const Icon(CupertinoIcons.ellipsis, size: 26),
               ),
       ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: CupertinoTextField(
-                controller: _title,
-                placeholder: 'Title',
-                autofocus: widget.isNew,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-                decoration: const BoxDecoration(),
-                maxLines: null,
-                textInputAction: TextInputAction.next,
-                textCapitalization: TextCapitalization.sentences,
+      child: Column(
+        children: [
+          Expanded(
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: CupertinoTextField(
+                      controller: _title,
+                      placeholder: 'Title',
+                      autofocus: widget.isNew,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      decoration: const BoxDecoration(),
+                      maxLines: null,
+                      textInputAction: TextInputAction.next,
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      height: 0.5,
+                      color: CupertinoColors.separator,
+                    ),
+                  ),
+                  Expanded(child: _buildContentArea()),
+                ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                height: 0.5,
-                color: CupertinoColors.separator,
-              ),
+          ),
+          if (showToolbar)
+            MarkdownToolbar(
+              controller: _content,
+              focusNode: _contentFocus,
+              onPromptLink: (selected) =>
+                  showLinkPromptDialog(context, initialText: selected),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                child: CupertinoTextField(
-                  controller: _content,
-                  placeholder: 'Note',
-                  style: const TextStyle(fontSize: 16),
-                  decoration: const BoxDecoration(),
-                  maxLines: null,
-                  expands: true,
-                  textAlignVertical: TextAlignVertical.top,
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
