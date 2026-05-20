@@ -37,11 +37,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
   String? _folderId;
   bool _deleted = false;
   bool _persistedNew = false;
+  bool _isEditing = false;
   Timer? _autosaveTimer;
 
   @override
   void initState() {
     super.initState();
+    _isEditing = widget.isNew;
     _title = TextEditingController(text: widget.note.title);
     _content = TextEditingController(text: widget.note.content);
     _folderId = widget.note.folderId;
@@ -150,9 +152,15 @@ class _NoteDetailViewState extends State<NoteDetailView>
     super.dispose();
   }
 
+  void _startEditing() {
+    setState(() => _isEditing = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _contentFocus.requestFocus();
+    });
+  }
+
   Widget _buildContentArea() {
-    final isEditing = _contentFocus.hasFocus || widget.isNew;
-    if (isEditing) {
+    if (_isEditing || _contentFocus.hasFocus) {
       return CupertinoTextField(
         controller: _content,
         focusNode: _contentFocus,
@@ -169,7 +177,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
     if (_content.text.trim().isEmpty) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _contentFocus.requestFocus(),
+        onTap: _startEditing,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
           child: Align(
@@ -187,7 +195,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
     }
     return MarkdownView(
       data: _content.text,
-      onTap: () => _contentFocus.requestFocus(),
+      onTap: _startEditing,
     );
   }
 
