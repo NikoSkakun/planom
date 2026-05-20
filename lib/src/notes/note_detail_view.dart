@@ -54,8 +54,9 @@ class _NoteDetailViewState extends State<NoteDetailView>
   }
 
   void _onFocusChanged() {
-    // Toolbar visibility is driven by focus; trigger a rebuild on every change.
-    if (mounted) setState(() {});
+    if (mounted) setState(() {
+      if (!_contentFocus.hasFocus) _isEditing = false;
+    });
   }
 
   void _scheduleAutosave() {
