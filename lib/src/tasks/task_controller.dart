@@ -44,6 +44,21 @@ class TaskController with ChangeNotifier {
   int get todayUncompletedCount =>
       todayTasks.where((t) => !t.isCompleted).length;
 
+  /// Uncompleted tasks whose due date falls on or before today + [extraDays]
+  /// (also includes overdue tasks). Used to pre-set the iOS badge to a value
+  /// that stays meaningful when the user doesn't open the app for a few days.
+  int uncompletedCountThroughNextDays(int extraDays) {
+    final now = DateTime.now();
+    final cutoff = DateTime(now.year, now.month, now.day)
+        .add(Duration(days: extraDays));
+    return _tasks.where((t) {
+      if (t.isCompleted) return false;
+      if (t.dueDate == null) return false;
+      final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);
+      return !due.isAfter(cutoff);
+    }).length;
+  }
+
   List<Task> get upcomingTasks {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -272,7 +287,20 @@ class TaskController with ChangeNotifier {
   }
 
   void _updateBadge() {
-    final count = todayUncompletedCount;
+    _setBadge(todayUncompletedCount);
+  }
+
+  /// Sets the badge to cover today plus the next 2 days (3-day window).
+  /// Called when the app is being backgrounded so the badge stays informative
+  /// even if the user doesn't reopen the app for a couple of days.
+  void updateBadgeForExit({int lookaheadDays = 2}) {
+    _setBadge(uncompletedCountThroughNextDays(lookaheadDays));
+  }
+
+  /// Resets the badge to the today-only count. Called when the app resumes.
+  void updateBadge() => _updateBadge();
+
+  void _setBadge(int count) {
     if (count > 0) {
       FlutterAppBadger.updateBadgeCount(count);
     } else {

@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/widgets.dart'
+    show WidgetsBindingObserver, AppLifecycleState;
 
 import 'calendar/calendar_view.dart';
 import 'calendar/event_controller.dart';
@@ -44,7 +46,7 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   // Logical indices: 0=Tasks 1=Notes 2=Calendar 3=Routines 4=Settings
   final _navigatorKeys = List.generate(5, (_) => GlobalKey<NavigatorState>());
   late final List<_DepthObserver> _depthObservers;
@@ -62,6 +64,7 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _tabController = CupertinoTabController();
     widget.settingsController.addListener(_onSettingsChanged);
+    WidgetsBinding.instance.addObserver(this);
     _depthObservers = [
       // Tasks tab: show + unless TaskDetailView is on the stack.
       _DepthObserver(
@@ -101,6 +104,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.settingsController.removeListener(_onSettingsChanged);
     _tabController.dispose();
     _activeListId.dispose();
@@ -110,6 +114,26 @@ class _HomeShellState extends State<HomeShell> {
     _calendarResetSignal.dispose();
     _showPlusButton.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Update badge to cover the next few days when the app is actually
+    // backgrounded — so the indicator stays informative if the user doesn't
+    // open the app for a day or two. Skip `inactive`, which fires for brief
+    // transitions (incoming call, control center) and would just flicker.
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        widget.taskController.updateBadgeForExit();
+        break;
+      case AppLifecycleState.resumed:
+        widget.taskController.updateBadge();
+        break;
+      case AppLifecycleState.inactive:
+        break;
+    }
   }
 
   void _onSettingsChanged() {
