@@ -17,25 +17,28 @@ const Map<String, String> kAppFonts = {
   'jetbrainsMono': 'JetBrains Mono',
 };
 
+/// Converts a camelCase Google Fonts key to a human-readable display name.
+/// e.g. 'workSans' → 'Work Sans', 'sourceSans3' → 'Source Sans 3'
+String fontDisplayName(String key) {
+  if (key == kSystemFontKey) return 'System';
+  return key
+      .replaceAllMapped(
+        RegExp(r'(?<=[a-z])([A-Z])'),
+        (m) => ' ${m.group(1)}',
+      )
+      .replaceAllMapped(
+        RegExp(r'(?<=[A-Za-z])(\d+)'),
+        (m) => ' ${m.group(1)}',
+      )
+      .split(' ')
+      .map((w) => w.isEmpty ? '' : w[0].toUpperCase() + w.substring(1))
+      .join(' ');
+}
+
 TextStyle _applyFont(String key, TextStyle base) {
-  switch (key) {
-    case 'inter':
-      return GoogleFonts.inter(textStyle: base);
-    case 'roboto':
-      return GoogleFonts.roboto(textStyle: base);
-    case 'sourceSans3':
-      return GoogleFonts.sourceSans3(textStyle: base);
-    case 'nunito':
-      return GoogleFonts.nunito(textStyle: base);
-    case 'lora':
-      return GoogleFonts.lora(textStyle: base);
-    case 'merriweather':
-      return GoogleFonts.merriweather(textStyle: base);
-    case 'jetbrainsMono':
-      return GoogleFonts.jetBrainsMono(textStyle: base);
-    default:
-      return base;
-  }
+  final fontFn = GoogleFonts.asMap()[key];
+  if (fontFn != null) return fontFn(textStyle: base);
+  return base;
 }
 
 /// Builds a [CupertinoTextThemeData] with [fontKey] applied to every text

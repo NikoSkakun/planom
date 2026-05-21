@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../database/database_service.dart';
 import '../localization/strings.dart';
@@ -55,7 +56,7 @@ class SettingsController with ChangeNotifier {
       if (key == 'locale') {
         _locale = localeFromCode(value);
       } else if (key == 'font') {
-        if (kAppFonts.containsKey(value)) _fontKey = value;
+        if (value == kSystemFontKey || GoogleFonts.asMap().containsKey(value)) _fontKey = value;
       }
     }
 
@@ -85,7 +86,7 @@ class SettingsController with ChangeNotifier {
 
   Future<void> updateFontKey(String key) async {
     if (key == _fontKey) return;
-    if (!kAppFonts.containsKey(key)) return;
+    if (key != kSystemFontKey && !GoogleFonts.asMap().containsKey(key)) return;
     _fontKey = key;
     notifyListeners();
     await _db.setAppSetting('font', key);
