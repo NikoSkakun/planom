@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_theme.dart';
 
 import '../folders/folder_icon_picker.dart';
+import '../localization/strings.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 
@@ -196,7 +197,7 @@ class NoteRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    note.title.isEmpty ? 'Untitled' : note.title,
+                    note.title.isEmpty ? S.of(context).untitled : note.title,
                     style: TextStyle(
                       fontSize: 17,
                       fontStyle: note.title.isEmpty

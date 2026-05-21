@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart' show ThemeMode;
 
+import '../localization/strings.dart';
 import '../spaces/space_manager.dart';
 import '../theme/app_theme.dart';
 import '../utils/dropdown_overlay.dart';
@@ -35,8 +36,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
       await widget.backupService!.exportBackup();
     } catch (_) {
       if (!mounted) return;
-      _showErrorDialog(
-          'Export Failed', 'An error occurred while creating the backup.');
+      _showErrorDialog(S.of(context).exportFailed, S.of(context).exportFailedBody);
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -44,24 +44,23 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
 
   Future<void> _import() async {
     if (widget.backupService == null) return;
+    final s = S.of(context);
 
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Replace All Data?'),
-        content: const Text(
-          'Importing will permanently replace all current data with the backup. This cannot be undone.',
-        ),
+        title: Text(s.replaceAllData),
+        content: Text(s.replaceAllDataBody),
         actions: [
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Import'),
+            child: Text(s.confirm),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
         ],
       ),
@@ -76,28 +75,27 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
         await showCupertinoDialog<void>(
           context: context,
           builder: (ctx) => CupertinoAlertDialog(
-            title: const Text('Import Successful'),
-            content:
-                const Text('Your data has been restored from the backup.'),
+            title: Text(S.of(context).importSuccessful),
+            content: Text(S.of(context).importSuccessfulBody),
             actions: [
               CupertinoDialogAction(
                 isDefaultAction: true,
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('OK'),
+                child: Text(S.of(context).ok),
               ),
             ],
           ),
         );
       } else {
         _showErrorDialog(
-          'Import Failed',
-          'The selected file is not a valid Planom backup.',
+          S.of(context).importFailed,
+          S.of(context).importFailedInvalid,
         );
       }
     } catch (_) {
       if (mounted) {
         _showErrorDialog(
-            'Import Failed', 'An error occurred while reading the file.');
+            S.of(context).importFailed, S.of(context).importFailedRead);
       }
     } finally {
       if (mounted) setState(() => _importing = false);
@@ -114,7 +112,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
+            child: Text(S.of(context).ok),
           ),
         ],
       ),
@@ -137,15 +135,16 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
 
   void _showAddSpaceDialog(BuildContext context, SpaceManager spaceManager) {
     final ctrl = TextEditingController();
+    final s = S.of(context);
     showCupertinoDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('New Space'),
+        title: Text(s.newSpace),
         content: Padding(
           padding: const EdgeInsets.only(top: 12),
           child: CupertinoTextField(
             controller: ctrl,
-            placeholder: 'Space name',
+            placeholder: s.spaceName,
             autofocus: true,
             textCapitalization: TextCapitalization.sentences,
           ),
@@ -153,7 +152,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
         actions: [
           CupertinoDialogAction(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
@@ -163,7 +162,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
               Navigator.of(ctx).pop();
               spaceManager.addSpace(name);
             },
-            child: const Text('Create'),
+            child: Text(s.create),
           ),
         ],
       ),
@@ -172,10 +171,11 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
 
   void _showVisibilityPicker(
       BuildContext context, String key, SmartListVisibility current) {
+    final s = S.of(context);
     showCupertinoModalPopup<void>(
       context: context,
       builder: (_) => CupertinoActionSheet(
-        title: const Text('Visibility'),
+        title: Text(s.visibility),
         actions: SmartListVisibility.values.map((v) {
           final isSelected = v == current;
           return CupertinoActionSheetAction(
@@ -196,7 +196,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                     ),
                   ),
                 Text(
-                  _visibilityLabel(v),
+                  _visibilityLabel(s, v),
                   style: TextStyle(
                     color: isSelected
                         ? CupertinoColors.activeBlue
@@ -211,32 +211,80 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
           isDefaultAction: true,
           onPressed: () =>
               Navigator.of(context, rootNavigator: true).pop(),
-          child: const Text('Cancel'),
+          child: Text(s.cancel),
         ),
       ),
     );
   }
 
-  static String _visibilityLabel(SmartListVisibility v) {
+  static String _visibilityLabel(S s, SmartListVisibility v) {
     switch (v) {
       case SmartListVisibility.show:
-        return 'Show';
+        return s.visibilityShow;
       case SmartListVisibility.showIfNotEmpty:
-        return 'If not empty';
+        return s.visibilityIfNotEmpty;
       case SmartListVisibility.hidden:
-        return 'Hidden';
+        return s.visibilityHidden;
     }
+  }
+
+  void _showLanguagePicker(BuildContext context) {
+    final s = S.of(context);
+    final current = widget.controller.locale.languageCode;
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: Text(s.language),
+        actions: kSupportedLocales.map((loc) {
+          final isSelected = loc.languageCode == current;
+          return CupertinoActionSheetAction(
+            onPressed: () {
+              widget.controller.updateLocale(loc);
+              Navigator.of(ctx).pop();
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isSelected)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Icon(
+                      CupertinoIcons.checkmark,
+                      size: 16,
+                      color: CupertinoColors.activeBlue,
+                    ),
+                  ),
+                Text(
+                  kLanguageNames[loc.languageCode] ?? loc.languageCode,
+                  style: TextStyle(
+                    color: isSelected
+                        ? CupertinoColors.activeBlue
+                        : CupertinoColors.label,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: Text(s.cancel),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final labelColor = CupertinoColors.secondaryLabel.resolveFrom(context);
     final hasBackup = widget.backupService != null;
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: const Text('Settings'),
+        middle: Text(s.settings),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () => _showSpacesMenu(context),
@@ -249,7 +297,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
           children: [
             // ── Appearance ──────────────────────────────────────────────
             Text(
-              'Appearance',
+              s.sectionAppearance,
               style: TextStyle(
                 fontSize: 13,
                 color: labelColor,
@@ -263,27 +311,50 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                   CupertinoSlidingSegmentedControl<ThemeMode>(
                 groupValue: widget.controller.themeMode,
                 onValueChanged: widget.controller.updateThemeMode,
-                children: const {
+                children: {
                   ThemeMode.light: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('Light'),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(s.themeLight),
                   ),
                   ThemeMode.system: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('System'),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(s.themeSystem),
                   ),
                   ThemeMode.dark: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('Dark'),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(s.themeDark),
                   ),
                 },
               ),
             ),
 
+            // ── Language ────────────────────────────────────────────────
+            const SizedBox(height: 32),
+            Text(
+              s.sectionLanguage,
+              style: TextStyle(
+                fontSize: 13,
+                color: labelColor,
+                letterSpacing: -0.08,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListenableBuilder(
+              listenable: widget.controller,
+              builder: (ctx, _) {
+                final code = widget.controller.locale.languageCode;
+                return _NavRow(
+                  label: s.language,
+                  trailingLabel: kLanguageNames[code] ?? code,
+                  onTap: () => _showLanguagePicker(context),
+                );
+              },
+            ),
+
             // ── Smart Lists ─────────────────────────────────────────────
             const SizedBox(height: 32),
             Text(
-              'Smart Lists',
+              s.sectionSmartLists,
               style: TextStyle(
                 fontSize: 13,
                 color: labelColor,
@@ -300,13 +371,13 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                     _SmartListRow(
                       icon: Image.asset('assets/icons/inbox.png',
                           width: 22, height: 22),
-                      label: 'Inbox',
+                      label: s.inbox,
                     ),
                     const SizedBox(height: 1),
                     _SmartListRow(
                       icon: Image.asset('assets/icons/today.png',
                           width: 22, height: 22),
-                      label: 'Today',
+                      label: s.today,
                       visibility: prefs.today,
                       onTap: () => _showVisibilityPicker(
                           ctx, 'today', prefs.today),
@@ -315,7 +386,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                     _SmartListRow(
                       icon: Image.asset('assets/icons/upcoming.png',
                           width: 22, height: 22),
-                      label: 'Upcoming',
+                      label: s.upcoming,
                       visibility: prefs.upcoming,
                       onTap: () => _showVisibilityPicker(
                           ctx, 'upcoming', prefs.upcoming),
@@ -327,7 +398,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                         size: 22,
                         color: AppColors.systemGreen,
                       ),
-                      label: 'Completed',
+                      label: s.completed,
                       visibility: prefs.completed,
                       onTap: () => _showVisibilityPicker(
                           ctx, 'completed', prefs.completed),
@@ -340,7 +411,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                         color: CupertinoColors.secondaryLabel
                             .resolveFrom(ctx),
                       ),
-                      label: 'Trash',
+                      label: s.trash,
                       visibility: prefs.trash,
                       onTap: () => _showVisibilityPicker(
                           ctx, 'trash', prefs.trash),
@@ -353,7 +424,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             // ── Tab Bar ─────────────────────────────────────────────────
             const SizedBox(height: 32),
             Text(
-              'Customization',
+              s.sectionCustomization,
               style: TextStyle(
                 fontSize: 13,
                 color: labelColor,
@@ -362,7 +433,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             ),
             const SizedBox(height: 8),
             _NavRow(
-              label: 'Tab Bar',
+              label: s.tabBar,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => TabBarSettingsView(
@@ -377,7 +448,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
 
               // ── Data ────────────────────────────────────────────────
               Text(
-                'Data',
+                s.sectionData,
                 style: TextStyle(
                   fontSize: 13,
                   color: labelColor,
@@ -386,15 +457,15 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
               ),
               const SizedBox(height: 8),
               _DataRow(
-                label: 'Export Backup',
-                sublabel: 'Planom (.planom) · full restore',
+                label: s.exportBackup,
+                sublabel: s.exportBackupSublabel,
                 loading: _exporting,
                 onTap: _exporting || _importing ? null : _export,
               ),
               const SizedBox(height: 1),
               _DataRow(
-                label: 'Import Backup',
-                sublabel: 'Planom (.planom) · replaces all data',
+                label: s.importBackup,
+                sublabel: s.importBackupSublabel,
                 loading: _importing,
                 onTap: _exporting || _importing ? null : _import,
               ),
@@ -424,6 +495,7 @@ class _SpacesDropdown extends StatelessWidget {
     final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
     final spaces = spaceManager.spaces;
     final activeId = spaceManager.activeSpaceId;
+    final s = S.of(context);
 
     return Stack(
       children: [
@@ -472,7 +544,7 @@ class _SpacesDropdown extends StatelessWidget {
                   color: CupertinoColors.separator.resolveFrom(context),
                 ),
                 _SpaceRow(
-                  name: 'New Space',
+                  name: s.newSpace,
                   icon: CupertinoIcons.plus,
                   isActive: false,
                   onTap: onAddSpace,
@@ -543,12 +615,13 @@ class TabBarSettingsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final labelColor = CupertinoColors.secondaryLabel.resolveFrom(context);
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: Text('Tab Bar'),
+        middle: Text(s.tabBar),
       ),
       child: SafeArea(
         child: ListenableBuilder(
@@ -565,7 +638,7 @@ class TabBarSettingsView extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               children: [
                 Text(
-                  'Display',
+                  s.display,
                   style: TextStyle(
                     fontSize: 13,
                     color: labelColor,
@@ -574,13 +647,13 @@ class TabBarSettingsView extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 _ToggleRow(
-                  label: 'Hide Labels',
+                  label: s.hideLabels,
                   value: controller.hideTabLabels,
                   onChanged: controller.updateHideTabLabels,
                 ),
                 const SizedBox(height: 32),
                 Text(
-                  'Visible Tabs',
+                  s.visibleTabs,
                   style: TextStyle(
                     fontSize: 13,
                     color: labelColor,
@@ -589,35 +662,35 @@ class TabBarSettingsView extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 _ToggleRow(
-                  label: 'Tasks',
+                  label: s.tabTasks,
                   value: controller.isTabVisible(0),
                   enabled: !isDisabled(0),
                   onChanged: (v) => controller.setTabVisible(0, v),
                 ),
                 const SizedBox(height: 1),
                 _ToggleRow(
-                  label: 'Notes',
+                  label: s.tabNotes,
                   value: controller.isTabVisible(1),
                   enabled: !isDisabled(1),
                   onChanged: (v) => controller.setTabVisible(1, v),
                 ),
                 const SizedBox(height: 1),
                 _ToggleRow(
-                  label: 'Calendar',
+                  label: s.tabCalendar,
                   value: controller.isTabVisible(2),
                   enabled: !isDisabled(2),
                   onChanged: (v) => controller.setTabVisible(2, v),
                 ),
                 const SizedBox(height: 1),
                 _ToggleRow(
-                  label: 'Routines',
+                  label: s.tabRoutines,
                   value: controller.isTabVisible(3),
                   enabled: !isDisabled(3),
                   onChanged: (v) => controller.setTabVisible(3, v),
                 ),
                 const SizedBox(height: 1),
                 _ToggleRow(
-                  label: 'Settings',
+                  label: s.tabSettings,
                   value: settingsVisible,
                   enabled: !isDisabled(4),
                   onChanged: (v) => controller.setTabVisible(4, v),
@@ -627,7 +700,7 @@ class TabBarSettingsView extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
-                      'Settings is accessible from the options menu (⋯) in every other tab.',
+                      s.settingsAccessibleHint,
                       style: TextStyle(fontSize: 13, color: labelColor),
                     ),
                   ),
@@ -644,10 +717,11 @@ class TabBarSettingsView extends StatelessWidget {
 // ── Shared row widgets ────────────────────────────────────────────────────────
 
 class _NavRow extends StatelessWidget {
-  const _NavRow({required this.label, required this.onTap});
+  const _NavRow({required this.label, required this.onTap, this.trailingLabel});
 
   final String label;
   final VoidCallback onTap;
+  final String? trailingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -674,6 +748,17 @@ class _NavRow extends StatelessWidget {
                 ),
               ),
             ),
+            if (trailingLabel != null) ...[
+              Text(
+                trailingLabel!,
+                style: TextStyle(
+                  fontSize: 15,
+                  color:
+                      CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
             Icon(
               CupertinoIcons.chevron_right,
               size: 16,
@@ -701,6 +786,7 @@ class _SmartListRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final bg = CupertinoDynamicColor.resolve(
       CupertinoColors.tertiarySystemBackground,
       context,
@@ -733,8 +819,8 @@ class _SmartListRow extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               isDisabled
-                  ? 'Always shown'
-                  : _visibilityLabel(visibility!),
+                  ? s.visibilityAlwaysShown
+                  : _visibilityLabel(s, visibility!),
               style: TextStyle(
                 fontSize: 15,
                 color:
@@ -756,14 +842,14 @@ class _SmartListRow extends StatelessWidget {
     );
   }
 
-  static String _visibilityLabel(SmartListVisibility v) {
+  static String _visibilityLabel(S s, SmartListVisibility v) {
     switch (v) {
       case SmartListVisibility.show:
-        return 'Show';
+        return s.visibilityShow;
       case SmartListVisibility.showIfNotEmpty:
-        return 'If not empty';
+        return s.visibilityIfNotEmpty;
       case SmartListVisibility.hidden:
-        return 'Hidden';
+        return s.visibilityHidden;
     }
   }
 }

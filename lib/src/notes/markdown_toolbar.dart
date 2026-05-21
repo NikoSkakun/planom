@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../localization/strings.dart';
 import '../theme/app_theme.dart';
 
 /// Toolbar that sits above the keyboard while editing a note. Buttons wrap the
@@ -234,11 +235,12 @@ Future<({String text, String url})?> showLinkPromptDialog(
 }) async {
   final textCtrl = TextEditingController(text: initialText);
   final urlCtrl = TextEditingController();
+  final s = S.of(context);
   final result = await showCupertinoDialog<({String text, String url})>(
     context: context,
     builder: (ctx) {
       return CupertinoAlertDialog(
-        title: const Text('Insert Link'),
+        title: Text(s.insertLink),
         content: Padding(
           padding: const EdgeInsets.only(top: 12),
           child: Column(
@@ -246,7 +248,7 @@ Future<({String text, String url})?> showLinkPromptDialog(
             children: [
               CupertinoTextField(
                 controller: textCtrl,
-                placeholder: 'Link text (optional)',
+                placeholder: s.insertLinkTextPlaceholder,
                 autocorrect: false,
               ),
               const SizedBox(height: 8),
@@ -264,7 +266,7 @@ Future<({String text, String url})?> showLinkPromptDialog(
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
@@ -278,7 +280,7 @@ Future<({String text, String url})?> showLinkPromptDialog(
                 (text: textCtrl.text.trim(), url: url),
               );
             },
-            child: const Text('Insert'),
+            child: Text(s.insert),
           ),
         ],
       );

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_icon_picker.dart';
+import '../localization/strings.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 import '../utils/dropdown_overlay.dart';
@@ -191,10 +192,10 @@ class _NoteFolderViewState extends State<NoteFolderView>
                     widget.controller.foldersIn(_currentFolder.id);
                 final notes = widget.controller.notesIn(_currentFolder.id);
                 if (subFolders.isEmpty && notes.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
-                      'No notes',
-                      style: TextStyle(
+                      S.of(context).noNotes,
+                      style: const TextStyle(
                           color: CupertinoColors.secondaryLabel),
                     ),
                   );
@@ -360,23 +361,23 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
           child: _DropdownPanel(
             items: [
               _DropdownItem(
-                  label: 'Rename',
+                  label: S.of(context).rename,
                   icon: CupertinoIcons.pencil,
                   onTap: onRename),
               _DropdownItem(
-                  label: 'Change Icon',
+                  label: S.of(context).changeIcon,
                   icon: CupertinoIcons.photo,
                   onTap: onChangeIcon),
               _DropdownItem(
-                  label: 'Move to',
+                  label: S.of(context).moveTo,
                   icon: CupertinoIcons.folder,
                   onTap: onMoveTo),
               _DropdownItem(
-                  label: 'Info',
+                  label: S.of(context).info,
                   icon: CupertinoIcons.info,
                   onTap: onInfo),
               _DropdownItem(
-                  label: 'Delete',
+                  label: S.of(context).delete,
                   icon: CupertinoIcons.trash,
                   onTap: onDelete,
                   color: CupertinoColors.destructiveRed),

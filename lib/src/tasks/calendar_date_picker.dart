@@ -1,13 +1,11 @@
 import 'package:flutter/cupertino.dart';
 
+import '../localization/strings.dart';
 import '../theme/app_theme.dart';
 
 // Formats a task date (and optional time) for display.
-String formatTaskDate(DateTime d, {int? doTime}) {
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
+String formatTaskDate(BuildContext context, DateTime d, {int? doTime}) {
+  final months = monthsShort(context);
   final datePart = '${months[d.month - 1]} ${d.day}';
   if (doTime == null) return datePart;
   return '$datePart ${formatDoTime(doTime)}';
@@ -15,25 +13,24 @@ String formatTaskDate(DateTime d, {int? doTime}) {
 
 /// Same as [formatTaskDate] but substitutes "Yesterday", "Today" or
 /// "Tomorrow" when the date lands in that relative window.
-String formatTaskDateRelative(DateTime d, {int? doTime, DateTime? now}) {
+String formatTaskDateRelative(BuildContext context, DateTime d,
+    {int? doTime, DateTime? now}) {
   final today = () {
     final n = now ?? DateTime.now();
     return DateTime(n.year, n.month, n.day);
   }();
   final dDay = DateTime(d.year, d.month, d.day);
   final diff = dDay.difference(today).inDays;
+  final s = S.of(context);
   String datePart;
   if (diff == -1) {
-    datePart = 'Yesterday';
+    datePart = s.yesterday;
   } else if (diff == 0) {
-    datePart = 'Today';
+    datePart = s.today;
   } else if (diff == 1) {
-    datePart = 'Tomorrow';
+    datePart = s.tomorrow;
   } else {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
+    final months = monthsShort(context);
     datePart = '${months[d.month - 1]} ${d.day}';
   }
   if (doTime == null) return datePart;
@@ -134,6 +131,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
     const accent = AppColors.accent;
     const pageHeight = 320.0;
@@ -195,7 +193,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _showTimePicker ? formatDoTime(_doTime!) : 'Set time',
+                      _showTimePicker ? formatDoTime(_doTime!) : s.setTime,
                       style: TextStyle(
                         fontSize: 14,
                         color: _showTimePicker
@@ -245,7 +243,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                   child: CupertinoButton(
                     onPressed: () => Navigator.of(context).pop((null, null)),
                     child: Text(
-                      'No Date',
+                      s.noDate,
                       style: TextStyle(
                         color: CupertinoColors.secondaryLabel
                             .resolveFrom(context),
@@ -262,9 +260,9 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                   child: CupertinoButton(
                     onPressed: () =>
                         Navigator.of(context).pop((_selected, _doTime)),
-                    child: const Text(
-                      'Done',
-                      style: TextStyle(
+                    child: Text(
+                      s.done,
+                      style: const TextStyle(
                         color: accent,
                         fontWeight: FontWeight.w600,
                       ),
@@ -297,16 +295,12 @@ class _MonthGrid extends StatelessWidget {
   final VoidCallback onNext;
   final ValueChanged<DateTime> onSelect;
 
-  static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  static const _monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-
   static const _rowHeight = 36.0;
 
   @override
   Widget build(BuildContext context) {
+    final weekdays = weekdaysShort(context);
+    final monthNames = monthsLong(context);
     final today = DateTime.now();
     final offset = _mondayOffset(DateTime(month.year, month.month, 1));
     final days = _daysInMonth(month.year, month.month);
@@ -336,7 +330,7 @@ class _MonthGrid extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${_monthNames[month.month - 1]} ${month.year}',
+                  '${monthNames[month.month - 1]} ${month.year}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -358,7 +352,7 @@ class _MonthGrid extends StatelessWidget {
           SizedBox(
             height: 24,
             child: Row(
-              children: _weekdays
+              children: weekdays
                   .map((d) => Expanded(
                         child: Center(
                           child: Text(

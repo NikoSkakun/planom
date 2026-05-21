@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../localization/strings.dart';
 import '../models/routine.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
@@ -43,6 +44,7 @@ class _RoutinesViewState extends State<RoutinesView> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final sc = widget.settingsController;
     final settingsHidden = sc != null && !sc.isTabVisible(4);
     return CupertinoPageScaffold(
@@ -50,14 +52,14 @@ class _RoutinesViewState extends State<RoutinesView> {
         border: null,
         middle: CupertinoSlidingSegmentedControl<int>(
           groupValue: _tab,
-          children: const {
+          children: {
             0: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Text('Today'),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(s.routinesToday),
             ),
             1: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Text('All'),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(s.routinesAll),
             ),
           },
           onValueChanged: (v) {
@@ -92,11 +94,12 @@ class _TodayContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final routines = controller.todayRoutines;
     if (routines.isEmpty) {
       return _EmptyState(
-        message: 'No routines today',
-        hint: 'Tap + to add your first routine',
+        message: s.noRoutinesToday,
+        hint: s.tapPlusFirstAdd,
       );
     }
     return CustomScrollView(
@@ -105,7 +108,7 @@ class _TodayContent extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Text(
-              'TODAY',
+              s.routinesTodaySection,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -137,11 +140,12 @@ class _AllContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final routines = controller.routines;
     if (routines.isEmpty) {
-      return const _EmptyState(
-        message: 'No routines yet',
-        hint: 'Tap + to create your first routine',
+      return _EmptyState(
+        message: s.noRoutinesYet,
+        hint: s.tapPlusFirstCreate,
       );
     }
     return ListView.builder(
@@ -270,14 +274,17 @@ class _TodayRoutineRow extends StatelessWidget {
     );
   }
 
-  Future<bool> _confirmDelete(BuildContext context) => confirmHardDelete(
-        context,
-        title: 'Delete Routine',
-        body:
-            'Delete "${routine.name}"? This will also remove all recorded history.',
-      );
+  Future<bool> _confirmDelete(BuildContext context) {
+    final s = S.of(context);
+    return confirmHardDelete(
+      context,
+      title: s.deleteRoutine,
+      body: s.deleteRoutineConfirm(routine.name),
+    );
+  }
 
   void _showOptions(BuildContext context) {
+    final s = S.of(context);
     showCupertinoModalPopup<void>(
       context: context,
       builder: (_) => CupertinoActionSheet(
@@ -294,11 +301,11 @@ class _TodayRoutineRow extends StatelessWidget {
                 ),
               );
             },
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(
-                    child: Text('Edit', textAlign: TextAlign.left)),
-                Icon(CupertinoIcons.pencil, size: 18),
+                    child: Text(s.edit, textAlign: TextAlign.left)),
+                const Icon(CupertinoIcons.pencil, size: 18),
               ],
             ),
           ),
@@ -309,11 +316,11 @@ class _TodayRoutineRow extends StatelessWidget {
               final ok = await _confirmDelete(context);
               if (ok) controller.deleteRoutine(routine.id);
             },
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(
-                    child: Text('Delete', textAlign: TextAlign.left)),
-                Icon(CupertinoIcons.trash,
+                    child: Text(s.delete, textAlign: TextAlign.left)),
+                const Icon(CupertinoIcons.trash,
                     size: 18, color: CupertinoColors.destructiveRed),
               ],
             ),
@@ -321,7 +328,7 @@ class _TodayRoutineRow extends StatelessWidget {
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-          child: const Text('Cancel'),
+          child: Text(s.cancel),
         ),
       ),
     );
@@ -387,7 +394,7 @@ class _AllRoutineRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _frequencyLabel(routine),
+                      _frequencyLabel(context, routine),
                       style: TextStyle(
                         fontSize: 13,
                         color: CupertinoColors.secondaryLabel
@@ -409,23 +416,25 @@ class _AllRoutineRow extends StatelessWidget {
     );
   }
 
-  String _frequencyLabel(Routine r) {
+  String _frequencyLabel(BuildContext context, Routine r) {
+    final s = S.of(context);
     if (r.frequencyType == 'days_after_complete') {
-      final d = r.daysAfterComplete ?? 1;
-      return '$d day${d == 1 ? '' : 's'} after completion';
+      return s.daysAfterCount(r.daysAfterComplete ?? 1);
     }
     final days = r.weekdays;
-    if (days == null || days.length == 7) return 'Every day';
-    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    if (days == null || days.length == 7) return s.everyDayLabel;
+    final labels = weekdaysShort(context);
     return days.map((d) => labels[d]).join(', ');
   }
 
-  Future<bool> _confirmDelete(BuildContext context) => confirmHardDelete(
-        context,
-        title: 'Delete Routine',
-        body:
-            'Delete "${routine.name}"? This will also remove all recorded history.',
-      );
+  Future<bool> _confirmDelete(BuildContext context) {
+    final s = S.of(context);
+    return confirmHardDelete(
+      context,
+      title: s.deleteRoutine,
+      body: s.deleteRoutineConfirm(routine.name),
+    );
+  }
 }
 
 // ── Shared widgets ────────────────────────────────────────────────────────────

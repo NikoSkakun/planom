@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../localization/strings.dart';
 import '../theme/app_theme.dart';
 
 const kListColorPresets = [
@@ -213,9 +214,9 @@ class _PickerSheetState extends State<_PickerSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'List Color',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          Text(
+            S.of(context).listColor,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
           ListColorSwatches(
@@ -230,9 +231,9 @@ class _PickerSheetState extends State<_PickerSheet> {
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: _showCustomPicker,
-            child: const Text(
-              'Other…',
-              style: TextStyle(
+            child: Text(
+              S.of(context).otherDots,
+              style: const TextStyle(
                 fontSize: 16,
                 color: AppColors.accent,
               ),
@@ -306,10 +307,10 @@ class _CustomColorPickerSheetState extends State<_CustomColorPickerSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          const Center(
+          Center(
             child: Text(
-              'Custom Color',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              S.of(context).customColor,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(height: 20),
@@ -349,9 +350,9 @@ class _CustomColorPickerSheetState extends State<_CustomColorPickerSheet> {
               widget.onSelected(_currentColor);
               Navigator.of(context, rootNavigator: true).pop();
             },
-            child: const Text(
-              'Select Color',
-              style: TextStyle(
+            child: Text(
+              S.of(context).selectColor,
+              style: const TextStyle(
                 color: CupertinoColors.white,
                 fontWeight: FontWeight.w600,
               ),

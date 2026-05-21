@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../localization/strings.dart';
 import '../models/app_folder.dart';
 import '../tasks/task_controller.dart';
 import '../utils/confirm_dialogs.dart';
@@ -103,15 +104,15 @@ class _FolderViewState extends State<FolderView>
     );
   }
 
-  Future<bool> _confirmDelete(String name, {required bool isFolder}) =>
-      confirmMoveToTrash(
-        context,
-        name: name,
-        isFolder: isFolder,
-        body: isFolder
-            ? 'This folder and all its contents will be moved to Trash.'
-            : 'This list and all its tasks will be moved to Trash.',
-      );
+  Future<bool> _confirmDelete(String name, {required bool isFolder}) {
+    final s = S.of(context);
+    return confirmMoveToTrash(
+      context,
+      name: name,
+      isFolder: isFolder,
+      body: isFolder ? s.moveToTrashFolderBody : s.moveToTrashListBody,
+    );
+  }
 
   Widget _proxyDecorator(
       Widget child, int index, Animation<double> animation) {
@@ -225,10 +226,10 @@ class _FolderViewState extends State<FolderView>
                     widget.folderController.listsIn(_currentFolder.id);
 
                 if (subFolders.isEmpty && lists.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
-                      'No items',
-                      style: TextStyle(
+                      S.of(context).noItems,
+                      style: const TextStyle(
                           color: CupertinoColors.secondaryLabel),
                     ),
                   );
@@ -400,23 +401,23 @@ class _FolderOptionsDropdown extends StatelessWidget {
           child: _DropdownPanel(
             items: [
               _DropdownItem(
-                  label: 'Rename',
+                  label: S.of(context).rename,
                   icon: CupertinoIcons.pencil,
                   onTap: onRename),
               _DropdownItem(
-                  label: 'Change Icon',
+                  label: S.of(context).changeIcon,
                   icon: CupertinoIcons.photo,
                   onTap: onChangeIcon),
               _DropdownItem(
-                  label: 'Move to',
+                  label: S.of(context).moveTo,
                   icon: CupertinoIcons.folder,
                   onTap: onMoveTo),
               _DropdownItem(
-                  label: 'Info',
+                  label: S.of(context).info,
                   icon: CupertinoIcons.info,
                   onTap: onInfo),
               _DropdownItem(
-                  label: 'Delete',
+                  label: S.of(context).delete,
                   icon: CupertinoIcons.trash,
                   onTap: onDelete,
                   color: CupertinoColors.destructiveRed),

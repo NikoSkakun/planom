@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart'
     show WidgetsBindingObserver, AppLifecycleState;
 
 import 'calendar/calendar_view.dart';
+import 'localization/strings.dart';
 import 'calendar/event_controller.dart';
 import 'calendar/event_creation_sheet.dart';
 import 'folders/folder_controller.dart';
@@ -177,10 +178,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   void _showCalendarItemPicker(DateTime date) {
+    final s = S.of(context);
     showCupertinoModalPopup<void>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
-        title: const Text('Add to Calendar'),
+        title: Text(s.addToCalendar),
         actions: [
           CupertinoActionSheetAction(
             onPressed: () {
@@ -192,7 +194,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 initialDueDate: date,
               );
             },
-            child: const Text('Task'),
+            child: Text(s.taskOption),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
@@ -203,13 +205,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 initialDate: date,
               );
             },
-            child: const Text('Event'),
+            child: Text(s.eventOption),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
           isDefaultAction: true,
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
+          child: Text(s.cancel),
         ),
       ),
     );
@@ -248,7 +250,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     return indices.isEmpty ? [0] : indices;
   }
 
-  BottomNavigationBarItem _tabItem(int logicalIdx, bool hideLabels) {
+  BottomNavigationBarItem _tabItem(
+      BuildContext context, int logicalIdx, bool hideLabels) {
+    final s = S.of(context);
     switch (logicalIdx) {
       case 0:
         return BottomNavigationBarItem(
@@ -263,7 +267,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               color: AppColors.accent,
             ),
           ),
-          label: hideLabels ? null : 'Tasks',
+          label: hideLabels ? null : s.tabTasks,
         );
       case 1:
         return BottomNavigationBarItem(
@@ -278,7 +282,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               color: AppColors.accent,
             ),
           ),
-          label: hideLabels ? null : 'Notes',
+          label: hideLabels ? null : s.tabNotes,
         );
       case 2:
         return BottomNavigationBarItem(
@@ -294,7 +298,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               color: AppColors.accent,
             ),
           ),
-          label: hideLabels ? null : 'Calendar',
+          label: hideLabels ? null : s.tabCalendar,
         );
       case 3:
         return BottomNavigationBarItem(
@@ -310,7 +314,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               color: AppColors.accent,
             ),
           ),
-          label: hideLabels ? null : 'Routines',
+          label: hideLabels ? null : s.tabRoutines,
         );
       default:
         return BottomNavigationBarItem(
@@ -326,7 +330,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               color: AppColors.accent,
             ),
           ),
-          label: hideLabels ? null : 'Settings',
+          label: hideLabels ? null : s.tabSettings,
         );
     }
   }
@@ -391,7 +395,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 onTap: (visualIdx) =>
                     _onTabTapped(visibleIndices[visualIdx]),
                 items: visibleIndices
-                    .map((i) => _tabItem(i, hideLabels))
+                    .map((i) => _tabItem(context, i, hideLabels))
                     .toList(),
               ),
               tabBuilder: (context, visualIdx) {

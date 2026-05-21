@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../database/database_service.dart';
+import '../localization/strings.dart';
 import 'settings_service.dart';
 import 'smart_list_prefs.dart';
 
@@ -16,6 +17,9 @@ class SettingsController with ChangeNotifier {
   SmartListPrefs _smartListPrefs = SmartListPrefs();
   SmartListPrefs get smartListPrefs => _smartListPrefs;
   bool get hideTabLabels => _smartListPrefs.hideTabLabels;
+
+  Locale _locale = const Locale('en');
+  Locale get locale => _locale;
 
   final Map<int, bool> _tabVisibility = {
     0: true,
@@ -42,6 +46,10 @@ class SettingsController with ChangeNotifier {
       if (match != null) {
         final idx = int.parse(match.group(1)!);
         _tabVisibility[idx] = value == 'true';
+        continue;
+      }
+      if (key == 'locale') {
+        _locale = localeFromCode(value);
       }
     }
 
@@ -60,6 +68,13 @@ class SettingsController with ChangeNotifier {
     _themeMode = newThemeMode;
     notifyListeners();
     await _settingsService.updateThemeMode(newThemeMode);
+  }
+
+  Future<void> updateLocale(Locale locale) async {
+    if (locale.languageCode == _locale.languageCode) return;
+    _locale = locale;
+    notifyListeners();
+    await _db.setAppSetting('locale', locale.languageCode);
   }
 
   Future<void> updateHideTabLabels(bool value) async {

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
 import '../folders/folder_controller.dart';
+import '../localization/strings.dart';
 import '../models/event.dart';
 import '../models/task.dart';
 import '../tasks/calendar_date_picker.dart';
@@ -48,15 +49,6 @@ class DayViewSheet extends StatefulWidget {
   final TaskController taskController;
   final EventController eventController;
   final FolderController folderController;
-
-  static const _months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  static const _weekdays = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-    'Friday', 'Saturday', 'Sunday',
-  ];
 
   @override
   State<DayViewSheet> createState() => _DayViewSheetState();
@@ -148,6 +140,8 @@ class _DayViewSheetState extends State<DayViewSheet> {
     final mq = MediaQuery.of(context);
     final height = mq.size.height * 0.78;
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
+    final monthsLongList = monthsLong(context);
+    final weekdaysLongList = weekdaysLong(context);
 
     return Container(
       height: height,
@@ -188,8 +182,8 @@ class _DayViewSheetState extends State<DayViewSheet> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
-                        '${DayViewSheet._months[widget.date.month - 1]}\n'
-                        '${DayViewSheet._weekdays[widget.date.weekday - 1]}',
+                        '${monthsLongList[widget.date.month - 1]}\n'
+                        '${weekdaysLongList[widget.date.weekday - 1]}',
                         style: TextStyle(
                           fontSize: 13,
                           height: 1.2,
@@ -265,7 +259,7 @@ class _DayViewSheetState extends State<DayViewSheet> {
     if (isEmpty) {
       return Center(
         child: Text(
-          'No tasks or events',
+          S.of(context).noTasksOrEvents,
           style: TextStyle(
             fontSize: 15,
             color: CupertinoColors.secondaryLabel.resolveFrom(context),
@@ -338,7 +332,7 @@ class _AddPickerMenu extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _PickerRow(
-            label: 'Task',
+            label: S.of(context).taskOption,
             icon: CupertinoIcons.checkmark_square,
             onTap: onTask,
           ),
@@ -347,7 +341,7 @@ class _AddPickerMenu extends StatelessWidget {
             color: CupertinoColors.separator.resolveFrom(context),
           ),
           _PickerRow(
-            label: 'Event',
+            label: S.of(context).eventOption,
             icon: CupertinoIcons.calendar,
             onTap: onEvent,
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../localization/strings.dart';
 import '../models/note.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
@@ -133,12 +134,13 @@ class _NotesViewState extends State<NotesView> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final sc = widget.settingsController;
     final settingsHidden = sc != null && !sc.isTabVisible(4);
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: const Text('Notes'),
+        middle: Text(s.tabNotes),
         trailing: settingsHidden
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
@@ -159,10 +161,10 @@ class _NotesViewState extends State<NotesView> {
                     widget.controller.trashedNotes.isNotEmpty ||
                         widget.controller.trashedFolders.isNotEmpty;
                 if (folders.isEmpty && notes.isEmpty && !hasTrash) {
-                  return const Center(
+                  return Center(
                     child: Text(
-                      'No notes',
-                      style: TextStyle(
+                      s.noNotes,
+                      style: const TextStyle(
                           color: CupertinoColors.secondaryLabel),
                     ),
                   );
@@ -292,10 +294,10 @@ class _NotesViewState extends State<NotesView> {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    const Expanded(
+                                    Expanded(
                                       child: Text(
-                                        'Trash',
-                                        style: TextStyle(fontSize: 17),
+                                        s.trash,
+                                        style: const TextStyle(fontSize: 17),
                                       ),
                                     ),
                                   ],

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../localization/strings.dart';
 import '../models/routine.dart';
 import '../theme/app_theme.dart';
 import '../utils/fast_route.dart';
@@ -23,7 +24,6 @@ const _kUnits = [
   'step',
 ];
 
-const _kWeekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 void showRoutineCreationView(
   BuildContext context,
@@ -166,16 +166,17 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
     );
   }
 
-  String get _unitLabel {
+  String _unitLabel(BuildContext context) {
     if (_useCustomUnit) {
       final v = _customUnitCtrl.text.trim();
-      return v.isEmpty ? 'custom' : v;
+      return v.isEmpty ? S.of(context).customDots.replaceAll('…', '') : v;
     }
     return _goalUnit;
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final bg = CupertinoColors.systemGroupedBackground.resolveFrom(context);
     final accent = AppColors.accent;
 
@@ -183,17 +184,17 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
       backgroundColor: bg,
       navigationBar: CupertinoNavigationBar(border: null,
         backgroundColor: bg,
-        middle: Text(widget.existing == null ? 'New Routine' : 'Edit Routine'),
+        middle: Text(widget.existing == null ? s.newRoutine : s.editRoutine),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(s.cancel),
         ),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: _nameEmpty ? null : _save,
           child: Text(
-            'Done',
+            s.done,
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: _nameEmpty ? CupertinoColors.inactiveGray : accent,
@@ -238,10 +239,10 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
             ),
 
             // ── Frequency ────────────────────────────────────────────────
-            _SectionHeader('FREQUENCY'),
+            _SectionHeader(s.sectionFrequency),
             _Section(children: [
               _SegmentedRow(
-                options: const ['Daily', 'X days after completion'],
+                options: [s.freqDaily, s.freqDaysAfter],
                 selected: _frequencyType == 'daily' ? 0 : 1,
                 onChanged: (i) => setState(() =>
                     _frequencyType = i == 0 ? 'daily' : 'days_after_complete'),
@@ -258,17 +259,19 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
               ],
               const _Divider(),
               _SwitchRow(
-                label: 'Auto Reset',
-                sublabel: _autoReset == 'everyday' ? 'Every day' : 'Do not reset',
+                label: s.autoReset,
+                sublabel: _autoReset == 'everyday'
+                    ? s.autoResetEveryDay
+                    : s.autoResetNone,
                 onTap: () => _showAutoResetPicker(),
               ),
             ]),
 
             // ── Goal ─────────────────────────────────────────────────────
-            _SectionHeader('GOAL'),
+            _SectionHeader(s.sectionGoal),
             _Section(children: [
               _SegmentedRow(
-                options: const ['Achieve it all', 'Reach certain amount'],
+                options: [s.goalAchieveAll, s.goalCertainAmount],
                 selected: _goalType == 'achieve_all' ? 0 : 1,
                 onChanged: (i) => setState(() =>
                     _goalType = i == 0 ? 'achieve_all' : 'certain_amount'),
@@ -276,7 +279,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
               if (_goalType == 'certain_amount') ...[
                 const _Divider(),
                 _AmountRow(
-                  label: 'Daily goal',
+                  label: s.dailyGoal,
                   controller: _goalAmountCtrl,
                   trailingWidget: GestureDetector(
                     onTap: _pickUnit,
@@ -284,7 +287,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          _unitLabel,
+                          _unitLabel(context),
                           style: TextStyle(
                             fontSize: 15,
                             color: CupertinoColors.secondaryLabel
@@ -305,17 +308,17 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
                 if (_useCustomUnit) ...[
                   const _Divider(),
                   _TextRow(
-                    label: 'Unit name',
+                    label: s.unitName,
                     controller: _customUnitCtrl,
-                    placeholder: 'e.g. glass',
+                    placeholder: s.unitEgGlass,
                   ),
                 ],
                 const _Divider(),
                 _AmountRow(
-                  label: 'Record per tap',
+                  label: s.recordPerTap,
                   controller: _recordAmountCtrl,
                   trailingWidget: Text(
-                    _unitLabel,
+                    _unitLabel(context),
                     style: TextStyle(
                       fontSize: 15,
                       color:
@@ -442,7 +445,7 @@ class _NameRow extends StatelessWidget {
           Expanded(
             child: CupertinoTextField(
               controller: nameCtrl,
-              placeholder: 'Routine name',
+              placeholder: S.of(context).routineName,
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
@@ -543,6 +546,7 @@ class _WeekdayPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = AppColors.accent;
+    final labels = weekdaysShort(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
@@ -568,7 +572,7 @@ class _WeekdayPicker extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  _kWeekdayLabels[i][0],
+                  labels[i].substring(0, 1),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -611,7 +615,7 @@ class _DaysAfterRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            'days after completion',
+            S.of(context).daysAfterCompletion,
             style: TextStyle(
               fontSize: 15,
               color: CupertinoColors.label.resolveFrom(context),
@@ -766,17 +770,17 @@ class _AutoResetPopup extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 14, 16, 10),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
               child: Text(
-                'Auto Reset',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                S.of(context).autoReset,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
             Container(height: 0.5, color: sep),
-            _Option(label: 'Every day', value: 'everyday', current: current, onChanged: onChanged),
+            _Option(label: S.of(context).autoResetEveryDay, value: 'everyday', current: current, onChanged: onChanged),
             Container(height: 0.5, color: sep),
-            _Option(label: 'Do not reset', value: 'none', current: current, onChanged: onChanged),
+            _Option(label: S.of(context).autoResetNone, value: 'none', current: current, onChanged: onChanged),
           ],
         ),
       ),
@@ -880,14 +884,14 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
             ),
           ),
           const SizedBox(height: 12),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Choose unit',
-                style:
-                    TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                S.of(context).chooseUnit,
+                style: const TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -927,8 +931,8 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                         horizontal: 20, vertical: 12),
                     child: Row(
                       children: [
-                        const Text('Custom…',
-                            style: TextStyle(fontSize: 16)),
+                        Text(S.of(context).customDots,
+                            style: const TextStyle(fontSize: 16)),
                         const Spacer(),
                         if (_showCustom)
                           const Icon(CupertinoIcons.checkmark,
@@ -946,7 +950,7 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
               child: CupertinoTextField(
                 controller: _ctrl,
                 autofocus: true,
-                placeholder: 'Unit name',
+                placeholder: S.of(context).unitName,
                 style: const TextStyle(fontSize: 15),
               ),
             ),
@@ -960,7 +964,7 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                     widget.onSelected(_ctrl.text.trim(), true);
                     Navigator.of(context, rootNavigator: true).pop();
                   },
-                  child: const Text('Confirm'),
+                  child: Text(S.of(context).confirm),
                 ),
               ),
             ),

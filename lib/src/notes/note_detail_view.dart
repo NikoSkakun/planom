@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/widgets.dart' show WidgetsBindingObserver, AppLifecycleState;
 
 import '../folders/move_to_sheet.dart';
+import '../localization/strings.dart';
 import '../models/note.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/item_info_sheet.dart';
@@ -165,7 +166,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
       return CupertinoTextField(
         controller: _content,
         focusNode: _contentFocus,
-        placeholder: 'Note',
+        placeholder: S.of(context).note,
         style: const TextStyle(fontSize: 16),
         decoration: const BoxDecoration(),
         maxLines: null,
@@ -184,7 +185,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
           child: Align(
             alignment: Alignment.topLeft,
             child: Text(
-              'Note',
+              S.of(context).note,
               style: TextStyle(
                 fontSize: 16,
                 color: CupertinoColors.placeholderText.resolveFrom(context),
@@ -225,7 +226,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                     child: CupertinoTextField(
                       controller: _title,
-                      placeholder: 'Title',
+                      placeholder: S.of(context).title,
                       autofocus: widget.isNew,
                       style: const TextStyle(
                         fontSize: 22,
@@ -307,7 +308,7 @@ class _NoteOptionsDropdown extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _DropdownRow(
-                  label: 'Move to',
+                  label: S.of(context).moveTo,
                   icon: CupertinoIcons.folder,
                   onTap: onMoveTo,
                 ),
@@ -316,7 +317,7 @@ class _NoteOptionsDropdown extends StatelessWidget {
                   color: CupertinoColors.separator.resolveFrom(context),
                 ),
                 _DropdownRow(
-                  label: 'Info',
+                  label: S.of(context).info,
                   icon: CupertinoIcons.info,
                   onTap: onInfo,
                 ),
@@ -325,7 +326,7 @@ class _NoteOptionsDropdown extends StatelessWidget {
                   color: CupertinoColors.separator.resolveFrom(context),
                 ),
                 _DropdownRow(
-                  label: 'Delete',
+                  label: S.of(context).delete,
                   icon: CupertinoIcons.trash,
                   onTap: onDelete,
                   color: CupertinoColors.destructiveRed,

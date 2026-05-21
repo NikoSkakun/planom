@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../localization/strings.dart';
 import '../models/event.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
@@ -97,6 +98,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
@@ -124,7 +126,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
           const SizedBox(height: 20),
           CupertinoTextField(
             controller: _titleCtrl,
-            placeholder: 'Event name',
+            placeholder: s.eventName,
             autofocus: true,
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.sentences,
@@ -138,7 +140,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
           const SizedBox(height: 8),
           CupertinoTextField(
             controller: _noteCtrl,
-            placeholder: 'Note',
+            placeholder: s.note,
             style: const TextStyle(fontSize: 15),
             decoration: const BoxDecoration(),
             textCapitalization: TextCapitalization.sentences,
@@ -157,7 +159,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
                             size: 16, color: AppColors.accent),
                         const SizedBox(width: 4),
                         Text(
-                          formatTaskDate(_date, doTime: _doTime),
+                          formatTaskDate(context, _date, doTime: _doTime),
                           style: const TextStyle(
                               fontSize: 14, color: AppColors.accent),
                         ),
@@ -179,7 +181,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
                         Text(
                           _duration != null
                               ? _formatDuration(_duration!)
-                              : 'Duration',
+                              : s.duration,
                           style: TextStyle(
                             fontSize: 14,
                             color: _duration != null
@@ -201,7 +203,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
                 borderRadius: BorderRadius.circular(22),
                 onPressed: _titleEmpty ? null : _submit,
                 child: Text(
-                  'Add',
+                  s.add,
                   style: TextStyle(
                     color: _titleEmpty
                         ? CupertinoColors.tertiaryLabel.resolveFrom(context)
@@ -228,10 +230,11 @@ String _formatDuration(int minutes) {
 
 Future<int?> _showDurationPicker(BuildContext context, int? current) async {
   const presets = [15, 30, 45, 60, 90, 120, 180, 240];
+  final s = S.of(context);
   return showCupertinoModalPopup<int?>(
     context: context,
     builder: (ctx) => CupertinoActionSheet(
-      title: const Text('Duration'),
+      title: Text(s.duration),
       actions: [
         for (final m in presets)
           CupertinoActionSheetAction(
@@ -242,13 +245,13 @@ Future<int?> _showDurationPicker(BuildContext context, int? current) async {
           CupertinoActionSheetAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(-1),
-            child: const Text('Clear'),
+            child: Text(s.clear),
           ),
       ],
       cancelButton: CupertinoActionSheetAction(
         isDefaultAction: true,
         onPressed: () => Navigator.of(ctx).pop(),
-        child: const Text('Cancel'),
+        child: Text(s.cancel),
       ),
     ),
   ).then((v) {

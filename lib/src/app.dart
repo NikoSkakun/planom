@@ -45,13 +45,14 @@ class MyApp extends StatelessWidget {
         };
         return CupertinoApp(
           restorationScopeId: 'app',
+          locale: settingsController.locale,
           localizationsDelegates: const [
             AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          supportedLocales: const [Locale('en', '')],
+          supportedLocales: AppLocalizations.supportedLocales,
           onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
           theme: CupertinoThemeData(
             brightness: brightness,

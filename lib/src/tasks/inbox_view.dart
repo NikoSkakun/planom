@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_controller.dart';
+import '../localization/strings.dart';
 import '../utils/fast_route.dart';
 import 'task_controller.dart';
 import 'task_detail_view.dart';
@@ -18,9 +19,10 @@ class InboxView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(border: null,
-        middle: Text('Inbox'),
+      navigationBar: CupertinoNavigationBar(border: null,
+        middle: Text(s.inbox),
       ),
       child: SafeArea(
         child: ListenableBuilder(
@@ -31,11 +33,10 @@ class InboxView extends StatelessWidget {
                 controller.sortOrder == TaskSortOrder.defaultOrder;
 
             if (tasks.isEmpty) {
-              return const Center(
+              return Center(
                 child: Text(
-                  'No tasks',
-                  style:
-                      TextStyle(color: CupertinoColors.secondaryLabel),
+                  s.noTasks,
+                  style: const TextStyle(color: CupertinoColors.secondaryLabel),
                 ),
               );
             }

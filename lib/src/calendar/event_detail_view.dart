@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../localization/strings.dart';
 import '../models/event.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
@@ -73,10 +74,11 @@ class _EventDetailViewState extends State<EventDetailView> {
   }
 
   Future<void> _pickDuration() async {
+    final s = S.of(context);
     final result = await showCupertinoModalPopup<int?>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
-        title: const Text('Duration'),
+        title: Text(s.duration),
         actions: [
           for (final m in const [15, 30, 45, 60, 90, 120, 180, 240])
             CupertinoActionSheetAction(
@@ -87,13 +89,13 @@ class _EventDetailViewState extends State<EventDetailView> {
             CupertinoActionSheetAction(
               isDestructiveAction: true,
               onPressed: () => Navigator.of(ctx).pop(-1),
-              child: const Text('Clear'),
+              child: Text(s.clear),
             ),
         ],
         cancelButton: CupertinoActionSheetAction(
           isDefaultAction: true,
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
+          child: Text(s.cancel),
         ),
       ),
     );
@@ -102,21 +104,22 @@ class _EventDetailViewState extends State<EventDetailView> {
   }
 
   Future<void> _delete() async {
+    final s = S.of(context);
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Delete Event?'),
-        content: const Text('This event will be permanently removed.'),
+        title: Text(s.deleteEventQuestion),
+        content: Text(s.deleteEventBody),
         actions: [
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text(s.delete),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
         ],
       ),
@@ -129,6 +132,7 @@ class _EventDetailViewState extends State<EventDetailView> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -147,7 +151,7 @@ class _EventDetailViewState extends State<EventDetailView> {
           children: [
             CupertinoTextField(
               controller: _title,
-              placeholder: 'Event name',
+              placeholder: s.eventName,
               style: const TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w600),
               decoration: const BoxDecoration(),
@@ -157,7 +161,7 @@ class _EventDetailViewState extends State<EventDetailView> {
             const SizedBox(height: 12),
             CupertinoTextField(
               controller: _note,
-              placeholder: 'Note',
+              placeholder: s.note,
               style: const TextStyle(fontSize: 15),
               decoration: const BoxDecoration(),
               maxLines: null,
@@ -172,7 +176,7 @@ class _EventDetailViewState extends State<EventDetailView> {
                       size: 18, color: AppColors.accent),
                   const SizedBox(width: 10),
                   Text(
-                    formatTaskDate(_date, doTime: _doTime),
+                    formatTaskDate(context, _date, doTime: _doTime),
                     style: const TextStyle(
                         fontSize: 15, color: AppColors.accent),
                   ),
@@ -192,7 +196,7 @@ class _EventDetailViewState extends State<EventDetailView> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    _duration != null ? _dur(_duration!) : 'No duration',
+                    _duration != null ? _dur(_duration!) : s.noDuration,
                     style: TextStyle(
                       fontSize: 15,
                       color:

@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_theme.dart';
 
 import '../folders/folder_controller.dart';
+import '../localization/strings.dart';
 import '../models/event.dart';
 import '../models/task.dart';
 import '../settings/backup_service.dart';
@@ -214,15 +215,13 @@ class _CalendarViewState extends State<CalendarView> {
 // ─── Weekday header ───────────────────────────────────────────────────────────
 
 class _WeekdayHeader extends StatelessWidget {
-  static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 32,
       color: CupertinoColors.systemBackground.resolveFrom(context),
       child: Row(
-        children: _weekdays
+        children: weekdaysShort(context)
             .map((l) => Expanded(
                   child: Center(
                     child: Text(
@@ -261,11 +260,6 @@ class _MonthSection extends StatelessWidget {
   final EventController eventController;
   final ValueChanged<DateTime> onDayTap;
 
-  static const _monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-
   List<DateTime?> _buildGrid() {
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
     final startOffset = DateTime(month.year, month.month, 1).weekday - 1;
@@ -291,7 +285,7 @@ class _MonthSection extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Text(
-            '${_monthNames[month.month - 1]} ${month.year}',
+            '${monthsLong(context)[month.month - 1]} ${month.year}',
             style:
                 const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),

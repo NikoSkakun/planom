@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' show showModalBottomSheet;
 
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
+import '../localization/strings.dart';
 import '../models/task.dart';
 import '../theme/app_theme.dart';
 import 'calendar_date_picker.dart';
@@ -139,9 +140,10 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     saved?.requestFocus();
   }
 
-  String get _listLabel {
-    if (_listId == null) return 'Inbox';
-    return widget.folderController.listById(_listId!)?.name ?? 'Inbox';
+  String _listLabel(BuildContext context) {
+    final inbox = S.of(context).inbox;
+    if (_listId == null) return inbox;
+    return widget.folderController.listById(_listId!)?.name ?? inbox;
   }
 
   String get _listIcon =>
@@ -151,7 +153,10 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
   void _cyclePriority() =>
       setState(() => _priority = (_priority + 1) % 4);
 
-  static const _priorityLabels = ['', 'Low', 'Med', 'High'];
+  List<String> _priorityLabels(BuildContext context) {
+    final s = S.of(context);
+    return ['', s.priorityLow, s.priorityMed, s.priorityHigh];
+  }
   static const _priorityColors = [
     CupertinoColors.systemGrey,
     CupertinoColors.systemBlue,
@@ -161,6 +166,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
 
@@ -190,7 +196,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
           CupertinoTextField(
             controller: _titleCtrl,
             focusNode: _titleFocus,
-            placeholder: 'Task name',
+            placeholder: s.taskName,
             autofocus: true,
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.sentences,
@@ -206,7 +212,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
           CupertinoTextField(
             controller: _noteCtrl,
             focusNode: _noteFocus,
-            placeholder: 'Note',
+            placeholder: s.note,
             style: const TextStyle(fontSize: 15),
             decoration: const BoxDecoration(),
             textCapitalization: TextCapitalization.sentences,
@@ -230,7 +236,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          _listLabel,
+                          _listLabel(context),
                           style: TextStyle(
                             fontSize: 14,
                             color: CupertinoColors.secondaryLabel
@@ -257,8 +263,9 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                         const SizedBox(width: 4),
                         Text(
                           _dueDate != null
-                              ? formatTaskDate(_dueDate!, doTime: _doTime)
-                              : 'Date',
+                              ? formatTaskDate(context, _dueDate!,
+                                  doTime: _doTime)
+                              : s.dateLabel,
                           style: TextStyle(
                             fontSize: 14,
                             color: _dueDate != null
@@ -287,7 +294,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                         if (_priority > 0) ...[
                           const SizedBox(width: 4),
                           Text(
-                            _priorityLabels[_priority],
+                            _priorityLabels(context)[_priority],
                             style: TextStyle(
                               fontSize: 13,
                               color: _priorityColors[_priority],
@@ -338,7 +345,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                 borderRadius: BorderRadius.circular(22),
                 onPressed: _titleEmpty ? null : _submit,
                 child: Text(
-                  'Add',
+                  s.add,
                   style: TextStyle(
                     color: _titleEmpty
                         ? CupertinoColors.tertiaryLabel
@@ -366,10 +373,11 @@ String _formatDuration(int minutes) {
 
 Future<int?> _showDurationPicker(BuildContext context, int? current) async {
   const presets = [15, 30, 45, 60, 90, 120, 180, 240];
+  final s = S.of(context);
   return showCupertinoModalPopup<int?>(
     context: context,
     builder: (ctx) => CupertinoActionSheet(
-      title: const Text('Duration'),
+      title: Text(s.duration),
       actions: [
         for (final m in presets)
           CupertinoActionSheetAction(
@@ -380,13 +388,13 @@ Future<int?> _showDurationPicker(BuildContext context, int? current) async {
           CupertinoActionSheetAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(-1),
-            child: const Text('Clear'),
+            child: Text(s.clear),
           ),
       ],
       cancelButton: CupertinoActionSheetAction(
         isDefaultAction: true,
         onPressed: () => Navigator.of(ctx).pop(),
-        child: const Text('Cancel'),
+        child: Text(s.cancel),
       ),
     ),
   ).then((v) {

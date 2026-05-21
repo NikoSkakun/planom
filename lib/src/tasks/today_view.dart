@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_controller.dart';
+import '../localization/strings.dart';
 import '../models/task.dart';
 import '../utils/fast_route.dart';
 import 'task_controller.dart';
@@ -53,10 +54,11 @@ class _TodayViewState extends State<TodayView> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: Text('Today'),
+        middle: Text(s.today),
       ),
       child: SafeArea(
         child: ListenableBuilder(
@@ -66,11 +68,10 @@ class _TodayViewState extends State<TodayView> {
             final tasks = widget.controller.todayTasks;
 
             if (tasks.isEmpty) {
-              return const Center(
+              return Center(
                 child: Text(
-                  'No tasks for today',
-                  style:
-                      TextStyle(color: CupertinoColors.secondaryLabel),
+                  s.noTasksForToday,
+                  style: const TextStyle(color: CupertinoColors.secondaryLabel),
                 ),
               );
             }

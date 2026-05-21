@@ -58,7 +58,7 @@ class TaskRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final dueDate = task.dueDate;
     final dateLabel = dueDate != null
-        ? formatTaskDateRelative(dueDate, doTime: task.doTime)
+        ? formatTaskDateRelative(context, dueDate, doTime: task.doTime)
         : null;
     final dateColor = isOverdue
         ? CupertinoColors.destructiveRed

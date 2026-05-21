@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
 
+import '../localization/strings.dart';
 import '../folders/create_folder_list_sheet.dart';
 import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
@@ -74,14 +75,16 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
     });
   }
 
+  // ignore: unused_element
   void _showSortSheet(BuildContext context) {
+    final s = S.of(context);
     final current = widget.controller.sortOrder;
     showCupertinoModalPopup<void>(
       context: context,
       builder: (_) => CupertinoActionSheet(
-        title: const Text('Sort Tasks'),
+        title: Text(s.sortTasks),
         actions: TaskSortOrder.values.map((order) {
-          final label = _sortLabel(order);
+          final label = _sortLabel(s, order);
           final isSelected = order == current;
           return CupertinoActionSheetAction(
             onPressed: () {
@@ -113,7 +116,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
           isDefaultAction: true,
           onPressed: () =>
               Navigator.of(context, rootNavigator: true).pop(),
-          child: const Text('Cancel'),
+          child: Text(s.cancel),
         ),
       ),
     );
@@ -142,31 +145,31 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
     });
   }
 
-  static String _sortLabel(TaskSortOrder order) {
+  static String _sortLabel(S s, TaskSortOrder order) {
     switch (order) {
       case TaskSortOrder.defaultOrder:
-        return 'Default';
+        return s.sortDefault;
       case TaskSortOrder.creationDate:
-        return 'By Creation Date';
+        return s.sortByCreation;
       case TaskSortOrder.name:
-        return 'By Name';
+        return s.sortByName;
       case TaskSortOrder.priority:
-        return 'By Priority';
+        return s.sortByPriority;
       case TaskSortOrder.dateTime:
-        return 'By Date & Time';
+        return s.sortByDateTime;
     }
   }
 
   Future<bool> _confirmDelete(BuildContext context, String name,
-          {required bool isFolder}) =>
-      confirmMoveToTrash(
-        context,
-        name: name,
-        isFolder: isFolder,
-        body: isFolder
-            ? 'This folder and all its contents will be moved to Trash.'
-            : 'This list and all its tasks will be moved to Trash.',
-      );
+          {required bool isFolder}) {
+    final s = S.of(context);
+    return confirmMoveToTrash(
+      context,
+      name: name,
+      isFolder: isFolder,
+      body: isFolder ? s.moveToTrashFolderBody : s.moveToTrashListBody,
+    );
+  }
 
   Widget _buildFolderChildren(
       BuildContext context, String folderId, double indent) {
@@ -237,10 +240,11 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: const Text('Tasks'),
+        middle: Text(s.tabTasks),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () => _showDropdown(context),
@@ -290,7 +294,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                           const SizedBox(height: 8),
                           _ListItem(
                             iconAsset: 'assets/icons/inbox.png',
-                            label: 'Inbox',
+                            label: s.inbox,
                             count: widget
                                 .controller.inboxUncompletedCount,
                             onTap: () => Navigator.of(context).push(
@@ -306,7 +310,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                           if (showToday)
                             _ListItem(
                               iconAsset: 'assets/icons/today.png',
-                              label: 'Today',
+                              label: s.today,
                               count:
                                   todayCount > 0 ? todayCount : null,
                               onTap: () => Navigator.of(context).push(
@@ -323,7 +327,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                           if (showUpcoming)
                             _ListItem(
                               iconAsset: 'assets/icons/upcoming.png',
-                              label: 'Upcoming',
+                              label: s.upcoming,
                               count: upcomingCount > 0
                                   ? upcomingCount
                                   : null,
@@ -481,7 +485,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                   size: 22,
                                   color: AppColors.systemGreen,
                                 ),
-                                label: 'Completed',
+                                label: s.completed,
                                 onTap: () => Navigator.of(context).push(
                                   FastRoute<void>(
                                     builder: (_) => CompletedView(
@@ -500,7 +504,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                   color: CupertinoColors.secondaryLabel
                                       .resolveFrom(context),
                                 ),
-                                label: 'Trash',
+                                label: s.trash,
                                 onTap: () => Navigator.of(context).push(
                                   FastRoute<void>(
                                     builder: (_) => TrashView(
@@ -684,7 +688,7 @@ class _TasksOptionsDropdown extends StatelessWidget {
     final items = <Widget>[];
     if (showSettings) {
       items.add(_DropdownRow(
-        label: 'Settings',
+        label: S.of(context).settings,
         icon: CupertinoIcons.gear_alt,
         onTap: onSettings ?? () {},
       ));

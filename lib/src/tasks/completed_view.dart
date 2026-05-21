@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_controller.dart';
+import '../localization/strings.dart';
 import '../utils/fast_route.dart';
 import 'task_controller.dart';
 import 'task_detail_view.dart';
@@ -18,10 +19,11 @@ class CompletedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: Text('Completed'),
+        middle: Text(s.completed),
       ),
       child: SafeArea(
         child: ListenableBuilder(
@@ -30,10 +32,10 @@ class CompletedView extends StatelessWidget {
             final tasks = controller.allCompletedTasks;
 
             if (tasks.isEmpty) {
-              return const Center(
+              return Center(
                 child: Text(
-                  'No completed tasks',
-                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                  s.noCompletedTasks,
+                  style: const TextStyle(color: CupertinoColors.secondaryLabel),
                 ),
               );
             }

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../localization/strings.dart';
 import '../models/app_folder.dart';
 import '../theme/app_theme.dart';
 import 'folder_controller.dart';
@@ -113,7 +114,7 @@ class _ListPickerSheetState extends State<_ListPickerSheet> {
                       ),
                     if (!isRoot) const SizedBox(width: 4),
                     Text(
-                      isRoot ? 'Move to' : (_current?.name ?? ''),
+                      isRoot ? S.of(context).moveTo : (_current?.name ?? ''),
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
@@ -138,7 +139,7 @@ class _ListPickerSheetState extends State<_ListPickerSheet> {
                   _PickerRow(
                     icon: Image.asset('assets/icons/inbox.png',
                         width: 22, height: 22),
-                    label: 'Inbox',
+                    label: S.of(context).inbox,
                     isSelected: widget.currentListId == null,
                     onTap: () => Navigator.of(context, rootNavigator: true)
                         .pop(_kInboxSentinel),
@@ -179,7 +180,7 @@ class _ListPickerSheetState extends State<_ListPickerSheet> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 16),
                     child: Text(
-                      'No lists in this folder',
+                      S.of(context).noListsInFolder,
                       style: TextStyle(
                         color: CupertinoColors.secondaryLabel
                             .resolveFrom(context),

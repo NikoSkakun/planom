@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_controller.dart';
+import '../localization/strings.dart';
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import '../models/task.dart';
@@ -17,12 +18,11 @@ class TrashView extends StatelessWidget {
   final TaskController taskController;
   final FolderController folderController;
 
-  // ── Restore destination helpers ──────────────────────────────────────────
-
-  String _taskDestination(Task task) {
-    if (task.listId == null) return 'Inbox';
+  String _taskDestination(BuildContext context, Task task) {
+    final inbox = S.of(context).inbox;
+    if (task.listId == null) return inbox;
     final list = folderController.listById(task.listId!);
-    return list?.name ?? 'Inbox';
+    return list?.name ?? inbox;
   }
 
   String? _taskTargetListId(Task task) {
@@ -30,9 +30,10 @@ class TrashView extends StatelessWidget {
     return folderController.listById(task.listId!)?.id;
   }
 
-  String _listDestination(AppList list) {
-    if (list.folderId == null) return 'Tasks';
-    return folderController.folderById(list.folderId!)?.name ?? 'Tasks';
+  String _listDestination(BuildContext context, AppList list) {
+    final tasks = S.of(context).tabTasks;
+    if (list.folderId == null) return tasks;
+    return folderController.folderById(list.folderId!)?.name ?? tasks;
   }
 
   String? _listTargetFolderId(AppList list) {
@@ -40,9 +41,10 @@ class TrashView extends StatelessWidget {
     return folderController.folderById(list.folderId!)?.id;
   }
 
-  String _folderDestination(AppFolder folder) {
-    if (folder.parentFolderId == null) return 'Tasks';
-    return folderController.folderById(folder.parentFolderId!)?.name ?? 'Tasks';
+  String _folderDestination(BuildContext context, AppFolder folder) {
+    final tasks = S.of(context).tabTasks;
+    if (folder.parentFolderId == null) return tasks;
+    return folderController.folderById(folder.parentFolderId!)?.name ?? tasks;
   }
 
   String? _folderTargetParentId(AppFolder folder) {
@@ -50,24 +52,23 @@ class TrashView extends StatelessWidget {
     return folderController.folderById(folder.parentFolderId!)?.id;
   }
 
-  // ── Confirmation dialogs ─────────────────────────────────────────────────
-
   Future<bool> _confirmRestore(
       BuildContext context, String label, String destination) async {
+    final s = S.of(context);
     final result = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: Text('Restore "$label"?'),
-        content: Text('This will be moved back to $destination.'),
+        title: Text(s.restoreQuestion(label)),
+        content: Text(s.restoreBody(destination)),
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Put Back'),
+            child: Text(s.putBack),
           ),
           CupertinoDialogAction(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
         ],
       ),
@@ -77,21 +78,22 @@ class TrashView extends StatelessWidget {
 
   Future<bool> _confirmPermanentDelete(
       BuildContext context, String label) async {
+    final s = S.of(context);
     final result = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: Text('Delete "$label" permanently?'),
-        content: const Text('This cannot be undone.'),
+        title: Text(s.deletePermanentlyQuestion(label)),
+        content: Text(s.cannotBeUndone),
         actions: [
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text(s.delete),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
         ],
       ),
@@ -103,10 +105,10 @@ class TrashView extends StatelessWidget {
       BuildContext context, DismissDirection direction, _TrashEntry entry) {
     if (direction == DismissDirection.startToEnd) {
       final dest = entry.task != null
-          ? _taskDestination(entry.task!)
+          ? _taskDestination(context, entry.task!)
           : entry.list != null
-              ? _listDestination(entry.list!)
-              : _folderDestination(entry.folder!);
+              ? _listDestination(context, entry.list!)
+              : _folderDestination(context, entry.folder!);
       return _confirmRestore(context, entry.label, dest);
     }
     return _confirmPermanentDelete(context, entry.label);
@@ -135,9 +137,8 @@ class TrashView extends StatelessWidget {
     }
   }
 
-  // ── Menu ─────────────────────────────────────────────────────────────────
-
   void _showMenu(BuildContext context) {
+    final s = S.of(context);
     showCupertinoModalPopup<void>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
@@ -148,12 +149,12 @@ class TrashView extends StatelessWidget {
               Navigator.of(ctx).pop();
               _confirmEmptyTrash(context);
             },
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(
-                  child: Text('Empty Trash', textAlign: TextAlign.left),
+                  child: Text(s.emptyTrash, textAlign: TextAlign.left),
                 ),
-                Icon(CupertinoIcons.trash,
+                const Icon(CupertinoIcons.trash,
                     size: 18, color: CupertinoColors.destructiveRed),
               ],
             ),
@@ -161,30 +162,29 @@ class TrashView extends StatelessWidget {
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
+          child: Text(s.cancel),
         ),
       ),
     );
   }
 
   Future<void> _confirmEmptyTrash(BuildContext context) async {
+    final s = S.of(context);
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Empty Trash?'),
-        content: const Text(
-          'All items in Trash will be permanently deleted. This cannot be undone.',
-        ),
+        title: Text(s.emptyTrashQuestion),
+        content: Text(s.emptyTrashBody),
         actions: [
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete All'),
+            child: Text(s.deleteAll),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
         ],
       ),
@@ -194,10 +194,9 @@ class TrashView extends StatelessWidget {
     await folderController.permanentlyDeleteAllTrashed();
   }
 
-  // ── Build ────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     return ListenableBuilder(
       listenable: Listenable.merge([taskController, folderController]),
       builder: (context, _) {
@@ -209,7 +208,7 @@ class TrashView extends StatelessWidget {
         return CupertinoPageScaffold(
           navigationBar: CupertinoNavigationBar(
             border: null,
-            middle: const Text('Trash'),
+            middle: Text(s.trash),
             trailing: isEmpty
                 ? null
                 : CupertinoButton(
@@ -221,11 +220,11 @@ class TrashView extends StatelessWidget {
           ),
           child: SafeArea(
             child: isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      'Trash is empty',
-                      style:
-                          TextStyle(color: CupertinoColors.secondaryLabel),
+                      s.trashIsEmpty,
+                      style: const TextStyle(
+                          color: CupertinoColors.secondaryLabel),
                     ),
                   )
                 : Builder(builder: (context) {
@@ -269,8 +268,6 @@ class TrashView extends StatelessWidget {
   }
 }
 
-// ── Data model ───────────────────────────────────────────────────────────────
-
 class _TrashEntry {
   _TrashEntry.task(Task t)
       : task = t,
@@ -307,8 +304,6 @@ class _TrashEntry {
   final DateTime? deletedDate;
   final IconData? icon;
 }
-
-// ── Widgets ──────────────────────────────────────────────────────────────────
 
 class _PutBackBackground extends StatelessWidget {
   const _PutBackBackground();

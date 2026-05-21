@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../localization/strings.dart';
 import '../theme/app_theme.dart';
 
 // Preset (iconId, displayColor) pairs.
@@ -233,9 +234,9 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Choose Icon',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          Text(
+            S.of(context).chooseIcon,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
           Wrap(
@@ -289,7 +290,9 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _picking ? 'Opening…' : 'Choose from Library',
+                    _picking
+                        ? S.of(context).opening
+                        : S.of(context).chooseFromLibrary,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,

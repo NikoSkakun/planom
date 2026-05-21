@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
 
+import '../localization/strings.dart';
 import '../models/app_folder.dart';
 import '../models/note_folder.dart';
 import '../notes/note_controller.dart';
@@ -128,7 +129,7 @@ class _MoveToSheetState extends State<_MoveToSheet> {
                         size: 20,
                         color: CupertinoColors.secondaryLabel.resolveFrom(context),
                       ),
-                      label: 'No Folder',
+                      label: S.of(context).noFolder,
                       depth: 0,
                       isSelected: _selectedId == null,
                       isCurrent: widget.currentParentId == null,
@@ -160,22 +161,22 @@ class _MoveToSheetState extends State<_MoveToSheet> {
         children: [
           CupertinoButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(S.of(context).cancel),
           ),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Move to',
+              S.of(context).moveTo,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
             ),
           ),
           CupertinoButton(
             onPressed: (_moving || !_canMove) ? null : _confirm,
             child: _moving
                 ? const CupertinoActivityIndicator()
-                : const Text(
-                    'Move',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                : Text(
+                    S.of(context).move,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
           ),
         ],
@@ -306,7 +307,7 @@ class _NoteMoveToSheetState extends State<_NoteMoveToSheet> {
                         color: CupertinoColors.secondaryLabel
                             .resolveFrom(context),
                       ),
-                      label: 'No Folder',
+                      label: S.of(context).noFolder,
                       depth: 0,
                       isSelected: _selectedId == null,
                       isCurrent: widget.currentParentId == null,
@@ -340,22 +341,22 @@ class _NoteMoveToSheetState extends State<_NoteMoveToSheet> {
         children: [
           CupertinoButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(S.of(context).cancel),
           ),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Move to',
+              S.of(context).moveTo,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
             ),
           ),
           CupertinoButton(
             onPressed: (_moving || !_canMove) ? null : _confirm,
             child: _moving
                 ? const CupertinoActivityIndicator()
-                : const Text(
-                    'Move',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                : Text(
+                    S.of(context).move,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
           ),
         ],
@@ -413,7 +414,7 @@ class _DestinationRow extends StatelessWidget {
                 ),
                 if (isCurrent)
                   Text(
-                    'Current',
+                    S.of(context).current,
                     style: TextStyle(
                       fontSize: 13,
                       color:

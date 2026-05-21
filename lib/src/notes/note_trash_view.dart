@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../localization/strings.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 import 'note_controller.dart';
@@ -9,11 +10,10 @@ class NoteTrashView extends StatelessWidget {
 
   final NoteController controller;
 
-  // ── Restore destination helpers ─────────────────────��────────────────────
-
-  String _noteDestination(Note note) {
-    if (note.folderId == null) return 'Notes';
-    return controller.folderById(note.folderId!)?.name ?? 'Notes';
+  String _noteDestination(BuildContext context, Note note) {
+    final notes = S.of(context).tabNotes;
+    if (note.folderId == null) return notes;
+    return controller.folderById(note.folderId!)?.name ?? notes;
   }
 
   String? _noteTargetFolderId(Note note) {
@@ -21,9 +21,10 @@ class NoteTrashView extends StatelessWidget {
     return controller.folderById(note.folderId!)?.id;
   }
 
-  String _folderDestination(NoteFolder folder) {
-    if (folder.parentFolderId == null) return 'Notes';
-    return controller.folderById(folder.parentFolderId!)?.name ?? 'Notes';
+  String _folderDestination(BuildContext context, NoteFolder folder) {
+    final notes = S.of(context).tabNotes;
+    if (folder.parentFolderId == null) return notes;
+    return controller.folderById(folder.parentFolderId!)?.name ?? notes;
   }
 
   String? _folderTargetParentId(NoteFolder folder) {
@@ -31,24 +32,23 @@ class NoteTrashView extends StatelessWidget {
     return controller.folderById(folder.parentFolderId!)?.id;
   }
 
-  // ── Confirmation dialogs ─────────────────────────────────────────────────
-
   Future<bool> _confirmRestore(
       BuildContext context, String label, String destination) async {
+    final s = S.of(context);
     final result = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: Text('Restore "$label"?'),
-        content: Text('This will be moved back to $destination.'),
+        title: Text(s.restoreQuestion(label)),
+        content: Text(s.restoreBody(destination)),
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Put Back'),
+            child: Text(s.putBack),
           ),
           CupertinoDialogAction(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
         ],
       ),
@@ -58,21 +58,22 @@ class NoteTrashView extends StatelessWidget {
 
   Future<bool> _confirmPermanentDelete(
       BuildContext context, String label) async {
+    final s = S.of(context);
     final result = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: Text('Delete "$label" permanently?'),
-        content: const Text('This cannot be undone.'),
+        title: Text(s.deletePermanentlyQuestion(label)),
+        content: Text(s.cannotBeUndone),
         actions: [
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text(s.delete),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
         ],
       ),
@@ -84,8 +85,8 @@ class NoteTrashView extends StatelessWidget {
       BuildContext context, DismissDirection direction, _TrashEntry entry) {
     if (direction == DismissDirection.startToEnd) {
       final dest = entry.note != null
-          ? _noteDestination(entry.note!)
-          : _folderDestination(entry.folder!);
+          ? _noteDestination(context, entry.note!)
+          : _folderDestination(context, entry.folder!);
       return _confirmRestore(context, entry.label, dest);
     }
     return _confirmPermanentDelete(context, entry.label);
@@ -109,9 +110,8 @@ class NoteTrashView extends StatelessWidget {
     }
   }
 
-  // ── Menu ──────────────────────────���──────────────────────────────────────
-
   void _showMenu(BuildContext context) {
+    final s = S.of(context);
     showCupertinoModalPopup<void>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
@@ -122,12 +122,12 @@ class NoteTrashView extends StatelessWidget {
               Navigator.of(ctx).pop();
               _confirmEmptyTrash(context);
             },
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(
-                  child: Text('Empty Trash', textAlign: TextAlign.left),
+                  child: Text(s.emptyTrash, textAlign: TextAlign.left),
                 ),
-                Icon(CupertinoIcons.trash,
+                const Icon(CupertinoIcons.trash,
                     size: 18, color: CupertinoColors.destructiveRed),
               ],
             ),
@@ -135,30 +135,29 @@ class NoteTrashView extends StatelessWidget {
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
+          child: Text(s.cancel),
         ),
       ),
     );
   }
 
   Future<void> _confirmEmptyTrash(BuildContext context) async {
+    final s = S.of(context);
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Empty Trash?'),
-        content: const Text(
-          'All items in Trash will be permanently deleted. This cannot be undone.',
-        ),
+        title: Text(s.emptyTrashQuestion),
+        content: Text(s.emptyTrashBody),
         actions: [
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete All'),
+            child: Text(s.deleteAll),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
         ],
       ),
@@ -167,10 +166,9 @@ class NoteTrashView extends StatelessWidget {
     await controller.permanentlyDeleteAllTrashed();
   }
 
-  // ── Build ───────────────────────────────────────────────────────��────────
-
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
@@ -181,7 +179,7 @@ class NoteTrashView extends StatelessWidget {
         return CupertinoPageScaffold(
           navigationBar: CupertinoNavigationBar(
             border: null,
-            middle: const Text('Trash'),
+            middle: Text(s.trash),
             trailing: isEmpty
                 ? null
                 : CupertinoButton(
@@ -193,16 +191,18 @@ class NoteTrashView extends StatelessWidget {
           ),
           child: SafeArea(
             child: isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      'Trash is empty',
-                      style:
-                          TextStyle(color: CupertinoColors.secondaryLabel),
+                      s.trashIsEmpty,
+                      style: const TextStyle(
+                          color: CupertinoColors.secondaryLabel),
                     ),
                   )
                 : Builder(builder: (context) {
                     final entries = <_TrashEntry>[
-                      for (final n in notes) _TrashEntry.note(n),
+                      for (final n in notes)
+                        _TrashEntry.note(
+                            n, n.title.isNotEmpty ? n.title : s.untitled),
                       for (final f in folders) _TrashEntry.folder(f),
                     ]..sort((a, b) {
                         final da = a.deletedDate ?? DateTime(0);
@@ -241,14 +241,12 @@ class NoteTrashView extends StatelessWidget {
   }
 }
 
-// ── Data model ──────────────────────────��────────────────────────────────────
-
 class _TrashEntry {
-  _TrashEntry.note(Note n)
+  _TrashEntry.note(Note n, String displayLabel)
       : note = n,
         folder = null,
         id = 'note_${n.id}',
-        label = n.title.isNotEmpty ? n.title : 'Untitled',
+        label = displayLabel,
         deletedDate = n.deletedDate,
         icon = CupertinoIcons.doc_text;
 
@@ -267,8 +265,6 @@ class _TrashEntry {
   final DateTime? deletedDate;
   final IconData icon;
 }
-
-// ── Widgets ──────────────────────────────────────────────────────────────────
 
 class _PutBackBackground extends StatelessWidget {
   const _PutBackBackground();

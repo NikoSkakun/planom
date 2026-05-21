@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_controller.dart';
+import '../localization/strings.dart';
 import '../utils/fast_route.dart';
 import 'task_controller.dart';
 import 'task_detail_view.dart';
@@ -18,10 +19,11 @@ class UpcomingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
+      navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: Text('Upcoming'),
+        middle: Text(s.upcoming),
       ),
       child: SafeArea(
         child: ListenableBuilder(
@@ -31,10 +33,10 @@ class UpcomingView extends StatelessWidget {
             final tasks = controller.upcomingTasks;
 
             if (tasks.isEmpty) {
-              return const Center(
+              return Center(
                 child: Text(
-                  'No upcoming tasks',
-                  style: TextStyle(color: CupertinoColors.secondaryLabel),
+                  s.noUpcomingTasks,
+                  style: const TextStyle(color: CupertinoColors.secondaryLabel),
                 ),
               );
             }

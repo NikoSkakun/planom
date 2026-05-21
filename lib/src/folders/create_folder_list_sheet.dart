@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../localization/strings.dart';
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import '../theme/app_theme.dart';
@@ -102,9 +103,9 @@ class _RenameSheetState extends State<_RenameSheet> {
             color: AppColors.accent,
             borderRadius: BorderRadius.circular(12),
             onPressed: _submit,
-            child: const Text(
-              'Rename',
-              style: TextStyle(
+            child: Text(
+              S.of(context).rename,
+              style: const TextStyle(
                 color: CupertinoColors.white,
                 fontWeight: FontWeight.w600,
               ),
@@ -226,7 +227,7 @@ class _CreateSheetState extends State<_CreateSheet> {
                 children: [
                   Image.asset('assets/icons/list.png', width: 16, height: 16),
                   const SizedBox(width: 6),
-                  const Text('List'),
+                  Text(S.of(context).list),
                 ],
               ),
               _CreateType.folder: Row(
@@ -235,7 +236,7 @@ class _CreateSheetState extends State<_CreateSheet> {
                   Image.asset('assets/icons/folder.png',
                       width: 16, height: 16),
                   const SizedBox(width: 6),
-                  const Text('Folder'),
+                  Text(S.of(context).folder),
                 ],
               ),
             },
@@ -272,7 +273,9 @@ class _CreateSheetState extends State<_CreateSheet> {
               Expanded(
                 child: CupertinoTextField(
                   controller: _nameCtrl,
-                  placeholder: isFolder ? 'Folder name' : 'List name',
+                  placeholder: isFolder
+                      ? S.of(context).folderName
+                      : S.of(context).listName,
                   autofocus: true,
                   textCapitalization: TextCapitalization.sentences,
                   textInputAction: TextInputAction.done,
@@ -309,7 +312,9 @@ class _CreateSheetState extends State<_CreateSheet> {
             borderRadius: BorderRadius.circular(12),
             onPressed: _submit,
             child: Text(
-              isFolder ? 'Create Folder' : 'Create List',
+              isFolder
+                  ? S.of(context).createFolder
+                  : S.of(context).createList,
               style: const TextStyle(
                 color: CupertinoColors.white,
                 fontWeight: FontWeight.w600,
@@ -343,10 +348,10 @@ class _ColorPickerButton extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'List color',
-                style: TextStyle(fontSize: 17),
+                S.of(context).listColor,
+                style: const TextStyle(fontSize: 17),
               ),
             ),
             if (selectedColor == null)

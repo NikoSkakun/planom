@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
 import '../folders/folder_icon_picker.dart';
+import '../localization/strings.dart';
 import '../models/note_folder.dart';
 import '../theme/app_theme.dart';
 import 'note_controller.dart';
@@ -116,7 +117,7 @@ class _CreateSheetState extends State<_CreateSheet> {
               Expanded(
                 child: CupertinoTextField(
                   controller: _nameCtrl,
-                  placeholder: 'Folder name',
+                  placeholder: S.of(context).folderName,
                   autofocus: true,
                   textCapitalization: TextCapitalization.sentences,
                   textInputAction: TextInputAction.done,
@@ -139,9 +140,9 @@ class _CreateSheetState extends State<_CreateSheet> {
             color: AppColors.accent,
             borderRadius: BorderRadius.circular(12),
             onPressed: _submit,
-            child: const Text(
-              'Create Folder',
-              style: TextStyle(
+            child: Text(
+              S.of(context).createFolder,
+              style: const TextStyle(
                 color: CupertinoColors.white,
                 fontWeight: FontWeight.w600,
               ),

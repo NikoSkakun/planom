@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
+import '../localization/strings.dart';
 import '../models/task.dart';
 import '../notes/markdown_toolbar.dart';
 import '../notes/markdown_view.dart';
@@ -182,17 +183,19 @@ class _TaskDetailViewState extends State<TaskDetailView>
     setState(() => _duration = result);
   }
 
-  String get _listLabel {
-    if (_listId == null) return 'Inbox';
-    return widget.folderController.listById(_listId!)?.name ?? 'Inbox';
+  String _listLabel(BuildContext context) {
+    final inbox = S.of(context).inbox;
+    if (_listId == null) return inbox;
+    return widget.folderController.listById(_listId!)?.name ?? inbox;
   }
 
   Widget _buildNoteArea() {
+    final notePlaceholder = S.of(context).note;
     if (_isEditingNote || _noteFocus.hasFocus) {
       return CupertinoTextField(
         controller: _note,
         focusNode: _noteFocus,
-        placeholder: 'Note',
+        placeholder: notePlaceholder,
         style: const TextStyle(fontSize: 15),
         decoration: const BoxDecoration(),
         padding: EdgeInsets.zero,
@@ -207,7 +210,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Text(
-            'Note',
+            notePlaceholder,
             style: TextStyle(
               fontSize: 15,
               color: CupertinoColors.placeholderText.resolveFrom(context),
@@ -226,6 +229,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final showToolbar = _noteFocus.hasFocus;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -260,7 +264,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
                       Expanded(
                         child: CupertinoTextField(
                           controller: _title,
-                          placeholder: 'Task name',
+                          placeholder: s.taskName,
                           style: const TextStyle(
                               fontSize: 20, fontWeight: FontWeight.w600),
                           decoration: const BoxDecoration(),
@@ -288,8 +292,8 @@ class _TaskDetailViewState extends State<TaskDetailView>
                                 size: 16,
                                 color: CupertinoColors.secondaryLabel),
                             const SizedBox(width: 10),
-                            const Text('Priority',
-                                style: TextStyle(fontSize: 15)),
+                            Text(s.priority,
+                                style: const TextStyle(fontSize: 15)),
                             const Spacer(),
                             _PriorityPicker(
                               value: _priority,
@@ -319,8 +323,9 @@ class _TaskDetailViewState extends State<TaskDetailView>
                         const SizedBox(width: 10),
                         Text(
                           _dueDate != null
-                              ? formatTaskDate(_dueDate!, doTime: _doTime)
-                              : 'No Date',
+                              ? formatTaskDate(context, _dueDate!,
+                                  doTime: _doTime)
+                              : s.noDate,
                           style: TextStyle(
                             fontSize: 15,
                             color: _dueDate != null
@@ -348,7 +353,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          _listLabel,
+                          _listLabel(context),
                           style: TextStyle(
                             fontSize: 15,
                             color:
@@ -384,7 +389,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
                         Text(
                           _duration != null
                               ? _formatDuration(_duration!)
-                              : 'No Duration',
+                              : s.noDuration,
                           style: TextStyle(
                             fontSize: 15,
                             color: _duration != null
@@ -440,7 +445,10 @@ class _PriorityPicker extends StatelessWidget {
   final int value;
   final ValueChanged<int> onChanged;
 
-  static const _labels = ['None', 'Low', 'Med', 'High'];
+  static List<String> _labelsFor(BuildContext context) {
+    final s = S.of(context);
+    return [s.priorityNone, s.priorityLow, s.priorityMed, s.priorityHigh];
+  }
   static const _colors = [
     CupertinoColors.systemGrey,
     CupertinoColors.systemBlue,
@@ -450,6 +458,7 @@ class _PriorityPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final labels = _labelsFor(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(4, (i) {
@@ -471,7 +480,7 @@ class _PriorityPicker extends StatelessWidget {
                   : null,
             ),
             child: Text(
-              _labels[i],
+              labels[i],
               style: TextStyle(
                 fontSize: 13,
                 color: selected
@@ -531,7 +540,7 @@ class _TaskOptionsDropdown extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _DropdownRow(
-                  label: 'Move to',
+                  label: S.of(context).moveTo,
                   icon: CupertinoIcons.folder,
                   onTap: onMoveTo,
                 ),
@@ -540,7 +549,7 @@ class _TaskOptionsDropdown extends StatelessWidget {
                   color: CupertinoColors.separator.resolveFrom(context),
                 ),
                 _DropdownRow(
-                  label: 'Info',
+                  label: S.of(context).info,
                   icon: CupertinoIcons.info,
                   onTap: onInfo,
                 ),
@@ -549,7 +558,7 @@ class _TaskOptionsDropdown extends StatelessWidget {
                   color: CupertinoColors.separator.resolveFrom(context),
                 ),
                 _DropdownRow(
-                  label: 'Delete',
+                  label: S.of(context).delete,
                   icon: CupertinoIcons.trash,
                   onTap: onDelete,
                   color: CupertinoColors.destructiveRed,
@@ -631,10 +640,11 @@ String _formatDuration(int minutes) {
 
 Future<int?> _showDurationPicker(BuildContext context, int? current) async {
   const presets = [15, 30, 45, 60, 90, 120, 180, 240];
+  final s = S.of(context);
   return showCupertinoModalPopup<int?>(
     context: context,
     builder: (ctx) => CupertinoActionSheet(
-      title: const Text('Duration'),
+      title: Text(s.duration),
       actions: [
         for (final m in presets)
           CupertinoActionSheetAction(
@@ -645,13 +655,13 @@ Future<int?> _showDurationPicker(BuildContext context, int? current) async {
           CupertinoActionSheetAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(-1),
-            child: const Text('Clear'),
+            child: Text(s.clear),
           ),
       ],
       cancelButton: CupertinoActionSheetAction(
         isDefaultAction: true,
         onPressed: () => Navigator.of(ctx).pop(),
-        child: const Text('Cancel'),
+        child: Text(s.cancel),
       ),
     ),
   ).then((v) {
