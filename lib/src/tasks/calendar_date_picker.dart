@@ -13,6 +13,33 @@ String formatTaskDate(DateTime d, {int? doTime}) {
   return '$datePart ${formatDoTime(doTime)}';
 }
 
+/// Same as [formatTaskDate] but substitutes "Yesterday", "Today" or
+/// "Tomorrow" when the date lands in that relative window.
+String formatTaskDateRelative(DateTime d, {int? doTime, DateTime? now}) {
+  final today = () {
+    final n = now ?? DateTime.now();
+    return DateTime(n.year, n.month, n.day);
+  }();
+  final dDay = DateTime(d.year, d.month, d.day);
+  final diff = dDay.difference(today).inDays;
+  String datePart;
+  if (diff == -1) {
+    datePart = 'Yesterday';
+  } else if (diff == 0) {
+    datePart = 'Today';
+  } else if (diff == 1) {
+    datePart = 'Tomorrow';
+  } else {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    datePart = '${months[d.month - 1]} ${d.day}';
+  }
+  if (doTime == null) return datePart;
+  return '$datePart ${formatDoTime(doTime)}';
+}
+
 // Formats minutes-since-midnight as "9:00 AM".
 String formatDoTime(int minutes) {
   final h = minutes ~/ 60;

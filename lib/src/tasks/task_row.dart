@@ -56,6 +56,14 @@ class TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dueDate = task.dueDate;
+    final dateLabel = dueDate != null
+        ? formatTaskDateRelative(dueDate, doTime: task.doTime)
+        : null;
+    final dateColor = isOverdue
+        ? CupertinoColors.destructiveRed
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -87,14 +95,38 @@ class TaskRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    task.title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: task.isCompleted
-                          ? CupertinoColors.secondaryLabel.resolveFrom(context)
-                          : null,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          task.title,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: task.isCompleted
+                                ? CupertinoColors.secondaryLabel
+                                    .resolveFrom(context)
+                                : null,
+                          ),
+                        ),
+                      ),
+                      if (dateLabel != null) ...[
+                        const SizedBox(width: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            dateLabel,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: dateColor,
+                              fontWeight: isOverdue
+                                  ? FontWeight.w500
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   if (task.note != null && task.note!.isNotEmpty)
                     Text(
@@ -105,38 +137,6 @@ class TaskRow extends StatelessWidget {
                         fontSize: 13,
                         color: CupertinoColors.secondaryLabel
                             .resolveFrom(context),
-                      ),
-                    ),
-                  if (isOverdue && task.dueDate != null)
-                    Text(
-                      formatTaskDate(task.dueDate!, doTime: task.doTime),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: CupertinoColors.destructiveRed,
-                      ),
-                    )
-                  else if (!isOverdue && task.dueDate != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Row(
-                        children: [
-                          Icon(
-                            CupertinoIcons.calendar,
-                            size: 11,
-                            color: CupertinoColors.secondaryLabel
-                                .resolveFrom(context),
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            formatTaskDate(task.dueDate!,
-                                doTime: task.doTime),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   if (showList && listColor != null)
