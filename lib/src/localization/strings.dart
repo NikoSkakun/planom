@@ -670,7 +670,7 @@ const Map<String, String> _fr = {
   'sectionAppearance': 'Apparence', 'themeLight': 'Clair',
   'themeSystem': 'Système', 'themeDark': 'Sombre',
   'sectionSmartLists': 'Listes intelligentes', 'sectionCustomization': 'Personnalisation',
-  ‘tabBar’: ‘Barre d’onglets’, ‘sectionLanguage’: ‘Langue’, ‘language’: ‘Langue’, ‘font’: ‘Police’, ‘searchFonts’: ‘Rechercher des polices’, ‘systemFont’: ‘Système’,
+  'tabBar': "Barre d'onglets", 'sectionLanguage': 'Langue', 'language': 'Langue', 'font': 'Police', 'searchFonts': 'Rechercher des polices', 'systemFont': 'Système',
   'sectionData': 'Données',
   'exportBackup': 'Exporter la sauvegarde', 'importBackup': 'Importer la sauvegarde',
   'exportBackupSublabel': 'Planom (.planom) · restauration complète',
