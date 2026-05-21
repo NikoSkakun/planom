@@ -2,14 +2,19 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Renders markdown to a scrollable, selectable view with tappable links.
+/// Renders markdown to a view with tappable links.
 /// Supports web (http/https), email (mailto:), telephone (tel:), and any
 /// custom app URL scheme (myapp://...) — anything `url_launcher` can resolve.
+///
+/// When [shrinkWrap] is true, the view sizes to its content (no internal
+/// scrolling) — use this inside a parent scroll view such as a ListView.
 class MarkdownView extends StatelessWidget {
   const MarkdownView({
     super.key,
     required this.data,
     required this.onTap,
+    this.shrinkWrap = false,
+    this.padding = const EdgeInsets.fromLTRB(20, 12, 20, 12),
   });
 
   /// Raw markdown text.
@@ -18,6 +23,12 @@ class MarkdownView extends StatelessWidget {
   /// Called when the user taps anywhere on the rendered surface that isn't a
   /// link — used by the host to switch into edit mode.
   final VoidCallback onTap;
+
+  /// When true, renders as a non-scrolling block sized to its content.
+  final bool shrinkWrap;
+
+  /// Padding around the rendered markdown.
+  final EdgeInsets padding;
 
   Future<void> _openLink(String? href) async {
     if (href == null || href.isEmpty) return;
@@ -69,17 +80,30 @@ class MarkdownView extends StatelessWidget {
       blockSpacing: 10,
     );
 
+    final body = shrinkWrap
+        ? Padding(
+            padding: padding,
+            child: MarkdownBody(
+              data: data,
+              selectable: false,
+              styleSheet: styleSheet,
+              softLineBreak: true,
+              onTapLink: (text, href, title) => _openLink(href),
+            ),
+          )
+        : Markdown(
+            data: data,
+            selectable: false,
+            padding: padding,
+            styleSheet: styleSheet,
+            softLineBreak: true,
+            onTapLink: (text, href, title) => _openLink(href),
+          );
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Markdown(
-        data: data,
-        selectable: false,
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-        styleSheet: styleSheet,
-        softLineBreak: true,
-        onTapLink: (text, href, title) => _openLink(href),
-      ),
+      child: body,
     );
   }
 }

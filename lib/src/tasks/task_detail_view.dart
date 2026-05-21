@@ -8,6 +8,8 @@ import '../theme/app_theme.dart';
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../models/task.dart';
+import '../notes/markdown_toolbar.dart';
+import '../notes/markdown_view.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/item_info_sheet.dart';
 import 'calendar_date_picker.dart';
@@ -35,6 +37,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
     with DropdownOverlayMixin, WidgetsBindingObserver {
   late final TextEditingController _title;
   late final TextEditingController _note;
+  final FocusNode _noteFocus = FocusNode();
   late DateTime? _dueDate;
   late int? _doTime;
   late int? _duration;
@@ -42,6 +45,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
   late String? _listId;
   late int _priority;
   bool _deleted = false;
+  bool _isEditingNote = false;
   Timer? _autosaveTimer;
 
   @override
@@ -57,7 +61,22 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _priority = widget.task.priority;
     _title.addListener(_scheduleAutosave);
     _note.addListener(_scheduleAutosave);
+    _noteFocus.addListener(_onNoteFocusChanged);
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _onNoteFocusChanged() {
+    if (!mounted) return;
+    setState(() {
+      if (!_noteFocus.hasFocus) _isEditingNote = false;
+    });
+  }
+
+  void _startEditingNote() {
+    setState(() => _isEditingNote = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _noteFocus.requestFocus();
+    });
   }
 
   void _scheduleAutosave() {
@@ -101,6 +120,8 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _autosaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _save();
+    _noteFocus.removeListener(_onNoteFocusChanged);
+    _noteFocus.dispose();
     _title.dispose();
     _note.dispose();
     super.dispose();
@@ -166,8 +187,46 @@ class _TaskDetailViewState extends State<TaskDetailView>
     return widget.folderController.listById(_listId!)?.name ?? 'Inbox';
   }
 
+  Widget _buildNoteArea() {
+    if (_isEditingNote || _noteFocus.hasFocus) {
+      return CupertinoTextField(
+        controller: _note,
+        focusNode: _noteFocus,
+        placeholder: 'Note',
+        style: const TextStyle(fontSize: 15),
+        decoration: const BoxDecoration(),
+        padding: EdgeInsets.zero,
+        maxLines: null,
+        textCapitalization: TextCapitalization.sentences,
+      );
+    }
+    if (_note.text.trim().isEmpty) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _startEditingNote,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            'Note',
+            style: TextStyle(
+              fontSize: 15,
+              color: CupertinoColors.placeholderText.resolveFrom(context),
+            ),
+          ),
+        ),
+      );
+    }
+    return MarkdownView(
+      data: _note.text,
+      shrinkWrap: true,
+      padding: EdgeInsets.zero,
+      onTap: _startEditingNote,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final showToolbar = _noteFocus.hasFocus;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
@@ -177,171 +236,178 @@ class _TaskDetailViewState extends State<TaskDetailView>
           child: const Icon(CupertinoIcons.ellipsis, size: 26),
         ),
       ),
-      child: SafeArea(
-        child: ListView(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: GestureDetector(
-                    onTap: () =>
-                        setState(() => _isCompleted = !_isCompleted),
-                    child: _RoundedCheckbox(checked: _isCompleted),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: CupertinoTextField(
-                    controller: _title,
-                    placeholder: 'Task name',
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w600),
-                    decoration: const BoxDecoration(),
-                    maxLines: null,
-                    textInputAction: TextInputAction.next,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.only(left: 34),
-              child: CupertinoTextField(
-                controller: _note,
-                placeholder: 'Note',
-                style: const TextStyle(fontSize: 15),
-                decoration: const BoxDecoration(),
-                maxLines: null,
-                textCapitalization: TextCapitalization.sentences,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Priority picker
-            _SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        children: [
+          Expanded(
+            child: SafeArea(
+              bottom: false,
+              child: ListView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(CupertinoIcons.flag_fill,
-                          size: 16,
-                          color: CupertinoColors.secondaryLabel),
-                      const SizedBox(width: 10),
-                      const Text('Priority',
-                          style: TextStyle(fontSize: 15)),
-                      const Spacer(),
-                      _PriorityPicker(
-                        value: _priority,
-                        onChanged: (v) =>
-                            setState(() => _priority = v),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: GestureDetector(
+                          onTap: () =>
+                              setState(() => _isCompleted = !_isCompleted),
+                          child: _RoundedCheckbox(checked: _isCompleted),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: CupertinoTextField(
+                          controller: _title,
+                          placeholder: 'Task name',
+                          style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w600),
+                          decoration: const BoxDecoration(),
+                          maxLines: null,
+                          textInputAction: TextInputAction.next,
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Date picker row
-            _SectionCard(
-              onTap: _pickDate,
-              child: Row(
-                children: [
-                  Icon(
-                    CupertinoIcons.calendar,
-                    size: 18,
-                    color: _dueDate != null
-                        ? AppColors.accent
-                        : CupertinoColors.secondaryLabel
-                            .resolveFrom(context),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 34),
+                    child: _buildNoteArea(),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _dueDate != null
-                        ? formatTaskDate(_dueDate!, doTime: _doTime)
-                        : 'No Date',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: _dueDate != null
-                          ? AppColors.accent
-                          : CupertinoColors.secondaryLabel
+                  const SizedBox(height: 24),
+
+                  // Priority picker
+                  _SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(CupertinoIcons.flag_fill,
+                                size: 16,
+                                color: CupertinoColors.secondaryLabel),
+                            const SizedBox(width: 10),
+                            const Text('Priority',
+                                style: TextStyle(fontSize: 15)),
+                            const Spacer(),
+                            _PriorityPicker(
+                              value: _priority,
+                              onChanged: (v) =>
+                                  setState(() => _priority = v),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Date picker row
+                  _SectionCard(
+                    onTap: _pickDate,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.calendar,
+                          size: 18,
+                          color: _dueDate != null
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _dueDate != null
+                              ? formatTaskDate(_dueDate!, doTime: _doTime)
+                              : 'No Date',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: _dueDate != null
+                                ? AppColors.accent
+                                : CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // List picker row
+                  _SectionCard(
+                    onTap: _pickList,
+                    child: Row(
+                      children: [
+                        Image.asset(
+                          _listId == null
+                              ? 'assets/icons/inbox.png'
+                              : 'assets/icons/list.png',
+                          width: 18,
+                          height: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _listLabel,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color:
+                                CupertinoColors.label.resolveFrom(context),
+                          ),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 14,
+                          color: CupertinoColors.secondaryLabel
                               .resolveFrom(context),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-            // List picker row
-            _SectionCard(
-              onTap: _pickList,
-              child: Row(
-                children: [
-                  Image.asset(
-                    _listId == null
-                        ? 'assets/icons/inbox.png'
-                        : 'assets/icons/list.png',
-                    width: 18,
-                    height: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _listLabel,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color:
-                          CupertinoColors.label.resolveFrom(context),
-                    ),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    CupertinoIcons.chevron_right,
-                    size: 14,
-                    color: CupertinoColors.secondaryLabel
-                        .resolveFrom(context),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Duration picker row
-            _SectionCard(
-              onTap: _pickDuration,
-              child: Row(
-                children: [
-                  Icon(
-                    CupertinoIcons.timer,
-                    size: 18,
-                    color: _duration != null
-                        ? AppColors.accent
-                        : CupertinoColors.secondaryLabel
-                            .resolveFrom(context),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _duration != null
-                        ? _formatDuration(_duration!)
-                        : 'No Duration',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: _duration != null
-                          ? AppColors.accent
-                          : CupertinoColors.secondaryLabel
-                              .resolveFrom(context),
+                  // Duration picker row
+                  _SectionCard(
+                    onTap: _pickDuration,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.timer,
+                          size: 18,
+                          color: _duration != null
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _duration != null
+                              ? _formatDuration(_duration!)
+                              : 'No Duration',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: _duration != null
+                                ? AppColors.accent
+                                : CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          if (showToolbar)
+            MarkdownToolbar(
+              controller: _note,
+              focusNode: _noteFocus,
+              onPromptLink: (selected) =>
+                  showLinkPromptDialog(context, initialText: selected),
+            ),
+        ],
       ),
     );
   }
