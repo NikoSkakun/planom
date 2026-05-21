@@ -173,7 +173,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
         expands: true,
         textAlignVertical: TextAlignVertical.top,
         textCapitalization: TextCapitalization.sentences,
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       );
     }
     if (_content.text.trim().isEmpty) {
@@ -181,7 +181,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
         behavior: HitTestBehavior.opaque,
         onTap: _startEditing,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
           child: Align(
             alignment: Alignment.topLeft,
             child: Text(
@@ -195,70 +195,90 @@ class _NoteDetailViewState extends State<NoteDetailView>
         ),
       );
     }
-    return MarkdownView(
-      data: _content.text,
-      onTap: _startEditing,
+    // Use shrinkWrap + an explicit scroll view so the user can drag-scroll
+    // long notes without competing with the tap-to-edit gesture detector
+    // that wraps the rendered markdown.
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: MarkdownView(
+        data: _content.text,
+        onTap: _startEditing,
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final showToolbar = _contentFocus.hasFocus;
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        border: null,
-        trailing: widget.isNew
-            ? null
-            : CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () => _showDropdown(context),
-                child: const Icon(CupertinoIcons.ellipsis, size: 26),
-              ),
-      ),
-      child: Column(
-        children: [
-          Expanded(
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: CupertinoTextField(
-                      controller: _title,
-                      placeholder: S.of(context).title,
-                      autofocus: widget.isNew,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
+    return PopScope(
+      // The pop completes immediately for iOS swipe-back, but unfocusing
+      // here forces the IME to commit any in-flight composition into
+      // _content.text before dispose() runs _save(), so the user's last
+      // typed word isn't lost.
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        _contentFocus.unfocus();
+        _autosaveTimer?.cancel();
+        _save();
+      },
+      child: CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(
+          border: null,
+          trailing: widget.isNew
+              ? null
+              : CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _showDropdown(context),
+                  child: const Icon(CupertinoIcons.ellipsis, size: 26),
+                ),
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                      child: CupertinoTextField(
+                        controller: _title,
+                        placeholder: S.of(context).title,
+                        autofocus: widget.isNew,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        decoration: const BoxDecoration(),
+                        padding: EdgeInsets.zero,
+                        maxLines: null,
+                        textInputAction: TextInputAction.next,
+                        textCapitalization: TextCapitalization.sentences,
                       ),
-                      decoration: const BoxDecoration(),
-                      padding: EdgeInsets.zero,
-                      maxLines: null,
-                      textInputAction: TextInputAction.next,
-                      textCapitalization: TextCapitalization.sentences,
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      height: 0.5,
-                      color: CupertinoColors.separator,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        height: 0.5,
+                        color: CupertinoColors.separator,
+                      ),
                     ),
-                  ),
-                  Expanded(child: _buildContentArea()),
-                ],
+                    Expanded(child: _buildContentArea()),
+                  ],
+                ),
               ),
             ),
-          ),
-          if (showToolbar)
-            MarkdownToolbar(
-              controller: _content,
-              focusNode: _contentFocus,
-              onPromptLink: (selected) =>
-                  showLinkPromptDialog(context, initialText: selected),
-            ),
-        ],
+            if (showToolbar)
+              MarkdownToolbar(
+                controller: _content,
+                focusNode: _contentFocus,
+                onPromptLink: (selected) =>
+                    showLinkPromptDialog(context, initialText: selected),
+              ),
+          ],
+        ),
       ),
     );
   }
