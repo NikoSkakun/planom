@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 
 import '../localization/strings.dart';
 import '../spaces/space_manager.dart';
+import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
@@ -275,6 +276,53 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
     );
   }
 
+  void _showFontPicker(BuildContext context) {
+    final s = S.of(context);
+    final current = widget.controller.fontKey;
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: Text(s.font),
+        actions: kAppFonts.entries.map((entry) {
+          final isSelected = entry.key == current;
+          return CupertinoActionSheetAction(
+            onPressed: () {
+              widget.controller.updateFontKey(entry.key);
+              Navigator.of(ctx).pop();
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isSelected)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Icon(
+                      CupertinoIcons.checkmark,
+                      size: 16,
+                      color: CupertinoColors.activeBlue,
+                    ),
+                  ),
+                Text(
+                  entry.value,
+                  style: TextStyle(
+                    color: isSelected
+                        ? CupertinoColors.activeBlue
+                        : CupertinoColors.label,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: Text(s.cancel),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -347,6 +395,18 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                   label: s.language,
                   trailingLabel: kLanguageNames[code] ?? code,
                   onTap: () => _showLanguagePicker(context),
+                );
+              },
+            ),
+            const SizedBox(height: 1),
+            ListenableBuilder(
+              listenable: widget.controller,
+              builder: (ctx, _) {
+                final key = widget.controller.fontKey;
+                return _NavRow(
+                  label: s.font,
+                  trailingLabel: kAppFonts[key] ?? key,
+                  onTap: () => _showFontPicker(context),
                 );
               },
             ),

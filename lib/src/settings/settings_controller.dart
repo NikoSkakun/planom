@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../database/database_service.dart';
 import '../localization/strings.dart';
+import '../theme/app_fonts.dart';
 import 'settings_service.dart';
 import 'smart_list_prefs.dart';
 
@@ -20,6 +21,9 @@ class SettingsController with ChangeNotifier {
 
   Locale _locale = const Locale('en');
   Locale get locale => _locale;
+
+  String _fontKey = kSystemFontKey;
+  String get fontKey => _fontKey;
 
   final Map<int, bool> _tabVisibility = {
     0: true,
@@ -50,6 +54,8 @@ class SettingsController with ChangeNotifier {
       }
       if (key == 'locale') {
         _locale = localeFromCode(value);
+      } else if (key == 'font') {
+        if (kAppFonts.containsKey(value)) _fontKey = value;
       }
     }
 
@@ -75,6 +81,14 @@ class SettingsController with ChangeNotifier {
     _locale = locale;
     notifyListeners();
     await _db.setAppSetting('locale', locale.languageCode);
+  }
+
+  Future<void> updateFontKey(String key) async {
+    if (key == _fontKey) return;
+    if (!kAppFonts.containsKey(key)) return;
+    _fontKey = key;
+    notifyListeners();
+    await _db.setAppSetting('font', key);
   }
 
   Future<void> updateHideTabLabels(bool value) async {

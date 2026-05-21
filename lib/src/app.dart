@@ -11,6 +11,7 @@ import 'routines/routine_controller.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'tasks/task_controller.dart';
+import 'theme/app_fonts.dart';
 import 'utils/fast_route.dart';
 
 class MyApp extends StatelessWidget {
@@ -57,6 +58,7 @@ class MyApp extends StatelessWidget {
           theme: CupertinoThemeData(
             brightness: brightness,
             barBackgroundColor: CupertinoColors.systemBackground,
+            textTheme: buildCupertinoTextTheme(settingsController.fontKey),
           ),
           onGenerateRoute: (settings) => FastRoute<void>(
             settings: settings,
