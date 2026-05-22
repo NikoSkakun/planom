@@ -510,6 +510,7 @@ class _EventCard extends StatelessWidget {
   final VoidCallback onTap;
 
   static const _accent = Color(0xFF0A84FF);
+  static const _pastAccent = Color(0xFF8E8E93);
 
   static String _dur(int m) {
     if (m < 60) return '${m}m';
@@ -519,16 +520,33 @@ class _EventCard extends StatelessWidget {
     return '${h}h ${r}m';
   }
 
+  static bool _isPast(Event event) {
+    final now = DateTime.now();
+    if (event.doTime != null) {
+      final endMinutes = event.doTime! + (event.duration ?? 0);
+      return event.date.add(Duration(minutes: endMinutes)).isBefore(now);
+    }
+    final eventDay =
+        DateTime(event.date.year, event.date.month, event.date.day);
+    final today = DateTime(now.year, now.month, now.day);
+    return eventDay.isBefore(today);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isPast = _isPast(event);
+    final accent = isPast ? _pastAccent : _accent;
+    final titleColor = isPast
+        ? CupertinoColors.secondaryLabel.resolveFrom(context)
+        : CupertinoColors.label.resolveFrom(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: _accent.withOpacity(0.12),
+          color: accent.withOpacity(0.12),
           borderRadius: BorderRadius.circular(8),
-          border: const Border(left: BorderSide(color: _accent, width: 3)),
+          border: Border(left: BorderSide(color: accent, width: 3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -538,7 +556,11 @@ class _EventCard extends StatelessWidget {
               event.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: titleColor,
+              ),
             ),
             if (event.doTime != null)
               Text(

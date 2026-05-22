@@ -443,7 +443,10 @@ class _DayCell extends StatelessWidget {
             const SizedBox(height: 2),
             ...chips.take(3).map((c) {
               if (c.isEvent) {
-                return _EventChip(title: c.event!.title);
+                return _EventChip(
+                  title: c.event!.title,
+                  isPast: _eventIsPast(c.event!),
+                );
               }
               final listColor = c.task!.listId != null
                   ? folderController.listById(c.task!.listId!)?.color
@@ -532,10 +535,12 @@ class _TaskChip extends StatelessWidget {
 }
 
 class _EventChip extends StatelessWidget {
-  const _EventChip({required this.title});
+  const _EventChip({required this.title, this.isPast = false});
   final String title;
+  final bool isPast;
 
   static const _color = Color(0xFF0A84FF);
+  static const _pastColor = Color(0xFF8E8E93);
 
   @override
   Widget build(BuildContext context) {
@@ -543,7 +548,7 @@ class _EventChip extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
       decoration: BoxDecoration(
-        color: _color,
+        color: isPast ? _pastColor : _color,
         borderRadius: BorderRadius.circular(3),
       ),
       child: Text(
@@ -554,4 +559,15 @@ class _EventChip extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _eventIsPast(Event event) {
+  final now = DateTime.now();
+  if (event.doTime != null) {
+    final endMinutes = event.doTime! + (event.duration ?? 0);
+    return event.date.add(Duration(minutes: endMinutes)).isBefore(now);
+  }
+  final eventDay = DateTime(event.date.year, event.date.month, event.date.day);
+  final today = DateTime(now.year, now.month, now.day);
+  return eventDay.isBefore(today);
 }
