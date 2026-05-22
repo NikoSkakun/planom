@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
-import 'package:flutter/material.dart' show ThemeMode;
+import 'package:flutter/material.dart' show ReorderableDragStartListener, ReorderableListView, ThemeMode;
 
 import '../localization/strings.dart';
 import '../spaces/space_manager.dart';
