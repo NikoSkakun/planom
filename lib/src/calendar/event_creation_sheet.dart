@@ -160,7 +160,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
                         const SizedBox(width: 4),
                         Text(
                           formatTaskDate(context, _date, doTime: _doTime),
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 14, color: AppColors.accent),
                         ),
                       ],

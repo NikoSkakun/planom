@@ -236,7 +236,7 @@ class _HomeShellState extends State<HomeShell> {
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(AssetImage('assets/icons/tab_bar/tasks.png')),
           ),
-          activeIcon: const Padding(
+          activeIcon: Padding(
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(
               AssetImage('assets/icons/tab_bar/tasks.png'),
@@ -251,7 +251,7 @@ class _HomeShellState extends State<HomeShell> {
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(AssetImage('assets/icons/tab_bar/notes.png')),
           ),
-          activeIcon: const Padding(
+          activeIcon: Padding(
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(
               AssetImage('assets/icons/tab_bar/notes.png'),
@@ -267,7 +267,7 @@ class _HomeShellState extends State<HomeShell> {
             child:
                 ImageIcon(AssetImage('assets/icons/tab_bar/calendar.png')),
           ),
-          activeIcon: const Padding(
+          activeIcon: Padding(
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(
               AssetImage('assets/icons/tab_bar/calendar.png'),
@@ -283,7 +283,7 @@ class _HomeShellState extends State<HomeShell> {
             child:
                 ImageIcon(AssetImage('assets/icons/tab_bar/routines.png')),
           ),
-          activeIcon: const Padding(
+          activeIcon: Padding(
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(
               AssetImage('assets/icons/tab_bar/routines.png'),
@@ -298,7 +298,7 @@ class _HomeShellState extends State<HomeShell> {
             padding: EdgeInsets.only(top: 8),
             child: Icon(CupertinoIcons.gear_alt, size: 24),
           ),
-          activeIcon: const Padding(
+          activeIcon: Padding(
             padding: EdgeInsets.only(top: 8),
             child: Icon(
               CupertinoIcons.gear_alt_fill,
@@ -451,10 +451,10 @@ class _PlusButton extends StatelessWidget {
       child: Container(
         width: 52,
         height: 52,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.accent,
           shape: BoxShape.circle,
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               color: Color(0x33000000),
               blurRadius: 8,

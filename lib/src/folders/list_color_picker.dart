@@ -233,7 +233,7 @@ class _PickerSheetState extends State<_PickerSheet> {
             onTap: _showCustomPicker,
             child: Text(
               S.of(context).otherDots,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 color: AppColors.accent,
               ),

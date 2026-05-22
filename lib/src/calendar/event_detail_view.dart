@@ -172,12 +172,12 @@ class _EventDetailViewState extends State<EventDetailView> {
               onTap: _pickDate,
               child: Row(
                 children: [
-                  const Icon(CupertinoIcons.calendar,
+                  Icon(CupertinoIcons.calendar,
                       size: 18, color: AppColors.accent),
                   const SizedBox(width: 10),
                   Text(
                     formatTaskDate(context, _date, doTime: _doTime),
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 15, color: AppColors.accent),
                   ),
                 ],

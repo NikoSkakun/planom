@@ -418,7 +418,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                     ),
                     const SizedBox(height: 1),
                     _SmartListRow(
-                      icon: const Icon(
+                      icon: Icon(
                         CupertinoIcons.checkmark_circle_fill,
                         size: 22,
                         color: AppColors.systemGreen,

@@ -323,7 +323,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                           const SizedBox(width: 4),
                           Text(
                             _formatDuration(_duration!),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               color: AppColors.accent,
                               fontWeight: FontWeight.w500,

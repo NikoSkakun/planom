@@ -480,7 +480,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                             ),
                             if (showCompleted)
                               _ListItem(
-                                iconWidget: const Icon(
+                                iconWidget: Icon(
                                   CupertinoIcons.checkmark_circle_fill,
                                   size: 22,
                                   color: AppColors.systemGreen,

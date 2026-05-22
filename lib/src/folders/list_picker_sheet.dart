@@ -230,7 +230,7 @@ class _PickerRow extends StatelessWidget {
             ),
           ),
           if (isSelected)
-            const Icon(CupertinoIcons.checkmark,
+            Icon(CupertinoIcons.checkmark,
                 size: 16, color: AppColors.accent)
           else if (trailing != null)
             trailing!,

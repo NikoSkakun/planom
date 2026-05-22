@@ -814,7 +814,7 @@ class _Option extends StatelessWidget {
             Text(label, style: const TextStyle(fontSize: 15)),
             const Spacer(),
             if (selected)
-              const Icon(CupertinoIcons.checkmark,
+              Icon(CupertinoIcons.checkmark,
                   size: 16, color: AppColors.accent),
           ],
         ),
@@ -916,7 +916,7 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                           Text(u, style: const TextStyle(fontSize: 16)),
                           const Spacer(),
                           if (selected)
-                            const Icon(CupertinoIcons.checkmark,
+                            Icon(CupertinoIcons.checkmark,
                                 size: 16, color: AppColors.accent),
                         ],
                       ),
@@ -935,7 +935,7 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                             style: const TextStyle(fontSize: 16)),
                         const Spacer(),
                         if (_showCustom)
-                          const Icon(CupertinoIcons.checkmark,
+                          Icon(CupertinoIcons.checkmark,
                               size: 16, color: AppColors.accent),
                       ],
                     ),

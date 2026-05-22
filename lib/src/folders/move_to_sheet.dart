@@ -422,7 +422,7 @@ class _DestinationRow extends StatelessWidget {
                     ),
                   )
                 else if (isSelected)
-                  const Icon(
+                  Icon(
                     CupertinoIcons.checkmark,
                     size: 16,
                     color: AppColors.accent,

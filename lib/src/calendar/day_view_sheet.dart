@@ -222,7 +222,7 @@ class _DayViewSheetState extends State<DayViewSheet> {
               child: Container(
                 width: 44,
                 height: 44,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.accent,
                   shape: BoxShape.circle,
                 ),
