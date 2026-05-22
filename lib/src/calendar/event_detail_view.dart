@@ -4,7 +4,7 @@ import '../localization/strings.dart';
 import '../models/event.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
-import '../utils/selection_menu.dart';
+import '../utils/duration_picker.dart';
 import 'event_controller.dart';
 
 class EventDetailView extends StatefulWidget {
@@ -75,20 +75,9 @@ class _EventDetailViewState extends State<EventDetailView> {
   }
 
   Future<void> _pickDuration() async {
-    final s = S.of(context);
-    final result = await showSelectionMenu<int>(
-      context: context,
-      title: s.duration,
-      current: _duration,
-      options: [
-        for (final m in const [15, 30, 45, 60, 90, 120, 180, 240])
-          SelectionMenuOption(value: m, label: _dur(m)),
-        if (_duration != null)
-          SelectionMenuOption(value: -1, label: s.clear, isDestructive: true),
-      ],
-    );
-    if (!mounted || result == null) return;
-    setState(() => _duration = result == -1 ? null : result);
+    final result = await showDurationPicker(context, _duration);
+    if (!mounted) return;
+    setState(() => _duration = result);
   }
 
   Future<void> _delete() async {
@@ -184,7 +173,7 @@ class _EventDetailViewState extends State<EventDetailView> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    _duration != null ? _dur(_duration!) : s.noDuration,
+                    _duration != null ? formatDuration(_duration!) : s.noDuration,
                     style: TextStyle(
                       fontSize: 15,
                       color:
@@ -201,13 +190,6 @@ class _EventDetailViewState extends State<EventDetailView> {
   }
 }
 
-String _dur(int m) {
-  if (m < 60) return '${m}m';
-  final h = m ~/ 60;
-  final r = m % 60;
-  if (r == 0) return '${h}h';
-  return '${h}h ${r}m';
-}
 
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.child, this.onTap});

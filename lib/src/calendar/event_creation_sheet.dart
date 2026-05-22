@@ -5,7 +5,7 @@ import '../localization/strings.dart';
 import '../models/event.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
-import '../utils/selection_menu.dart';
+import '../utils/duration_picker.dart';
 import 'event_controller.dart';
 
 void showEventCreationSheet(
@@ -108,7 +108,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
   Future<void> _pickDuration() async {
     final saved = _activeFocus;
     FocusManager.instance.primaryFocus?.unfocus();
-    final result = await _showDurationPicker(context, _duration);
+    final result = await showDurationPicker(context, _duration);
     if (!mounted) return;
     setState(() => _duration = result);
     saved?.requestFocus();
@@ -200,7 +200,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
                         const SizedBox(width: 4),
                         Text(
                           _duration != null
-                              ? _formatDuration(_duration!)
+                              ? formatDuration(_duration!)
                               : s.duration,
                           style: TextStyle(
                             fontSize: 14,
@@ -240,29 +240,3 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
   }
 }
 
-String _formatDuration(int minutes) {
-  if (minutes < 60) return '${minutes}m';
-  final h = minutes ~/ 60;
-  final m = minutes % 60;
-  if (m == 0) return '${h}h';
-  return '${h}h ${m}m';
-}
-
-Future<int?> _showDurationPicker(BuildContext context, int? current) async {
-  const presets = [15, 30, 45, 60, 90, 120, 180, 240];
-  final s = S.of(context);
-  final result = await showSelectionMenu<int>(
-    context: context,
-    title: s.duration,
-    current: current,
-    options: [
-      for (final m in presets)
-        SelectionMenuOption(value: m, label: _formatDuration(m)),
-      if (current != null)
-        SelectionMenuOption(value: -1, label: s.clear, isDestructive: true),
-    ],
-  );
-  if (result == null) return current;
-  if (result == -1) return null;
-  return result;
-}

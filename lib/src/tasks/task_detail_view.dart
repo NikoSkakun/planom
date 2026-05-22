@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/widgets.dart' show WidgetsBindingObserver, AppLifecycleState;
 
 import '../theme/app_theme.dart';
-import '../utils/selection_menu.dart';
+import '../utils/duration_picker.dart';
 
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
@@ -179,7 +179,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
   }
 
   Future<void> _pickDuration() async {
-    final result = await _showDurationPicker(context, _duration);
+    final result = await showDurationPicker(context, _duration);
     if (!mounted) return;
     setState(() => _duration = result);
   }
@@ -389,7 +389,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
                         const SizedBox(width: 10),
                         Text(
                           _duration != null
-                              ? _formatDuration(_duration!)
+                              ? formatDuration(_duration!)
                               : s.noDuration,
                           style: TextStyle(
                             fontSize: 15,
@@ -633,29 +633,3 @@ class _RoundedCheckbox extends StatelessWidget {
   }
 }
 
-String _formatDuration(int minutes) {
-  if (minutes < 60) return '${minutes}m';
-  final h = minutes ~/ 60;
-  final m = minutes % 60;
-  if (m == 0) return '${h}h';
-  return '${h}h ${m}m';
-}
-
-Future<int?> _showDurationPicker(BuildContext context, int? current) async {
-  const presets = [15, 30, 45, 60, 90, 120, 180, 240];
-  final s = S.of(context);
-  final result = await showSelectionMenu<int>(
-    context: context,
-    title: s.duration,
-    current: current,
-    options: [
-      for (final m in presets)
-        SelectionMenuOption(value: m, label: _formatDuration(m)),
-      if (current != null)
-        SelectionMenuOption(value: -1, label: s.clear, isDestructive: true),
-    ],
-  );
-  if (result == null) return current;
-  if (result == -1) return null;
-  return result;
-}
