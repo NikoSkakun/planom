@@ -86,6 +86,7 @@ class _FontPickerViewState extends State<FontPickerView> {
     final s = S.of(context);
     final choice = await showSelectionMenu<String>(
       context: context,
+      anchor: SelectionMenuAnchor.topRight,
       options: [
         SelectionMenuOption(value: 'edit', label: s.editPreviewText),
       ],

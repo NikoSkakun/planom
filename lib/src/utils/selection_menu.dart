@@ -20,10 +20,20 @@ class SelectionMenuOption<T> {
   final bool isDestructive;
 }
 
-/// Shows a centred floating selection menu styled the same as the app's
-/// three-dots dropdowns (rounded panel, drop shadow, vertical rows with
-/// checkmarks on the current value). Returns the chosen value, or `null` if
-/// the user tapped outside to dismiss.
+/// Where the menu floats relative to the screen.
+enum SelectionMenuAnchor {
+  /// Centred on screen — for menus opened from inline rows or long-press.
+  center,
+
+  /// Pinned to the top-right under the navigation bar — for menus opened
+  /// from a nav-bar trailing ⋯ button. Matches the three-dots dropdown style.
+  topRight,
+}
+
+/// Shows a floating selection menu styled the same as the app's three-dots
+/// dropdowns (rounded panel, drop shadow, vertical rows with checkmarks on
+/// the current value). Returns the chosen value, or `null` if the user tapped
+/// outside to dismiss.
 ///
 /// Replaces system [CupertinoActionSheet] popups for single-choice pickers
 /// (visibility, language, sort order, duration, etc.) so the whole app uses
@@ -33,6 +43,7 @@ Future<T?> showSelectionMenu<T>({
   required List<SelectionMenuOption<T>> options,
   T? current,
   String? title,
+  SelectionMenuAnchor anchor = SelectionMenuAnchor.center,
 }) {
   final overlay = Overlay.of(context, rootOverlay: true);
   final completer = Completer<T?>();
@@ -49,6 +60,7 @@ Future<T?> showSelectionMenu<T>({
       options: options,
       current: current,
       title: title,
+      anchor: anchor,
       onSelect: (v) => close(v),
       onDismiss: () => close(null),
     );
@@ -63,6 +75,7 @@ class _SelectionMenuOverlay<T> extends StatelessWidget {
     required this.options,
     required this.current,
     required this.title,
+    required this.anchor,
     required this.onSelect,
     required this.onDismiss,
   });
@@ -70,6 +83,7 @@ class _SelectionMenuOverlay<T> extends StatelessWidget {
   final List<SelectionMenuOption<T>> options;
   final T? current;
   final String? title;
+  final SelectionMenuAnchor anchor;
   final ValueChanged<T> onSelect;
   final VoidCallback onDismiss;
 
@@ -78,6 +92,51 @@ class _SelectionMenuOverlay<T> extends StatelessWidget {
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
     final separator = CupertinoColors.separator.resolveFrom(context);
 
+    final panel = Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 20,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (title != null) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              child: Text(
+                title!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color:
+                      CupertinoColors.secondaryLabel.resolveFrom(context),
+                  letterSpacing: -0.08,
+                ),
+              ),
+            ),
+            Container(height: 0.5, color: separator),
+          ],
+          for (int i = 0; i < options.length; i++) ...[
+            _OptionRow<T>(
+              option: options[i],
+              isSelected: options[i].value == current,
+              onTap: () => onSelect(options[i].value),
+            ),
+            if (i < options.length - 1)
+              Container(height: 0.5, color: separator),
+          ],
+        ],
+      ),
+    );
+
     return Stack(
       children: [
         GestureDetector(
@@ -85,58 +144,22 @@ class _SelectionMenuOverlay<T> extends StatelessWidget {
           onTap: onDismiss,
           child: const SizedBox.expand(),
         ),
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 280),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: bg,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: AppColors.shadow,
-                      blurRadius: 20,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (title != null) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                        child: Text(
-                          title!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: CupertinoColors.secondaryLabel
-                                .resolveFrom(context),
-                            letterSpacing: -0.08,
-                          ),
-                        ),
-                      ),
-                      Container(height: 0.5, color: separator),
-                    ],
-                    for (int i = 0; i < options.length; i++) ...[
-                      _OptionRow<T>(
-                        option: options[i],
-                        isSelected: options[i].value == current,
-                        onTap: () => onSelect(options[i].value),
-                      ),
-                      if (i < options.length - 1)
-                        Container(height: 0.5, color: separator),
-                    ],
-                  ],
-                ),
+        if (anchor == SelectionMenuAnchor.center)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 280),
+                child: panel,
               ),
             ),
+          )
+        else
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 44.0 + 4.0,
+            right: 8,
+            child: SizedBox(width: 220, child: panel),
           ),
-        ),
       ],
     );
   }
