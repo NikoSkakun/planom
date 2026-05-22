@@ -97,6 +97,9 @@ class S {
   String get themeLight => t('themeLight');
   String get themeSystem => t('themeSystem');
   String get themeDark => t('themeDark');
+  String get theme => t('theme');
+  String get accentColor => t('accentColor');
+  String get completionColor => t('completionColor');
   String get sectionSmartLists => t('sectionSmartLists');
   String get sectionCustomization => t('sectionCustomization');
   String get tabBar => t('tabBar');
@@ -365,6 +368,7 @@ const Map<String, String> _en = {
   'settings': 'Settings',
   'sectionAppearance': 'Appearance', 'themeLight': 'Light',
   'themeSystem': 'System', 'themeDark': 'Dark',
+  'theme': 'Theme', 'accentColor': 'Accent Color', 'completionColor': 'Completion Color',
   'sectionSmartLists': 'Smart Lists', 'sectionCustomization': 'Customization',
   'tabBar': 'Tab Bar', 'sectionLanguage': 'Language', 'language': 'Language', 'font': 'Font', 'searchFonts': 'Search fonts', 'systemFont': 'System', 'fontOfflineWarning': 'Offline — only cached fonts show previews', 'editPreviewText': 'Edit Preview Text', 'previewText': 'Preview Text',
   'sectionData': 'Data',
@@ -466,6 +470,7 @@ const Map<String, String> _uk = {
   'settings': 'Налаштування',
   'sectionAppearance': 'Зовнішній вигляд', 'themeLight': 'Світла',
   'themeSystem': 'Системна', 'themeDark': 'Темна',
+  'theme': 'Тема', 'accentColor': 'Акцентний колір', 'completionColor': 'Колір завершення',
   'sectionSmartLists': 'Розумні списки', 'sectionCustomization': 'Налаштування',
   'tabBar': 'Панель вкладок', 'sectionLanguage': 'Мова', 'language': 'Мова', 'font': 'Шрифт', 'searchFonts': 'Пошук шрифтів', 'systemFont': 'Системний', 'fontOfflineWarning': 'Офлайн — лише завантажені шрифти', 'editPreviewText': 'Змінити текст прикладу', 'previewText': 'Текст прикладу',
   'sectionData': 'Дані',
@@ -569,6 +574,7 @@ const Map<String, String> _es = {
   'settings': 'Ajustes',
   'sectionAppearance': 'Apariencia', 'themeLight': 'Claro',
   'themeSystem': 'Sistema', 'themeDark': 'Oscuro',
+  'theme': 'Tema', 'accentColor': 'Color de acento', 'completionColor': 'Color de completado',
   'sectionSmartLists': 'Listas inteligentes', 'sectionCustomization': 'Personalización',
   'tabBar': 'Barra de pestañas', 'sectionLanguage': 'Idioma', 'language': 'Idioma', 'font': 'Fuente', 'searchFonts': 'Buscar fuentes', 'systemFont': 'Sistema', 'fontOfflineWarning': 'Sin conexión — solo fuentes en caché', 'editPreviewText': 'Editar texto de vista previa', 'previewText': 'Texto de vista previa',
   'sectionData': 'Datos',
@@ -672,6 +678,7 @@ const Map<String, String> _fr = {
   'settings': 'Réglages',
   'sectionAppearance': 'Apparence', 'themeLight': 'Clair',
   'themeSystem': 'Système', 'themeDark': 'Sombre',
+  'theme': 'Thème', 'accentColor': "Couleur d'accent", 'completionColor': 'Couleur de complétion',
   'sectionSmartLists': 'Listes intelligentes', 'sectionCustomization': 'Personnalisation',
   'tabBar': "Barre d'onglets", 'sectionLanguage': 'Langue', 'language': 'Langue', 'font': 'Police', 'searchFonts': 'Rechercher des polices', 'systemFont': 'Système', 'fontOfflineWarning': 'Hors ligne — aperçu des polices en cache uniquement', 'editPreviewText': "Modifier le texte d'aperçu", 'previewText': "Texte d'aperçu",
   'sectionData': 'Données',
@@ -775,6 +782,7 @@ const Map<String, String> _de = {
   'settings': 'Einstellungen',
   'sectionAppearance': 'Erscheinungsbild', 'themeLight': 'Hell',
   'themeSystem': 'System', 'themeDark': 'Dunkel',
+  'theme': 'Thema', 'accentColor': 'Akzentfarbe', 'completionColor': 'Abschlussfarbe',
   'sectionSmartLists': 'Intelligente Listen', 'sectionCustomization': 'Anpassung',
   'tabBar': 'Tab-Leiste', 'sectionLanguage': 'Sprache', 'language': 'Sprache', 'font': 'Schrift', 'searchFonts': 'Schriften suchen', 'systemFont': 'System', 'fontOfflineWarning': 'Offline — nur gecachte Schriften', 'editPreviewText': 'Vorschautext bearbeiten', 'previewText': 'Vorschautext',
   'sectionData': 'Daten',
@@ -878,6 +886,7 @@ const Map<String, String> _it = {
   'settings': 'Impostazioni',
   'sectionAppearance': 'Aspetto', 'themeLight': 'Chiaro',
   'themeSystem': 'Sistema', 'themeDark': 'Scuro',
+  'theme': 'Tema', 'accentColor': 'Colore accento', 'completionColor': 'Colore completamento',
   'sectionSmartLists': 'Liste intelligenti', 'sectionCustomization': 'Personalizzazione',
   'tabBar': 'Barra schede', 'sectionLanguage': 'Lingua', 'language': 'Lingua', 'font': 'Carattere', 'searchFonts': 'Cerca caratteri', 'systemFont': 'Sistema', 'fontOfflineWarning': 'Offline — solo caratteri nella cache', 'editPreviewText': 'Modifica testo di anteprima', 'previewText': 'Testo di anteprima',
   'sectionData': 'Dati',
@@ -981,6 +990,7 @@ const Map<String, String> _pt = {
   'settings': 'Ajustes',
   'sectionAppearance': 'Aparência', 'themeLight': 'Claro',
   'themeSystem': 'Sistema', 'themeDark': 'Escuro',
+  'theme': 'Tema', 'accentColor': 'Cor de destaque', 'completionColor': 'Cor de conclusão',
   'sectionSmartLists': 'Listas inteligentes', 'sectionCustomization': 'Personalização',
   'tabBar': 'Barra de abas', 'sectionLanguage': 'Idioma', 'language': 'Idioma', 'font': 'Fonte', 'searchFonts': 'Pesquisar fontes', 'systemFont': 'Sistema', 'fontOfflineWarning': 'Offline — apenas fontes em cache', 'editPreviewText': 'Editar texto de previsualização', 'previewText': 'Texto de previsualização',
   'sectionData': 'Dados',
@@ -1084,6 +1094,7 @@ const Map<String, String> _ru = {
   'settings': 'Настройки',
   'sectionAppearance': 'Внешний вид', 'themeLight': 'Светлая',
   'themeSystem': 'Системная', 'themeDark': 'Тёмная',
+  'theme': 'Тема', 'accentColor': 'Цвет акцента', 'completionColor': 'Цвет завершения',
   'sectionSmartLists': 'Умные списки', 'sectionCustomization': 'Настройка',
   'tabBar': 'Панель вкладок', 'sectionLanguage': 'Язык', 'language': 'Язык', 'font': 'Шрифт', 'searchFonts': 'Поиск шрифтов', 'systemFont': 'Системный', 'fontOfflineWarning': 'Офлайн — только кешированные шрифты', 'editPreviewText': 'Изменить текст примера', 'previewText': 'Текст примера',
   'sectionData': 'Данные',
@@ -1187,6 +1198,7 @@ const Map<String, String> _zh = {
   'settings': '设置',
   'sectionAppearance': '外观', 'themeLight': '浅色',
   'themeSystem': '系统', 'themeDark': '深色',
+  'theme': '主题', 'accentColor': '强调色', 'completionColor': '完成颜色',
   'sectionSmartLists': '智能列表', 'sectionCustomization': '自定义',
   'tabBar': '标签栏', 'sectionLanguage': '语言', 'language': '语言', 'font': '字体', 'searchFonts': '搜索字体', 'systemFont': '系统', 'fontOfflineWarning': '离线 — 仅显示已缓存字体', 'editPreviewText': '编辑预览文字', 'previewText': '预览文字',
   'sectionData': '数据',
@@ -1290,6 +1302,7 @@ const Map<String, String> _ja = {
   'settings': '設定',
   'sectionAppearance': '外観', 'themeLight': 'ライト',
   'themeSystem': 'システム', 'themeDark': 'ダーク',
+  'theme': 'テーマ', 'accentColor': 'アクセントカラー', 'completionColor': '完了カラー',
   'sectionSmartLists': 'スマートリスト', 'sectionCustomization': 'カスタマイズ',
   'tabBar': 'タブバー', 'sectionLanguage': '言語', 'language': '言語', 'font': 'フォント', 'searchFonts': 'フォントを検索', 'systemFont': 'システム', 'fontOfflineWarning': 'オフライン — キャッシュ済みフォントのみ', 'editPreviewText': 'プレビューテキストを編集', 'previewText': 'プレビューテキスト',
   'sectionData': 'データ',

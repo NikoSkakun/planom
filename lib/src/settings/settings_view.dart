@@ -5,11 +5,12 @@ import 'package:flutter/material.dart' show ThemeMode;
 import '../localization/strings.dart';
 import '../spaces/space_manager.dart';
 import '../theme/app_fonts.dart';
-import 'font_picker_view.dart';
 import '../theme/app_theme.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
+import 'appearance_view.dart';
 import 'backup_service.dart';
+import 'font_picker_view.dart';
 import 'settings_controller.dart';
 import 'smart_list_prefs.dart';
 
@@ -317,25 +318,25 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             const SizedBox(height: 8),
             ListenableBuilder(
               listenable: widget.controller,
-              builder: (context, _) =>
-                  CupertinoSlidingSegmentedControl<ThemeMode>(
-                groupValue: widget.controller.themeMode,
-                onValueChanged: widget.controller.updateThemeMode,
-                children: {
-                  ThemeMode.light: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(s.themeLight),
+              builder: (ctx, _) {
+                final tm = widget.controller.themeMode;
+                final themeName = tm == ThemeMode.light
+                    ? s.themeLight
+                    : tm == ThemeMode.dark
+                        ? s.themeDark
+                        : s.themeSystem;
+                return _NavRow(
+                  label: s.sectionAppearance,
+                  trailingLabel: themeName,
+                  onTap: () => Navigator.of(context).push(
+                    FastRoute<void>(
+                      builder: (_) => AppearanceView(
+                        controller: widget.controller,
+                      ),
+                    ),
                   ),
-                  ThemeMode.system: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(s.themeSystem),
-                  ),
-                  ThemeMode.dark: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(s.themeDark),
-                  ),
-                },
-              ),
+                );
+              },
             ),
 
             // ── Language ────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../database/database_service.dart';
 import '../localization/strings.dart';
 import '../theme/app_fonts.dart';
+import '../theme/app_theme.dart';
 import 'settings_service.dart';
 import 'smart_list_prefs.dart';
 
@@ -25,6 +26,12 @@ class SettingsController with ChangeNotifier {
 
   String _fontKey = kSystemFontKey;
   String get fontKey => _fontKey;
+
+  Color _accentColor = AppColors.accent;
+  Color get accentColor => _accentColor;
+
+  Color _completionColor = AppColors.systemGreen;
+  Color get completionColor => _completionColor;
 
   final Map<int, bool> _tabVisibility = {
     0: true,
@@ -57,6 +64,12 @@ class SettingsController with ChangeNotifier {
         _locale = localeFromCode(value);
       } else if (key == 'font') {
         if (value == kSystemFontKey || GoogleFonts.asMap().containsKey(value)) _fontKey = value;
+      } else if (key == 'accent_color') {
+        final v = int.tryParse(value);
+        if (v != null) { _accentColor = Color(v); AppColors.accent = _accentColor; }
+      } else if (key == 'completion_color') {
+        final v = int.tryParse(value);
+        if (v != null) { _completionColor = Color(v); AppColors.systemGreen = _completionColor; }
       }
     }
 
@@ -90,6 +103,22 @@ class SettingsController with ChangeNotifier {
     _fontKey = key;
     notifyListeners();
     await _db.setAppSetting('font', key);
+  }
+
+  Future<void> updateAccentColor(Color color) async {
+    if (color == _accentColor) return;
+    AppColors.accent = color;
+    _accentColor = color;
+    notifyListeners();
+    await _db.setAppSetting('accent_color', color.value.toString());
+  }
+
+  Future<void> updateCompletionColor(Color color) async {
+    if (color == _completionColor) return;
+    AppColors.systemGreen = color;
+    _completionColor = color;
+    notifyListeners();
+    await _db.setAppSetting('completion_color', color.value.toString());
   }
 
   Future<void> updateHideTabLabels(bool value) async {

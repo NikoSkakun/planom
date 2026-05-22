@@ -7,11 +7,14 @@ import 'package:flutter/cupertino.dart';
 class AppColors {
   AppColors._();
 
-  /// Primary brand accent (orange-red).
-  static const Color accent = Color(0xFFFF4D00);
+  /// Primary brand accent (orange-red). Mutable so the user can customise it
+  /// via Settings → Appearance; changes propagate through a SettingsController
+  /// rebuild rather than const-capture.
+  static Color accent = const Color(0xFFFF4D00);
 
   /// System green used for completed indicators (matches iOS systemGreen).
-  static const Color systemGreen = Color(0xFF34C759);
+  /// Also user-customisable via Settings → Appearance.
+  static Color systemGreen = const Color(0xFF34C759);
 
   /// Subtle drop-shadow used by floating panels and dropdowns.
   static const Color shadow = Color(0x30000000);

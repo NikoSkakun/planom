@@ -133,7 +133,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
-    const accent = AppColors.accent;
+    final accent = AppColors.accent;
     const pageHeight = 320.0;
 
     return Center(
