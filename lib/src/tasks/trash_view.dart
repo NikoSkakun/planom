@@ -5,7 +5,9 @@ import '../localization/strings.dart';
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import '../models/task.dart';
+import '../utils/fast_route.dart';
 import 'task_controller.dart';
+import 'task_detail_view.dart';
 import 'task_row.dart' show RoundedCheckbox;
 
 class TrashView extends StatelessWidget {
@@ -137,6 +139,20 @@ class TrashView extends StatelessWidget {
     }
   }
 
+  void _openEntry(BuildContext context, _TrashEntry entry) {
+    if (entry.task == null) return;
+    Navigator.of(context).push(
+      FastRoute<void>(
+        settings: const RouteSettings(name: TaskDetailView.routeName),
+        builder: (_) => TaskDetailView(
+          task: entry.task!,
+          controller: taskController,
+          folderController: folderController,
+        ),
+      ),
+    );
+  }
+
   void _showMenu(BuildContext context) {
     final s = S.of(context);
     showCupertinoModalPopup<void>(
@@ -213,9 +229,8 @@ class TrashView extends StatelessWidget {
                 ? null
                 : CupertinoButton(
                     padding: EdgeInsets.zero,
-                    minSize: 0,
                     onPressed: () => _showMenu(context),
-                    child: const Icon(CupertinoIcons.ellipsis_circle),
+                    child: const Icon(CupertinoIcons.ellipsis, size: 26),
                   ),
           ),
           child: SafeArea(
@@ -252,7 +267,11 @@ class TrashView extends StatelessWidget {
                                     _confirmDismiss(context, direction, entry),
                                 onDismissed: (direction) =>
                                     _handleDismissed(direction, entry),
-                                child: _TrashRow(entry: entry),
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () => _openEntry(context, entry),
+                                  child: _TrashRow(entry: entry),
+                                ),
                               );
                             },
                             childCount: entries.length,
