@@ -4,6 +4,7 @@ import '../localization/strings.dart';
 import '../models/event.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
+import '../utils/selection_menu.dart';
 import 'event_controller.dart';
 
 class EventDetailView extends StatefulWidget {
@@ -75,29 +76,16 @@ class _EventDetailViewState extends State<EventDetailView> {
 
   Future<void> _pickDuration() async {
     final s = S.of(context);
-    final result = await showCupertinoModalPopup<int?>(
+    final result = await showSelectionMenu<int>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(s.duration),
-        actions: [
-          for (final m in const [15, 30, 45, 60, 90, 120, 180, 240])
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.of(ctx).pop(m),
-              child: Text(_dur(m)),
-            ),
-          if (_duration != null)
-            CupertinoActionSheetAction(
-              isDestructiveAction: true,
-              onPressed: () => Navigator.of(ctx).pop(-1),
-              child: Text(s.clear),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(s.cancel),
-        ),
-      ),
+      title: s.duration,
+      current: _duration,
+      options: [
+        for (final m in const [15, 30, 45, 60, 90, 120, 180, 240])
+          SelectionMenuOption(value: m, label: _dur(m)),
+        if (_duration != null)
+          SelectionMenuOption(value: -1, label: s.clear, isDestructive: true),
+      ],
     );
     if (!mounted || result == null) return;
     setState(() => _duration = result == -1 ? null : result);

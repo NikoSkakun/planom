@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/selection_menu.dart';
 
 import '../localization/strings.dart';
 import '../folders/create_folder_list_sheet.dart';
@@ -76,50 +77,17 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
   }
 
   // ignore: unused_element
-  void _showSortSheet(BuildContext context) {
+  Future<void> _showSortSheet(BuildContext context) async {
     final s = S.of(context);
-    final current = widget.controller.sortOrder;
-    showCupertinoModalPopup<void>(
+    final selected = await showSelectionMenu<TaskSortOrder>(
       context: context,
-      builder: (_) => CupertinoActionSheet(
-        title: Text(s.sortTasks),
-        actions: TaskSortOrder.values.map((order) {
-          final label = _sortLabel(s, order);
-          final isSelected = order == current;
-          return CupertinoActionSheetAction(
-            onPressed: () {
-              widget.controller.setSortOrder(order);
-              Navigator.of(context, rootNavigator: true).pop();
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (isSelected)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 8),
-                    child: Icon(CupertinoIcons.checkmark,
-                        size: 16, color: CupertinoColors.activeBlue),
-                  ),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected
-                        ? CupertinoColors.activeBlue
-                        : CupertinoColors.label,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () =>
-              Navigator.of(context, rootNavigator: true).pop(),
-          child: Text(s.cancel),
-        ),
-      ),
+      title: s.sortTasks,
+      current: widget.controller.sortOrder,
+      options: TaskSortOrder.values
+          .map((o) => SelectionMenuOption(value: o, label: _sortLabel(s, o)))
+          .toList(),
     );
+    if (selected != null) widget.controller.setSortOrder(selected);
   }
 
   void _showDropdown(BuildContext context) {

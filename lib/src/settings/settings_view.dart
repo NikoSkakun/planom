@@ -8,6 +8,7 @@ import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
+import '../utils/selection_menu.dart';
 import 'appearance_view.dart';
 import 'backup_service.dart';
 import 'font_picker_view.dart';
@@ -172,52 +173,23 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
     ).then((_) => ctrl.dispose());
   }
 
-  void _showVisibilityPicker(
-      BuildContext context, String key, SmartListVisibility current) {
+  Future<void> _showVisibilityPicker(
+      BuildContext context, String key, SmartListVisibility current) async {
     final s = S.of(context);
-    showCupertinoModalPopup<void>(
+    final selected = await showSelectionMenu<SmartListVisibility>(
       context: context,
-      builder: (_) => CupertinoActionSheet(
-        title: Text(s.visibility),
-        actions: SmartListVisibility.values.map((v) {
-          final isSelected = v == current;
-          return CupertinoActionSheetAction(
-            onPressed: () {
-              widget.controller.updateSmartListVisibility(key, v);
-              Navigator.of(context, rootNavigator: true).pop();
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (isSelected)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 8),
-                    child: Icon(
-                      CupertinoIcons.checkmark,
-                      size: 16,
-                      color: CupertinoColors.activeBlue,
-                    ),
-                  ),
-                Text(
-                  _visibilityLabel(s, v),
-                  style: TextStyle(
-                    color: isSelected
-                        ? CupertinoColors.activeBlue
-                        : CupertinoColors.label,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () =>
-              Navigator.of(context, rootNavigator: true).pop(),
-          child: Text(s.cancel),
-        ),
-      ),
+      title: s.visibility,
+      current: current,
+      options: SmartListVisibility.values
+          .map((v) => SelectionMenuOption(
+                value: v,
+                label: _visibilityLabel(s, v),
+              ))
+          .toList(),
     );
+    if (selected != null) {
+      widget.controller.updateSmartListVisibility(key, selected);
+    }
   }
 
   static String _visibilityLabel(S s, SmartListVisibility v) {
@@ -231,51 +203,23 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
     }
   }
 
-  void _showLanguagePicker(BuildContext context) {
+  Future<void> _showLanguagePicker(BuildContext context) async {
     final s = S.of(context);
     final current = widget.controller.locale.languageCode;
-    showCupertinoModalPopup<void>(
+    final selected = await showSelectionMenu<String>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(s.language),
-        actions: kSupportedLocales.map((loc) {
-          final isSelected = loc.languageCode == current;
-          return CupertinoActionSheetAction(
-            onPressed: () {
-              widget.controller.updateLocale(loc);
-              Navigator.of(ctx).pop();
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (isSelected)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 8),
-                    child: Icon(
-                      CupertinoIcons.checkmark,
-                      size: 16,
-                      color: CupertinoColors.activeBlue,
-                    ),
-                  ),
-                Text(
-                  kLanguageNames[loc.languageCode] ?? loc.languageCode,
-                  style: TextStyle(
-                    color: isSelected
-                        ? CupertinoColors.activeBlue
-                        : CupertinoColors.label,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(s.cancel),
-        ),
-      ),
+      title: s.language,
+      current: current,
+      options: kSupportedLocales
+          .map((loc) => SelectionMenuOption(
+                value: loc.languageCode,
+                label: kLanguageNames[loc.languageCode] ?? loc.languageCode,
+              ))
+          .toList(),
     );
+    if (selected != null) {
+      widget.controller.updateLocale(Locale(selected));
+    }
   }
 
   void _openFontPicker(BuildContext context) {

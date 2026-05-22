@@ -5,6 +5,7 @@ import '../localization/strings.dart';
 import '../models/event.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
+import '../utils/selection_menu.dart';
 import 'event_controller.dart';
 
 void showEventCreationSheet(
@@ -231,32 +232,18 @@ String _formatDuration(int minutes) {
 Future<int?> _showDurationPicker(BuildContext context, int? current) async {
   const presets = [15, 30, 45, 60, 90, 120, 180, 240];
   final s = S.of(context);
-  return showCupertinoModalPopup<int?>(
+  final result = await showSelectionMenu<int>(
     context: context,
-    builder: (ctx) => CupertinoActionSheet(
-      title: Text(s.duration),
-      actions: [
-        for (final m in presets)
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(ctx).pop(m),
-            child: Text(_formatDuration(m)),
-          ),
-        if (current != null)
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(ctx).pop(-1),
-            child: Text(s.clear),
-          ),
-      ],
-      cancelButton: CupertinoActionSheetAction(
-        isDefaultAction: true,
-        onPressed: () => Navigator.of(ctx).pop(),
-        child: Text(s.cancel),
-      ),
-    ),
-  ).then((v) {
-    if (v == null) return current;
-    if (v == -1) return null;
-    return v;
-  });
+    title: s.duration,
+    current: current,
+    options: [
+      for (final m in presets)
+        SelectionMenuOption(value: m, label: _formatDuration(m)),
+      if (current != null)
+        SelectionMenuOption(value: -1, label: s.clear, isDestructive: true),
+    ],
+  );
+  if (result == null) return current;
+  if (result == -1) return null;
+  return result;
 }

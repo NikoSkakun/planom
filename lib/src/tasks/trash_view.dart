@@ -6,6 +6,7 @@ import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import '../models/task.dart';
 import '../utils/fast_route.dart';
+import '../utils/selection_menu.dart';
 import 'task_controller.dart';
 import 'task_detail_view.dart';
 import 'task_row.dart' show RoundedCheckbox;
@@ -153,35 +154,20 @@ class TrashView extends StatelessWidget {
     );
   }
 
-  void _showMenu(BuildContext context) {
+  Future<void> _showMenu(BuildContext context) async {
     final s = S.of(context);
-    showCupertinoModalPopup<void>(
+    final choice = await showSelectionMenu<String>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _confirmEmptyTrash(context);
-            },
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(s.emptyTrash, textAlign: TextAlign.left),
-                ),
-                const Icon(CupertinoIcons.trash,
-                    size: 18, color: CupertinoColors.destructiveRed),
-              ],
-            ),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(s.cancel),
+      options: [
+        SelectionMenuOption(
+          value: 'empty',
+          label: s.emptyTrash,
+          icon: CupertinoIcons.trash,
+          isDestructive: true,
         ),
-      ),
+      ],
     );
+    if (choice == 'empty') _confirmEmptyTrash(context);
   }
 
   Future<void> _confirmEmptyTrash(BuildContext context) async {

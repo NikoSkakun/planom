@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../localization/strings.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
+import '../utils/selection_menu.dart';
 import 'font_cache.dart';
 import 'settings_controller.dart';
 
@@ -81,27 +82,15 @@ class _FontPickerViewState extends State<FontPickerView> {
     Navigator.of(context).pop();
   }
 
-  void _showMenu(BuildContext context) {
+  Future<void> _showMenu(BuildContext context) async {
     final s = S.of(context);
-    showCupertinoModalPopup<void>(
+    final choice = await showSelectionMenu<String>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _showEditPreviewDialog(context);
-            },
-            child: Text(s.editPreviewText),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(s.cancel),
-        ),
-      ),
+      options: [
+        SelectionMenuOption(value: 'edit', label: s.editPreviewText),
+      ],
     );
+    if (choice == 'edit' && mounted) _showEditPreviewDialog(context);
   }
 
   void _showEditPreviewDialog(BuildContext context) {

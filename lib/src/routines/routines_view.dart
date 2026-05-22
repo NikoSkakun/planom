@@ -8,6 +8,7 @@ import '../settings/settings_view.dart';
 import '../theme/app_theme.dart';
 import '../utils/confirm_dialogs.dart';
 import '../utils/fast_route.dart';
+import '../utils/selection_menu.dart';
 import 'routine_controller.dart';
 import 'routine_creation_view.dart';
 import 'routine_icons.dart';
@@ -283,55 +284,37 @@ class _TodayRoutineRow extends StatelessWidget {
     );
   }
 
-  void _showOptions(BuildContext context) {
+  Future<void> _showOptions(BuildContext context) async {
     final s = S.of(context);
-    showCupertinoModalPopup<void>(
+    final choice = await showSelectionMenu<String>(
       context: context,
-      builder: (_) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(context, rootNavigator: true).pop();
-              Navigator.of(context).push(
-                FastRoute(
-                  builder: (_) => RoutineCreationView(
-                    controller: controller,
-                    existing: routine,
-                  ),
-                ),
-              );
-            },
-            child: Row(
-              children: [
-                Expanded(
-                    child: Text(s.edit, textAlign: TextAlign.left)),
-                const Icon(CupertinoIcons.pencil, size: 18),
-              ],
-            ),
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () async {
-              Navigator.of(context, rootNavigator: true).pop();
-              final ok = await _confirmDelete(context);
-              if (ok) controller.deleteRoutine(routine.id);
-            },
-            child: Row(
-              children: [
-                Expanded(
-                    child: Text(s.delete, textAlign: TextAlign.left)),
-                const Icon(CupertinoIcons.trash,
-                    size: 18, color: CupertinoColors.destructiveRed),
-              ],
-            ),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-          child: Text(s.cancel),
+      options: [
+        SelectionMenuOption(
+          value: 'edit',
+          label: s.edit,
+          icon: CupertinoIcons.pencil,
         ),
-      ),
+        SelectionMenuOption(
+          value: 'delete',
+          label: s.delete,
+          icon: CupertinoIcons.trash,
+          isDestructive: true,
+        ),
+      ],
     );
+    if (choice == 'edit') {
+      Navigator.of(context).push(
+        FastRoute(
+          builder: (_) => RoutineCreationView(
+            controller: controller,
+            existing: routine,
+          ),
+        ),
+      );
+    } else if (choice == 'delete') {
+      final ok = await _confirmDelete(context);
+      if (ok) controller.deleteRoutine(routine.id);
+    }
   }
 }
 

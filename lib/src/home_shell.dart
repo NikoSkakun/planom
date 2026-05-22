@@ -18,6 +18,7 @@ import 'tasks/task_creation_sheet.dart';
 import 'tasks/tasks_view.dart';
 import 'theme/app_theme.dart';
 import 'utils/fast_route.dart';
+import 'utils/selection_menu.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({
@@ -153,44 +154,31 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  void _showCalendarItemPicker(DateTime date) {
+  Future<void> _showCalendarItemPicker(DateTime date) async {
     final s = S.of(context);
-    showCupertinoModalPopup<void>(
+    final choice = await showSelectionMenu<String>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(s.addToCalendar),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              showTaskCreationSheet(
-                context,
-                widget.taskController,
-                widget.folderController,
-                initialDueDate: date,
-              );
-            },
-            child: Text(s.taskOption),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              showEventCreationSheet(
-                context,
-                widget.eventController,
-                initialDate: date,
-              );
-            },
-            child: Text(s.eventOption),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(s.cancel),
-        ),
-      ),
+      title: s.addToCalendar,
+      options: [
+        SelectionMenuOption(value: 'task', label: s.taskOption),
+        SelectionMenuOption(value: 'event', label: s.eventOption),
+      ],
     );
+    if (!mounted) return;
+    if (choice == 'task') {
+      showTaskCreationSheet(
+        context,
+        widget.taskController,
+        widget.folderController,
+        initialDueDate: date,
+      );
+    } else if (choice == 'event') {
+      showEventCreationSheet(
+        context,
+        widget.eventController,
+        initialDate: date,
+      );
+    }
   }
 
   void _onTabTapped(int tappedIndex) {
