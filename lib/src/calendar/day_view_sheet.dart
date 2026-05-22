@@ -476,9 +476,6 @@ class _TaskCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      decoration: task.isCompleted
-                          ? TextDecoration.lineThrough
-                          : null,
                       color: task.isCompleted
                           ? CupertinoColors.secondaryLabel.resolveFrom(context)
                           : CupertinoColors.label.resolveFrom(context),
