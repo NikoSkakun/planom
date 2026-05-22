@@ -262,7 +262,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                         Navigator.of(context).pop((_selected, _doTime)),
                     child: Text(
                       s.done,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: accent,
                         fontWeight: FontWeight.w600,
                       ),
