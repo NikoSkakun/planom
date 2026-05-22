@@ -480,7 +480,7 @@ class _SpacesDropdown extends StatelessWidget {
             width: 220,
             decoration: BoxDecoration(
               color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: const [
                 BoxShadow(
                   color: AppColors.shadow,

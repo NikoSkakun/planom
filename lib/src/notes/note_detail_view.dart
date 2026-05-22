@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart' show WidgetsBindingObserver, AppLifecycleS
 
 import '../folders/move_to_sheet.dart';
 import '../localization/strings.dart';
+import '../theme/app_theme.dart';
 import '../models/note.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/item_info_sheet.dart';
@@ -314,10 +315,10 @@ class _NoteOptionsDropdown extends StatelessWidget {
             width: 220,
             decoration: BoxDecoration(
               color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x30000000),
+                  color: AppColors.shadow,
                   blurRadius: 20,
                   offset: Offset(0, 6),
                 ),
@@ -377,22 +378,20 @@ class _DropdownRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveColor =
         color ?? CupertinoColors.label.resolveFrom(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(fontSize: 15, color: effectiveColor),
-              ),
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      onPressed: onTap,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: effectiveColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 16, color: effectiveColor),
             ),
-            const SizedBox(width: 8),
-            Icon(icon, size: 17, color: effectiveColor),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -527,10 +527,10 @@ class _TaskOptionsDropdown extends StatelessWidget {
             width: 220,
             decoration: BoxDecoration(
               color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x30000000),
+                  color: AppColors.shadow,
                   blurRadius: 20,
                   offset: Offset(0, 6),
                 ),
@@ -596,7 +596,9 @@ class _DropdownRow extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: fg),
           const SizedBox(width: 10),
-          Text(label, style: TextStyle(fontSize: 16, color: fg)),
+          Expanded(
+            child: Text(label, style: TextStyle(fontSize: 16, color: fg)),
+          ),
         ],
       ),
     );
