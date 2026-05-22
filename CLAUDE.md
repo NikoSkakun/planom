@@ -24,6 +24,7 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 - **Icons**: `cupertino_icons` package required for `CupertinoIcons`; custom PNG tab-bar icons in `assets/icons/tab_bar/` (Tasks/Notes/Calendar/Routines use PNGs; Settings tab uses `CupertinoIcons.gear_alt` / `gear_alt_fill`); list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`; use `Image.asset` (not `ImageIcon`) when original PNG colors must be preserved. Smart lists that have no PNG asset (Completed, Trash) use `CupertinoIcons` passed as `iconWidget` to `_ListItem`.
 - **App badge**: `flutter_app_badger ^1.5.0` (discontinued but functional) — set by `TaskController._updateBadge()` to `todayUncompletedCount`; iOS badge permission requested in `AppDelegate.swift` via `UNUserNotificationCenter`
 - **Backup / share**: `share_plus ^7.2.1` — iOS share sheet for exporting `.planom` backup files; `file_picker ^8.0.0` — document picker for importing backup files
+- **Fonts**: `google_fonts` package — `GoogleFonts.asMap()` returns ~1500 font constructors keyed by camelCase name; fonts are downloaded and cached automatically at `<appSupport>/google_fonts/` by the package
 
 ## Architecture
 
@@ -147,6 +148,13 @@ Migration history:
 
 When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 
+**`app_settings` keys** (all stored as strings in the `value` column):
+- `tab_1_visible` … `tab_4_visible` — per-tab visibility booleans (`'true'`/`'false'`)
+- `accent_color` — ARGB int as decimal string (e.g. `'4294930688'`); loaded into `AppColors.accent` at startup
+- `completion_color` — ARGB int as decimal string; loaded into `AppColors.systemGreen` at startup
+- `font` — Google Fonts camelCase key or `'__system__'`; applied to the app's `CupertinoTheme`
+- `locale` — BCP-47 language code (e.g. `'en'`, `'uk'`)
+
 Key query methods (tasks):
 - `getTasks()` — active only (`isDeleted = 0`), sorted by `sortOrder ASC, creationDate DESC`
 - `getTrashedTasks()` — `isDeleted = 1`, sorted by `deletedDate DESC`
@@ -225,6 +233,9 @@ Routine DB schema:
 - Manages `ThemeMode` (persisted via `SettingsService` → `SharedPreferences`)
 - Owns `SmartListPrefs` (visibility of Today/Upcoming/Completed/Trash smart lists + `hideTabLabels` toggle), persisted to a JSON file in the documents directory
 - Owns per-tab visibility (`_tabVisibility` map for tabs 1=Notes, 2=Calendar, 3=Routines, 4=Settings; tab 0 always on), persisted to the `app_settings` DB table so backups carry it across devices
+- Owns accent and completion colors: `_accentColor` and `_completionColor`; `loadSettings()` reads `accent_color` and `completion_color` from `app_settings` and sets `AppColors.accent` / `AppColors.systemGreen` statics accordingly
+- `updateAccentColor(Color)` / `updateCompletionColor(Color)` — mutate the `AppColors` static, persist to `app_settings`, call `notifyListeners()`; the `ListenableBuilder` wrapping `CupertinoApp` propagates the change to all widgets that read `AppColors.accent`
+- `updateFontKey(String)` — validates the key (`kSystemFontKey` or a key in `GoogleFonts.asMap()`), stores in `app_settings`, calls `notifyListeners()`
 - `visibleOptionalTabCount` — number of optional tabs currently enabled; used to gray out the last toggle (UI prevents disabling all of them)
 - `importSmartListPrefs(map)` — invoked by `BackupService` during import to restore the JSON-backed prefs
 
@@ -271,7 +282,7 @@ Routine DB schema:
 | `today_view.dart` | Tasks due today + overdue (`dueDate ≤ today`); sets `activeDueDate` so `+` pre-fills today; overdue tasks show date in red |
 | `upcoming_view.dart` | Tasks with `dueDate > today`, sorted by date; grouped by date header |
 | `completed_view.dart` | All non-trashed completed tasks across every scope; swipe-to-delete sends to Trash; no count badge on entry |
-| `trash_view.dart` | All trashed tasks + lists + folders, sorted by `deletedDate DESC`; **swipe right → Put Back** (blue, confirmation shows restore destination); **swipe left → Delete Permanently** (red, confirmation required); **`⋯` nav bar button → Empty Trash** (action sheet + confirmation dialog, only shown when trash is non-empty); no count badge on entry |
+| `trash_view.dart` | All trashed tasks + lists + folders, sorted by `deletedDate DESC`; **tap task row → `TaskDetailView`** (read-only context from Trash); **swipe right → Put Back** (blue, confirmation shows restore destination); **swipe left → Delete Permanently** (red, confirmation required); **`⋯` nav bar button → Empty Trash** (uses `showSelectionMenu`, only shown when trash is non-empty); no count badge on entry |
 | `task_detail_view.dart` | Edit screen; "Done" nav bar button saves via `controller.updateTask`; `routeName = 'task_detail'` used by `_DepthObserver` to hide the global `+` button |
 | `task_creation_sheet.dart` | Modal bottom sheet (root navigator); title (sentence-cap) + note + date + list picker + Add; accepts `initialListId` and `initialDueDate` |
 | `calendar_date_picker.dart` | Date+time picker dialog; `formatTaskDate(DateTime, {int? doTime})` and `formatDoTime(int)` helpers; returns `(DateTime?, int?)?` — outer null = barrier dismiss (no change), `(null,null)` = No Date, `(date, time?)` = selection |
@@ -307,10 +318,32 @@ Routine DB schema:
 
 | File | Purpose |
 |------|---------|
-| `settings_controller.dart` | `ChangeNotifier` managing `ThemeMode`; persisted via `SettingsService` |
+| `settings_controller.dart` | `ChangeNotifier` managing `ThemeMode`, accent color, completion color, font, per-tab visibility, and smart list prefs. Color/font changes mutate `AppColors` statics and call `notifyListeners()` to trigger a full `CupertinoApp` rebuild. |
 | `settings_service.dart` | Persists `ThemeMode` to `SharedPreferences` |
-| `settings_view.dart` | Settings tab root (`StatefulWidget`); **Appearance** section (Light/System/Dark segmented control); **Data** section with Export Backup and Import Backup rows (only rendered when `backupService` is non-null). Loading spinner shown in place of chevron while operation is in progress. |
+| `settings_view.dart` | Settings tab root (`StatefulWidget`); **Appearance** section (taps → `AppearanceView`); **Font** row (taps → `FontPickerView`); **Tab Bar** section; **Data** section with Export/Import Backup. Loading spinner shown in place of chevron while operation is in progress. |
+| `appearance_view.dart` | Full-screen settings sub-page pushed from Settings → Appearance. Three sections: **Theme** (Light/System/Dark segmented control), **Accent Color** (12 swatches via `_ColorSwatchRow`), **Completion Color** (7 swatches). Each swatch is a 36×36 circle; selected swatch shows a border + checkmark. Color changes call `settingsController.updateAccentColor` / `updateCompletionColor`. |
+| `font_picker_view.dart` | Full-screen Google Fonts browser. Shows all ~1500 fonts in a lazy `ListView.builder`; `CupertinoSearchTextField` filters by key or display name. Connectivity is checked on init via `InternetAddress.lookup('fonts.gstatic.com')`; offline shows a warning banner. Offline + uncached fonts are grayed out (no preview, no tap). When online, each rendered row is marked cached in `FontCache`. `⋯` nav-bar button (anchored `topRight`) → "Edit Preview Text" dialog. Selection calls `settingsController.updateFontKey(key)`. |
+| `font_cache.dart` | `FontCache` singleton. Persists `Set<String>` of seen font keys + custom preview text to `<docsDir>/font_cache.json`. Key methods: `load()`, `isCached(key)`, `markCached(key)`, `setPreviewText(text)`, `previewText` getter. Used by `FontPickerView` to determine which fonts are available offline. |
 | `backup_service.dart` | `exportBackup()` — serialises all data + custom icon image bytes to `.planom` JSON, shares via share sheet. `importBackup()` — picks a file, validates, restores icon files, clears DB, re-inserts data, reloads all controllers. |
+
+**Appearance color presets:**
+```dart
+// Accent options (12):
+[0xFFFF4D00, 0xFFFF3B30, 0xFFFF9500, 0xFFFFCC00, 0xFF34C759,
+ 0xFF00C7BE, 0xFF30B0C7, 0xFF007AFF, 0xFF5856D6, 0xFFAF52DE,
+ 0xFFFF2D55, 0xFFA2845E]
+
+// Completion color options (7):
+[0xFF34C759, 0xFF00C7BE, 0xFF007AFF, 0xFF5856D6,
+ 0xFFFF9500, 0xFFFF2D55, 0xFF8E8E93]
+```
+
+### Font system (`lib/src/theme/app_fonts.dart`)
+
+- `kSystemFontKey = '__system__'` — sentinel for the platform default font
+- `fontDisplayName(key)` — converts a camelCase Google Fonts key to a human-readable name (e.g. `'playfairDisplay'` → `'Playfair Display'`); handles numeric suffixes
+- `_applyFont(key, base)` — looks up the key in `GoogleFonts.asMap()` and applies it to a `TextStyle`; falls back to `base` for `kSystemFontKey` or unknown keys
+- Font is stored as `fontKey` in `SettingsController` and applied via the `CupertinoTheme`'s `textTheme` — the `ListenableBuilder` wrapping `CupertinoApp` rebuilds when the font changes
 
 ### Routines feature (`lib/src/routines/`)
 
@@ -319,7 +352,7 @@ Routine DB schema:
 | `routine_icons.dart` | `kRoutineIconPresets` — 16 `(iconId, colorARGB)` preset combos; `routineIconData(iconId)` maps string keys to `CupertinoIcons` constants |
 | `routine_controller.dart` | `ChangeNotifier`; owns `_routines` + `_entries` lists; computes `todayRoutines`, progress, completion state |
 | `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; also used for editing (`existing` param). Sections: name+icon row, icon picker grid, Frequency (segmented + weekday chips or days-after input + auto-reset), Goal (segmented + amount/unit/record fields) |
-| `routines_view.dart` | Tab root; `todayRoutines` list with `_RoutineRow` items; swipe-to-delete (`Dismissible`); tap → `recordProgress`; long-press → edit/delete action sheet; empty state with prompt |
+| `routines_view.dart` | Tab root; `todayRoutines` list with `_RoutineRow` items; swipe-to-delete (`Dismissible`); tap → `recordProgress`; long-press → `showSelectionMenu` with edit/delete options; empty state with prompt |
 
 **Routine row layout**: 40px colored circle icon (dimmed + checkmark overlay when `achieve_all` complete) · name (strikethrough when complete) · right-aligned `_ProgressBadge` showing `"progress/goal unit"` (only for `certain_amount`)
 
@@ -331,7 +364,7 @@ Routine DB schema:
 - `'everyday'`: each new day's entry starts at 0 (default behavior since entries are per-day)
 - `'none'`: for `achieve_all` — shows as completed if any historical completion exists (persists across days until toggled off); for `certain_amount` — carries over the last entry's amount as today's starting value
 
-### Calendar feature (`lib/src/calendar/calendar_view.dart`)
+### Calendar feature (`lib/src/calendar/`)
 
 `CalendarView` uses `CustomScrollView(center: _centerKey)` for true bidirectional infinite scroll (600 months back + current + 600 forward ≈ 50 years each way):
 
@@ -339,26 +372,46 @@ Routine DB schema:
 - **Layout**: `CupertinoPageScaffold` with standard `CupertinoNavigationBar` (shows `_visibleYear`, updated by scroll listener using `_avgMonthPx ≈ 481` approximation) + a fixed `_WeekdayHeader` row (Mon–Sun) + `Expanded(CustomScrollView(...))`.
 - **Past SliverList**: laid out bottom-to-top by Flutter. Index 0 = last month (sits just above current), index N = N+1 months ago (further up).
 - **Reset signal**: `animateTo(0.0)` snaps/animates back to the current month.
-- **Day cells**: 88px min height, up to 3 orange task chips (uncompleted only) + `+N` overflow label. Monday-first grid.
+- **Day cells**: 88px min height, up to 3 task/event chips (uncompleted tasks only, plus events) + `+N` overflow label. Monday-first grid.
+
+**Past event visual treatment** in both `calendar_view.dart` and `day_view_sheet.dart`:
+- `_eventIsPast(Event event)` — returns `true` when the event's end moment is before `DateTime.now()`. For timed events: `event.date + Duration(minutes: event.doTime! + (event.duration ?? 0)) < now`. For all-day events: `event.date (midnight) < today (midnight)`.
+- In `calendar_view.dart`: past `_EventChip` uses `_pastColor = Color(0xFF8E8E93)` (gray) instead of the active blue.
+- In `day_view_sheet.dart`: past `_EventCard` uses `_pastAccent = Color(0xFF8E8E93)` for the left border/dot; title uses `secondaryLabel` color.
 
 ### Design tokens
 
-All colors and durations live in `lib/src/theme/app_theme.dart`. Use the constants — never hard-code these values at call sites.
-- `AppColors.accent` (`0xFFFF4D00`) — primary brand accent
-- `AppColors.systemGreen` (`0xFF34C759`) — completed indicators
-- `AppColors.shadow` (`0x30000000`) — dropdown / panel drop-shadow
+All colors and durations live in `lib/src/theme/app_theme.dart`. Use the statics — never hard-code these values at call sites.
+- `AppColors.accent` — mutable `static Color` (default `Color(0xFFFF4D00)`); user-configurable via Settings → Appearance → Accent Color; **not `const`** — do not use in `const` widget constructors
+- `AppColors.systemGreen` — mutable `static Color` (default `Color(0xFF34C759)`); user-configurable via Settings → Appearance → Completion Color; **not `const`**
+- `AppColors.shadow` — `static const Color(0x30000000)` — dropdown / panel drop-shadow (still const)
 - `AppDurations.transition` (180 ms) — standard page transition; baked into `FastRoute`
 - Active tab label/icon: black (`Color(0xFF000000)`)
 - Inactive tab: `Color(0xFF636366)`
 - Checkbox: 22×22 rounded rect (radius 6), filled accent when checked
 
+**`const` warning**: Because `AppColors.accent` and `AppColors.systemGreen` are mutable statics, any widget tree that references them cannot use `const`. Remove `const` from the nearest enclosing constructor whenever you add a reference to these colors.
+
 ### Shared utilities (`lib/src/utils/`)
 
 - `fast_route.dart` — `FastRoute<T>` `CupertinoPageRoute` subclass with 180 ms transition. **Always use FastRoute, never bare `CupertinoPageRoute`.**
 - `dropdown_overlay.dart` — `DropdownOverlayMixin` on `State<T>`: provides `showDropdown(context, builder)` that inserts an `OverlayEntry`, exposes a `dismiss()` callback to the builder, and auto-removes the entry in `dispose()` so the overlay can't leak when the host route is popped while the menu is open.
+- `selection_menu.dart` — **unified selection menu** replacing all `CupertinoActionSheet` usage. `showSelectionMenu<T>({context, options, current?, title?, anchor})` returns `Future<T?>` (null = dismissed). Options are `SelectionMenuOption<T>(value, label, icon?, isDestructive)`. Two anchor modes:
+  - `SelectionMenuAnchor.center` (default) — centered overlay with max width 280; used for row-triggered pickers (sort order, font, language, duration)
+  - `SelectionMenuAnchor.topRight` — pinned `top: safeTop + 44 + 4, right: 8, width: 220`; used for nav-bar `⋯` button menus (trash, notes trash, font picker)
+  - No backdrop dimming; full-screen `GestureDetector(HitTestBehavior.opaque)` dismisses on outside tap. Uses `Completer<T?>` internally.
 - `confirm_dialogs.dart` — `confirmMoveToTrash(context, name:, body:, isFolder:)` returns `Future<bool>`; the canonical "Move to Trash?" Cupertino dialog used by every soft-delete site.
 - `item_info_sheet.dart` — `showItemInfoSheet(context, ...)` modal showing creation/modified/completion dates for a task/note/folder.
+
+**Duration picker pattern** (used in task detail, task creation, event detail, event creation): `showSelectionMenu<int>` with preset minute values plus a sentinel `value: -1, isDestructive: true` for "No Duration / Clear". Callers: `if (result == null) return currentValue; if (result == -1) return null; return result;`
 
 ### Localization
 
 String resources in `lib/src/localization/app_en.arb`. Run `flutter gen-l10n` after editing. Both `GlobalMaterialLocalizations.delegate` and `GlobalCupertinoLocalizations.delegate` are registered (Material delegate is needed for `showModalBottomSheet`).
+
+**Curly-quote hazard**: The Edit tool can silently introduce Unicode curly apostrophes (U+2018/U+2019) into `.arb` or `strings.dart` files, which breaks Dart string parsing. If you see `Error: The non-ASCII character ''' (U+2018) can't be used in identifiers`, fix via Python byte replacement rather than a text editor:
+```python
+content = open('path/to/strings.dart', 'rb').read()
+fixed = content.replace(b'\xe2\x80\x98', b"'").replace(b'\xe2\x80\x99', b"'")
+open('path/to/strings.dart', 'wb').write(fixed)
+```
