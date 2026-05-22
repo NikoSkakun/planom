@@ -46,6 +46,11 @@ class SettingsController with ChangeNotifier {
   int get visibleOptionalTabCount =>
       [0, 1, 2, 3, 4].where((i) => _tabVisibility[i] == true).length;
 
+  List<int> _tabOrder = [0, 1, 2, 3, 4];
+
+  /// The user-defined display order of the five logical tab indices.
+  List<int> get tabOrder => List.unmodifiable(_tabOrder);
+
   Future<void> loadSettings() async {
     _themeMode = await _settingsService.themeMode();
     _smartListPrefs = await SmartListPrefs.load();
@@ -70,6 +75,14 @@ class SettingsController with ChangeNotifier {
       } else if (key == 'completion_color') {
         final v = int.tryParse(value);
         if (v != null) { _completionColor = Color(v); AppColors.systemGreen = _completionColor; }
+      } else if (key == 'tab_order') {
+        final parts = value.split(',')
+            .map((s) => int.tryParse(s))
+            .whereType<int>()
+            .toList();
+        if (parts.length == 5 && parts.toSet().containsAll([0, 1, 2, 3, 4])) {
+          _tabOrder = parts;
+        }
       }
     }
 
@@ -80,6 +93,13 @@ class SettingsController with ChangeNotifier {
     _tabVisibility[index] = visible;
     notifyListeners();
     await _db.setAppSetting('tab_${index}_visible', visible.toString());
+  }
+
+  Future<void> updateTabOrder(List<int> order) async {
+    if (order.length != 5 || order.toSet().length != 5) return;
+    _tabOrder = List.of(order);
+    notifyListeners();
+    await _db.setAppSetting('tab_order', order.join(','));
   }
 
   Future<void> updateThemeMode(ThemeMode? newThemeMode) async {

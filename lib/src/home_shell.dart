@@ -204,14 +204,8 @@ class _HomeShellState extends State<HomeShell> {
 
   List<int> _computeVisibleIndices() {
     final sc = widget.settingsController;
-    final indices = [
-      if (sc.isTabVisible(0)) 0,
-      if (sc.isTabVisible(1)) 1,
-      if (sc.isTabVisible(2)) 2,
-      if (sc.isTabVisible(3)) 3,
-      if (sc.isTabVisible(4)) 4,
-    ];
-    return indices.isEmpty ? [0] : indices;
+    final ordered = sc.tabOrder.where((i) => sc.isTabVisible(i)).toList();
+    return ordered.isEmpty ? [0] : ordered;
   }
 
   BottomNavigationBarItem _tabItem(

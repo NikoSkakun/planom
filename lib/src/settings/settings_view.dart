@@ -582,6 +582,17 @@ class TabBarSettingsView extends StatelessWidget {
 
   final SettingsController controller;
 
+  String _tabLabel(S s, int tabIndex) {
+    switch (tabIndex) {
+      case 0: return s.tabTasks;
+      case 1: return s.tabNotes;
+      case 2: return s.tabCalendar;
+      case 3: return s.tabRoutines;
+      case 4: return s.tabSettings;
+      default: return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -598,85 +609,146 @@ class TabBarSettingsView extends StatelessWidget {
           builder: (ctx, _) {
             final visibleCount = controller.visibleOptionalTabCount;
             final settingsVisible = controller.isTabVisible(4);
+            final tabOrder = controller.tabOrder;
 
             bool isDisabled(int tabIndex) =>
                 visibleCount == 1 && controller.isTabVisible(tabIndex);
 
-            return ListView(
+            return SingleChildScrollView(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              children: [
-                Text(
-                  s.display,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: labelColor,
-                    letterSpacing: -0.08,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _ToggleRow(
-                  label: s.hideLabels,
-                  value: controller.hideTabLabels,
-                  onChanged: controller.updateHideTabLabels,
-                ),
-                const SizedBox(height: 32),
-                Text(
-                  s.visibleTabs,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: labelColor,
-                    letterSpacing: -0.08,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _ToggleRow(
-                  label: s.tabTasks,
-                  value: controller.isTabVisible(0),
-                  enabled: !isDisabled(0),
-                  onChanged: (v) => controller.setTabVisible(0, v),
-                ),
-                const SizedBox(height: 1),
-                _ToggleRow(
-                  label: s.tabNotes,
-                  value: controller.isTabVisible(1),
-                  enabled: !isDisabled(1),
-                  onChanged: (v) => controller.setTabVisible(1, v),
-                ),
-                const SizedBox(height: 1),
-                _ToggleRow(
-                  label: s.tabCalendar,
-                  value: controller.isTabVisible(2),
-                  enabled: !isDisabled(2),
-                  onChanged: (v) => controller.setTabVisible(2, v),
-                ),
-                const SizedBox(height: 1),
-                _ToggleRow(
-                  label: s.tabRoutines,
-                  value: controller.isTabVisible(3),
-                  enabled: !isDisabled(3),
-                  onChanged: (v) => controller.setTabVisible(3, v),
-                ),
-                const SizedBox(height: 1),
-                _ToggleRow(
-                  label: s.tabSettings,
-                  value: settingsVisible,
-                  enabled: !isDisabled(4),
-                  onChanged: (v) => controller.setTabVisible(4, v),
-                ),
-                if (!settingsVisible) ...[
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      s.settingsAccessibleHint,
-                      style: TextStyle(fontSize: 13, color: labelColor),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Display ────────────────────────────────────────────
+                  Text(
+                    s.display,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: labelColor,
+                      letterSpacing: -0.08,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  _ToggleRow(
+                    label: s.hideLabels,
+                    value: controller.hideTabLabels,
+                    onChanged: controller.updateHideTabLabels,
+                  ),
+                  const SizedBox(height: 32),
+                  // ── Visible Tabs (reorderable) ─────────────────────────
+                  Text(
+                    s.visibleTabs,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: labelColor,
+                      letterSpacing: -0.08,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ReorderableListView(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    onReorder: (oldIndex, newIndex) {
+                      final newOrder = List.of(tabOrder);
+                      if (newIndex > oldIndex) newIndex--;
+                      final item = newOrder.removeAt(oldIndex);
+                      newOrder.insert(newIndex, item);
+                      controller.updateTabOrder(newOrder);
+                    },
+                    children: [
+                      for (int i = 0; i < tabOrder.length; i++)
+                        _TabOrderRow(
+                          key: ValueKey(tabOrder[i]),
+                          index: i,
+                          label: _tabLabel(s, tabOrder[i]),
+                          isVisible: controller.isTabVisible(tabOrder[i]),
+                          isDisabled: isDisabled(tabOrder[i]),
+                          onVisibilityChanged: (v) =>
+                              controller.setTabVisible(tabOrder[i], v),
+                        ),
+                    ],
+                  ),
+                  if (!settingsVisible) ...[
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        s.settingsAccessibleHint,
+                        style: TextStyle(fontSize: 13, color: labelColor),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tab order row ─────────────────────────────────────────────────────────────
+
+class _TabOrderRow extends StatelessWidget {
+  const _TabOrderRow({
+    super.key,
+    required this.index,
+    required this.label,
+    required this.isVisible,
+    required this.isDisabled,
+    required this.onVisibilityChanged,
+  });
+
+  final int index;
+  final String label;
+  final bool isVisible;
+  final bool isDisabled;
+  final ValueChanged<bool> onVisibilityChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = CupertinoDynamicColor.resolve(
+      CupertinoColors.tertiarySystemBackground,
+      context,
+    );
+    return Opacity(
+      opacity: isDisabled ? 0.4 : 1.0,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 17,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
+              ),
+            ),
+            CupertinoSwitch(
+              value: isVisible,
+              onChanged: isDisabled ? null : onVisibilityChanged,
+              activeColor: AppColors.accent,
+            ),
+            const SizedBox(width: 12),
+            ReorderableDragStartListener(
+              index: index,
+              child: Icon(
+                CupertinoIcons.line_horizontal_3,
+                size: 20,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ),
+          ],
         ),
       ),
     );
