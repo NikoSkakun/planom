@@ -42,6 +42,9 @@ class EventCreationSheet extends StatefulWidget {
 class _EventCreationSheetState extends State<EventCreationSheet> {
   final _titleCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _titleFocus = FocusNode();
+  final _noteFocus = FocusNode();
+  FocusNode? _activeFocus;
   late DateTime _date;
   int? _doTime;
   int? _duration; // minutes
@@ -56,10 +59,21 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
       final empty = _titleCtrl.text.trim().isEmpty;
       if (empty != _titleEmpty) setState(() => _titleEmpty = empty);
     });
+    _titleFocus.addListener(_onFocusChange);
+    _noteFocus.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (_titleFocus.hasFocus) _activeFocus = _titleFocus;
+    if (_noteFocus.hasFocus) _activeFocus = _noteFocus;
   }
 
   @override
   void dispose() {
+    _titleFocus.removeListener(_onFocusChange);
+    _noteFocus.removeListener(_onFocusChange);
+    _titleFocus.dispose();
+    _noteFocus.dispose();
     _titleCtrl.dispose();
     _noteCtrl.dispose();
     super.dispose();
@@ -92,9 +106,12 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
   }
 
   Future<void> _pickDuration() async {
+    final saved = _activeFocus;
+    FocusManager.instance.primaryFocus?.unfocus();
     final result = await _showDurationPicker(context, _duration);
     if (!mounted) return;
     setState(() => _duration = result);
+    saved?.requestFocus();
   }
 
   @override
@@ -127,6 +144,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
           const SizedBox(height: 20),
           CupertinoTextField(
             controller: _titleCtrl,
+            focusNode: _titleFocus,
             placeholder: s.eventName,
             autofocus: true,
             textInputAction: TextInputAction.next,
@@ -141,6 +159,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
           const SizedBox(height: 8),
           CupertinoTextField(
             controller: _noteCtrl,
+            focusNode: _noteFocus,
             placeholder: s.note,
             style: const TextStyle(fontSize: 15),
             decoration: const BoxDecoration(),
