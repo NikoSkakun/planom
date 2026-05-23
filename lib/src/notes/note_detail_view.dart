@@ -168,7 +168,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
         controller: _content,
         focusNode: _contentFocus,
         placeholder: S.of(context).note,
-        style: const TextStyle(fontSize: 16),
+        style: const TextStyle(fontSize: 16, height: 1.35),
         decoration: const BoxDecoration(),
         maxLines: null,
         expands: true,

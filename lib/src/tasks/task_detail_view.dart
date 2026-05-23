@@ -197,7 +197,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
         controller: _note,
         focusNode: _noteFocus,
         placeholder: notePlaceholder,
-        style: const TextStyle(fontSize: 15),
+        style: const TextStyle(fontSize: 16, height: 1.35),
         decoration: const BoxDecoration(),
         padding: EdgeInsets.zero,
         maxLines: null,
@@ -213,7 +213,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
           child: Text(
             notePlaceholder,
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 16,
               color: CupertinoColors.placeholderText.resolveFrom(context),
             ),
           ),
