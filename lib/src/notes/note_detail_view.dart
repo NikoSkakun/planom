@@ -8,6 +8,7 @@ import '../localization/strings.dart';
 import '../theme/app_theme.dart';
 import '../models/note.dart';
 import '../utils/dropdown_overlay.dart';
+import '../utils/dropdown_row.dart';
 import '../utils/item_info_sheet.dart';
 import 'markdown_toolbar.dart';
 import 'markdown_view.dart';
@@ -328,7 +329,7 @@ class _NoteOptionsDropdown extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _DropdownRow(
+                DropdownRow(
                   label: S.of(context).moveTo,
                   icon: CupertinoIcons.folder,
                   onTap: onMoveTo,
@@ -337,7 +338,7 @@ class _NoteOptionsDropdown extends StatelessWidget {
                   height: 0.5,
                   color: CupertinoColors.separator.resolveFrom(context),
                 ),
-                _DropdownRow(
+                DropdownRow(
                   label: S.of(context).info,
                   icon: CupertinoIcons.info,
                   onTap: onInfo,
@@ -346,7 +347,7 @@ class _NoteOptionsDropdown extends StatelessWidget {
                   height: 0.5,
                   color: CupertinoColors.separator.resolveFrom(context),
                 ),
-                _DropdownRow(
+                DropdownRow(
                   label: S.of(context).delete,
                   icon: CupertinoIcons.trash,
                   onTap: onDelete,
@@ -357,42 +358,6 @@ class _NoteOptionsDropdown extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _DropdownRow extends StatelessWidget {
-  const _DropdownRow({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.color,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final effectiveColor =
-        color ?? CupertinoColors.label.resolveFrom(context);
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      onPressed: onTap,
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: effectiveColor),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(fontSize: 16, color: effectiveColor),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

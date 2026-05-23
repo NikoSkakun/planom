@@ -14,6 +14,7 @@ import '../settings/settings_view.dart';
 import '../settings/smart_list_prefs.dart';
 import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
+import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
 import 'completed_view.dart';
 import 'inbox_view.dart';
@@ -625,7 +626,7 @@ class _TasksOptionsDropdown extends StatelessWidget {
     final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
     final items = <Widget>[];
     if (showSettings) {
-      items.add(_DropdownRow(
+      items.add(DropdownRow(
         label: S.of(context).settings,
         icon: CupertinoIcons.gear_alt,
         onTap: onSettings ?? () {},
@@ -664,38 +665,6 @@ class _TasksOptionsDropdown extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _DropdownRow extends StatelessWidget {
-  const _DropdownRow({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.color,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = color ?? CupertinoColors.label.resolveFrom(context);
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      onPressed: onTap,
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: fg),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(label, style: TextStyle(fontSize: 16, color: fg)),
-          ),
-        ],
-      ),
     );
   }
 }
