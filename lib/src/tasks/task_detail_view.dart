@@ -4,12 +4,17 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/widgets.dart' show WidgetsBindingObserver, AppLifecycleState;
 
 import '../theme/app_theme.dart';
+import '../utils/duration_picker.dart';
 
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
+import '../localization/strings.dart';
 import '../models/task.dart';
+import '../notes/markdown_toolbar.dart';
+import '../notes/markdown_view.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/reminder_picker.dart';
 import 'calendar_date_picker.dart';
 import 'task_controller.dart';
 
@@ -35,13 +40,16 @@ class _TaskDetailViewState extends State<TaskDetailView>
     with DropdownOverlayMixin, WidgetsBindingObserver {
   late final TextEditingController _title;
   late final TextEditingController _note;
+  final FocusNode _noteFocus = FocusNode();
   late DateTime? _dueDate;
   late int? _doTime;
   late int? _duration;
+  late List<int> _reminderOffsets;
   late bool _isCompleted;
   late String? _listId;
   late int _priority;
   bool _deleted = false;
+  bool _isEditingNote = false;
   Timer? _autosaveTimer;
 
   @override
@@ -55,9 +63,25 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _isCompleted = widget.task.isCompleted;
     _listId = widget.task.listId;
     _priority = widget.task.priority;
+    _reminderOffsets = List.of(widget.task.reminderOffsets);
     _title.addListener(_scheduleAutosave);
     _note.addListener(_scheduleAutosave);
+    _noteFocus.addListener(_onNoteFocusChanged);
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _onNoteFocusChanged() {
+    if (!mounted) return;
+    setState(() {
+      if (!_noteFocus.hasFocus) _isEditingNote = false;
+    });
+  }
+
+  void _startEditingNote() {
+    setState(() => _isEditingNote = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _noteFocus.requestFocus();
+    });
   }
 
   void _scheduleAutosave() {
@@ -82,6 +106,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
       listId: _listId,
       clearListId: _listId == null,
       priority: _priority,
+      reminderOffsets: _reminderOffsets,
     ));
   }
 
@@ -101,6 +126,8 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _autosaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _save();
+    _noteFocus.removeListener(_onNoteFocusChanged);
+    _noteFocus.dispose();
     _title.dispose();
     _note.dispose();
     super.dispose();
@@ -156,18 +183,66 @@ class _TaskDetailViewState extends State<TaskDetailView>
   }
 
   Future<void> _pickDuration() async {
-    final result = await _showDurationPicker(context, _duration);
+    final result = await showDurationPicker(context, _duration);
     if (!mounted) return;
     setState(() => _duration = result);
   }
 
-  String get _listLabel {
-    if (_listId == null) return 'Inbox';
-    return widget.folderController.listById(_listId!)?.name ?? 'Inbox';
+  Future<void> _pickReminders() async {
+    final result = await showReminderPicker(context, _reminderOffsets);
+    if (!mounted || result == null) return;
+    setState(() => _reminderOffsets = result);
+    _save();
+  }
+
+  String _listLabel(BuildContext context) {
+    final inbox = S.of(context).inbox;
+    if (_listId == null) return inbox;
+    return widget.folderController.listById(_listId!)?.name ?? inbox;
+  }
+
+  Widget _buildNoteArea() {
+    final notePlaceholder = S.of(context).note;
+    if (_isEditingNote || _noteFocus.hasFocus) {
+      return CupertinoTextField(
+        controller: _note,
+        focusNode: _noteFocus,
+        placeholder: notePlaceholder,
+        style: const TextStyle(fontSize: 16, height: 1.35),
+        decoration: const BoxDecoration(),
+        padding: EdgeInsets.zero,
+        maxLines: null,
+        textCapitalization: TextCapitalization.sentences,
+      );
+    }
+    if (_note.text.trim().isEmpty) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _startEditingNote,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            notePlaceholder,
+            style: TextStyle(
+              fontSize: 16,
+              color: CupertinoColors.placeholderText.resolveFrom(context),
+            ),
+          ),
+        ),
+      );
+    }
+    return MarkdownView(
+      data: _note.text,
+      shrinkWrap: true,
+      padding: EdgeInsets.zero,
+      onTap: _startEditingNote,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
+    final showToolbar = _noteFocus.hasFocus;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
@@ -177,171 +252,208 @@ class _TaskDetailViewState extends State<TaskDetailView>
           child: const Icon(CupertinoIcons.ellipsis, size: 26),
         ),
       ),
-      child: SafeArea(
-        child: ListView(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: GestureDetector(
-                    onTap: () =>
-                        setState(() => _isCompleted = !_isCompleted),
-                    child: _RoundedCheckbox(checked: _isCompleted),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: CupertinoTextField(
-                    controller: _title,
-                    placeholder: 'Task name',
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w600),
-                    decoration: const BoxDecoration(),
-                    maxLines: null,
-                    textInputAction: TextInputAction.next,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.only(left: 34),
-              child: CupertinoTextField(
-                controller: _note,
-                placeholder: 'Note',
-                style: const TextStyle(fontSize: 15),
-                decoration: const BoxDecoration(),
-                maxLines: null,
-                textCapitalization: TextCapitalization.sentences,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Priority picker
-            _SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        children: [
+          Expanded(
+            child: SafeArea(
+              bottom: false,
+              child: ListView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(CupertinoIcons.flag_fill,
-                          size: 16,
-                          color: CupertinoColors.secondaryLabel),
-                      const SizedBox(width: 10),
-                      const Text('Priority',
-                          style: TextStyle(fontSize: 15)),
-                      const Spacer(),
-                      _PriorityPicker(
-                        value: _priority,
-                        onChanged: (v) =>
-                            setState(() => _priority = v),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: GestureDetector(
+                          onTap: () =>
+                              setState(() => _isCompleted = !_isCompleted),
+                          child: _RoundedCheckbox(checked: _isCompleted),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: CupertinoTextField(
+                          controller: _title,
+                          placeholder: s.taskName,
+                          style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w600),
+                          decoration: const BoxDecoration(),
+                          maxLines: null,
+                          textInputAction: TextInputAction.next,
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Date picker row
-            _SectionCard(
-              onTap: _pickDate,
-              child: Row(
-                children: [
-                  Icon(
-                    CupertinoIcons.calendar,
-                    size: 18,
-                    color: _dueDate != null
-                        ? AppColors.accent
-                        : CupertinoColors.secondaryLabel
-                            .resolveFrom(context),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 34),
+                    child: _buildNoteArea(),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _dueDate != null
-                        ? formatTaskDate(_dueDate!, doTime: _doTime)
-                        : 'No Date',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: _dueDate != null
-                          ? AppColors.accent
-                          : CupertinoColors.secondaryLabel
+                  const SizedBox(height: 24),
+
+                  // Priority picker
+                  _SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(CupertinoIcons.flag_fill,
+                                size: 16,
+                                color: CupertinoColors.secondaryLabel),
+                            const SizedBox(width: 10),
+                            Text(s.priority,
+                                style: const TextStyle(fontSize: 15)),
+                            const Spacer(),
+                            _PriorityPicker(
+                              value: _priority,
+                              onChanged: (v) =>
+                                  setState(() => _priority = v),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Date picker row
+                  _SectionCard(
+                    onTap: _pickDate,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.calendar,
+                          size: 18,
+                          color: _dueDate != null
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _dueDate != null
+                              ? formatTaskDate(context, _dueDate!,
+                                  doTime: _doTime)
+                              : s.noDate,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: _dueDate != null
+                                ? AppColors.accent
+                                : CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // List picker row
+                  _SectionCard(
+                    onTap: _pickList,
+                    child: Row(
+                      children: [
+                        Image.asset(
+                          _listId == null
+                              ? 'assets/icons/inbox.png'
+                              : 'assets/icons/list.png',
+                          width: 18,
+                          height: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _listLabel(context),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color:
+                                CupertinoColors.label.resolveFrom(context),
+                          ),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 14,
+                          color: CupertinoColors.secondaryLabel
                               .resolveFrom(context),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-            // List picker row
-            _SectionCard(
-              onTap: _pickList,
-              child: Row(
-                children: [
-                  Image.asset(
-                    _listId == null
-                        ? 'assets/icons/inbox.png'
-                        : 'assets/icons/list.png',
-                    width: 18,
-                    height: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _listLabel,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color:
-                          CupertinoColors.label.resolveFrom(context),
+                  // Duration picker row
+                  _SectionCard(
+                    onTap: _pickDuration,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.timer,
+                          size: 18,
+                          color: _duration != null
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _duration != null
+                              ? formatDuration(_duration!)
+                              : s.noDuration,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: _duration != null
+                                ? AppColors.accent
+                                : CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
-                  Icon(
-                    CupertinoIcons.chevron_right,
-                    size: 14,
-                    color: CupertinoColors.secondaryLabel
-                        .resolveFrom(context),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-            // Duration picker row
-            _SectionCard(
-              onTap: _pickDuration,
-              child: Row(
-                children: [
-                  Icon(
-                    CupertinoIcons.timer,
-                    size: 18,
-                    color: _duration != null
-                        ? AppColors.accent
-                        : CupertinoColors.secondaryLabel
-                            .resolveFrom(context),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _duration != null
-                        ? _formatDuration(_duration!)
-                        : 'No Duration',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: _duration != null
-                          ? AppColors.accent
-                          : CupertinoColors.secondaryLabel
-                              .resolveFrom(context),
+                  // Reminder row
+                  _SectionCard(
+                    onTap: _pickReminders,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.bell,
+                          size: 18,
+                          color: _reminderOffsets.isNotEmpty
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          formatReminderOffsets(_reminderOffsets, s),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: _reminderOffsets.isNotEmpty
+                                ? AppColors.accent
+                                : CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          if (showToolbar)
+            MarkdownToolbar(
+              controller: _note,
+              focusNode: _noteFocus,
+              onPromptLink: (selected) =>
+                  showLinkPromptDialog(context, initialText: selected),
+            ),
+        ],
       ),
     );
   }
@@ -374,7 +486,10 @@ class _PriorityPicker extends StatelessWidget {
   final int value;
   final ValueChanged<int> onChanged;
 
-  static const _labels = ['None', 'Low', 'Med', 'High'];
+  static List<String> _labelsFor(BuildContext context) {
+    final s = S.of(context);
+    return [s.priorityNone, s.priorityLow, s.priorityMed, s.priorityHigh];
+  }
   static const _colors = [
     CupertinoColors.systemGrey,
     CupertinoColors.systemBlue,
@@ -384,6 +499,7 @@ class _PriorityPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final labels = _labelsFor(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(4, (i) {
@@ -405,7 +521,7 @@ class _PriorityPicker extends StatelessWidget {
                   : null,
             ),
             child: Text(
-              _labels[i],
+              labels[i],
               style: TextStyle(
                 fontSize: 13,
                 color: selected
@@ -451,10 +567,10 @@ class _TaskOptionsDropdown extends StatelessWidget {
             width: 220,
             decoration: BoxDecoration(
               color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x30000000),
+                  color: AppColors.shadow,
                   blurRadius: 20,
                   offset: Offset(0, 6),
                 ),
@@ -465,7 +581,7 @@ class _TaskOptionsDropdown extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _DropdownRow(
-                  label: 'Move to',
+                  label: S.of(context).moveTo,
                   icon: CupertinoIcons.folder,
                   onTap: onMoveTo,
                 ),
@@ -474,7 +590,7 @@ class _TaskOptionsDropdown extends StatelessWidget {
                   color: CupertinoColors.separator.resolveFrom(context),
                 ),
                 _DropdownRow(
-                  label: 'Info',
+                  label: S.of(context).info,
                   icon: CupertinoIcons.info,
                   onTap: onInfo,
                 ),
@@ -483,7 +599,7 @@ class _TaskOptionsDropdown extends StatelessWidget {
                   color: CupertinoColors.separator.resolveFrom(context),
                 ),
                 _DropdownRow(
-                  label: 'Delete',
+                  label: S.of(context).delete,
                   icon: CupertinoIcons.trash,
                   onTap: onDelete,
                   color: CupertinoColors.destructiveRed,
@@ -520,7 +636,9 @@ class _DropdownRow extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: fg),
           const SizedBox(width: 10),
-          Text(label, style: TextStyle(fontSize: 16, color: fg)),
+          Expanded(
+            child: Text(label, style: TextStyle(fontSize: 16, color: fg)),
+          ),
         ],
       ),
     );
@@ -555,42 +673,3 @@ class _RoundedCheckbox extends StatelessWidget {
   }
 }
 
-String _formatDuration(int minutes) {
-  if (minutes < 60) return '${minutes}m';
-  final h = minutes ~/ 60;
-  final m = minutes % 60;
-  if (m == 0) return '${h}h';
-  return '${h}h ${m}m';
-}
-
-Future<int?> _showDurationPicker(BuildContext context, int? current) async {
-  const presets = [15, 30, 45, 60, 90, 120, 180, 240];
-  return showCupertinoModalPopup<int?>(
-    context: context,
-    builder: (ctx) => CupertinoActionSheet(
-      title: const Text('Duration'),
-      actions: [
-        for (final m in presets)
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(ctx).pop(m),
-            child: Text(_formatDuration(m)),
-          ),
-        if (current != null)
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(ctx).pop(-1),
-            child: const Text('Clear'),
-          ),
-      ],
-      cancelButton: CupertinoActionSheetAction(
-        isDefaultAction: true,
-        onPressed: () => Navigator.of(ctx).pop(),
-        child: const Text('Cancel'),
-      ),
-    ),
-  ).then((v) {
-    if (v == null) return current;
-    if (v == -1) return null;
-    return v;
-  });
-}

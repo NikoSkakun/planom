@@ -3,6 +3,7 @@ import 'package:flutter_app_badger/flutter_app_badger.dart';
 
 import '../database/database_service.dart';
 import '../models/task.dart';
+import '../notifications/notification_service.dart';
 
 enum TaskSortOrder { defaultOrder, creationDate, name, priority, dateTime }
 
@@ -96,6 +97,9 @@ class TaskController with ChangeNotifier {
     _tasks = [task, ..._tasks];
     _updateBadge();
     notifyListeners();
+    if (task.reminderOffsets.isNotEmpty) {
+      NotificationService.instance.scheduleTaskReminders(task);
+    }
   }
 
   Future<void> updateTask(Task updated) async {
@@ -105,6 +109,7 @@ class TaskController with ChangeNotifier {
     _tasks = [..._tasks]..[i] = updated;
     _updateBadge();
     notifyListeners();
+    NotificationService.instance.scheduleTaskReminders(updated);
   }
 
   Future<void> toggleCompleted(String id) async {
@@ -138,6 +143,7 @@ class TaskController with ChangeNotifier {
     _trashedTasks = [trashed, ..._trashedTasks];
     _updateBadge();
     notifyListeners();
+    NotificationService.instance.cancelTaskReminders(id);
   }
 
   Future<void> deleteTasksForList(String listId) async {

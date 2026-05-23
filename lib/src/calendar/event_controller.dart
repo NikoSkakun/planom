@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../database/database_service.dart';
 import '../models/event.dart';
+import '../notifications/notification_service.dart';
 
 class EventController with ChangeNotifier {
   EventController(this._db);
@@ -27,6 +28,9 @@ class EventController with ChangeNotifier {
     await _db.insertEvent(event);
     _events = [event, ..._events];
     notifyListeners();
+    if (event.reminderOffsets.isNotEmpty) {
+      NotificationService.instance.scheduleEventReminders(event);
+    }
   }
 
   Future<void> updateEvent(Event updated) async {
@@ -35,11 +39,13 @@ class EventController with ChangeNotifier {
     if (i == -1) return;
     _events = [..._events]..[i] = updated;
     notifyListeners();
+    NotificationService.instance.scheduleEventReminders(updated);
   }
 
   Future<void> deleteEvent(String id) async {
     await _db.permanentlyDeleteEvent(id);
     _events = _events.where((e) => e.id != id).toList();
     notifyListeners();
+    NotificationService.instance.cancelEventReminders(id);
   }
 }

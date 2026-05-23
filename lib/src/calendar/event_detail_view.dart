@@ -1,8 +1,11 @@
 import 'package:flutter/cupertino.dart';
 
 import '../models/event.dart';
+import '../localization/strings.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
+import '../utils/duration_picker.dart';
+import '../utils/reminder_picker.dart';
 import 'event_controller.dart';
 
 class EventDetailView extends StatefulWidget {
@@ -25,6 +28,7 @@ class _EventDetailViewState extends State<EventDetailView> {
   late DateTime _date;
   late int? _doTime;
   late int? _duration;
+  late List<int> _reminderOffsets;
   bool _deleted = false;
 
   @override
@@ -35,6 +39,7 @@ class _EventDetailViewState extends State<EventDetailView> {
     _date = widget.event.date;
     _doTime = widget.event.doTime;
     _duration = widget.event.duration;
+    _reminderOffsets = List.of(widget.event.reminderOffsets);
   }
 
   @override
@@ -51,6 +56,7 @@ class _EventDetailViewState extends State<EventDetailView> {
           clearDoTime: _doTime == null,
           duration: _duration,
           clearDuration: _duration == null,
+          reminderOffsets: _reminderOffsets,
         ));
       }
     }
@@ -73,50 +79,34 @@ class _EventDetailViewState extends State<EventDetailView> {
   }
 
   Future<void> _pickDuration() async {
-    final result = await showCupertinoModalPopup<int?>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('Duration'),
-        actions: [
-          for (final m in const [15, 30, 45, 60, 90, 120, 180, 240])
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.of(ctx).pop(m),
-              child: Text(_dur(m)),
-            ),
-          if (_duration != null)
-            CupertinoActionSheetAction(
-              isDestructiveAction: true,
-              onPressed: () => Navigator.of(ctx).pop(-1),
-              child: const Text('Clear'),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
-        ),
-      ),
-    );
+    final result = await showDurationPicker(context, _duration);
+    if (!mounted) return;
+    setState(() => _duration = result);
+  }
+
+  Future<void> _pickReminders() async {
+    final result = await showReminderPicker(context, _reminderOffsets);
     if (!mounted || result == null) return;
-    setState(() => _duration = result == -1 ? null : result);
+    setState(() => _reminderOffsets = result);
   }
 
   Future<void> _delete() async {
+    final s = S.of(context);
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Delete Event?'),
-        content: const Text('This event will be permanently removed.'),
+        title: Text(s.deleteEventQuestion),
+        content: Text(s.deleteEventBody),
         actions: [
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text(s.delete),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(s.cancel),
           ),
         ],
       ),
@@ -129,6 +119,7 @@ class _EventDetailViewState extends State<EventDetailView> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -147,7 +138,7 @@ class _EventDetailViewState extends State<EventDetailView> {
           children: [
             CupertinoTextField(
               controller: _title,
-              placeholder: 'Event name',
+              placeholder: s.eventName,
               style: const TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w600),
               decoration: const BoxDecoration(),
@@ -157,7 +148,7 @@ class _EventDetailViewState extends State<EventDetailView> {
             const SizedBox(height: 12),
             CupertinoTextField(
               controller: _note,
-              placeholder: 'Note',
+              placeholder: s.note,
               style: const TextStyle(fontSize: 15),
               decoration: const BoxDecoration(),
               maxLines: null,
@@ -192,11 +183,38 @@ class _EventDetailViewState extends State<EventDetailView> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    _duration != null ? _dur(_duration!) : 'No duration',
+                    _duration != null
+                        ? formatDuration(_duration!)
+                        : s.noDuration,
                     style: TextStyle(
                       fontSize: 15,
                       color:
                           _duration != null ? AppColors.accent : secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SectionCard(
+              onTap: _pickReminders,
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.bell,
+                    size: 18,
+                    color: _reminderOffsets.isNotEmpty
+                        ? AppColors.accent
+                        : secondary,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    formatReminderOffsets(_reminderOffsets, s),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: _reminderOffsets.isNotEmpty
+                          ? AppColors.accent
+                          : secondary,
                     ),
                   ),
                 ],
@@ -207,14 +225,6 @@ class _EventDetailViewState extends State<EventDetailView> {
       ),
     );
   }
-}
-
-String _dur(int m) {
-  if (m < 60) return '${m}m';
-  final h = m ~/ 60;
-  final r = m % 60;
-  if (r == 0) return '${h}h';
-  return '${h}h ${r}m';
 }
 
 class _SectionCard extends StatelessWidget {

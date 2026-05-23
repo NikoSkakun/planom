@@ -14,7 +14,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 16;
+  static const _dbVersion = 17;
 
   Database? _db;
 
@@ -42,7 +42,8 @@ class DatabaseService {
             sortOrder INTEGER NOT NULL DEFAULT 0,
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
-            completionDate INTEGER
+            completionDate INTEGER,
+            reminderOffsets TEXT
           )
         ''');
         await db.execute('''
@@ -137,7 +138,8 @@ class DatabaseService {
             doTime INTEGER,
             duration INTEGER,
             isDeleted INTEGER NOT NULL DEFAULT 0,
-            deletedDate INTEGER
+            deletedDate INTEGER,
+            reminderOffsets TEXT
           )
         ''');
       },
@@ -297,6 +299,10 @@ class DatabaseService {
         if (oldVersion < 16) {
           await db.execute(
               'ALTER TABLE tasks ADD COLUMN duration INTEGER');
+        }
+        if (oldVersion < 17) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN reminderOffsets TEXT');
+          await db.execute('ALTER TABLE events ADD COLUMN reminderOffsets TEXT');
         }
       },
     );
@@ -917,6 +923,18 @@ class DatabaseService {
           conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
+  }
+
+  Future<void> resetUserData() async {
+    final db = await _database;
+    await db.delete('events');
+    await db.delete('routine_entries');
+    await db.delete('routines');
+    await db.delete('notes');
+    await db.delete('note_folders');
+    await db.delete('app_lists');
+    await db.delete('folders');
+    await db.delete('tasks');
   }
 
   Future<void> close() async {

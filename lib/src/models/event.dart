@@ -12,6 +12,7 @@ class Event extends AppItem {
   final int? duration; // minutes; null = no defined duration
   final bool isDeleted;
   final DateTime? deletedDate;
+  final List<int> reminderOffsets;
 
   Event({
     String? id,
@@ -24,6 +25,7 @@ class Event extends AppItem {
     this.duration,
     this.isDeleted = false,
     this.deletedDate,
+    this.reminderOffsets = const [],
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -42,6 +44,7 @@ class Event extends AppItem {
     bool? isDeleted,
     DateTime? deletedDate,
     bool clearDeletedDate = false,
+    List<int>? reminderOffsets,
   }) {
     return Event(
       id: id,
@@ -55,6 +58,7 @@ class Event extends AppItem {
       isDeleted: isDeleted ?? this.isDeleted,
       deletedDate:
           clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
+      reminderOffsets: reminderOffsets ?? this.reminderOffsets,
     );
   }
 
@@ -69,6 +73,7 @@ class Event extends AppItem {
         'duration': duration,
         'isDeleted': isDeleted ? 1 : 0,
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
+        'reminderOffsets': reminderOffsets.join(','),
       };
 
   factory Event.fromMap(Map<String, dynamic> map) => Event(
@@ -85,5 +90,11 @@ class Event extends AppItem {
         deletedDate: map['deletedDate'] != null
             ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)
             : null,
+        reminderOffsets: _parseOffsets(map['reminderOffsets'] as String?),
       );
+
+  static List<int> _parseOffsets(String? s) {
+    if (s == null || s.isEmpty) return const [];
+    return s.split(',').map((e) => int.tryParse(e)).whereType<int>().toList();
+  }
 }

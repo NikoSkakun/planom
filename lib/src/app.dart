@@ -8,6 +8,8 @@ import 'localization/app_localizations.dart';
 import 'home_shell.dart';
 import 'notes/note_controller.dart';
 import 'routines/routine_controller.dart';
+import 'security/lock_screen.dart';
+import 'security/security_service.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'tasks/task_controller.dart';
@@ -23,6 +25,7 @@ class MyApp extends StatelessWidget {
     required this.routineController,
     required this.eventController,
     required this.backupService,
+    this.securityService,
   });
 
   final SettingsController settingsController;
@@ -32,6 +35,7 @@ class MyApp extends StatelessWidget {
   final RoutineController routineController;
   final EventController eventController;
   final BackupService backupService;
+  final SecurityService? securityService;
 
   @override
   Widget build(BuildContext context) {
@@ -59,18 +63,71 @@ class MyApp extends StatelessWidget {
           ),
           onGenerateRoute: (settings) => FastRoute<void>(
             settings: settings,
-            builder: (context) => HomeShell(
-              settingsController: settingsController,
-              taskController: taskController,
-              folderController: folderController,
-              noteController: noteController,
-              routineController: routineController,
-              eventController: eventController,
-              backupService: backupService,
+            builder: (context) => _SecurityGate(
+              securityService: securityService,
+              child: HomeShell(
+                settingsController: settingsController,
+                taskController: taskController,
+                folderController: folderController,
+                noteController: noteController,
+                routineController: routineController,
+                eventController: eventController,
+                backupService: backupService,
+                securityService: securityService,
+              ),
             ),
           ),
         );
       },
     );
+  }
+}
+
+class _SecurityGate extends StatefulWidget {
+  const _SecurityGate({required this.securityService, required this.child});
+
+  final SecurityService? securityService;
+  final Widget child;
+
+  @override
+  State<_SecurityGate> createState() => _SecurityGateState();
+}
+
+class _SecurityGateState extends State<_SecurityGate>
+    with WidgetsBindingObserver {
+  bool _locked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _locked = widget.securityService?.isLocked ?? false;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      if (widget.securityService?.isLocked ?? false) {
+        setState(() => _locked = true);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_locked && widget.securityService != null) {
+      return LockScreen(
+        securityService: widget.securityService!,
+        onUnlocked: () => setState(() => _locked = false),
+      );
+    }
+    return widget.child;
   }
 }
