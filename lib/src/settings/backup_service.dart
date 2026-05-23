@@ -97,19 +97,6 @@ class BackupService {
 
     if (data['version'] != 1) return false;
 
-    // Restore custom icon files first so DB records can reference them.
-    final docsPath = (await getApplicationDocumentsDirectory()).path;
-    final iconsDir = Directory('$docsPath/icons');
-    if (!iconsDir.existsSync()) iconsDir.createSync(recursive: true);
-
-    final customIcons =
-        (data['customIcons'] as Map<String, dynamic>?) ?? {};
-    for (final entry in customIcons.entries) {
-      final relPath = entry.key; // 'icons/filename.ext'
-      final bytes = base64Decode(entry.value as String);
-      await File('$docsPath/$relPath').writeAsBytes(bytes);
-    }
-
     List<Map<String, dynamic>> asMaps(dynamic value) {
       if (value == null) return [];
       return (value as List<dynamic>)
@@ -117,16 +104,46 @@ class BackupService {
           .toList();
     }
 
-    await db.clearAllData();
-    await db.importTasks(asMaps(data['tasks']));
-    await db.importFolders(asMaps(data['folders']));
-    await db.importLists(asMaps(data['app_lists']));
-    await db.importNoteFolders(asMaps(data['note_folders']));
-    await db.importNotes(asMaps(data['notes']));
-    await db.importRoutines(asMaps(data['routines']));
-    await db.importRoutineEntries(asMaps(data['routine_entries']));
-    await db.importEvents(asMaps(data['events']));
-    await db.importAppSettings(asMaps(data['app_settings']));
+    // Fully parse and validate the payload BEFORE touching any data. If the
+    // backup is malformed, we return early with everything still intact.
+    final Map<String, dynamic> customIcons;
+    final Map<String, List<Map<String, dynamic>>> tables;
+    try {
+      customIcons = (data['customIcons'] as Map<String, dynamic>?) ?? {};
+      tables = {
+        'tasks': asMaps(data['tasks']),
+        'folders': asMaps(data['folders']),
+        'app_lists': asMaps(data['app_lists']),
+        'note_folders': asMaps(data['note_folders']),
+        'notes': asMaps(data['notes']),
+        'routines': asMaps(data['routines']),
+        'routine_entries': asMaps(data['routine_entries']),
+        'events': asMaps(data['events']),
+        'app_settings': asMaps(data['app_settings']),
+      };
+    } catch (_) {
+      return false;
+    }
+
+    // Restore custom icon files first so DB records can reference them. These
+    // are written before the DB transaction; orphaned files are harmless if
+    // the import is later aborted.
+    final docsPath = (await getApplicationDocumentsDirectory()).path;
+    final iconsDir = Directory('$docsPath/icons');
+    if (!iconsDir.existsSync()) iconsDir.createSync(recursive: true);
+    for (final entry in customIcons.entries) {
+      final relPath = entry.key; // 'icons/filename.ext'
+      final bytes = base64Decode(entry.value as String);
+      await File('$docsPath/$relPath').writeAsBytes(bytes);
+    }
+
+    // Atomic clear + insert: on any failure the transaction rolls back and the
+    // user's existing data is preserved (no half-imported state).
+    try {
+      await db.replaceAllData(tables);
+    } catch (_) {
+      return false;
+    }
 
     // Smart-list prefs were added in a later format revision; ignore if absent.
     final smartListMap = data['smart_list_prefs'];
