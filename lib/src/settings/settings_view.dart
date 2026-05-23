@@ -46,8 +46,41 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
           dismiss();
           _showAddSpaceDialog(context, spaceManager);
         },
+        onDeleteSpace: (id) {
+          dismiss();
+          _confirmDeleteSpace(context, spaceManager, id);
+        },
       );
     });
+  }
+
+  void _confirmDeleteSpace(
+      BuildContext context, SpaceManager spaceManager, String id) {
+    final s = S.of(context);
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(s.deleteSpace),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(s.deleteSpaceBody),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.cancel),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              spaceManager.deleteSpace(id);
+            },
+            child: Text(s.delete),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAddSpaceDialog(BuildContext context, SpaceManager spaceManager) {
@@ -407,11 +440,13 @@ class _SpacesDropdown extends StatelessWidget {
     required this.spaceManager,
     required this.onDismiss,
     required this.onAddSpace,
+    required this.onDeleteSpace,
   });
 
   final SpaceManager spaceManager;
   final VoidCallback onDismiss;
   final VoidCallback onAddSpace;
+  final void Function(String id) onDeleteSpace;
 
   @override
   Widget build(BuildContext context) {
@@ -455,6 +490,11 @@ class _SpacesDropdown extends StatelessWidget {
                       onDismiss();
                       spaceManager.switchSpace(space.id);
                     },
+                    // The default space and the active space can't be deleted
+                    // from here (switch away first to delete a non-default one).
+                    onDelete: (space.id != 'default' && space.id != activeId)
+                        ? () => onDeleteSpace(space.id)
+                        : null,
                   ),
                   if (space != spaces.last)
                     Container(
@@ -487,12 +527,14 @@ class _SpaceRow extends StatelessWidget {
     required this.isActive,
     required this.onTap,
     this.icon,
+    this.onDelete,
   });
 
   final String name;
   final bool isActive;
   final VoidCallback onTap;
   final IconData? icon;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -522,6 +564,19 @@ class _SpaceRow extends StatelessWidget {
               CupertinoIcons.checkmark,
               size: 16,
               color: AppColors.accent,
+            )
+          else if (onDelete != null)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onDelete,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Icon(
+                  CupertinoIcons.delete,
+                  size: 16,
+                  color: CupertinoColors.systemRed.resolveFrom(context),
+                ),
+              ),
             ),
         ],
       ),
