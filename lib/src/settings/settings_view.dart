@@ -602,6 +602,27 @@ class TabBarSettingsView extends StatelessWidget {
     }
   }
 
+  String _defaultTabLabel(S s, String value) {
+    if (value == kLastOpenedTab) return s.lastOpenedTab;
+    return _tabLabel(s, int.tryParse(value) ?? 0);
+  }
+
+  Future<void> _showDefaultTabPicker(BuildContext context) async {
+    final s = S.of(context);
+    final visible = controller.tabOrder.where(controller.isTabVisible).toList();
+    final selected = await showSelectionMenu<String>(
+      context: context,
+      title: s.defaultTab,
+      current: controller.defaultTab,
+      options: [
+        SelectionMenuOption(value: kLastOpenedTab, label: s.lastOpenedTab),
+        for (final i in visible)
+          SelectionMenuOption(value: i.toString(), label: _tabLabel(s, i)),
+      ],
+    );
+    if (selected != null) controller.updateDefaultTab(selected);
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -643,6 +664,23 @@ class TabBarSettingsView extends StatelessWidget {
                     label: s.hideLabels,
                     value: controller.hideTabLabels,
                     onChanged: controller.updateHideTabLabels,
+                  ),
+                  const SizedBox(height: 32),
+                  // ── Startup ────────────────────────────────────────────
+                  Text(
+                    s.startup,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: labelColor,
+                      letterSpacing: -0.08,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _NavRow(
+                    label: s.defaultTab,
+                    trailingLabel:
+                        _defaultTabLabel(s, controller.defaultTab),
+                    onTap: () => _showDefaultTabPicker(context),
                   ),
                   const SizedBox(height: 32),
                   // ── Visible Tabs (reorderable) ─────────────────────────

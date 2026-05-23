@@ -145,6 +145,9 @@ class S {
   String get hideLabels => t('hideLabels');
   String get visibleTabs => t('visibleTabs');
   String get settingsAccessibleHint => t('settingsAccessibleHint');
+  String get startup => t('startup');
+  String get defaultTab => t('defaultTab');
+  String get lastOpenedTab => t('lastOpenedTab');
   String get visibility => t('visibility');
   String get visibilityShow => t('visibilityShow');
   String get visibilityIfNotEmpty => t('visibilityIfNotEmpty');
@@ -454,6 +457,7 @@ const Map<String, String> _en = {
   'importBackupSublabel': 'Planom (.planom) · replaces all data',
   'display': 'Display', 'hideLabels': 'Hide Labels', 'visibleTabs': 'Visible Tabs',
   'settingsAccessibleHint': 'Settings is accessible from the options menu (⋯) in every other tab.',
+  'startup': 'Startup', 'defaultTab': 'Default Tab', 'lastOpenedTab': 'Last Opened',
   'visibility': 'Visibility',
   'visibilityShow': 'Show', 'visibilityIfNotEmpty': 'If not empty',
   'visibilityHidden': 'Hidden', 'visibilityAlwaysShown': 'Always shown',

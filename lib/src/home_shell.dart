@@ -65,7 +65,11 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
-    _tabController = CupertinoTabController();
+    final visible = _computeVisibleIndices();
+    _lastTabIndex = widget.settingsController.resolveInitialTab(visible);
+    final initialVisual = visible.indexOf(_lastTabIndex);
+    _tabController =
+        CupertinoTabController(initialIndex: initialVisual < 0 ? 0 : initialVisual);
     widget.settingsController.addListener(_onSettingsChanged);
     _depthObservers = [
       // Tasks tab: show + unless TaskDetailView is on the stack.
@@ -102,6 +106,8 @@ class _HomeShellState extends State<HomeShell> {
         },
       ),
     ];
+    // Notes (1) and Settings (4) never show the global +.
+    _showPlusButton.value = _lastTabIndex != 1 && _lastTabIndex != 4;
   }
 
   @override
@@ -241,6 +247,7 @@ class _HomeShellState extends State<HomeShell> {
         _showPlusButton.value = _depthObservers[tappedIndex].depth <= 1;
     }
     _lastTabIndex = tappedIndex;
+    widget.settingsController.setLastOpenedTab(tappedIndex);
   }
 
   List<int> _computeVisibleIndices() {
