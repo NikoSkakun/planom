@@ -18,7 +18,11 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 ## Tech stack
 
 - **Framework**: Flutter / Dart, Cupertino (iOS-native) widgets throughout — no Material widgets in UI except `showModalBottomSheet` (which requires `GlobalMaterialLocalizations.delegate` already registered)
-- **Database**: `sqflite` v2, single file `planom.db`, current schema version **14**
+- **Database**: `sqflite` v2, per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **17**
+- **Multi-space**: `SpaceManager` (`lib/src/spaces/`) owns a list of `Space`s (metadata in `spaces.json`) and swaps the active space's controllers; the default space shares the global `planom.db` handle. See "Spaces" section below.
+- **App lock**: `SecurityService` (`lib/src/security/`) — optional PIN/password gate; salted + key-stretched hash in `app_settings` (`auth_*` keys), excluded from backups
+- **Local notifications**: `NotificationService` (`lib/src/notifications/`) — `flutter_local_notifications` + `timezone`; per-item reminder scheduling via slot-based IDs
+- **Calendar/events**: `EventController` + `events` table (separate from tasks); see Calendar feature
 - **State**: Flutter `ChangeNotifier` — no third-party state library
 - **Routing**: `FastRoute` (custom `CupertinoPageRoute` subclass with 180 ms transition, in `lib/src/utils/fast_route.dart`) used everywhere instead of bare `CupertinoPageRoute`
 - **Icons**: `cupertino_icons` package required for `CupertinoIcons`; custom PNG tab-bar icons in `assets/icons/tab_bar/` (Tasks/Notes/Calendar/Routines use PNGs; Settings tab uses `CupertinoIcons.gear_alt` / `gear_alt_fill`); list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`; use `Image.asset` (not `ImageIcon`) when original PNG colors must be preserved. Smart lists that have no PNG asset (Completed, Trash) use `CupertinoIcons` passed as `iconWidget` to `_ListItem`.
@@ -127,7 +131,7 @@ Custom photo icons for folders and lists are stored as **relative paths** (`icon
 
 ### Database (`lib/src/database/database_service.dart`)
 
-Single `DatabaseService` class, lazy-opens `planom.db` via sqflite. Current version: **14**.
+Single `DatabaseService` class, lazy-opens its DB file (`dbName`, default `planom.db`) via sqflite. Current version: **17**. One `DatabaseService` instance per file — never open the same file with two handles (the default space reuses the global handle; see Spaces).
 
 Migration history:
 | Version | Changes |
@@ -145,8 +149,15 @@ Migration history:
 | v12 | `note_folders.isDeleted`, `note_folders.deletedDate`, `notes.isDeleted`, `notes.deletedDate` |
 | v13 | `tasks.completionDate INTEGER` |
 | v14 | `app_settings` table (`key` TEXT PK, `value` TEXT) — persists tab visibility prefs across backups |
+| v15 | `events` table (calendar events; separate from tasks) |
+| v16 | `tasks.duration INTEGER` |
+| v17 | `tasks.reminderOffsets TEXT`, `events.reminderOffsets TEXT` (comma-separated minute offsets for local notifications) |
 
 When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
+
+**`app_settings` also holds** (beyond the tab/appearance/font/locale keys): `auth_type`, `auth_hash`, `auth_salt` (the app-lock passcode — salted + key-stretched, owned by `SecurityService`, **excluded from backup export and never overwritten on import**, see `SecurityService.authSettingKeys`).
+
+**Backup import is atomic**: `BackupService.importBackup` parses/validates the whole payload first, then `DatabaseService.replaceAllData` clears + re-inserts every table inside one transaction (rolls back on any error, so a corrupt/partial backup can't destroy existing data). Backups currently cover only the **active** space (multi-space backup is a known follow-up).
 
 **`app_settings` keys** (all stored as strings in the `value` column):
 - `tab_1_visible` … `tab_4_visible` — per-tab visibility booleans (`'true'`/`'false'`)
@@ -234,7 +245,7 @@ Routine DB schema:
 - Owns `SmartListPrefs` (visibility of Today/Upcoming/Completed/Trash smart lists + `hideTabLabels` toggle), persisted to a JSON file in the documents directory
 - Owns per-tab visibility (`_tabVisibility` map for tabs 1=Notes, 2=Calendar, 3=Routines, 4=Settings; tab 0 always on), persisted to the `app_settings` DB table so backups carry it across devices
 - Owns accent and completion colors: `_accentColor` and `_completionColor`; `loadSettings()` reads `accent_color` and `completion_color` from `app_settings` and sets `AppColors.accent` / `AppColors.systemGreen` statics accordingly
-- `updateAccentColor(Color)` / `updateCompletionColor(Color)` — mutate the `AppColors` static, persist to `app_settings`, call `notifyListeners()`; the `ListenableBuilder` wrapping `CupertinoApp` propagates the change to all widgets that read `AppColors.accent`
+- `updateAccentColor(Color)` / `updateCompletionColor(Color)` — mutate the `AppColors` static, persist to `app_settings`, then bump `colorRevision` (a `ValueNotifier<int>`) **instead of** `notifyListeners()`. The app content is wrapped in a `ValueListenableBuilder(colorRevision)` so color changes rebuild only the content subtree, not the whole `CupertinoApp` (theme/locale/font). `AppearanceView` listens to `Listenable.merge([controller, colorRevision])` so the selected swatch still updates.
 - `updateFontKey(String)` — validates the key (`kSystemFontKey` or a key in `GoogleFonts.asMap()`), stores in `app_settings`, calls `notifyListeners()`
 - `visibleOptionalTabCount` — number of optional tabs currently enabled; used to gray out the last toggle (UI prevents disabling all of them)
 - `importSmartListPrefs(map)` — invoked by `BackupService` during import to restore the JSON-backed prefs
@@ -243,7 +254,19 @@ Routine DB schema:
 - Not a `ChangeNotifier`; created in `main.dart` alongside controllers and passed through `MyApp` → `HomeShell` → `SettingsView`
 - `exportBackup()` — reads all 7 tables (including trashed items), collects custom icon image bytes (base64), serialises `SettingsController.smartListPrefs` alongside the DB rows, writes a `planom_backup_YYYY-MM-DD.planom` JSON file to the temp directory, shares it via iOS share sheet. Custom iconIds are normalised to relative paths (`icons/<filename>`) in the export; image bytes are stored under a top-level `customIcons` map keyed by relative path.
 - `importBackup()` — opens the file picker, parses the JSON, writes custom icon files to `<docsDir>/icons/`, clears all DB tables, bulk-inserts all records, restores smart-list prefs from `smart_list_prefs`, then calls `load()` on each controller. Returns `true` on success, `false` if the file was invalid or the picker was cancelled.
-- Backup format: JSON with `.planom` extension, `version: 1`. Top-level keys: `version`, `exportDate`, `customIcons`, `tasks`, `folders`, `app_lists`, `note_folders`, `notes`, `routines`, `routine_entries`, `app_settings`, `smart_list_prefs`.
+- Backup format: JSON with `.planom` extension, `version: 1`. Top-level keys: `version`, `exportDate`, `customIcons`, `tasks`, `folders`, `app_lists`, `note_folders`, `notes`, `routines`, `routine_entries`, `events`, `app_settings`, `smart_list_prefs`. The `app_settings` block excludes the `auth_*` passcode keys.
+
+### Spaces (`lib/src/spaces/`)
+
+`SpaceManager` (`ChangeNotifier`, provided via `SpaceManagerProvider` InheritedWidget) lets the user keep multiple independent data sets ("spaces"). Each space is a separate DB file; the **default** space reuses the global `planom.db` handle (created in `main.dart` and also used by `SettingsController`/`SecurityService`), while non-default spaces use `planom_<id>.db`. Space metadata (`Space` list + active id) lives in `spaces.json` in the docs dir, loaded with a corrupt-file fallback and saved atomically (temp file + rename). On `switchSpace`, the previous (non-default) DB is closed and a fresh set of controllers is built for the new space; `main.dart` re-keys `MyApp` by `activeSpaceId` to force a clean rebuild. `addSpace`, `switchSpace`, `deleteSpace` (refuses the default/last space; switches away first if active; deletes the DB file). **Global** prefs (appearance/font/locale/tab visibility) and the passcode live in the global `planom.db`'s `app_settings`, not per space.
+
+### Security / app lock (`lib/src/security/`)
+
+`SecurityService` stores an optional passcode in `app_settings` as a random-salt + iterated-HMAC-SHA256 hash (`auth_hash`/`auth_salt`/`auth_type`). Legacy unsalted SHA-256 hashes verify once then upgrade transparently. `_SecurityGate` in `app.dart` shows `LockScreen` when locked (on launch + on resume from background). `SecurityService.authSettingKeys` is the set of passcode keys that backups must exclude/preserve. (No biometric/`local_auth` dependency yet.)
+
+### Notifications (`lib/src/notifications/`)
+
+`NotificationService` (singleton) wraps `flutter_local_notifications` + `timezone`. Tasks/events carry `reminderOffsets` (minutes relative to the due/event time). Scheduling and cancellation **both** use the slot-based ID `_notifSlot(itemId, slotIndex)` over `0.._maxSlots-1` — they must stay in sync. `TaskController.toggleCompleted` cancels reminders on complete and reschedules on un-complete; delete cancels. `initTimezone` currently offset-matches the IANA zone (known DST limitation; `flutter_timezone` is the documented follow-up).
 
 ### App shell (`lib/src/home_shell.dart`)
 
@@ -386,8 +409,7 @@ All colors and durations live in `lib/src/theme/app_theme.dart`. Use the statics
 - `AppColors.systemGreen` — mutable `static Color` (default `Color(0xFF34C759)`); user-configurable via Settings → Appearance → Completion Color; **not `const`**
 - `AppColors.shadow` — `static const Color(0x30000000)` — dropdown / panel drop-shadow (still const)
 - `AppDurations.transition` (180 ms) — standard page transition; baked into `FastRoute`
-- Active tab label/icon: black (`Color(0xFF000000)`)
-- Inactive tab: `Color(0xFF636366)`
+- Active tab label/icon: `CupertinoColors.label`; inactive: `CupertinoColors.secondaryLabel` (dynamic — resolve correctly in light/dark)
 - Checkbox: 22×22 rounded rect (radius 6), filled accent when checked
 
 **`const` warning**: Because `AppColors.accent` and `AppColors.systemGreen` are mutable statics, any widget tree that references them cannot use `const`. Remove `const` from the nearest enclosing constructor whenever you add a reference to these colors.
