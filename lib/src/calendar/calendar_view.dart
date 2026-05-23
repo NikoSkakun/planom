@@ -8,8 +8,10 @@ import '../models/event.dart';
 import '../models/task.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
+import '../settings/settings_menu.dart';
 import '../settings/settings_view.dart';
 import '../tasks/task_controller.dart';
+import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import 'day_view_sheet.dart';
 import 'event_controller.dart';
@@ -38,7 +40,8 @@ class CalendarView extends StatefulWidget {
   State<CalendarView> createState() => _CalendarViewState();
 }
 
-class _CalendarViewState extends State<CalendarView> {
+class _CalendarViewState extends State<CalendarView>
+    with DropdownOverlayMixin {
   static const _pastMonths = 600;
   static const _futureMonths = 600;
   static const _avgMonthPx = 481.0;
@@ -160,6 +163,19 @@ class _CalendarViewState extends State<CalendarView> {
     );
   }
 
+  void _showSettingsMenu(BuildContext context) {
+    showDropdown(
+      context,
+      (dismiss) => SettingsMenuOverlay(
+        onDismiss: dismiss,
+        onSettings: () {
+          dismiss();
+          _openSettings(context);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sc = widget.settingsController;
@@ -171,7 +187,7 @@ class _CalendarViewState extends State<CalendarView> {
         trailing: settingsHidden
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
-                onPressed: () => _openSettings(context),
+                onPressed: () => _showSettingsMenu(context),
                 child: const Icon(CupertinoIcons.ellipsis, size: 26),
               )
             : null,

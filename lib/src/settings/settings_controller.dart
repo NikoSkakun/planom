@@ -8,6 +8,10 @@ import '../theme/app_theme.dart';
 import 'settings_service.dart';
 import 'smart_list_prefs.dart';
 
+/// Sentinel [SettingsController.defaultTab] value: open whichever tab was last
+/// open when the app was closed, rather than a fixed tab.
+const String kLastOpenedTab = 'last';
+
 class SettingsController with ChangeNotifier {
   SettingsController(this._settingsService, this._db);
 
@@ -64,6 +68,27 @@ class SettingsController with ChangeNotifier {
   /// The user-defined display order of the five logical tab indices.
   List<int> get tabOrder => List.unmodifiable(_tabOrder);
 
+  // Which tab to select on launch: a logical index ('0'–'4') or [kLastOpenedTab].
+  String _defaultTab = '0';
+  String get defaultTab => _defaultTab;
+
+  // Last tab the user opened; persisted so [kLastOpenedTab] can restore it.
+  int _lastOpenedTab = 0;
+  int get lastOpenedTab => _lastOpenedTab;
+
+  /// The logical tab (0–4) to show on launch, resolved against the tabs that
+  /// are currently visible. Falls back to the first visible tab when the
+  /// configured choice is hidden or invalid.
+  int resolveInitialTab(List<int> visibleLogicalTabs) {
+    if (visibleLogicalTabs.isEmpty) return 0;
+    final candidate = _defaultTab == kLastOpenedTab
+        ? _lastOpenedTab
+        : (int.tryParse(_defaultTab) ?? 0);
+    return visibleLogicalTabs.contains(candidate)
+        ? candidate
+        : visibleLogicalTabs.first;
+  }
+
   Future<void> loadSettings() async {
     _themeMode = await _settingsService.themeMode();
     _smartListPrefs = await SmartListPrefs.load();
@@ -96,6 +121,14 @@ class SettingsController with ChangeNotifier {
         if (parts.length == 5 && parts.toSet().containsAll([0, 1, 2, 3, 4])) {
           _tabOrder = parts;
         }
+      } else if (key == 'default_tab') {
+        if (value == kLastOpenedTab ||
+            (int.tryParse(value) != null && value.length == 1)) {
+          _defaultTab = value;
+        }
+      } else if (key == 'last_tab') {
+        final v = int.tryParse(value);
+        if (v != null && v >= 0 && v <= 4) _lastOpenedTab = v;
       }
     }
 
@@ -113,6 +146,21 @@ class SettingsController with ChangeNotifier {
     _tabOrder = List.of(order);
     notifyListeners();
     await _db.setAppSetting('tab_order', order.join(','));
+  }
+
+  Future<void> updateDefaultTab(String value) async {
+    if (value == _defaultTab) return;
+    _defaultTab = value;
+    notifyListeners();
+    await _db.setAppSetting('default_tab', value);
+  }
+
+  /// Records the last tab the user opened (persisted for [kLastOpenedTab]).
+  /// No [notifyListeners] — nothing in the UI reacts to this live.
+  Future<void> setLastOpenedTab(int index) async {
+    if (index == _lastOpenedTab) return;
+    _lastOpenedTab = index;
+    await _db.setAppSetting('last_tab', index.toString());
   }
 
   Future<void> updateThemeMode(ThemeMode? newThemeMode) async {

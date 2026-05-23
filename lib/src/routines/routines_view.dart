@@ -4,9 +4,11 @@ import '../localization/strings.dart';
 import '../models/routine.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
+import '../settings/settings_menu.dart';
 import '../settings/settings_view.dart';
 import '../theme/app_theme.dart';
 import '../utils/confirm_dialogs.dart';
+import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
 import 'routine_controller.dart';
@@ -29,7 +31,8 @@ class RoutinesView extends StatefulWidget {
   State<RoutinesView> createState() => _RoutinesViewState();
 }
 
-class _RoutinesViewState extends State<RoutinesView> {
+class _RoutinesViewState extends State<RoutinesView>
+    with DropdownOverlayMixin {
   int _tab = 0;
 
   void _openSettings(BuildContext context) {
@@ -39,6 +42,19 @@ class _RoutinesViewState extends State<RoutinesView> {
           controller: widget.settingsController!,
           backupService: widget.backupService,
         ),
+      ),
+    );
+  }
+
+  void _showSettingsMenu(BuildContext context) {
+    showDropdown(
+      context,
+      (dismiss) => SettingsMenuOverlay(
+        onDismiss: dismiss,
+        onSettings: () {
+          dismiss();
+          _openSettings(context);
+        },
       ),
     );
   }
@@ -70,7 +86,7 @@ class _RoutinesViewState extends State<RoutinesView> {
         trailing: settingsHidden
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
-                onPressed: () => _openSettings(context),
+                onPressed: () => _showSettingsMenu(context),
                 child: const Icon(CupertinoIcons.ellipsis, size: 26),
               )
             : null,

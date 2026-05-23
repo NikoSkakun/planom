@@ -4,7 +4,9 @@ import '../localization/strings.dart';
 import '../models/note.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
+import '../settings/settings_menu.dart';
 import '../settings/settings_view.dart';
+import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
@@ -31,7 +33,7 @@ class NotesView extends StatefulWidget {
   State<NotesView> createState() => _NotesViewState();
 }
 
-class _NotesViewState extends State<NotesView> {
+class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
   final Set<String> _expandedIds = {};
 
   @override
@@ -132,6 +134,19 @@ class _NotesViewState extends State<NotesView> {
     );
   }
 
+  void _showSettingsMenu(BuildContext context) {
+    showDropdown(
+      context,
+      (dismiss) => SettingsMenuOverlay(
+        onDismiss: dismiss,
+        onSettings: () {
+          dismiss();
+          _openSettings(context);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -144,7 +159,7 @@ class _NotesViewState extends State<NotesView> {
         trailing: settingsHidden
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
-                onPressed: () => _openSettings(context),
+                onPressed: () => _showSettingsMenu(context),
                 child: const Icon(CupertinoIcons.ellipsis, size: 26),
               )
             : null,
