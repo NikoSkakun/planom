@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 
@@ -26,6 +27,15 @@ class SecurityService {
 
   final DatabaseService _db;
 
+  /// app_settings keys holding the local passcode. These are device-local and
+  /// must never be written into a shared backup nor overwritten by an imported
+  /// one — backup export/import filters them out via this set.
+  static const authSettingKeys = {'auth_hash', 'auth_type', 'auth_salt'};
+
+  /// Key-stretching rounds. Runs synchronously on the unlock path; tune (or
+  /// move to an isolate) if it ever feels slow on a real device.
+  static const _iterations = 100000;
+
   PasswordType _type = PasswordType.none;
   PasswordType get type => _type;
   bool get isLocked => _type != PasswordType.none;
@@ -40,8 +50,9 @@ class SecurityService {
   }
 
   Future<void> setPassword(String password, PasswordType type) async {
-    final hash = _hash(password);
-    await _db.setAppSetting('auth_hash', hash);
+    final salt = _generateSalt();
+    await _db.setAppSetting('auth_salt', salt);
+    await _db.setAppSetting('auth_hash', _hash(password, salt));
     await _db.setAppSetting('auth_type', type.name);
     _type = type;
   }
@@ -49,23 +60,48 @@ class SecurityService {
   Future<void> removePassword() async {
     await _db.setAppSetting('auth_type', 'none');
     await _db.setAppSetting('auth_hash', '');
+    await _db.setAppSetting('auth_salt', '');
     _type = PasswordType.none;
   }
 
   Future<bool> verify(String password) async {
     final rows = await _db.getAppSettings();
     String? storedHash;
+    String? salt;
     for (final row in rows) {
       if (row['key'] == 'auth_hash') storedHash = row['value'] as String?;
+      if (row['key'] == 'auth_salt') salt = row['value'] as String?;
     }
     if (storedHash == null || storedHash.isEmpty) return false;
-    return _hash(password) == storedHash;
+
+    if (salt == null || salt.isEmpty) {
+      // Legacy unsalted SHA-256 hash from before salting was added. Verify
+      // against the old scheme and, on success, transparently re-store the
+      // passcode in the salted + stretched form.
+      if (_legacyHash(password) != storedHash) return false;
+      await setPassword(password, _type);
+      return true;
+    }
+    return _hash(password, salt) == storedHash;
   }
 
-  static String _hash(String password) {
-    final bytes = utf8.encode(password);
-    return sha256.convert(bytes).toString();
+  static String _generateSalt() {
+    final rnd = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rnd.nextInt(256));
+    return base64.encode(bytes);
   }
+
+  static String _hash(String password, String salt) {
+    final hmac = Hmac(sha256, base64.decode(salt));
+    var digest = hmac.convert(utf8.encode(password)).bytes;
+    for (int i = 1; i < _iterations; i++) {
+      digest = hmac.convert(digest).bytes;
+    }
+    return base64.encode(digest);
+  }
+
+  static String _legacyHash(String password) =>
+      sha256.convert(utf8.encode(password)).toString();
 
   static PasswordType _typeFromString(String? s) {
     switch (s) {

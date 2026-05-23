@@ -12,6 +12,7 @@ import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
 import '../notes/note_controller.dart';
 import '../routines/routine_controller.dart';
+import '../security/security_service.dart';
 import '../tasks/task_controller.dart';
 import 'settings_controller.dart';
 
@@ -61,7 +62,10 @@ class BackupService {
       'routines': await db.exportRoutines(),
       'routine_entries': await db.exportRoutineEntries(),
       'events': await db.exportEvents(),
-      'app_settings': await db.exportAppSettings(),
+      // Exclude the local passcode (auth_*) so it never leaves the device.
+      'app_settings': (await db.exportAppSettings())
+          .where((r) => !SecurityService.authSettingKeys.contains(r['key']))
+          .toList(),
       // Smart-list visibility + hideTabLabels live in a JSON file in the docs
       // directory, not the DB, so we include their raw map here.
       'smart_list_prefs': settingsController.smartListPrefs.toJson(),
@@ -104,6 +108,12 @@ class BackupService {
           .toList();
     }
 
+    // Keep the device's local passcode and never let an imported backup change
+    // it: preserve our own auth_* rows and drop any the backup carries.
+    final localAuth = (await db.exportAppSettings())
+        .where((r) => SecurityService.authSettingKeys.contains(r['key']))
+        .toList();
+
     // Fully parse and validate the payload BEFORE touching any data. If the
     // backup is malformed, we return early with everything still intact.
     final Map<String, dynamic> customIcons;
@@ -119,7 +129,11 @@ class BackupService {
         'routines': asMaps(data['routines']),
         'routine_entries': asMaps(data['routine_entries']),
         'events': asMaps(data['events']),
-        'app_settings': asMaps(data['app_settings']),
+        'app_settings': [
+          ...asMaps(data['app_settings']).where(
+              (r) => !SecurityService.authSettingKeys.contains(r['key'])),
+          ...localAuth,
+        ],
       };
     } catch (_) {
       return false;
