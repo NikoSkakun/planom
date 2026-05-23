@@ -37,11 +37,18 @@ class _NoteDetailViewState extends State<NoteDetailView>
   late final TextEditingController _title;
   late final TextEditingController _content;
   final FocusNode _contentFocus = FocusNode();
+  final FocusNode _titleFocus = FocusNode();
   String? _folderId;
   bool _deleted = false;
   bool _persistedNew = false;
   bool _isEditing = false;
   Timer? _autosaveTimer;
+
+  // Baseline of what is currently persisted, so the change check stays
+  // accurate after each save (widget.note is captured once and never updated).
+  late String _savedTitle;
+  late String _savedContent;
+  String? _savedFolderId;
 
   @override
   void initState() {
@@ -50,29 +57,48 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _title = TextEditingController(text: widget.note.title);
     _content = TextEditingController(text: widget.note.content);
     _folderId = widget.note.folderId;
+    _savedTitle = widget.note.title;
+    _savedContent = widget.note.content;
+    _savedFolderId = widget.note.folderId;
     _title.addListener(_scheduleAutosave);
     _content.addListener(_scheduleAutosave);
-    _contentFocus.addListener(_onFocusChanged);
+    _contentFocus.addListener(_onContentFocusChanged);
+    _titleFocus.addListener(_onTitleFocusChanged);
     WidgetsBinding.instance.addObserver(this);
   }
 
-  void _onFocusChanged() {
-    if (mounted) setState(() {
-      if (!_contentFocus.hasFocus) _isEditing = false;
-    });
+  void _onContentFocusChanged() {
+    if (_contentFocus.hasFocus) return;
+    // Losing content focus (e.g. dismissing the keyboard, switching tabs,
+    // tapping the title) must persist immediately — the debounce timer might
+    // not fire before the app is killed or this view is torn down.
+    _flushSave();
+    if (mounted) setState(() => _isEditing = false);
+  }
+
+  void _onTitleFocusChanged() {
+    if (!_titleFocus.hasFocus) _flushSave();
   }
 
   void _scheduleAutosave() {
     _autosaveTimer?.cancel();
-    _autosaveTimer = Timer(const Duration(seconds: 3), _save);
+    _autosaveTimer = Timer(const Duration(seconds: 1), _save);
+  }
+
+  /// Cancels any pending debounce and saves the current text right now.
+  void _flushSave() {
+    _autosaveTimer?.cancel();
+    _save();
   }
 
   void _save() {
     if (_deleted) return;
     final title = _title.text.trim();
-    final content = _content.text.trim();
+    // Persist the body exactly as typed — trimming would silently drop leading
+    // indentation (meaningful in markdown) and trailing blank lines.
+    final content = _content.text;
     if (widget.isNew && !_persistedNew) {
-      if (title.isEmpty && content.isEmpty) return;
+      if (title.isEmpty && content.trim().isEmpty) return;
       widget.controller.addNote(
         widget.note.copyWith(
           title: title,
@@ -82,14 +108,20 @@ class _NoteDetailViewState extends State<NoteDetailView>
         ),
       );
       _persistedNew = true;
+      _savedTitle = title;
+      _savedContent = content;
+      _savedFolderId = _folderId;
       return;
     }
     // Skip the write when nothing actually changed — otherwise copyWith bumps
     // modifiedDate and the note jumps to the top of its list on next sort.
-    final changed = title != widget.note.title ||
-        content != widget.note.content ||
-        _folderId != widget.note.folderId;
-    if (!changed) return;
+    // Compared against the last-saved values (not the stale initial note) so a
+    // genuine edit is never mistaken for "unchanged".
+    if (title == _savedTitle &&
+        content == _savedContent &&
+        _folderId == _savedFolderId) {
+      return;
+    }
     widget.controller.updateNote(
       widget.note.copyWith(
         title: title,
@@ -98,6 +130,9 @@ class _NoteDetailViewState extends State<NoteDetailView>
         clearFolderId: _folderId == null,
       ),
     );
+    _savedTitle = title;
+    _savedContent = content;
+    _savedFolderId = _folderId;
   }
 
   @override
@@ -106,8 +141,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
-      _autosaveTimer?.cancel();
-      _save();
+      _flushSave();
     }
   }
 
@@ -123,6 +157,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
             currentParentId: _folderId,
             onMove: (folderId) async {
               if (mounted) setState(() => _folderId = folderId);
+              _flushSave();
             },
           );
         },
@@ -149,8 +184,10 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _autosaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _save();
-    _contentFocus.removeListener(_onFocusChanged);
+    _contentFocus.removeListener(_onContentFocusChanged);
     _contentFocus.dispose();
+    _titleFocus.removeListener(_onTitleFocusChanged);
+    _titleFocus.dispose();
     _title.dispose();
     _content.dispose();
     super.dispose();
@@ -221,9 +258,9 @@ class _NoteDetailViewState extends State<NoteDetailView>
       // typed word isn't lost.
       canPop: true,
       onPopInvokedWithResult: (didPop, _) {
+        _titleFocus.unfocus();
         _contentFocus.unfocus();
-        _autosaveTimer?.cancel();
-        _save();
+        _flushSave();
       },
       child: CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
@@ -247,6 +284,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
                       child: CupertinoTextField(
                         controller: _title,
+                        focusNode: _titleFocus,
                         placeholder: S.of(context).title,
                         autofocus: widget.isNew,
                         style: const TextStyle(
