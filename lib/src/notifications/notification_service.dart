@@ -20,7 +20,12 @@ class NotificationService {
 
   static Future<void> initTimezone() async {
     tz_data.initializeTimeZones();
-    // Use local timezone; on iOS this resolves automatically
+    // NOTE: this picks the first IANA zone whose CURRENT offset matches the
+    // device, which can select a zone with the wrong DST rules — a reminder
+    // scheduled across a DST boundary may then fire an hour off. The correct
+    // fix is to read the device's IANA zone name via the `flutter_timezone`
+    // plugin and pass it to `tz.getLocation`; left as a follow-up to avoid
+    // adding an unverified native dependency here.
     final localTz = DateTime.now().timeZoneOffset;
     final locations = tz.timeZoneDatabase.locations;
     for (final name in locations.keys) {
