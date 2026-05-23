@@ -33,6 +33,19 @@ class SettingsController with ChangeNotifier {
   Color _completionColor = AppColors.systemGreen;
   Color get completionColor => _completionColor;
 
+  /// Bumped whenever the accent/completion color changes. Those colors live in
+  /// AppColors statics read all over the tree, so instead of firing the main
+  /// notifier (which rebuilds the whole CupertinoApp, including routing, locale
+  /// and theme), color updates only bump this. Widgets that must react to a
+  /// color change listen to this notifier, scoping the rebuild to the content.
+  final ValueNotifier<int> colorRevision = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    colorRevision.dispose();
+    super.dispose();
+  }
+
   final Map<int, bool> _tabVisibility = {
     0: true,
     1: true,
@@ -129,7 +142,7 @@ class SettingsController with ChangeNotifier {
     if (color == _accentColor) return;
     AppColors.accent = color;
     _accentColor = color;
-    notifyListeners();
+    colorRevision.value++;
     await _db.setAppSetting('accent_color', color.value.toString());
   }
 
@@ -137,7 +150,7 @@ class SettingsController with ChangeNotifier {
     if (color == _completionColor) return;
     AppColors.systemGreen = color;
     _completionColor = color;
-    notifyListeners();
+    colorRevision.value++;
     await _db.setAppSetting('completion_color', color.value.toString());
   }
 

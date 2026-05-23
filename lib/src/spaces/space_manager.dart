@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../calendar/event_controller.dart';
@@ -72,6 +74,32 @@ class SpaceManager with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Permanently deletes a space and its database file. The default space can
+  /// never be deleted and at least one space always remains. If the deleted
+  /// space is active, the default space becomes active first so we don't remove
+  /// a database that's currently open.
+  Future<void> deleteSpace(String id) async {
+    if (id == 'default') return;
+    if (_spaces.length <= 1) return;
+    if (!_spaces.any((s) => s.id == id)) return;
+
+    if (id == _activeSpaceId) {
+      await switchSpace('default');
+    }
+
+    _spaces = _spaces.where((s) => s.id != id).toList();
+    await _saveMetadata();
+
+    final dbPath = await getDatabasesPath();
+    try {
+      await deleteDatabase(join(dbPath, 'planom_$id.db'));
+    } catch (_) {
+      // File may not exist (space never opened); deletion is best-effort.
+    }
+
+    notifyListeners();
+  }
+
   // ── Private ────────────────────────────────────────────────────────────────
 
   Future<void> _initControllers(String spaceId) async {
@@ -121,34 +149,48 @@ class SpaceManager with ChangeNotifier {
   Future<void> _loadMetadata() async {
     final dir = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/$_metaFile');
-    if (!file.existsSync()) {
-      _spaces = [
-        Space(id: 'default', name: 'Personal', creationDate: DateTime.now()),
-      ];
-      _activeSpaceId = 'default';
-      await _saveMetadata();
-      return;
+    if (file.existsSync()) {
+      try {
+        final data =
+            jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+        _spaces = (data['spaces'] as List<dynamic>)
+            .map((e) => Space.fromJson(e as Map<String, dynamic>))
+            .toList();
+        _activeSpaceId = data['activeSpaceId'] as String? ?? 'default';
+      } catch (_) {
+        // Corrupt or partially-written metadata: fall back to a clean default
+        // rather than throwing on launch. Existing space DB files are intact.
+        _spaces = [];
+        _activeSpaceId = 'default';
+      }
     }
-    final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-    _activeSpaceId = data['activeSpaceId'] as String? ?? 'default';
-    _spaces = (data['spaces'] as List<dynamic>)
-        .map((e) => Space.fromJson(e as Map<String, dynamic>))
-        .toList();
-    if (_spaces.isEmpty) {
-      _spaces = [
+
+    // Self-heal into a consistent state: a default space must always exist and
+    // the active id must point at a real space.
+    if (!_spaces.any((s) => s.id == 'default')) {
+      _spaces.insert(
+        0,
         Space(id: 'default', name: 'Personal', creationDate: DateTime.now()),
-      ];
+      );
+    }
+    if (!_spaces.any((s) => s.id == _activeSpaceId)) {
       _activeSpaceId = 'default';
     }
+    await _saveMetadata();
   }
 
   Future<void> _saveMetadata() async {
     final dir = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/$_metaFile');
-    await file.writeAsString(jsonEncode({
+    final tmp = File('${dir.path}/$_metaFile.tmp');
+    final json = jsonEncode({
       'activeSpaceId': _activeSpaceId,
       'spaces': _spaces.map((s) => s.toJson()).toList(),
-    }));
+    });
+    // Write to a temp file then atomically rename, so a crash mid-write can
+    // never leave a half-written spaces.json that bricks the next launch.
+    await tmp.writeAsString(json, flush: true);
+    await tmp.rename(file.path);
   }
 }
 

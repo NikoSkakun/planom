@@ -136,6 +136,8 @@ class S {
   String get exportFailedBody => t('exportFailedBody');
   String get newSpace => t('newSpace');
   String get spaceName => t('spaceName');
+  String get deleteSpace => t('deleteSpace');
+  String get deleteSpaceBody => t('deleteSpaceBody');
 
   // ── Security ──────────────────────────────────────────────────────────────
   String get sectionSecurity => t('sectionSecurity');
@@ -440,6 +442,9 @@ const Map<String, String> _en = {
   'exportFailed': 'Export Failed',
   'exportFailedBody': 'An error occurred while creating the backup.',
   'newSpace': 'New Space', 'spaceName': 'Space name',
+  'deleteSpace': 'Delete Space?',
+  'deleteSpaceBody':
+      'This permanently deletes the space and all of its data. This cannot be undone.',
   'sectionSecurity': 'Privacy & Security',
   'appLock': 'App Lock', 'enableLock': 'Enable Lock', 'changeLock': 'Change Lock', 'removeLock': 'Remove Lock',
   'lockType': 'Lock Type',

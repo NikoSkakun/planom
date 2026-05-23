@@ -51,7 +51,10 @@ class AppearanceView extends StatelessWidget {
       ),
       child: SafeArea(
         child: ListenableBuilder(
-          listenable: controller,
+          // Merge the main notifier (theme) with colorRevision so tapping an
+          // accent/completion swatch still moves the checkmark — color changes
+          // no longer fire the main notifier.
+          listenable: Listenable.merge([controller, controller.colorRevision]),
           builder: (context, _) {
             return ListView(
               padding:
