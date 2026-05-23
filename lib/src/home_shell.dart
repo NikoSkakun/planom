@@ -348,8 +348,8 @@ class _HomeShellState extends State<HomeShell> {
             CupertinoTabScaffold(
               controller: _tabController,
               tabBar: CupertinoTabBar(
-                activeColor: const Color(0xFF000000),
-                inactiveColor: const Color(0xFF636366),
+                activeColor: CupertinoColors.label,
+                inactiveColor: CupertinoColors.secondaryLabel,
                 backgroundColor: const CupertinoDynamicColor.withBrightness(
                   color: Color(0xF0F9F9F9),
                   darkColor: Color(0xF01D1D1D),
