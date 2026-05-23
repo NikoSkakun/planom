@@ -16,9 +16,14 @@ import '../tasks/task_controller.dart';
 import 'space.dart';
 
 class SpaceManager with ChangeNotifier {
-  SpaceManager({required this.settingsController});
+  SpaceManager({required this.settingsController, required this.globalDb});
 
   final SettingsController settingsController;
+
+  /// The shared `planom.db` handle (also used by SettingsController and
+  /// SecurityService). The default space reuses this exact instance instead of
+  /// opening a second handle to the same file.
+  final DatabaseService globalDb;
 
   List<Space> _spaces = [];
   String _activeSpaceId = 'default';
@@ -70,15 +75,18 @@ class SpaceManager with ChangeNotifier {
   // ── Private ────────────────────────────────────────────────────────────────
 
   Future<void> _initControllers(String spaceId) async {
-    // Close previous DB unless it was the default space (that DB may still be
-    // referenced by the global SettingsController created in main.dart).
+    // Close previous DB unless it was the default space — its handle is the
+    // shared globalDb, still referenced by SettingsController/SecurityService.
     if (_initialized && _prevSpaceId != null && _prevSpaceId != 'default') {
       await _db.close();
     }
     _prevSpaceId = spaceId;
 
-    _db = DatabaseService(
-        dbName: spaceId == 'default' ? 'planom.db' : 'planom_$spaceId.db');
+    // The default space shares the global handle; only non-default spaces get
+    // their own DatabaseService, so a single file is never opened twice.
+    _db = spaceId == 'default'
+        ? globalDb
+        : DatabaseService(dbName: 'planom_$spaceId.db');
 
     _taskController = TaskController(_db);
     await _taskController.load();
