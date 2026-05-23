@@ -14,6 +14,10 @@ class NotificationService {
   bool _initialized = false;
   bool _permissionGranted = false;
 
+  /// Maximum reminders per item. Scheduling and cancellation both iterate
+  /// slots `0.._maxSlots-1`, so the two must use the same bound to stay in sync.
+  static const _maxSlots = 20;
+
   static Future<void> initTimezone() async {
     tz_data.initializeTimeZones();
     // Use local timezone; on iOS this resolves automatically
@@ -69,7 +73,7 @@ class NotificationService {
   // ── Task reminders ─────────────────────────────────────────────────────────
 
   Future<void> scheduleTaskReminders(Task task) async {
-    await _cancelFor(task.id, task.reminderOffsets);
+    await cancelTaskReminders(task.id);
     if (!_permissionGranted) await checkPermission();
     if (!_permissionGranted) return;
     if (task.reminderOffsets.isEmpty) return;
@@ -78,23 +82,21 @@ class NotificationService {
     final baseTime = _taskDateTime(task);
     if (baseTime == null) return;
 
-    for (final offset in task.reminderOffsets) {
-      final fireAt = baseTime.add(Duration(minutes: offset));
+    final offsets = task.reminderOffsets.take(_maxSlots).toList();
+    for (int i = 0; i < offsets.length; i++) {
+      final fireAt = baseTime.add(Duration(minutes: offsets[i]));
       if (fireAt.isBefore(DateTime.now())) continue;
       await _schedule(
-        id: _notifId(task.id, offset),
+        id: _notifSlot(task.id, i),
         title: task.title,
-        body: _offsetLabel(offset),
+        body: _offsetLabel(offsets[i]),
         fireAt: fireAt,
       );
     }
   }
 
   Future<void> cancelTaskReminders(String taskId) async {
-    // Cancel using all possible offsets range — or we just cancel via group
-    // Since we can't enumerate what was scheduled without storing state,
-    // use a deterministic ID pattern to cancel all 20 possible slots.
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < _maxSlots; i++) {
       await _plugin.cancel(_notifSlot(taskId, i));
     }
   }
@@ -110,20 +112,21 @@ class NotificationService {
     final baseTime = _eventDateTime(event);
     if (baseTime == null) return;
 
-    for (final offset in event.reminderOffsets) {
-      final fireAt = baseTime.add(Duration(minutes: offset));
+    final offsets = event.reminderOffsets.take(_maxSlots).toList();
+    for (int i = 0; i < offsets.length; i++) {
+      final fireAt = baseTime.add(Duration(minutes: offsets[i]));
       if (fireAt.isBefore(DateTime.now())) continue;
       await _schedule(
-        id: _notifId(event.id, offset),
+        id: _notifSlot(event.id, i),
         title: event.title,
-        body: _offsetLabel(offset),
+        body: _offsetLabel(offsets[i]),
         fireAt: fireAt,
       );
     }
   }
 
   Future<void> cancelEventReminders(String eventId) async {
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < _maxSlots; i++) {
       await _plugin.cancel(_notifSlot(eventId, i));
     }
   }
@@ -135,12 +138,6 @@ class NotificationService {
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-
-  Future<void> _cancelFor(String id, List<int> offsets) async {
-    for (int i = 0; i < 20; i++) {
-      await _plugin.cancel(_notifSlot(id, i));
-    }
-  }
 
   Future<void> _schedule({
     required int id,
@@ -185,20 +182,14 @@ class NotificationService {
     return DateTime(d.year, d.month, d.day, doTime ~/ 60, doTime % 60);
   }
 
-  /// Deterministic notification ID: uses a slot index (0-19) per item.
-  /// When scheduling, assigns offsets to slots in order.
+  /// Deterministic notification ID derived from the item id and a slot index.
+  /// Reminders are assigned to slots `0.._maxSlots-1` in offset order, and
+  /// cancellation clears the same slot range — so the formula here must be the
+  /// single source of truth for both scheduling and cancelling.
   int _notifSlot(String itemId, int slotIndex) {
     final hex = itemId.replaceAll('-', '').substring(0, 8);
     final base = int.tryParse(hex, radix: 16) ?? itemId.hashCode;
     return (base ^ (slotIndex * 97)) & 0x7FFFFFFF;
-  }
-
-  int _notifId(String itemId, int offsetMinutes) {
-    // Find the slot for this offset relative to previously set offsets.
-    // Since we cancel all slots before scheduling, we use a hash of offset.
-    final hex = itemId.replaceAll('-', '').substring(0, 8);
-    final base = int.tryParse(hex, radix: 16) ?? itemId.hashCode;
-    return (base ^ ((offsetMinutes + 10000) * 31)) & 0x7FFFFFFF;
   }
 
   String _offsetLabel(int offset) {
