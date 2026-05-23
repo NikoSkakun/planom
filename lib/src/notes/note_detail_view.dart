@@ -38,6 +38,10 @@ class _NoteDetailViewState extends State<NoteDetailView>
   late final TextEditingController _content;
   final FocusNode _contentFocus = FocusNode();
   final FocusNode _titleFocus = FocusNode();
+  // Owned by the content area's scroll view and kept alive across the
+  // preview↔edit switch, so the scroll position is preserved instead of
+  // snapping back to the top each time the body widget is rebuilt.
+  final ScrollController _contentScroll = ScrollController();
   String? _folderId;
   bool _deleted = false;
   bool _persistedNew = false;
@@ -190,6 +194,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _titleFocus.dispose();
     _title.dispose();
     _content.dispose();
+    _contentScroll.dispose();
     super.dispose();
   }
 
@@ -201,50 +206,63 @@ class _NoteDetailViewState extends State<NoteDetailView>
   }
 
   Widget _buildContentArea() {
-    if (_isEditing || _contentFocus.hasFocus) {
-      return CupertinoTextField(
-        controller: _content,
-        focusNode: _contentFocus,
-        placeholder: S.of(context).note,
-        style: const TextStyle(fontSize: 16, height: 1.35),
-        decoration: const BoxDecoration(),
-        maxLines: null,
-        expands: true,
-        textAlignVertical: TextAlignVertical.top,
-        textCapitalization: TextCapitalization.sentences,
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      );
-    }
-    if (_content.text.trim().isEmpty) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _startEditing,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: Text(
-              S.of(context).note,
-              style: TextStyle(
-                fontSize: 16,
-                color: CupertinoColors.placeholderText.resolveFrom(context),
+    // A single scroll view hosts every mode (edit / preview / placeholder) so
+    // its scroll offset survives the mode switch. The inner child is forced to
+    // at least the viewport height so the whole area is tappable-to-edit and
+    // short notes still fill the screen. The text field grows with its content
+    // (no `expands`) and the surrounding scroll view keeps the caret in view.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final minHeight = constraints.maxHeight;
+        final Widget child;
+        if (_isEditing || _contentFocus.hasFocus) {
+          child = CupertinoTextField(
+            controller: _content,
+            focusNode: _contentFocus,
+            placeholder: S.of(context).note,
+            style: const TextStyle(fontSize: 16, height: 1.35),
+            decoration: const BoxDecoration(),
+            maxLines: null,
+            textAlignVertical: TextAlignVertical.top,
+            textCapitalization: TextCapitalization.sentences,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          );
+        } else if (_content.text.trim().isEmpty) {
+          child = GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _startEditing,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Text(
+                  S.of(context).note,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color:
+                        CupertinoColors.placeholderText.resolveFrom(context),
+                  ),
+                ),
               ),
             ),
+          );
+        } else {
+          child = MarkdownView(
+            data: _content.text,
+            onTap: _startEditing,
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          );
+        }
+        return SingleChildScrollView(
+          controller: _contentScroll,
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: minHeight),
+            child: child,
           ),
-        ),
-      );
-    }
-    // Use shrinkWrap + an explicit scroll view so the user can drag-scroll
-    // long notes without competing with the tap-to-edit gesture detector
-    // that wraps the rendered markdown.
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      child: MarkdownView(
-        data: _content.text,
-        onTap: _startEditing,
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      ),
+        );
+      },
     );
   }
 
