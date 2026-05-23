@@ -418,9 +418,7 @@ class _DayCell extends StatelessWidget {
             Align(
               alignment: Alignment.topCenter,
               child: Container(
-                padding: _isToday
-                    ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2)
-                    : const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: _isToday
                     ? BoxDecoration(
                         color: AppColors.accent,

@@ -189,7 +189,7 @@ class _LockScreenState extends State<LockScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              _isPin ? s.enterPassword : s.enterPassword,
+              s.enterPassword,
               style: TextStyle(
                 fontSize: 15,
                 color: CupertinoColors.secondaryLabel.resolveFrom(context),

@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
-import '../utils/selection_menu.dart';
 
 import '../localization/strings.dart';
 import '../folders/create_folder_list_sheet.dart';
@@ -76,20 +75,6 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
     });
   }
 
-  // ignore: unused_element
-  Future<void> _showSortSheet(BuildContext context) async {
-    final s = S.of(context);
-    final selected = await showSelectionMenu<TaskSortOrder>(
-      context: context,
-      title: s.sortTasks,
-      current: widget.controller.sortOrder,
-      options: TaskSortOrder.values
-          .map((o) => SelectionMenuOption(value: o, label: _sortLabel(s, o)))
-          .toList(),
-    );
-    if (selected != null) widget.controller.setSortOrder(selected);
-  }
-
   void _showDropdown(BuildContext context) {
     final settingsHidden = !widget.settingsController.isTabVisible(4);
     showDropdown(context, (dismiss) {
@@ -111,21 +96,6 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
             : null,
       );
     });
-  }
-
-  static String _sortLabel(S s, TaskSortOrder order) {
-    switch (order) {
-      case TaskSortOrder.defaultOrder:
-        return s.sortDefault;
-      case TaskSortOrder.creationDate:
-        return s.sortByCreation;
-      case TaskSortOrder.name:
-        return s.sortByName;
-      case TaskSortOrder.priority:
-        return s.sortByPriority;
-      case TaskSortOrder.dateTime:
-        return s.sortByDateTime;
-    }
   }
 
   Future<bool> _confirmDelete(BuildContext context, String name,
