@@ -48,12 +48,36 @@ class S {
 
   static S of(BuildContext context) {
     final locale = Localizations.maybeLocaleOf(context) ?? const Locale('en');
+    assert(() {
+      _debugReportMissingKeys();
+      return true;
+    }());
     return S(locale);
   }
 
   String t(String key) {
     final table = _translations[locale.languageCode] ?? _translations['en']!;
     return table[key] ?? _translations['en']![key] ?? key;
+  }
+
+  static bool _completenessChecked = false;
+
+  /// Debug-only: logs any locale whose table is missing keys that exist in
+  /// English. Such keys silently fall back to English at runtime (see [t]), so
+  /// without this they slip past QA unnoticed. Runs once; no release-mode cost
+  /// because the call site is wrapped in an `assert`.
+  static void _debugReportMissingKeys() {
+    if (_completenessChecked) return;
+    _completenessChecked = true;
+    final en = _translations['en']!;
+    _translations.forEach((code, table) {
+      if (code == 'en') return;
+      final missing = en.keys.where((k) => !table.containsKey(k)).toList();
+      if (missing.isNotEmpty) {
+        debugPrint(
+            '[i18n] "$code" missing ${missing.length} key(s): ${missing.join(', ')}');
+      }
+    });
   }
 
   // ── Common ────────────────────────────────────────────────────────────────
