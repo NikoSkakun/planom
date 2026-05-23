@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
-import '../utils/selection_menu.dart';
 
 import '../localization/strings.dart';
 import '../folders/create_folder_list_sheet.dart';
@@ -15,6 +14,7 @@ import '../settings/settings_view.dart';
 import '../settings/smart_list_prefs.dart';
 import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
+import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
 import 'completed_view.dart';
 import 'inbox_view.dart';
@@ -76,20 +76,6 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
     });
   }
 
-  // ignore: unused_element
-  Future<void> _showSortSheet(BuildContext context) async {
-    final s = S.of(context);
-    final selected = await showSelectionMenu<TaskSortOrder>(
-      context: context,
-      title: s.sortTasks,
-      current: widget.controller.sortOrder,
-      options: TaskSortOrder.values
-          .map((o) => SelectionMenuOption(value: o, label: _sortLabel(s, o)))
-          .toList(),
-    );
-    if (selected != null) widget.controller.setSortOrder(selected);
-  }
-
   void _showDropdown(BuildContext context) {
     final settingsHidden = !widget.settingsController.isTabVisible(4);
     showDropdown(context, (dismiss) {
@@ -111,21 +97,6 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
             : null,
       );
     });
-  }
-
-  static String _sortLabel(S s, TaskSortOrder order) {
-    switch (order) {
-      case TaskSortOrder.defaultOrder:
-        return s.sortDefault;
-      case TaskSortOrder.creationDate:
-        return s.sortByCreation;
-      case TaskSortOrder.name:
-        return s.sortByName;
-      case TaskSortOrder.priority:
-        return s.sortByPriority;
-      case TaskSortOrder.dateTime:
-        return s.sortByDateTime;
-    }
   }
 
   Future<bool> _confirmDelete(BuildContext context, String name,
@@ -577,38 +548,43 @@ class _ListItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                    16 + indent, 9, onExpand != null ? 4 : 16, 9),
-                child: Row(
-                  children: [
-                    SizedBox(width: 22, height: 22, child: icon),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: isFolder
-                              ? FontWeight.w500
-                              : FontWeight.normal,
+            child: MergeSemantics(
+              child: Semantics(
+                button: true,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onTap,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                        16 + indent, 9, onExpand != null ? 4 : 16, 9),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 22, height: 22, child: icon),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: isFolder
+                                  ? FontWeight.w500
+                                  : FontWeight.normal,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (count != null && count! > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '$count',
+                            style: TextStyle(
+                              color: CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (count != null && count! > 0) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '$count',
-                        style: TextStyle(
-                          color: CupertinoColors.secondaryLabel
-                              .resolveFrom(context),
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -655,7 +631,7 @@ class _TasksOptionsDropdown extends StatelessWidget {
     final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
     final items = <Widget>[];
     if (showSettings) {
-      items.add(_DropdownRow(
+      items.add(DropdownRow(
         label: S.of(context).settings,
         icon: CupertinoIcons.gear_alt,
         onTap: onSettings ?? () {},
@@ -694,38 +670,6 @@ class _TasksOptionsDropdown extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _DropdownRow extends StatelessWidget {
-  const _DropdownRow({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.color,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = color ?? CupertinoColors.label.resolveFrom(context);
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      onPressed: onTap,
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: fg),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(label, style: TextStyle(fontSize: 16, color: fg)),
-          ),
-        ],
-      ),
     );
   }
 }

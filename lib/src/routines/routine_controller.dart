@@ -36,8 +36,11 @@ class RoutineController with ChangeNotifier {
         // days_after_complete: show when today >= last completion + gap
         final lastCompletion = _lastCompletedEntry(r);
         if (lastCompletion == null) return true; // never completed
-        final nextDate = _normalizeDate(lastCompletion.date)
-            .add(Duration(days: r.daysAfterComplete ?? 1));
+        // Use date-component arithmetic, not Duration(days:): adding a Duration
+        // across a DST boundary can land on the wrong calendar day.
+        final last = _normalizeDate(lastCompletion.date);
+        final nextDate =
+            DateTime(last.year, last.month, last.day + (r.daysAfterComplete ?? 1));
         return !today.isBefore(nextDate);
       }
     }).toList();

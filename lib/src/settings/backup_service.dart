@@ -79,7 +79,17 @@ class BackupService {
     final file = File('${tempDir.path}/$name');
     await file.writeAsString(json, encoding: utf8);
 
-    await Share.shareXFiles([XFile(file.path)], subject: 'Planom Backup');
+    try {
+      await Share.shareXFiles([XFile(file.path)], subject: 'Planom Backup');
+    } finally {
+      // The share sheet has copied/handed off the file by the time this
+      // returns, so clean up the temp copy rather than letting it accumulate.
+      if (await file.exists()) {
+        try {
+          await file.delete();
+        } catch (_) {}
+      }
+    }
   }
 
   // Returns true on success, false if file was invalid or picker cancelled.

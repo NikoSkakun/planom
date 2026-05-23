@@ -48,6 +48,10 @@ class S {
 
   static S of(BuildContext context) {
     final locale = Localizations.maybeLocaleOf(context) ?? const Locale('en');
+    assert(() {
+      _debugReportMissingKeys();
+      return true;
+    }());
     return S(locale);
   }
 
@@ -56,8 +60,29 @@ class S {
     return table[key] ?? _translations['en']![key] ?? key;
   }
 
+  static bool _completenessChecked = false;
+
+  /// Debug-only: logs any locale whose table is missing keys that exist in
+  /// English. Such keys silently fall back to English at runtime (see [t]), so
+  /// without this they slip past QA unnoticed. Runs once; no release-mode cost
+  /// because the call site is wrapped in an `assert`.
+  static void _debugReportMissingKeys() {
+    if (_completenessChecked) return;
+    _completenessChecked = true;
+    final en = _translations['en']!;
+    _translations.forEach((code, table) {
+      if (code == 'en') return;
+      final missing = en.keys.where((k) => !table.containsKey(k)).toList();
+      if (missing.isNotEmpty) {
+        debugPrint(
+            '[i18n] "$code" missing ${missing.length} key(s): ${missing.join(', ')}');
+      }
+    });
+  }
+
   // ── Common ────────────────────────────────────────────────────────────────
   String get appTitle => t('appTitle');
+  String get a11yToggleComplete => t('a11yToggleComplete');
   String get cancel => t('cancel');
   String get done => t('done');
   String get ok => t('ok');
@@ -442,6 +467,7 @@ const Map<String, String> _en = {
   'exportFailed': 'Export Failed',
   'exportFailedBody': 'An error occurred while creating the backup.',
   'newSpace': 'New Space', 'spaceName': 'Space name',
+  'a11yToggleComplete': 'Toggle completion',
   'deleteSpace': 'Delete Space?',
   'deleteSpaceBody':
       'This permanently deletes the space and all of its data. This cannot be undone.',
