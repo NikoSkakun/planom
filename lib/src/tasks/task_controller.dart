@@ -131,6 +131,11 @@ class TaskController with ChangeNotifier {
     }
     _updateBadge();
     notifyListeners();
+    if (updated.isCompleted) {
+      NotificationService.instance.cancelTaskReminders(id);
+    } else {
+      NotificationService.instance.scheduleTaskReminders(updated);
+    }
   }
 
   Future<void> deleteTask(String id) async {

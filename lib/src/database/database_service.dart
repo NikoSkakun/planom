@@ -745,15 +745,6 @@ class DatabaseService {
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
-  Future<void> importEvents(List<Map<String, dynamic>> maps) async {
-    final db = await _database;
-    final batch = db.batch();
-    for (final m in maps) {
-      batch.insert('events', m,
-          conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
-  }
 
   Future<void> clearTrashedTasks() async {
     final db = await _database;
@@ -835,94 +826,39 @@ class DatabaseService {
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
-  Future<void> importAppSettings(List<Map<String, dynamic>> maps) async {
-    final db = await _database;
-    final batch = db.batch();
-    for (final m in maps) {
-      batch.insert('app_settings', m,
-          conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
-  }
+  static const _allTables = [
+    'events',
+    'app_settings',
+    'routine_entries',
+    'routines',
+    'notes',
+    'note_folders',
+    'app_lists',
+    'folders',
+    'tasks',
+  ];
 
-  Future<void> clearAllData() async {
+  /// Atomically replaces all data: clears every table and re-inserts the given
+  /// rows inside a single transaction, keyed by table name. If any insert (or
+  /// the clear) throws, the whole transaction rolls back and the existing data
+  /// is left intact — so a corrupt or partial backup can never destroy it.
+  Future<void> replaceAllData(
+      Map<String, List<Map<String, dynamic>>> tables) async {
     final db = await _database;
-    await db.delete('events');
-    await db.delete('app_settings');
-    await db.delete('routine_entries');
-    await db.delete('routines');
-    await db.delete('notes');
-    await db.delete('note_folders');
-    await db.delete('app_lists');
-    await db.delete('folders');
-    await db.delete('tasks');
-  }
-
-  Future<void> importTasks(List<Map<String, dynamic>> maps) async {
-    final db = await _database;
-    final batch = db.batch();
-    for (final m in maps) {
-      batch.insert('tasks', m, conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
-  }
-
-  Future<void> importFolders(List<Map<String, dynamic>> maps) async {
-    final db = await _database;
-    final batch = db.batch();
-    for (final m in maps) {
-      batch.insert('folders', m, conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
-  }
-
-  Future<void> importLists(List<Map<String, dynamic>> maps) async {
-    final db = await _database;
-    final batch = db.batch();
-    for (final m in maps) {
-      batch.insert('app_lists', m,
-          conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
-  }
-
-  Future<void> importNoteFolders(List<Map<String, dynamic>> maps) async {
-    final db = await _database;
-    final batch = db.batch();
-    for (final m in maps) {
-      batch.insert('note_folders', m,
-          conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
-  }
-
-  Future<void> importNotes(List<Map<String, dynamic>> maps) async {
-    final db = await _database;
-    final batch = db.batch();
-    for (final m in maps) {
-      batch.insert('notes', m, conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
-  }
-
-  Future<void> importRoutines(List<Map<String, dynamic>> maps) async {
-    final db = await _database;
-    final batch = db.batch();
-    for (final m in maps) {
-      batch.insert('routines', m,
-          conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
-  }
-
-  Future<void> importRoutineEntries(List<Map<String, dynamic>> maps) async {
-    final db = await _database;
-    final batch = db.batch();
-    for (final m in maps) {
-      batch.insert('routine_entries', m,
-          conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
+    await db.transaction((txn) async {
+      for (final table in _allTables) {
+        await txn.delete(table);
+      }
+      for (final entry in tables.entries) {
+        if (entry.value.isEmpty) continue;
+        final batch = txn.batch();
+        for (final row in entry.value) {
+          batch.insert(entry.key, row,
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        await batch.commit(noResult: true);
+      }
+    });
   }
 
   Future<void> resetUserData() async {

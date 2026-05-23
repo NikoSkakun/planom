@@ -22,8 +22,10 @@ void main() async {
   await NotificationService.initTimezone();
   await NotificationService.instance.init();
 
-  // Global DB — only for app_settings (tab visibility, etc.) via
-  // SettingsController. Per-space data lives in space-specific DB files.
+  // Shared planom.db handle: holds app_settings (tab visibility, appearance,
+  // passcode) read by SettingsController/SecurityService, and is reused as the
+  // default space's data DB. Non-default spaces use their own DB files. One
+  // handle per file — never open planom.db twice.
   final globalDb = DatabaseService();
 
   final settingsController = SettingsController(SettingsService(), globalDb);
@@ -32,7 +34,8 @@ void main() async {
   final securityService = SecurityService(globalDb);
   await securityService.load();
 
-  final spaceManager = SpaceManager(settingsController: settingsController);
+  final spaceManager =
+      SpaceManager(settingsController: settingsController, globalDb: globalDb);
   await spaceManager.load();
 
   runApp(
