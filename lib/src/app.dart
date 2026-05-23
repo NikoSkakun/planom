@@ -66,17 +66,23 @@ class MyApp extends StatelessWidget {
           ),
           onGenerateRoute: (settings) => FastRoute<void>(
             settings: settings,
-            builder: (context) => _SecurityGate(
-              securityService: securityService,
-              child: HomeShell(
-                settingsController: settingsController,
-                taskController: taskController,
-                folderController: folderController,
-                noteController: noteController,
-                routineController: routineController,
-                eventController: eventController,
-                backupService: backupService,
+            // Accent/completion color changes bump colorRevision (not the main
+            // settings notifier), so they rebuild only this content subtree
+            // instead of the whole CupertinoApp above.
+            builder: (context) => ValueListenableBuilder<int>(
+              valueListenable: settingsController.colorRevision,
+              builder: (context, _, __) => _SecurityGate(
                 securityService: securityService,
+                child: HomeShell(
+                  settingsController: settingsController,
+                  taskController: taskController,
+                  folderController: folderController,
+                  noteController: noteController,
+                  routineController: routineController,
+                  eventController: eventController,
+                  backupService: backupService,
+                  securityService: securityService,
+                ),
               ),
             ),
           ),
