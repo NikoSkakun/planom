@@ -120,13 +120,51 @@ class _HomeShellState extends State<HomeShell> {
   void _onSettingsChanged() {
     if (!mounted) return;
     final visibleIndices = _computeVisibleIndices();
-    if (!visibleIndices.contains(_lastTabIndex)) {
-      _lastTabIndex = 0;
-      _tabController.index = 0;
-      _showPlusButton.value = _depthObservers[0].trackedCount == 0;
-    } else {
+    if (visibleIndices.contains(_lastTabIndex)) {
       _tabController.index = visibleIndices.indexOf(_lastTabIndex);
+      return;
     }
+    // The active tab was just hidden from the tab bar. Fall back to Tasks (or
+    // the first remaining tab) so the scaffold index stays valid.
+    final wasSettings = _lastTabIndex == 4;
+    final fallback = visibleIndices.contains(0) ? 0 : visibleIndices.first;
+    _lastTabIndex = fallback;
+    _tabController.index = visibleIndices.indexOf(fallback);
+    switch (fallback) {
+      case 0:
+        _showPlusButton.value = _depthObservers[0].trackedCount == 0;
+      case 1:
+        _showPlusButton.value = false;
+      default:
+        _showPlusButton.value = _depthObservers[fallback].depth <= 1;
+    }
+    // Hiding the Settings tab only removes its tab-bar item — it must not yank
+    // the user out of Settings. Re-open it full-screen (with the Tab Bar
+    // sub-page they were on) so the screen stays put.
+    if (wasSettings) _reopenSettingsFullScreen();
+  }
+
+  void _reopenSettingsFullScreen() {
+    // Pushed synchronously (this runs from the visibility-toggle tap, not a
+    // build) so the full-screen Settings covers the scaffold before it repaints
+    // — otherwise the fallback tab would flash for a frame.
+    final nav = Navigator.of(context, rootNavigator: true);
+    nav.push(
+      FastRoute<void>(
+        builder: (_) => SettingsView(
+          controller: widget.settingsController,
+          backupService: widget.backupService,
+          securityService: widget.securityService,
+        ),
+      ),
+    );
+    nav.push(
+      FastRoute<void>(
+        builder: (_) => TabBarSettingsView(
+          controller: widget.settingsController,
+        ),
+      ),
+    );
   }
 
   void _onPlusPressed() {
