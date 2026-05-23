@@ -1,10 +1,11 @@
 import 'package:flutter/cupertino.dart';
 
-import '../localization/strings.dart';
 import '../models/event.dart';
+import '../localization/strings.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
 import '../utils/duration_picker.dart';
+import '../utils/reminder_picker.dart';
 import 'event_controller.dart';
 
 class EventDetailView extends StatefulWidget {
@@ -27,6 +28,7 @@ class _EventDetailViewState extends State<EventDetailView> {
   late DateTime _date;
   late int? _doTime;
   late int? _duration;
+  late List<int> _reminderOffsets;
   bool _deleted = false;
 
   @override
@@ -37,6 +39,7 @@ class _EventDetailViewState extends State<EventDetailView> {
     _date = widget.event.date;
     _doTime = widget.event.doTime;
     _duration = widget.event.duration;
+    _reminderOffsets = List.of(widget.event.reminderOffsets);
   }
 
   @override
@@ -53,6 +56,7 @@ class _EventDetailViewState extends State<EventDetailView> {
           clearDoTime: _doTime == null,
           duration: _duration,
           clearDuration: _duration == null,
+          reminderOffsets: _reminderOffsets,
         ));
       }
     }
@@ -78,6 +82,12 @@ class _EventDetailViewState extends State<EventDetailView> {
     final result = await showDurationPicker(context, _duration);
     if (!mounted) return;
     setState(() => _duration = result);
+  }
+
+  Future<void> _pickReminders() async {
+    final result = await showReminderPicker(context, _reminderOffsets);
+    if (!mounted || result == null) return;
+    setState(() => _reminderOffsets = result);
   }
 
   Future<void> _delete() async {
@@ -149,12 +159,12 @@ class _EventDetailViewState extends State<EventDetailView> {
               onTap: _pickDate,
               child: Row(
                 children: [
-                  Icon(CupertinoIcons.calendar,
+                  const Icon(CupertinoIcons.calendar,
                       size: 18, color: AppColors.accent),
                   const SizedBox(width: 10),
                   Text(
-                    formatTaskDate(context, _date, doTime: _doTime),
-                    style: TextStyle(
+                    formatTaskDate(_date, doTime: _doTime),
+                    style: const TextStyle(
                         fontSize: 15, color: AppColors.accent),
                   ),
                 ],
@@ -173,11 +183,38 @@ class _EventDetailViewState extends State<EventDetailView> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    _duration != null ? formatDuration(_duration!) : s.noDuration,
+                    _duration != null
+                        ? formatDuration(_duration!)
+                        : s.noDuration,
                     style: TextStyle(
                       fontSize: 15,
                       color:
                           _duration != null ? AppColors.accent : secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SectionCard(
+              onTap: _pickReminders,
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.bell,
+                    size: 18,
+                    color: _reminderOffsets.isNotEmpty
+                        ? AppColors.accent
+                        : secondary,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    formatReminderOffsets(_reminderOffsets, s),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: _reminderOffsets.isNotEmpty
+                          ? AppColors.accent
+                          : secondary,
                     ),
                   ),
                 ],
@@ -189,7 +226,6 @@ class _EventDetailViewState extends State<EventDetailView> {
     );
   }
 }
-
 
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.child, this.onTap});

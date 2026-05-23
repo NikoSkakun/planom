@@ -144,6 +144,15 @@ class BackupService {
     return true;
   }
 
+  Future<void> hardReset() async {
+    await db.resetUserData();
+    await taskController.load();
+    await folderController.load();
+    await noteController.load();
+    await routineController.load();
+    await eventController.load();
+  }
+
   // ── Private helpers ───────────────────────────────────────────────────────
 
   /// For each row whose [iconColumn] is a custom image path, reads the image

@@ -14,6 +14,7 @@ import '../notes/markdown_toolbar.dart';
 import '../notes/markdown_view.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/reminder_picker.dart';
 import 'calendar_date_picker.dart';
 import 'task_controller.dart';
 
@@ -43,6 +44,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
   late DateTime? _dueDate;
   late int? _doTime;
   late int? _duration;
+  late List<int> _reminderOffsets;
   late bool _isCompleted;
   late String? _listId;
   late int _priority;
@@ -61,6 +63,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _isCompleted = widget.task.isCompleted;
     _listId = widget.task.listId;
     _priority = widget.task.priority;
+    _reminderOffsets = List.of(widget.task.reminderOffsets);
     _title.addListener(_scheduleAutosave);
     _note.addListener(_scheduleAutosave);
     _noteFocus.addListener(_onNoteFocusChanged);
@@ -103,6 +106,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
       listId: _listId,
       clearListId: _listId == null,
       priority: _priority,
+      reminderOffsets: _reminderOffsets,
     ));
   }
 
@@ -182,6 +186,13 @@ class _TaskDetailViewState extends State<TaskDetailView>
     final result = await showDurationPicker(context, _duration);
     if (!mounted) return;
     setState(() => _duration = result);
+  }
+
+  Future<void> _pickReminders() async {
+    final result = await showReminderPicker(context, _reminderOffsets);
+    if (!mounted || result == null) return;
+    setState(() => _reminderOffsets = result);
+    _save();
   }
 
   String _listLabel(BuildContext context) {
@@ -394,6 +405,35 @@ class _TaskDetailViewState extends State<TaskDetailView>
                           style: TextStyle(
                             fontSize: 15,
                             color: _duration != null
+                                ? AppColors.accent
+                                : CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Reminder row
+                  _SectionCard(
+                    onTap: _pickReminders,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.bell,
+                          size: 18,
+                          color: _reminderOffsets.isNotEmpty
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          formatReminderOffsets(_reminderOffsets, s),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: _reminderOffsets.isNotEmpty
                                 ? AppColors.accent
                                 : CupertinoColors.secondaryLabel
                                     .resolveFrom(context),

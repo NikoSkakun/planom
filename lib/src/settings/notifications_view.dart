@@ -1,0 +1,120 @@
+import 'package:flutter/cupertino.dart';
+
+import '../localization/strings.dart';
+import '../notifications/notification_service.dart';
+import '../theme/app_theme.dart';
+
+class NotificationsSettingsView extends StatefulWidget {
+  const NotificationsSettingsView({super.key});
+
+  @override
+  State<NotificationsSettingsView> createState() =>
+      _NotificationsSettingsViewState();
+}
+
+class _NotificationsSettingsViewState
+    extends State<NotificationsSettingsView> {
+  bool? _permissionGranted;
+  bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPermission();
+  }
+
+  Future<void> _checkPermission() async {
+    setState(() => _checking = true);
+    final granted = await NotificationService.instance.checkPermission();
+    if (mounted) setState(() { _permissionGranted = granted; _checking = false; });
+  }
+
+  Future<void> _requestPermission() async {
+    setState(() => _checking = true);
+    final granted = await NotificationService.instance.requestPermission();
+    if (mounted) setState(() { _permissionGranted = granted; _checking = false; });
+    if (!granted && mounted) {
+      _showPermissionHint();
+    }
+  }
+
+  void _showPermissionHint() {
+    final s = S.of(context);
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(s.sectionNotifications),
+        content: Text(s.notificationsPermissionHint),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.ok),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final labelColor = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final bg = CupertinoDynamicColor.resolve(
+        CupertinoColors.tertiarySystemBackground, context);
+
+    final granted = _permissionGranted ?? false;
+
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        middle: Text(s.sectionNotifications),
+      ),
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          children: [
+            Text(
+              s.sectionNotifications,
+              style: TextStyle(
+                  fontSize: 13, color: labelColor, letterSpacing: -0.08),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              decoration: BoxDecoration(
+                  color: bg, borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(s.notificationsEnabled,
+                        style: const TextStyle(fontSize: 17)),
+                  ),
+                  if (_checking)
+                    const CupertinoActivityIndicator()
+                  else
+                    CupertinoSwitch(
+                      value: granted,
+                      onChanged: granted ? null : (_) => _requestPermission(),
+                      activeColor: AppColors.accent,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                granted
+                    ? 'Notifications are enabled. You can set reminders on tasks and events.'
+                    : s.notificationsPermissionHint,
+                style: TextStyle(fontSize: 13, color: labelColor),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

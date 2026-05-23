@@ -10,6 +10,7 @@ import 'notes/notes_view.dart';
 import 'routines/routine_controller.dart';
 import 'routines/routine_creation_view.dart';
 import 'routines/routines_view.dart';
+import 'security/security_service.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
@@ -30,6 +31,7 @@ class HomeShell extends StatefulWidget {
     required this.routineController,
     required this.eventController,
     required this.backupService,
+    this.securityService,
   });
 
   static const routeName = '/';
@@ -41,6 +43,7 @@ class HomeShell extends StatefulWidget {
   final RoutineController routineController;
   final EventController eventController;
   final BackupService backupService;
+  final SecurityService? securityService;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -327,6 +330,7 @@ class _HomeShellState extends State<HomeShell> {
       _ => SettingsView(
           controller: widget.settingsController,
           backupService: widget.backupService,
+          securityService: widget.securityService,
         ),
     };
   }

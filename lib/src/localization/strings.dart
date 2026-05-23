@@ -137,6 +137,56 @@ class S {
   String get newSpace => t('newSpace');
   String get spaceName => t('spaceName');
 
+  // ── Security ──────────────────────────────────────────────────────────────
+  String get sectionSecurity => t('sectionSecurity');
+  String get appLock => t('appLock');
+  String get enableLock => t('enableLock');
+  String get changeLock => t('changeLock');
+  String get removeLock => t('removeLock');
+  String get lockType => t('lockType');
+  String get lockTypePin4 => t('lockTypePin4');
+  String get lockTypePin5 => t('lockTypePin5');
+  String get lockTypePin6 => t('lockTypePin6');
+  String get lockTypePin7 => t('lockTypePin7');
+  String get lockTypePin8 => t('lockTypePin8');
+  String get lockTypeCustom => t('lockTypeCustom');
+  String get enterPassword => t('enterPassword');
+  String get enterNewPassword => t('enterNewPassword');
+  String get confirmPassword => t('confirmPassword');
+  String get confirmNewPassword => t('confirmNewPassword');
+  String get currentPassword => t('currentPassword');
+  String get wrongPassword => t('wrongPassword');
+  String get passwordsDoNotMatch => t('passwordsDoNotMatch');
+  String get forgotPasswordHint => t('forgotPasswordHint');
+  String get lockEnabled => t('lockEnabled');
+  String get lockDisabled => t('lockDisabled');
+  String get verifyToDisable => t('verifyToDisable');
+  String get verifyToChange => t('verifyToChange');
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+  String get sectionNotifications => t('sectionNotifications');
+  String get notificationsEnabled => t('notificationsEnabled');
+  String get notificationsPermissionHint => t('notificationsPermissionHint');
+  String get reminders => t('reminders');
+  String get noReminders => t('noReminders');
+  String get reminderAtTime => t('reminderAtTime');
+  String get reminder5MinBefore => t('reminder5MinBefore');
+  String get reminder10MinBefore => t('reminder10MinBefore');
+  String get reminder15MinBefore => t('reminder15MinBefore');
+  String get reminder30MinBefore => t('reminder30MinBefore');
+  String get reminder1HBefore => t('reminder1HBefore');
+  String get reminder2HBefore => t('reminder2HBefore');
+  String get reminder1DBefore => t('reminder1DBefore');
+  String get reminder1HAfter => t('reminder1HAfter');
+  String get reminder1DAfter => t('reminder1DAfter');
+  String get reminderCustomBefore => t('reminderCustomBefore');
+  String get reminderCustomAfter => t('reminderCustomAfter');
+
+  // ── Data reset ────────────────────────────────────────────────────────────
+  String get resetAllData => t('resetAllData');
+  String get resetAllDataQuestion => t('resetAllDataQuestion');
+  String get resetAllDataBody => t('resetAllDataBody');
+
   // ── Tasks ─────────────────────────────────────────────────────────────────
   String get sortTasks => t('sortTasks');
   String get sortDefault => t('sortDefault');
@@ -390,6 +440,33 @@ const Map<String, String> _en = {
   'exportFailed': 'Export Failed',
   'exportFailedBody': 'An error occurred while creating the backup.',
   'newSpace': 'New Space', 'spaceName': 'Space name',
+  'sectionSecurity': 'Privacy & Security',
+  'appLock': 'App Lock', 'enableLock': 'Enable Lock', 'changeLock': 'Change Lock', 'removeLock': 'Remove Lock',
+  'lockType': 'Lock Type',
+  'lockTypePin4': '4-digit PIN', 'lockTypePin5': '5-digit PIN', 'lockTypePin6': '6-digit PIN',
+  'lockTypePin7': '7-digit PIN', 'lockTypePin8': '8-digit PIN', 'lockTypeCustom': 'Custom Password',
+  'enterPassword': 'Enter password', 'enterNewPassword': 'Enter new password',
+  'confirmPassword': 'Confirm password', 'confirmNewPassword': 'Confirm new password',
+  'currentPassword': 'Current password',
+  'wrongPassword': 'Wrong password', 'passwordsDoNotMatch': 'Passwords do not match',
+  'forgotPasswordHint': 'If you forget your password, the only way to access the app is to reinstall it.',
+  'lockEnabled': 'Lock enabled', 'lockDisabled': 'Lock disabled',
+  'verifyToDisable': 'Enter current password to disable lock',
+  'verifyToChange': 'Enter current password to change lock',
+  'sectionNotifications': 'Notifications',
+  'notificationsEnabled': 'Notifications Enabled',
+  'notificationsPermissionHint': 'Open Settings to allow notifications for Planom.',
+  'reminders': 'Reminders', 'noReminders': 'No Reminders',
+  'reminderAtTime': 'At time',
+  'reminder5MinBefore': '5 min before', 'reminder10MinBefore': '10 min before',
+  'reminder15MinBefore': '15 min before', 'reminder30MinBefore': '30 min before',
+  'reminder1HBefore': '1 hour before', 'reminder2HBefore': '2 hours before',
+  'reminder1DBefore': '1 day before',
+  'reminder1HAfter': '1 hour after', 'reminder1DAfter': '1 day after',
+  'reminderCustomBefore': 'Custom before…', 'reminderCustomAfter': 'Custom after…',
+  'resetAllData': 'Reset All Data',
+  'resetAllDataQuestion': 'Reset All Data?',
+  'resetAllDataBody': 'All tasks, notes, events, and routines will be permanently deleted. Your preferences and settings will be preserved. This cannot be undone.',
   'sortTasks': 'Sort Tasks', 'sortDefault': 'Default',
   'sortByCreation': 'By Creation Date', 'sortByName': 'By Name',
   'sortByPriority': 'By Priority', 'sortByDateTime': 'By Date & Time',

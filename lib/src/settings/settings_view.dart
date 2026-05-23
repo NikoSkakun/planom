@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show ReorderableDragStartListener, ReorderableListView, ThemeMode;
 
 import '../localization/strings.dart';
+import '../security/security_service.dart';
 import '../spaces/space_manager.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
@@ -11,7 +12,10 @@ import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
 import 'appearance_view.dart';
 import 'backup_service.dart';
+import 'data_view.dart';
 import 'font_picker_view.dart';
+import 'notifications_view.dart';
+import 'security_view.dart';
 import 'settings_controller.dart';
 import 'smart_list_prefs.dart';
 
@@ -20,109 +24,18 @@ class SettingsView extends StatefulWidget {
     super.key,
     required this.controller,
     this.backupService,
+    this.securityService,
   });
 
   final SettingsController controller;
   final BackupService? backupService;
+  final SecurityService? securityService;
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
 }
 
 class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
-  bool _exporting = false;
-  bool _importing = false;
-
-  Future<void> _export() async {
-    if (widget.backupService == null) return;
-    setState(() => _exporting = true);
-    try {
-      await widget.backupService!.exportBackup();
-    } catch (_) {
-      if (!mounted) return;
-      _showErrorDialog(S.of(context).exportFailed, S.of(context).exportFailedBody);
-    } finally {
-      if (mounted) setState(() => _exporting = false);
-    }
-  }
-
-  Future<void> _import() async {
-    if (widget.backupService == null) return;
-    final s = S.of(context);
-
-    final confirmed = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(s.replaceAllData),
-        content: Text(s.replaceAllDataBody),
-        actions: [
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(s.confirm),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(s.cancel),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    setState(() => _importing = true);
-    try {
-      final success = await widget.backupService!.importBackup();
-      if (!mounted) return;
-      if (success) {
-        await showCupertinoDialog<void>(
-          context: context,
-          builder: (ctx) => CupertinoAlertDialog(
-            title: Text(S.of(context).importSuccessful),
-            content: Text(S.of(context).importSuccessfulBody),
-            actions: [
-              CupertinoDialogAction(
-                isDefaultAction: true,
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(S.of(context).ok),
-              ),
-            ],
-          ),
-        );
-      } else {
-        _showErrorDialog(
-          S.of(context).importFailed,
-          S.of(context).importFailedInvalid,
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        _showErrorDialog(
-            S.of(context).importFailed, S.of(context).importFailedRead);
-      }
-    } finally {
-      if (mounted) setState(() => _importing = false);
-    }
-  }
-
-  void _showErrorDialog(String title, String message) {
-    showCupertinoDialog<void>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(S.of(context).ok),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showSpacesMenu(BuildContext context) {
     final spaceManager = SpaceManagerProvider.of(context);
     showDropdown(context, (dismiss) {
@@ -412,10 +325,53 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
               ),
             ),
 
-            if (hasBackup) ...[
-              const SizedBox(height: 32),
+            // ── Notifications ────────────────────────────────────────
+            const SizedBox(height: 32),
+            Text(
+              s.sectionNotifications,
+              style: TextStyle(
+                fontSize: 13,
+                color: labelColor,
+                letterSpacing: -0.08,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _NavRow(
+              label: s.sectionNotifications,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => const NotificationsSettingsView(),
+                ),
+              ),
+            ),
 
-              // ── Data ────────────────────────────────────────────────
+            // ── Security ─────────────────────────────────────────────
+            if (widget.securityService != null) ...[
+              const SizedBox(height: 32),
+              Text(
+                s.sectionSecurity,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: labelColor,
+                  letterSpacing: -0.08,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _NavRow(
+                label: s.sectionSecurity,
+                onTap: () => Navigator.of(context).push(
+                  FastRoute<void>(
+                    builder: (_) => SecuritySettingsView(
+                      securityService: widget.securityService!,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+
+            if (hasBackup) ...[
+              // ── Data ──────────────────────────────────────────────
+              const SizedBox(height: 32),
               Text(
                 s.sectionData,
                 style: TextStyle(
@@ -425,18 +381,16 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                 ),
               ),
               const SizedBox(height: 8),
-              _DataRow(
-                label: s.exportBackup,
-                sublabel: s.exportBackupSublabel,
-                loading: _exporting,
-                onTap: _exporting || _importing ? null : _export,
-              ),
-              const SizedBox(height: 1),
-              _DataRow(
-                label: s.importBackup,
-                sublabel: s.importBackupSublabel,
-                loading: _importing,
-                onTap: _exporting || _importing ? null : _import,
+              _NavRow(
+                label: s.sectionData,
+                onTap: () => Navigator.of(context).push(
+                  FastRoute<void>(
+                    builder: (_) => DataView(
+                      backupService: widget.backupService!,
+                      securityService: widget.securityService,
+                    ),
+                  ),
+                ),
               ),
             ],
           ],
@@ -945,75 +899,3 @@ class _ToggleRow extends StatelessWidget {
   }
 }
 
-class _DataRow extends StatelessWidget {
-  const _DataRow({
-    required this.label,
-    required this.sublabel,
-    required this.loading,
-    required this.onTap,
-  });
-
-  final String label;
-  final String sublabel;
-  final bool loading;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = CupertinoDynamicColor.resolve(
-      CupertinoColors.tertiarySystemBackground,
-      context,
-    );
-    final disabled = onTap == null && !loading;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 17,
-                      color: disabled
-                          ? CupertinoColors.secondaryLabel
-                              .resolveFrom(context)
-                          : CupertinoColors.label.resolveFrom(context),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    sublabel,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: CupertinoColors.secondaryLabel
-                          .resolveFrom(context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (loading)
-              const CupertinoActivityIndicator()
-            else
-              Icon(
-                CupertinoIcons.chevron_right,
-                size: 16,
-                color:
-                    CupertinoColors.tertiaryLabel.resolveFrom(context),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}

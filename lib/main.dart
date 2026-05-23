@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'src/app.dart';
 import 'src/database/database_service.dart';
 import 'src/folders/folder_icon_picker.dart';
+import 'src/notifications/notification_service.dart';
+import 'src/security/security_service.dart';
 import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
 import 'src/spaces/space_manager.dart';
@@ -17,6 +19,8 @@ void main() async {
   ]);
 
   await initFolderIconService();
+  await NotificationService.initTimezone();
+  await NotificationService.instance.init();
 
   // Global DB — only for app_settings (tab visibility, etc.) via
   // SettingsController. Per-space data lives in space-specific DB files.
@@ -24,6 +28,9 @@ void main() async {
 
   final settingsController = SettingsController(SettingsService(), globalDb);
   await settingsController.loadSettings();
+
+  final securityService = SecurityService(globalDb);
+  await securityService.load();
 
   final spaceManager = SpaceManager(settingsController: settingsController);
   await spaceManager.load();
@@ -44,6 +51,7 @@ void main() async {
           routineController: spaceManager.routineController,
           eventController: spaceManager.eventController,
           backupService: spaceManager.backupService,
+          securityService: securityService,
         ),
       ),
     ),
