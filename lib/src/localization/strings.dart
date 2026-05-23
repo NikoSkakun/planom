@@ -58,6 +58,7 @@ class S {
 
   // ── Common ────────────────────────────────────────────────────────────────
   String get appTitle => t('appTitle');
+  String get a11yToggleComplete => t('a11yToggleComplete');
   String get cancel => t('cancel');
   String get done => t('done');
   String get ok => t('ok');
@@ -442,6 +443,7 @@ const Map<String, String> _en = {
   'exportFailed': 'Export Failed',
   'exportFailedBody': 'An error occurred while creating the backup.',
   'newSpace': 'New Space', 'spaceName': 'Space name',
+  'a11yToggleComplete': 'Toggle completion',
   'deleteSpace': 'Delete Space?',
   'deleteSpaceBody':
       'This permanently deletes the space and all of its data. This cannot be undone.',

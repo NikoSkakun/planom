@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
 
+import '../localization/strings.dart';
 import '../models/task.dart';
 import 'calendar_date_picker.dart';
 
@@ -68,90 +69,102 @@ class TaskRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // Checkbox zone — includes the vertical padding so the full item height is tappable
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onToggle,
-          child: Padding(
-            padding: const EdgeInsets.only(left: 16, top: 7, bottom: 7),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RoundedCheckbox(
-                  checked: task.isCompleted,
-                  priority: task.priority,
+        MergeSemantics(
+          child: Semantics(
+            label: S.of(context).a11yToggleComplete,
+            checked: task.isCompleted,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onToggle,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16, top: 7, bottom: 7),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RoundedCheckbox(
+                      checked: task.isCompleted,
+                      priority: task.priority,
+                    ),
+                    const SizedBox(width: 12),
+                  ],
                 ),
-                const SizedBox(width: 12),
-              ],
+              ),
             ),
           ),
         ),
         // Text zone
         Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 7, bottom: 7, right: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+          child: MergeSemantics(
+            child: Semantics(
+              button: true,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.only(top: 7, bottom: 7, right: 16),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          task.title,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: task.isCompleted
+                                    ? CupertinoColors.secondaryLabel
+                                        .resolveFrom(context)
+                                    : null,
+                              ),
+                            ),
+                          ),
+                          if (dateLabel != null) ...[
+                            const SizedBox(width: 8),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                dateLabel,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: dateColor,
+                                  fontWeight: isOverdue
+                                      ? FontWeight.w500
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (task.note != null && task.note!.isNotEmpty)
+                        Text(
+                          task.note!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 16,
-                            color: task.isCompleted
-                                ? CupertinoColors.secondaryLabel
-                                    .resolveFrom(context)
-                                : null,
+                            fontSize: 13,
+                            color: CupertinoColors.secondaryLabel
+                                .resolveFrom(context),
                           ),
                         ),
-                      ),
-                      if (dateLabel != null) ...[
-                        const SizedBox(width: 8),
+                      if (showList && listColor != null)
                         Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            dateLabel,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: dateColor,
-                              fontWeight: isOverdue
-                                  ? FontWeight.w500
-                                  : FontWeight.normal,
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: listColor,
+                              shape: BoxShape.circle,
                             ),
                           ),
                         ),
-                      ],
                     ],
                   ),
-                  if (task.note != null && task.note!.isNotEmpty)
-                    Text(
-                      task.note!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: CupertinoColors.secondaryLabel
-                            .resolveFrom(context),
-                      ),
-                    ),
-                  if (showList && listColor != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: listColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                ],
+                ),
               ),
             ),
           ),

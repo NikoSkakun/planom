@@ -548,38 +548,43 @@ class _ListItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                    16 + indent, 9, onExpand != null ? 4 : 16, 9),
-                child: Row(
-                  children: [
-                    SizedBox(width: 22, height: 22, child: icon),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: isFolder
-                              ? FontWeight.w500
-                              : FontWeight.normal,
+            child: MergeSemantics(
+              child: Semantics(
+                button: true,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onTap,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                        16 + indent, 9, onExpand != null ? 4 : 16, 9),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 22, height: 22, child: icon),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: isFolder
+                                  ? FontWeight.w500
+                                  : FontWeight.normal,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (count != null && count! > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '$count',
+                            style: TextStyle(
+                              color: CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (count != null && count! > 0) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '$count',
-                        style: TextStyle(
-                          color: CupertinoColors.secondaryLabel
-                              .resolveFrom(context),
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),
