@@ -198,6 +198,10 @@ class S {
   String get addList => t('addList');
   String get addFolder => t('addFolder');
   String get addNote => t('addNote');
+  String get share => t('share');
+  String get shareAsText => t('shareAsText');
+  String get shareAsPdf => t('shareAsPdf');
+  String get shareAsImage => t('shareAsImage');
   String get deleteSpace => t('deleteSpace');
   String get deleteSpaceBody => t('deleteSpaceBody');
 
@@ -623,6 +627,8 @@ const Map<String, String> _en = {
   'todayShort': 'Today',
   'tomorrowShort': 'Tomorrow',
   'addList': 'Add List', 'addFolder': 'Add Folder', 'addNote': 'Add Note',
+  'share': 'Share', 'shareAsText': 'Plain Text',
+  'shareAsPdf': 'PDF', 'shareAsImage': 'Image',
   'a11yToggleComplete': 'Toggle completion',
   'deleteSpace': 'Delete Space?',
   'deleteSpaceBody':

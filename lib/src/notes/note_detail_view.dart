@@ -14,6 +14,7 @@ import '../utils/undo_controller.dart';
 import 'markdown_toolbar.dart';
 import 'markdown_view.dart';
 import 'note_controller.dart';
+import 'note_share.dart';
 
 class NoteDetailView extends StatefulWidget {
   const NoteDetailView({
@@ -161,6 +162,18 @@ class _NoteDetailViewState extends State<NoteDetailView>
     showDropdown(context, (dismiss) {
       return _NoteOptionsDropdown(
         onDismiss: dismiss,
+        onShare: () {
+          dismiss();
+          // Persist the latest edit first so the on-disk note matches what
+          // the user just exported — saves accidental drift between the
+          // share payload and the stored copy.
+          _flushSave();
+          showNoteShareMenu(
+            context,
+            title: _title.text,
+            content: _content.text,
+          );
+        },
         onMoveTo: () {
           dismiss();
           showNoteMoveToSheet(
@@ -367,19 +380,26 @@ class _NoteDetailViewState extends State<NoteDetailView>
 class _NoteOptionsDropdown extends StatelessWidget {
   const _NoteOptionsDropdown({
     required this.onDismiss,
+    required this.onShare,
     required this.onMoveTo,
     required this.onInfo,
     required this.onDelete,
   });
 
   final VoidCallback onDismiss;
+  final VoidCallback onShare;
   final VoidCallback onMoveTo;
   final VoidCallback onInfo;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    final separator = Container(
+      height: 0.5,
+      color: CupertinoColors.separator.resolveFrom(context),
+    );
     return Stack(
       children: [
         GestureDetector(
@@ -408,25 +428,25 @@ class _NoteOptionsDropdown extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 DropdownRow(
-                  label: S.of(context).moveTo,
+                  label: s.share,
+                  icon: CupertinoIcons.share,
+                  onTap: onShare,
+                ),
+                separator,
+                DropdownRow(
+                  label: s.moveTo,
                   icon: CupertinoIcons.folder,
                   onTap: onMoveTo,
                 ),
-                Container(
-                  height: 0.5,
-                  color: CupertinoColors.separator.resolveFrom(context),
-                ),
+                separator,
                 DropdownRow(
-                  label: S.of(context).info,
+                  label: s.info,
                   icon: CupertinoIcons.info,
                   onTap: onInfo,
                 ),
-                Container(
-                  height: 0.5,
-                  color: CupertinoColors.separator.resolveFrom(context),
-                ),
+                separator,
                 DropdownRow(
-                  label: S.of(context).delete,
+                  label: s.delete,
                   icon: CupertinoIcons.trash,
                   onTap: onDelete,
                   color: CupertinoColors.destructiveRed,
