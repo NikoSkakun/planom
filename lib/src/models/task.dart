@@ -19,6 +19,9 @@ class Task extends AppItem {
   final DateTime? deletedDate;
   final DateTime? completionDate;
   final List<int> reminderOffsets;
+  final String? parentTaskId;
+  final List<String> tagIds;
+  final String? recurrence;
 
   Task({
     String? id,
@@ -37,6 +40,9 @@ class Task extends AppItem {
     this.deletedDate,
     this.completionDate,
     this.reminderOffsets = const [],
+    this.parentTaskId,
+    this.tagIds = const [],
+    this.recurrence,
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -63,6 +69,11 @@ class Task extends AppItem {
     DateTime? completionDate,
     bool clearCompletionDate = false,
     List<int>? reminderOffsets,
+    String? parentTaskId,
+    bool clearParentTaskId = false,
+    List<String>? tagIds,
+    String? recurrence,
+    bool clearRecurrence = false,
   }) {
     return Task(
       id: id,
@@ -81,6 +92,11 @@ class Task extends AppItem {
       deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
       completionDate: clearCompletionDate ? null : (completionDate ?? this.completionDate),
       reminderOffsets: reminderOffsets ?? this.reminderOffsets,
+      parentTaskId:
+          clearParentTaskId ? null : (parentTaskId ?? this.parentTaskId),
+      tagIds: tagIds ?? this.tagIds,
+      recurrence:
+          clearRecurrence ? null : (recurrence ?? this.recurrence),
     );
   }
 
@@ -101,6 +117,9 @@ class Task extends AppItem {
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
         'completionDate': completionDate?.millisecondsSinceEpoch,
         'reminderOffsets': reminderOffsets.join(','),
+        'parentTaskId': parentTaskId,
+        'tagIds': tagIds.join(','),
+        'recurrence': recurrence,
       };
 
   factory Task.fromMap(Map<String, dynamic> map) => Task(
@@ -127,10 +146,18 @@ class Task extends AppItem {
             ? DateTime.fromMillisecondsSinceEpoch(map['completionDate'] as int)
             : null,
         reminderOffsets: _parseOffsets(map['reminderOffsets'] as String?),
+        parentTaskId: map['parentTaskId'] as String?,
+        tagIds: _parseIds(map['tagIds'] as String?),
+        recurrence: map['recurrence'] as String?,
       );
 
   static List<int> _parseOffsets(String? s) {
     if (s == null || s.isEmpty) return const [];
     return s.split(',').map((e) => int.tryParse(e)).whereType<int>().toList();
+  }
+
+  static List<String> _parseIds(String? s) {
+    if (s == null || s.isEmpty) return const [];
+    return s.split(',').where((e) => e.isNotEmpty).toList();
   }
 }

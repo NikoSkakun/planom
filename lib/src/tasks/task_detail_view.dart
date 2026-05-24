@@ -9,14 +9,19 @@ import '../utils/duration_picker.dart';
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../localization/strings.dart';
+import '../models/recurrence.dart';
+import '../models/tag.dart';
 import '../models/task.dart';
 import '../notes/markdown_toolbar.dart';
 import '../notes/markdown_view.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
+import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/reminder_picker.dart';
 import 'calendar_date_picker.dart';
+import 'recurrence_picker.dart';
+import 'tag_picker_sheet.dart';
 import 'task_controller.dart';
 
 class TaskDetailView extends StatefulWidget {
@@ -42,10 +47,14 @@ class _TaskDetailViewState extends State<TaskDetailView>
   late final TextEditingController _title;
   late final TextEditingController _note;
   final FocusNode _noteFocus = FocusNode();
+  final TextEditingController _newSubtask = TextEditingController();
+  final FocusNode _newSubtaskFocus = FocusNode();
   late DateTime? _dueDate;
   late int? _doTime;
   late int? _duration;
   late List<int> _reminderOffsets;
+  late List<String> _tagIds;
+  late String? _recurrence;
   late bool _isCompleted;
   late String? _listId;
   late int _priority;
@@ -65,6 +74,8 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _listId = widget.task.listId;
     _priority = widget.task.priority;
     _reminderOffsets = List.of(widget.task.reminderOffsets);
+    _tagIds = List.of(widget.task.tagIds);
+    _recurrence = widget.task.recurrence;
     _title.addListener(_scheduleAutosave);
     _note.addListener(_scheduleAutosave);
     _noteFocus.addListener(_onNoteFocusChanged);
@@ -108,7 +119,31 @@ class _TaskDetailViewState extends State<TaskDetailView>
       clearListId: _listId == null,
       priority: _priority,
       reminderOffsets: _reminderOffsets,
+      tagIds: _tagIds,
+      recurrence: _recurrence,
+      clearRecurrence: _recurrence == null,
     ));
+  }
+
+  Future<void> _pickRecurrence() async {
+    final result = await showRecurrencePicker(
+      context,
+      Recurrence.parse(_recurrence),
+    );
+    if (!mounted || result == null) return;
+    setState(() => _recurrence = result.value?.toJson());
+    _save();
+  }
+
+  Future<void> _pickTags() async {
+    final result = await showTagPickerSheet(
+      context,
+      widget.controller,
+      initialSelected: _tagIds,
+    );
+    if (!mounted || result == null) return;
+    setState(() => _tagIds = result);
+    _save();
   }
 
   @override
@@ -131,7 +166,37 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _noteFocus.dispose();
     _title.dispose();
     _note.dispose();
+    _newSubtask.dispose();
+    _newSubtaskFocus.dispose();
     super.dispose();
+  }
+
+  void _addSubtask() {
+    final text = _newSubtask.text.trim();
+    if (text.isEmpty) return;
+    // Inherit the parent's list so the subtree stays scoped to a single list,
+    // but never inherit the date — subtasks default to no due date.
+    widget.controller.addTask(Task(
+      title: text,
+      listId: widget.task.listId,
+      parentTaskId: widget.task.id,
+    ));
+    _newSubtask.clear();
+    // Re-focus so the user can chain-enter several subtasks in a row.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _newSubtaskFocus.requestFocus();
+    });
+  }
+
+  void _openSubtask(Task subtask) {
+    Navigator.of(context).push(FastRoute<void>(
+      settings: const RouteSettings(name: TaskDetailView.routeName),
+      builder: (_) => TaskDetailView(
+        task: subtask,
+        controller: widget.controller,
+        folderController: widget.folderController,
+      ),
+    ));
   }
 
   void _showDropdown(BuildContext context) {
@@ -247,10 +312,14 @@ class _TaskDetailViewState extends State<TaskDetailView>
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => _showDropdown(context),
-          child: const Icon(CupertinoIcons.ellipsis, size: 26),
+        trailing: Semantics(
+          label: s.info,
+          button: true,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => _showDropdown(context),
+            child: const Icon(CupertinoIcons.ellipsis, size: 26),
+          ),
         ),
       ),
       child: Column(
@@ -352,6 +421,37 @@ class _TaskDetailViewState extends State<TaskDetailView>
                   ),
                   const SizedBox(height: 12),
 
+                  // Repeat row — only meaningful when a date is set; the
+                  // recurrence advance fires off the due date.
+                  _SectionCard(
+                    onTap: _dueDate == null ? null : _pickRecurrence,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.repeat,
+                          size: 18,
+                          color: _recurrence != null
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          formatRecurrence(
+                              context, Recurrence.parse(_recurrence)),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: _recurrence != null
+                                ? AppColors.accent
+                                : CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
                   // List picker row
                   _SectionCard(
                     onTap: _pickList,
@@ -416,6 +516,59 @@ class _TaskDetailViewState extends State<TaskDetailView>
                   ),
                   const SizedBox(height: 12),
 
+                  // Tag picker row — chips for selected tags + chevron
+                  _SectionCard(
+                    onTap: _pickTags,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.tag,
+                          size: 18,
+                          color: _tagIds.isNotEmpty
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _tagIds.isEmpty
+                              ? Text(
+                                  s.addTag,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: CupertinoColors.secondaryLabel
+                                        .resolveFrom(context),
+                                  ),
+                                )
+                              : ListenableBuilder(
+                                  listenable: widget.controller,
+                                  builder: (context, _) {
+                                    final tags = _tagIds
+                                        .map(widget.controller.tagById)
+                                        .whereType<Tag>()
+                                        .toList();
+                                    return Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      children: [
+                                        for (final tag in tags)
+                                          _TagChip(tag: tag),
+                                      ],
+                                    );
+                                  },
+                                ),
+                        ),
+                        Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 14,
+                          color: CupertinoColors.secondaryLabel
+                              .resolveFrom(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
                   // Reminder row
                   _SectionCard(
                     onTap: _pickReminders,
@@ -443,6 +596,27 @@ class _TaskDetailViewState extends State<TaskDetailView>
                       ],
                     ),
                   ),
+                  const SizedBox(height: 24),
+
+                  // Subtasks — only on top-level tasks; nesting beyond one
+                  // level adds tree-management cost for little user value.
+                  if (widget.task.parentTaskId == null)
+                    ListenableBuilder(
+                      listenable: widget.controller,
+                      builder: (context, _) {
+                        final subs = widget.controller
+                            .subtasksOf(widget.task.id);
+                        return _SubtasksSection(
+                          subtasks: subs,
+                          newCtrl: _newSubtask,
+                          newFocus: _newSubtaskFocus,
+                          onAdd: _addSubtask,
+                          onToggle: (id) =>
+                              widget.controller.toggleCompleted(id),
+                          onOpen: _openSubtask,
+                        );
+                      },
+                    ),
                 ],
               ),
             ),
@@ -455,6 +629,190 @@ class _TaskDetailViewState extends State<TaskDetailView>
                   showLinkPromptDialog(context, initialText: selected),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  const _TagChip({required this.tag});
+
+  final Tag tag;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = tag.color != null
+        ? Color(tag.color!)
+        : CupertinoColors.systemGrey.resolveFrom(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: accent.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        tag.name,
+        style: TextStyle(
+          fontSize: 12,
+          color: accent,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+class _SubtasksSection extends StatelessWidget {
+  const _SubtasksSection({
+    required this.subtasks,
+    required this.newCtrl,
+    required this.newFocus,
+    required this.onAdd,
+    required this.onToggle,
+    required this.onOpen,
+  });
+
+  final List<Task> subtasks;
+  final TextEditingController newCtrl;
+  final FocusNode newFocus;
+  final VoidCallback onAdd;
+  final ValueChanged<String> onToggle;
+  final ValueChanged<Task> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final done = subtasks.where((t) => t.isCompleted).length;
+    final headerLabel = subtasks.isEmpty
+        ? s.subtasks.toUpperCase()
+        : '${s.subtasks.toUpperCase()}  $done/${subtasks.length}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            headerLabel,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            children: [
+              for (int i = 0; i < subtasks.length; i++) ...[
+                _SubtaskRow(
+                  task: subtasks[i],
+                  onToggle: () => onToggle(subtasks[i].id),
+                  onOpen: () => onOpen(subtasks[i]),
+                ),
+                if (i < subtasks.length)
+                  Container(
+                    height: 0.5,
+                    margin: const EdgeInsets.only(left: 44),
+                    color: CupertinoColors.separator.resolveFrom(context),
+                  ),
+              ],
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      CupertinoIcons.add_circled,
+                      size: 20,
+                      color:
+                          CupertinoColors.secondaryLabel.resolveFrom(context),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: CupertinoTextField(
+                        controller: newCtrl,
+                        focusNode: newFocus,
+                        placeholder: s.addSubtask,
+                        style: const TextStyle(fontSize: 15),
+                        decoration: const BoxDecoration(),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        textInputAction: TextInputAction.done,
+                        textCapitalization: TextCapitalization.sentences,
+                        onSubmitted: (_) => onAdd(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubtaskRow extends StatelessWidget {
+  const _SubtaskRow({
+    required this.task,
+    required this.onToggle,
+    required this.onOpen,
+  });
+
+  final Task task;
+  final VoidCallback onToggle;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: task.title,
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: onToggle,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 2, vertical: 2),
+                  child: _RoundedCheckbox(checked: task.isCompleted),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  task.title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: task.isCompleted
+                        ? CupertinoColors.secondaryLabel.resolveFrom(context)
+                        : CupertinoColors.label.resolveFrom(context),
+                    decoration: task.isCompleted
+                        ? TextDecoration.lineThrough
+                        : null,
+                  ),
+                ),
+              ),
+              Icon(
+                CupertinoIcons.chevron_right,
+                size: 14,
+                color:
+                    CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -14,7 +14,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 17;
+  static const _dbVersion = 21;
 
   Database? _db;
 
@@ -43,7 +43,18 @@ class DatabaseService {
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
             completionDate INTEGER,
-            reminderOffsets TEXT
+            reminderOffsets TEXT,
+            parentTaskId TEXT,
+            tagIds TEXT,
+            recurrence TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE tags (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            color INTEGER,
+            creationDate INTEGER NOT NULL
           )
         ''');
         await db.execute('''
@@ -142,6 +153,7 @@ class DatabaseService {
             reminderOffsets TEXT
           )
         ''');
+        await _createFtsTables(db);
       },
       onUpgrade: (db, oldVersion, _) async {
         if (oldVersion < 2) {
@@ -303,6 +315,27 @@ class DatabaseService {
         if (oldVersion < 17) {
           await db.execute('ALTER TABLE tasks ADD COLUMN reminderOffsets TEXT');
           await db.execute('ALTER TABLE events ADD COLUMN reminderOffsets TEXT');
+        }
+        if (oldVersion < 18) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN parentTaskId TEXT');
+        }
+        if (oldVersion < 19) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN tagIds TEXT');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS tags (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              color INTEGER,
+              creationDate INTEGER NOT NULL
+            )
+          ''');
+        }
+        if (oldVersion < 20) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN recurrence TEXT');
+        }
+        if (oldVersion < 21) {
+          await _createFtsTables(db);
+          await _backfillFts(db);
         }
       },
     );
@@ -761,6 +794,35 @@ class DatabaseService {
     await db.delete('app_lists', where: 'isDeleted = 1');
   }
 
+  // Tags — flat, name-uniqueness enforced in the controller
+  Future<List<Map<String, dynamic>>> getTags() async {
+    final db = await _database;
+    final rows = await db.query('tags', orderBy: 'name COLLATE NOCASE ASC');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<void> insertTag(Map<String, dynamic> tag) async {
+    final db = await _database;
+    await db.insert('tags', tag,
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateTag(Map<String, dynamic> tag) async {
+    final db = await _database;
+    await db.update('tags', tag, where: 'id = ?', whereArgs: [tag['id']]);
+  }
+
+  Future<void> deleteTag(String id) async {
+    final db = await _database;
+    await db.delete('tags', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> exportTags() async {
+    final db = await _database;
+    final rows = await db.query('tags');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
   // App settings — generic key/value store for app-level preferences
   Future<List<Map<String, dynamic>>> getAppSettings() async {
     final db = await _database;
@@ -835,6 +897,7 @@ class DatabaseService {
     'note_folders',
     'app_lists',
     'folders',
+    'tags',
     'tasks',
   ];
 
@@ -870,6 +933,7 @@ class DatabaseService {
     await db.delete('note_folders');
     await db.delete('app_lists');
     await db.delete('folders');
+    await db.delete('tags');
     await db.delete('tasks');
   }
 
@@ -877,4 +941,149 @@ class DatabaseService {
     await _db?.close();
     _db = null;
   }
+
+  // ── Full-text search (FTS5) ────────────────────────────────────────────────
+
+  /// Searches tasks, notes and events for [query] and returns up to [limit]
+  /// matching ids per source table. Excludes trashed rows. Quotes/escapes the
+  /// query so user input can't poison the FTS MATCH expression.
+  Future<SearchResults> searchAll(String query, {int limit = 50}) async {
+    final db = await _database;
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return const SearchResults({}, {}, {});
+
+    // Wrap each whitespace-separated token in double quotes (with internal
+    // quotes doubled) and join with a space — gives the user implicit AND
+    // matching without exposing FTS5 syntax to typos.
+    final tokens = trimmed
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .map((t) => '"${t.replaceAll('"', '""')}"*')
+        .join(' ');
+
+    Future<Set<String>> idsFrom(String fts) async {
+      final rows = await db.rawQuery(
+        'SELECT id FROM $fts WHERE $fts MATCH ? LIMIT ?',
+        [tokens, limit],
+      );
+      return rows.map((r) => r['id'] as String).toSet();
+    }
+
+    final tasks = await idsFrom('tasks_fts');
+    final notes = await idsFrom('notes_fts');
+    final events = await idsFrom('events_fts');
+    return SearchResults(tasks, notes, events);
+  }
+
+  static Future<void> _createFtsTables(Database db) async {
+    // Contentless FTS5 tables keyed by the source row's id (UNINDEXED so it
+    // doesn't get tokenised). Triggers below keep them in sync — see
+    // _backfillFts for the one-time population on migration.
+    await db.execute('''
+      CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts
+      USING fts5(id UNINDEXED, title, body, tokenize='unicode61');
+    ''');
+    await db.execute('''
+      CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts
+      USING fts5(id UNINDEXED, title, body, tokenize='unicode61');
+    ''');
+    await db.execute('''
+      CREATE VIRTUAL TABLE IF NOT EXISTS events_fts
+      USING fts5(id UNINDEXED, title, body, tokenize='unicode61');
+    ''');
+
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS tasks_ai AFTER INSERT ON tasks BEGIN
+        DELETE FROM tasks_fts WHERE id = new.id;
+        INSERT INTO tasks_fts(id, title, body)
+          VALUES (new.id, new.title, COALESCE(new.note, ''));
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS tasks_ad AFTER DELETE ON tasks BEGIN
+        DELETE FROM tasks_fts WHERE id = old.id;
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS tasks_au AFTER UPDATE ON tasks BEGIN
+        DELETE FROM tasks_fts WHERE id = old.id;
+        INSERT INTO tasks_fts(id, title, body)
+          VALUES (new.id, new.title, COALESCE(new.note, ''));
+      END;
+    ''');
+
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+        DELETE FROM notes_fts WHERE id = new.id;
+        INSERT INTO notes_fts(id, title, body)
+          VALUES (new.id, new.title, new.content);
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+        DELETE FROM notes_fts WHERE id = old.id;
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
+        DELETE FROM notes_fts WHERE id = old.id;
+        INSERT INTO notes_fts(id, title, body)
+          VALUES (new.id, new.title, new.content);
+      END;
+    ''');
+
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS events_ai AFTER INSERT ON events BEGIN
+        DELETE FROM events_fts WHERE id = new.id;
+        INSERT INTO events_fts(id, title, body)
+          VALUES (new.id, new.title, COALESCE(new.note, ''));
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS events_ad AFTER DELETE ON events BEGIN
+        DELETE FROM events_fts WHERE id = old.id;
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS events_au AFTER UPDATE ON events BEGIN
+        DELETE FROM events_fts WHERE id = old.id;
+        INSERT INTO events_fts(id, title, body)
+          VALUES (new.id, new.title, COALESCE(new.note, ''));
+      END;
+    ''');
+  }
+
+  /// One-shot backfill of every row that existed before FTS arrived.
+  /// Idempotent: triggers above start the moment the tables exist, so any new
+  /// rows are already in fts; this catches the legacy ones.
+  static Future<void> _backfillFts(Database db) async {
+    await db.execute(
+      "INSERT INTO tasks_fts(id, title, body) "
+      "SELECT id, title, COALESCE(note, '') FROM tasks "
+      "WHERE id NOT IN (SELECT id FROM tasks_fts);",
+    );
+    await db.execute(
+      "INSERT INTO notes_fts(id, title, body) "
+      "SELECT id, title, content FROM notes "
+      "WHERE id NOT IN (SELECT id FROM notes_fts);",
+    );
+    await db.execute(
+      "INSERT INTO events_fts(id, title, body) "
+      "SELECT id, title, COALESCE(note, '') FROM events "
+      "WHERE id NOT IN (SELECT id FROM events_fts);",
+    );
+  }
+}
+
+/// Container for the three buckets returned by [DatabaseService.searchAll].
+class SearchResults {
+  const SearchResults(this.taskIds, this.noteIds, this.eventIds);
+
+  final Set<String> taskIds;
+  final Set<String> noteIds;
+  final Set<String> eventIds;
+
+  bool get isEmpty =>
+      taskIds.isEmpty && noteIds.isEmpty && eventIds.isEmpty;
+  int get total => taskIds.length + noteIds.length + eventIds.length;
 }

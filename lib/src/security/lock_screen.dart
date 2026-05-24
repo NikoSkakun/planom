@@ -43,6 +43,21 @@ class _LockScreenState extends State<LockScreen>
       TweenSequenceItem(tween: Tween(begin: -10.0, end: 10.0), weight: 2),
       TweenSequenceItem(tween: Tween(begin: 10.0, end: 0.0), weight: 1),
     ]).animate(_shakeCtrl);
+
+    // Auto-prompt the biometric sheet on display when the user has opted in.
+    // Failures (cancel, no enrolment) fall through to the manual PIN entry.
+    if (widget.securityService.biometricEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryBiometric());
+    }
+  }
+
+  Future<void> _tryBiometric() async {
+    if (!mounted) return;
+    final s = S.of(context);
+    final ok = await widget.securityService
+        .authenticateBiometric(s.unlockPrompt);
+    if (!mounted) return;
+    if (ok) widget.onUnlocked();
   }
 
   @override
@@ -124,15 +139,19 @@ class _LockScreenState extends State<LockScreen>
             return SizedBox(
               width: 88,
               height: 72,
-              child: CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: isBack ? _onBackspace : () => _onDigit(d),
-                child: Text(
-                  d,
-                  style: TextStyle(
-                    fontSize: isBack ? 22 : 28,
-                    color: CupertinoColors.label.resolveFrom(context),
-                    fontWeight: FontWeight.w300,
+              child: Semantics(
+                label: isBack ? 'Backspace' : d,
+                button: true,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: isBack ? _onBackspace : () => _onDigit(d),
+                  child: Text(
+                    d,
+                    style: TextStyle(
+                      fontSize: isBack ? 22 : 28,
+                      color: CupertinoColors.label.resolveFrom(context),
+                      fontWeight: FontWeight.w300,
+                    ),
                   ),
                 ),
               ),
@@ -234,7 +253,20 @@ class _LockScreenState extends State<LockScreen>
                 ),
               ),
             ],
-            const SizedBox(height: 40),
+            const SizedBox(height: 24),
+            if (widget.securityService.biometricEnabled)
+              CupertinoButton(
+                onPressed: _tryBiometric,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(CupertinoIcons.lock_open, size: 18),
+                    const SizedBox(width: 8),
+                    Text(s.useBiometric),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
             Text(
               s.forgotPasswordHint,
               textAlign: TextAlign.center,

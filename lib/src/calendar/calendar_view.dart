@@ -185,10 +185,14 @@ class _CalendarViewState extends State<CalendarView>
         border: null,
         middle: Text('$_visibleYear'),
         trailing: settingsHidden
-            ? CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () => _showSettingsMenu(context),
-                child: const Icon(CupertinoIcons.ellipsis, size: 26),
+            ? Semantics(
+                label: S.of(context).settings,
+                button: true,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _showSettingsMenu(context),
+                  child: const Icon(CupertinoIcons.ellipsis, size: 26),
+                ),
               )
             : null,
       ),

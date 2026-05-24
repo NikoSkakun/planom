@@ -157,10 +157,14 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
         border: null,
         middle: Text(s.tabNotes),
         trailing: settingsHidden
-            ? CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () => _showSettingsMenu(context),
-                child: const Icon(CupertinoIcons.ellipsis, size: 26),
+            ? Semantics(
+                label: s.settings,
+                button: true,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _showSettingsMenu(context),
+                  child: const Icon(CupertinoIcons.ellipsis, size: 26),
+                ),
               )
             : null,
       ),
