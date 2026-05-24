@@ -41,8 +41,21 @@ platform :ios do
       return false
     end
 
+    # Spaceship's create_capability takes capability_type as a positional
+    # argument (kwarg form raises ArgumentError). ICLOUD requires a settings
+    # payload pinning the version — XCODE_6 is the modern flavour; it covers
+    # iCloud Documents (what we use) and also enables CloudKit, which we
+    # simply don't reference in entitlements.
     bid.create_capability(
-      capability_type: Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD,
+      Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD,
+      settings: [
+        {
+          key: Spaceship::ConnectAPI::BundleIdCapability::Settings::ICLOUD_VERSION,
+          options: [
+            { key: Spaceship::ConnectAPI::BundleIdCapability::Options::XCODE_6 },
+          ],
+        },
+      ],
     )
     UI.success("✅  Enabled iCloud capability on #{bundle_id}")
     true
