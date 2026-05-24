@@ -204,6 +204,38 @@ class S {
   String get searchEmptyHint => t('searchEmptyHint');
   String get searchNoResults => t('searchNoResults');
 
+  // ── Sync ──────────────────────────────────────────────────────────────
+  String get sync => t('sync');
+  String get syncFreeSection => t('syncFreeSection');
+  String get syncPaidSection => t('syncPaidSection');
+  String get syncStatusSection => t('syncStatusSection');
+  String get syncICloudTitle => t('syncICloudTitle');
+  String get syncICloudSublabel => t('syncICloudSublabel');
+  String get syncPlanomTitle => t('syncPlanomTitle');
+  String get syncPlanomSublabel => t('syncPlanomSublabel');
+  String get syncCustomTitle => t('syncCustomTitle');
+  String get syncCustomSublabel => t('syncCustomSublabel');
+  String get tagFree => t('tagFree');
+  String get tagComingSoon => t('tagComingSoon');
+  String get syncStatusLabel => t('syncStatusLabel');
+  String get syncNow => t('syncNow');
+  String get syncPullReplace => t('syncPullReplace');
+  String get disableSync => t('disableSync');
+  String get disableSyncBody => t('disableSyncBody');
+  String get pullReplacesLocal => t('pullReplacesLocal');
+  String get syncPassphraseHint => t('syncPassphraseHint');
+  String get syncPassphraseLossHint => t('syncPassphraseLossHint');
+  String get syncNever => t('syncNever');
+  String get syncPushing => t('syncPushing');
+  String get syncPulling => t('syncPulling');
+  String get syncSucceeded => t('syncSucceeded');
+  String get syncFailed => t('syncFailed');
+  String get syncNotConfigured => t('syncNotConfigured');
+  String get syncPassphraseRequired => t('syncPassphraseRequired');
+  String get syncNotAvailable => t('syncNotAvailable');
+  String syncLastAt(String relative) =>
+      t('syncLastAt').replaceAll('{when}', relative);
+
   // ── Notifications ─────────────────────────────────────────────────────────
   String get sectionNotifications => t('sectionNotifications');
   String get notificationsEnabled => t('notificationsEnabled');
@@ -522,6 +554,42 @@ const Map<String, String> _en = {
   'search': 'Search', 'searchPlaceholder': 'Search tasks, notes, events',
   'searchEmptyHint': 'Type to search across tasks, notes, and events.',
   'searchNoResults': 'No matches.',
+  'sync': 'Sync',
+  'syncFreeSection': 'Free',
+  'syncPaidSection': 'Cross-device',
+  'syncStatusSection': 'Status',
+  'syncICloudTitle': 'iCloud',
+  'syncICloudSublabel':
+      'Free on your iCloud storage. Apple devices only. End-to-end encrypted.',
+  'syncPlanomTitle': 'Planom Account',
+  'syncPlanomSublabel':
+      'Sync across iOS, Android, and Web with a Planom subscription.',
+  'syncCustomTitle': 'Custom Server',
+  'syncCustomSublabel':
+      'Bring your own PocketBase / WebDAV server. Free; you host it.',
+  'tagFree': 'FREE',
+  'tagComingSoon': 'SOON',
+  'syncStatusLabel': 'Status',
+  'syncNow': 'Push now',
+  'syncPullReplace': 'Pull from cloud (replaces local)',
+  'disableSync': 'Disable sync',
+  'disableSyncBody':
+      'Stops syncing on this device and removes the cloud copy. Local data is kept.',
+  'pullReplacesLocal':
+      'Pulling will replace all local data with the cloud copy. This cannot be undone.',
+  'syncPassphraseHint':
+      'Pick a passphrase. We use it to encrypt your data before it leaves the device. We never see it.',
+  'syncPassphraseLossHint':
+      'If you forget the passphrase, your cloud backup cannot be decrypted. There is no recovery.',
+  'syncNever': 'Never synced',
+  'syncPushing': 'Uploading…',
+  'syncPulling': 'Downloading…',
+  'syncSucceeded': 'Up to date',
+  'syncFailed': 'Sync failed',
+  'syncNotConfigured': 'Sign into iCloud to enable',
+  'syncPassphraseRequired': 'Enter passphrase to continue',
+  'syncNotAvailable': 'Not available on this platform',
+  'syncLastAt': 'Last sync: {when}',
   'sectionNotifications': 'Notifications',
   'notificationsEnabled': 'Notifications Enabled',
   'notificationsPermissionHint': 'Open Settings to allow notifications for Planom.',

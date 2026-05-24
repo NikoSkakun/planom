@@ -14,6 +14,7 @@ import '../notes/note_controller.dart';
 import '../routines/routine_controller.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
+import '../sync/sync_controller.dart';
 import '../tasks/task_controller.dart';
 import 'space.dart';
 
@@ -39,6 +40,7 @@ class SpaceManager with ChangeNotifier {
   late RoutineController _routineController;
   late EventController _eventController;
   late BackupService _backupService;
+  late SyncController _syncController;
 
   List<Space> get spaces => List.unmodifiable(_spaces);
   String get activeSpaceId => _activeSpaceId;
@@ -53,6 +55,7 @@ class SpaceManager with ChangeNotifier {
   RoutineController get routineController => _routineController;
   EventController get eventController => _eventController;
   BackupService get backupService => _backupService;
+  SyncController get syncController => _syncController;
   // Exposed for features (e.g. search) that need to query the active space's
   // DB directly. Always the current space's handle — re-grabbed by widgets
   // each time the active space switches because MyApp is keyed by space id.
@@ -144,6 +147,12 @@ class SpaceManager with ChangeNotifier {
       eventController: _eventController,
       settingsController: settingsController,
     );
+
+    _syncController = SyncController(
+      db: _db,
+      backupService: _backupService,
+    );
+    await _syncController.load();
 
     _initialized = true;
   }

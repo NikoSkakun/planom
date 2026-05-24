@@ -18,6 +18,7 @@ import 'notifications_view.dart';
 import 'security_view.dart';
 import 'settings_controller.dart';
 import 'smart_list_prefs.dart';
+import 'sync_settings_view.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({
@@ -403,6 +404,31 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             ],
 
             if (hasBackup) ...[
+              // ── Sync ──────────────────────────────────────────────
+              const SizedBox(height: 32),
+              Text(
+                s.sync,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: labelColor,
+                  letterSpacing: -0.08,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _NavRow(
+                label: s.sync,
+                onTap: () {
+                  final syncController =
+                      SpaceManagerProvider.of(context).syncController;
+                  Navigator.of(context).push(
+                    FastRoute<void>(
+                      builder: (_) =>
+                          SyncSettingsView(controller: syncController),
+                    ),
+                  );
+                },
+              ),
+
               // ── Data ──────────────────────────────────────────────
               const SizedBox(height: 32),
               Text(
