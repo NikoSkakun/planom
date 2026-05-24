@@ -54,6 +54,20 @@ class TaskController with ChangeNotifier {
   int get todayUncompletedCount =>
       todayTasks.where((t) => !t.isCompleted).length;
 
+  List<Task> get tomorrowTasks {
+    final now = DateTime.now();
+    final tomorrow =
+        DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    return _completedLast(_applySort(_topLevel.where((t) {
+      if (t.dueDate == null) return false;
+      final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);
+      return due == tomorrow;
+    })));
+  }
+
+  int get tomorrowUncompletedCount =>
+      tomorrowTasks.where((t) => !t.isCompleted).length;
+
   List<Task> get upcomingTasks {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);

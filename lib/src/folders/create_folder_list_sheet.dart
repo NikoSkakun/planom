@@ -117,10 +117,13 @@ class _RenameSheetState extends State<_RenameSheet> {
   }
 }
 
+enum CreateSheetInitial { list, folder }
+
 void showCreateFolderListSheet(
   BuildContext context,
   FolderController controller, {
   String? parentFolderId,
+  CreateSheetInitial initialType = CreateSheetInitial.list,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -130,6 +133,9 @@ void showCreateFolderListSheet(
     builder: (_) => _CreateSheet(
       controller: controller,
       parentFolderId: parentFolderId,
+      initialType: initialType == CreateSheetInitial.folder
+          ? _CreateType.folder
+          : _CreateType.list,
     ),
   );
 }
@@ -140,17 +146,19 @@ class _CreateSheet extends StatefulWidget {
   const _CreateSheet({
     required this.controller,
     this.parentFolderId,
+    this.initialType = _CreateType.list,
   });
 
   final FolderController controller;
   final String? parentFolderId;
+  final _CreateType initialType;
 
   @override
   State<_CreateSheet> createState() => _CreateSheetState();
 }
 
 class _CreateSheetState extends State<_CreateSheet> {
-  _CreateType _type = _CreateType.list;
+  late _CreateType _type = widget.initialType;
   final _nameCtrl = TextEditingController();
   int? _selectedColor;
   String? _selectedIconId;

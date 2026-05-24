@@ -7,18 +7,19 @@ import '../security/security_service.dart';
 import '../spaces/space_manager.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
-import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
 import 'appearance_view.dart';
 import 'backup_service.dart';
 import 'data_view.dart';
 import 'font_picker_view.dart';
+import 'module_settings_views.dart';
 import 'notifications_view.dart';
 import 'security_view.dart';
 import 'settings_controller.dart';
-import 'smart_list_prefs.dart';
+import 'spaces_view.dart';
 import 'sync_settings_view.dart';
+import 'tasks_settings_view.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({
@@ -36,120 +37,7 @@ class SettingsView extends StatefulWidget {
   State<SettingsView> createState() => _SettingsViewState();
 }
 
-class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
-  void _showSpacesMenu(BuildContext context) {
-    final spaceManager = SpaceManagerProvider.of(context);
-    showDropdown(context, (dismiss) {
-      return _SpacesDropdown(
-        spaceManager: spaceManager,
-        onDismiss: dismiss,
-        onAddSpace: () {
-          dismiss();
-          _showAddSpaceDialog(context, spaceManager);
-        },
-        onDeleteSpace: (id) {
-          dismiss();
-          _confirmDeleteSpace(context, spaceManager, id);
-        },
-      );
-    });
-  }
-
-  void _confirmDeleteSpace(
-      BuildContext context, SpaceManager spaceManager, String id) {
-    final s = S.of(context);
-    showCupertinoDialog<void>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(s.deleteSpace),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(s.deleteSpaceBody),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(s.cancel),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              spaceManager.deleteSpace(id);
-            },
-            child: Text(s.delete),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddSpaceDialog(BuildContext context, SpaceManager spaceManager) {
-    final ctrl = TextEditingController();
-    final s = S.of(context);
-    showCupertinoDialog<void>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(s.newSpace),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: ctrl,
-            placeholder: s.spaceName,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(s.cancel),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () {
-              final name = ctrl.text.trim();
-              if (name.isEmpty) return;
-              Navigator.of(ctx).pop();
-              spaceManager.addSpace(name);
-            },
-            child: Text(s.create),
-          ),
-        ],
-      ),
-    ).then((_) => ctrl.dispose());
-  }
-
-  Future<void> _showVisibilityPicker(
-      BuildContext context, String key, SmartListVisibility current) async {
-    final s = S.of(context);
-    final selected = await showSelectionMenu<SmartListVisibility>(
-      context: context,
-      title: s.visibility,
-      current: current,
-      options: SmartListVisibility.values
-          .map((v) => SelectionMenuOption(
-                value: v,
-                label: _visibilityLabel(s, v),
-              ))
-          .toList(),
-    );
-    if (selected != null) {
-      widget.controller.updateSmartListVisibility(key, selected);
-    }
-  }
-
-  static String _visibilityLabel(S s, SmartListVisibility v) {
-    switch (v) {
-      case SmartListVisibility.show:
-        return s.visibilityShow;
-      case SmartListVisibility.showIfNotEmpty:
-        return s.visibilityIfNotEmpty;
-      case SmartListVisibility.hidden:
-        return s.visibilityHidden;
-    }
-  }
-
+class _SettingsViewState extends State<SettingsView> {
   Future<void> _showLanguagePicker(BuildContext context) async {
     final s = S.of(context);
     final current = widget.controller.locale.languageCode;
@@ -187,15 +75,10 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
       navigationBar: CupertinoNavigationBar(
         border: null,
         middle: Text(s.settings),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => _showSpacesMenu(context),
-          child: const Icon(CupertinoIcons.ellipsis, size: 26),
-        ),
       ),
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           children: [
             // ── Appearance ──────────────────────────────────────────────
             Text(
@@ -206,7 +89,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                 letterSpacing: -0.08,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             ListenableBuilder(
               listenable: widget.controller,
               builder: (ctx, _) {
@@ -231,7 +114,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             ),
 
             // ── Language ────────────────────────────────────────────────
-            const SizedBox(height: 32),
+            const SizedBox(height: 18),
             Text(
               s.sectionLanguage,
               style: TextStyle(
@@ -240,7 +123,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                 letterSpacing: -0.08,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             ListenableBuilder(
               listenable: widget.controller,
               builder: (ctx, _) {
@@ -267,78 +150,77 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
               },
             ),
 
-            // ── Smart Lists ─────────────────────────────────────────────
-            const SizedBox(height: 32),
+            // ── Modules ─────────────────────────────────────────────────
+            const SizedBox(height: 18),
             Text(
-              s.sectionSmartLists,
+              s.sectionModules,
               style: TextStyle(
                 fontSize: 13,
                 color: labelColor,
                 letterSpacing: -0.08,
               ),
             ),
-            const SizedBox(height: 8),
-            ListenableBuilder(
-              listenable: widget.controller,
-              builder: (ctx, _) {
-                final prefs = widget.controller.smartListPrefs;
-                return Column(
-                  children: [
-                    _SmartListRow(
-                      icon: Image.asset('assets/icons/inbox.png',
-                          width: 22, height: 22),
-                      label: s.inbox,
-                    ),
-                    const SizedBox(height: 1),
-                    _SmartListRow(
-                      icon: Image.asset('assets/icons/today.png',
-                          width: 22, height: 22),
-                      label: s.today,
-                      visibility: prefs.today,
-                      onTap: () => _showVisibilityPicker(
-                          ctx, 'today', prefs.today),
-                    ),
-                    const SizedBox(height: 1),
-                    _SmartListRow(
-                      icon: Image.asset('assets/icons/upcoming.png',
-                          width: 22, height: 22),
-                      label: s.upcoming,
-                      visibility: prefs.upcoming,
-                      onTap: () => _showVisibilityPicker(
-                          ctx, 'upcoming', prefs.upcoming),
-                    ),
-                    const SizedBox(height: 1),
-                    _SmartListRow(
-                      icon: Icon(
-                        CupertinoIcons.checkmark_circle_fill,
-                        size: 22,
-                        color: AppColors.systemGreen,
-                      ),
-                      label: s.completed,
-                      visibility: prefs.completed,
-                      onTap: () => _showVisibilityPicker(
-                          ctx, 'completed', prefs.completed),
-                    ),
-                    const SizedBox(height: 1),
-                    _SmartListRow(
-                      icon: Icon(
-                        CupertinoIcons.trash,
-                        size: 22,
-                        color: CupertinoColors.secondaryLabel
-                            .resolveFrom(ctx),
-                      ),
-                      label: s.trash,
-                      visibility: prefs.trash,
-                      onTap: () => _showVisibilityPicker(
-                          ctx, 'trash', prefs.trash),
-                    ),
-                  ],
-                );
-              },
+            const SizedBox(height: 6),
+            _NavRow(
+              label: s.tabTasks,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => TasksSettingsView(
+                    controller: widget.controller,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 1),
+            _NavRow(
+              label: s.tabNotes,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => const NotesSettingsView(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 1),
+            _NavRow(
+              label: s.tabCalendar,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => const CalendarSettingsView(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 1),
+            _NavRow(
+              label: s.tabRoutines,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => const RoutinesSettingsView(),
+                ),
+              ),
+            ),
+
+            // ── Spaces ──────────────────────────────────────────────────
+            const SizedBox(height: 18),
+            Text(
+              s.spaces,
+              style: TextStyle(
+                fontSize: 13,
+                color: labelColor,
+                letterSpacing: -0.08,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _NavRow(
+              label: s.spaces,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => const SpacesView(),
+                ),
+              ),
             ),
 
             // ── Tab Bar ─────────────────────────────────────────────────
-            const SizedBox(height: 32),
+            const SizedBox(height: 18),
             Text(
               s.sectionCustomization,
               style: TextStyle(
@@ -347,7 +229,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                 letterSpacing: -0.08,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _NavRow(
               label: s.tabBar,
               onTap: () => Navigator.of(context).push(
@@ -360,7 +242,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             ),
 
             // ── Notifications ────────────────────────────────────────
-            const SizedBox(height: 32),
+            const SizedBox(height: 18),
             Text(
               s.sectionNotifications,
               style: TextStyle(
@@ -369,7 +251,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                 letterSpacing: -0.08,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _NavRow(
               label: s.sectionNotifications,
               onTap: () => Navigator.of(context).push(
@@ -381,7 +263,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
 
             // ── Security ─────────────────────────────────────────────
             if (widget.securityService != null) ...[
-              const SizedBox(height: 32),
+              const SizedBox(height: 18),
               Text(
                 s.sectionSecurity,
                 style: TextStyle(
@@ -390,7 +272,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                   letterSpacing: -0.08,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _NavRow(
                 label: s.sectionSecurity,
                 onTap: () => Navigator.of(context).push(
@@ -405,7 +287,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
 
             if (hasBackup) ...[
               // ── Sync ──────────────────────────────────────────────
-              const SizedBox(height: 32),
+              const SizedBox(height: 18),
               Text(
                 s.sync,
                 style: TextStyle(
@@ -414,7 +296,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                   letterSpacing: -0.08,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _NavRow(
                 label: s.sync,
                 onTap: () {
@@ -430,7 +312,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
               ),
 
               // ── Data ──────────────────────────────────────────────
-              const SizedBox(height: 32),
+              const SizedBox(height: 18),
               Text(
                 s.sectionData,
                 style: TextStyle(
@@ -439,7 +321,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                   letterSpacing: -0.08,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _NavRow(
                 label: s.sectionData,
                 onTap: () => Navigator.of(context).push(
@@ -454,157 +336,6 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── Spaces dropdown ──────────────────────────────────────────────────────────
-
-class _SpacesDropdown extends StatelessWidget {
-  const _SpacesDropdown({
-    required this.spaceManager,
-    required this.onDismiss,
-    required this.onAddSpace,
-    required this.onDeleteSpace,
-  });
-
-  final SpaceManager spaceManager;
-  final VoidCallback onDismiss;
-  final VoidCallback onAddSpace;
-  final void Function(String id) onDeleteSpace;
-
-  @override
-  Widget build(BuildContext context) {
-    final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
-    final spaces = spaceManager.spaces;
-    final activeId = spaceManager.activeSpaceId;
-    final s = S.of(context);
-
-    return Stack(
-      children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onDismiss,
-          child: const SizedBox.expand(),
-        ),
-        Positioned(
-          top: topOffset,
-          right: 8,
-          child: Container(
-            width: 220,
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 20,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final space in spaces) ...[
-                  _SpaceRow(
-                    name: space.name,
-                    isActive: space.id == activeId,
-                    onTap: () {
-                      onDismiss();
-                      spaceManager.switchSpace(space.id);
-                    },
-                    // The default space and the active space can't be deleted
-                    // from here (switch away first to delete a non-default one).
-                    onDelete: (space.id != 'default' && space.id != activeId)
-                        ? () => onDeleteSpace(space.id)
-                        : null,
-                  ),
-                  if (space != spaces.last)
-                    Container(
-                      height: 0.5,
-                      color: CupertinoColors.separator.resolveFrom(context),
-                    ),
-                ],
-                Container(
-                  height: 0.5,
-                  color: CupertinoColors.separator.resolveFrom(context),
-                ),
-                _SpaceRow(
-                  name: s.newSpace,
-                  icon: CupertinoIcons.plus,
-                  isActive: false,
-                  onTap: onAddSpace,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SpaceRow extends StatelessWidget {
-  const _SpaceRow({
-    required this.name,
-    required this.isActive,
-    required this.onTap,
-    this.icon,
-    this.onDelete,
-  });
-
-  final String name;
-  final bool isActive;
-  final VoidCallback onTap;
-  final IconData? icon;
-  final VoidCallback? onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = CupertinoColors.label.resolveFrom(context);
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      onPressed: onTap,
-      child: Row(
-        children: [
-          if (icon != null)
-            Icon(icon, size: 18, color: fg)
-          else
-            Icon(
-              CupertinoIcons.circle_fill,
-              size: 10,
-              color: isActive ? AppColors.accent : CupertinoColors.transparent,
-            ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              name,
-              style: TextStyle(fontSize: 16, color: fg),
-            ),
-          ),
-          if (isActive)
-            Icon(
-              CupertinoIcons.checkmark,
-              size: 16,
-              color: AppColors.accent,
-            )
-          else if (onDelete != null)
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onDelete,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Icon(
-                  CupertinoIcons.delete,
-                  size: 16,
-                  color: CupertinoColors.systemRed.resolveFrom(context),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -672,7 +403,7 @@ class TabBarSettingsView extends StatelessWidget {
 
             return SingleChildScrollView(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -685,13 +416,13 @@ class TabBarSettingsView extends StatelessWidget {
                       letterSpacing: -0.08,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   _ToggleRow(
                     label: s.hideLabels,
                     value: controller.hideTabLabels,
                     onChanged: controller.updateHideTabLabels,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 18),
                   // ── Startup ────────────────────────────────────────────
                   Text(
                     s.startup,
@@ -701,14 +432,14 @@ class TabBarSettingsView extends StatelessWidget {
                       letterSpacing: -0.08,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   _NavRow(
                     label: s.defaultTab,
                     trailingLabel:
                         _defaultTabLabel(s, controller.defaultTab),
                     onTap: () => _showDefaultTabPicker(context),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 18),
                   // ── Visible Tabs (reorderable) ─────────────────────────
                   Text(
                     s.visibleTabs,
@@ -718,7 +449,7 @@ class TabBarSettingsView extends StatelessWidget {
                       letterSpacing: -0.08,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   ReorderableListView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -744,7 +475,7 @@ class TabBarSettingsView extends StatelessWidget {
                     ],
                   ),
                   if (!settingsVisible) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Text(
@@ -791,7 +522,7 @@ class _TabOrderRow extends StatelessWidget {
       opacity: isDisabled ? 0.4 : 1.0,
       child: Container(
         margin: const EdgeInsets.only(bottom: 1),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),
@@ -846,7 +577,7 @@ class _NavRow extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),
@@ -885,89 +616,6 @@ class _NavRow extends StatelessWidget {
   }
 }
 
-class _SmartListRow extends StatelessWidget {
-  const _SmartListRow({
-    required this.icon,
-    required this.label,
-    this.visibility,
-    this.onTap,
-  });
-
-  final Widget icon;
-  final String label;
-  final SmartListVisibility? visibility;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.of(context);
-    final bg = CupertinoDynamicColor.resolve(
-      CupertinoColors.tertiarySystemBackground,
-      context,
-    );
-    final isDisabled = onTap == null;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            SizedBox(width: 22, height: 22, child: icon),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 17,
-                  color: isDisabled
-                      ? CupertinoColors.secondaryLabel.resolveFrom(context)
-                      : CupertinoColors.label.resolveFrom(context),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              isDisabled
-                  ? s.visibilityAlwaysShown
-                  : _visibilityLabel(s, visibility!),
-              style: TextStyle(
-                fontSize: 15,
-                color:
-                    CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
-            if (!isDisabled) ...[
-              const SizedBox(width: 4),
-              Icon(
-                CupertinoIcons.chevron_right,
-                size: 14,
-                color:
-                    CupertinoColors.tertiaryLabel.resolveFrom(context),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  static String _visibilityLabel(S s, SmartListVisibility v) {
-    switch (v) {
-      case SmartListVisibility.show:
-        return s.visibilityShow;
-      case SmartListVisibility.showIfNotEmpty:
-        return s.visibilityIfNotEmpty;
-      case SmartListVisibility.hidden:
-        return s.visibilityHidden;
-    }
-  }
-}
-
 class _ToggleRow extends StatelessWidget {
   const _ToggleRow({
     required this.label,
@@ -990,7 +638,7 @@ class _ToggleRow extends StatelessWidget {
     return Opacity(
       opacity: enabled ? 1.0 : 0.4,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),

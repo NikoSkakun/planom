@@ -2,17 +2,19 @@ import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
 
+import '../database/database_service.dart';
 import '../folders/folder_controller.dart';
+import '../home_shell.dart';
 import '../localization/strings.dart';
 import '../models/event.dart';
 import '../models/task.dart';
+import '../notes/note_controller.dart';
+import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_menu.dart';
-import '../settings/settings_view.dart';
 import '../tasks/task_controller.dart';
 import '../utils/dropdown_overlay.dart';
-import '../utils/fast_route.dart';
 import 'day_view_sheet.dart';
 import 'event_controller.dart';
 
@@ -26,6 +28,8 @@ class CalendarView extends StatefulWidget {
     this.settingsController,
     this.backupService,
     this.onDaySelected,
+    this.db,
+    this.noteController,
   });
 
   final TaskController controller;
@@ -35,6 +39,8 @@ class CalendarView extends StatefulWidget {
   final SettingsController? settingsController;
   final BackupService? backupService;
   final ValueChanged<DateTime?>? onDaySelected;
+  final DatabaseService? db;
+  final NoteController? noteController;
 
   @override
   State<CalendarView> createState() => _CalendarViewState();
@@ -153,14 +159,7 @@ class _CalendarViewState extends State<CalendarView>
       );
 
   void _openSettings(BuildContext context) {
-    Navigator.of(context).push(
-      FastRoute<void>(
-        builder: (_) => SettingsView(
-          controller: widget.settingsController!,
-          backupService: widget.backupService,
-        ),
-      ),
-    );
+    HomeShell.openGlobalSettings(context);
   }
 
   void _showSettingsMenu(BuildContext context) {
@@ -197,7 +196,8 @@ class _CalendarViewState extends State<CalendarView>
             : null,
       ),
       child: SafeArea(
-        child: Column(
+        child: _maybeWrapWithSearchPull(
+          child: Column(
           children: [
             _WeekdayHeader(),
             Expanded(
@@ -227,7 +227,20 @@ class _CalendarViewState extends State<CalendarView>
             ),
           ],
         ),
+        ),
       ),
+    );
+  }
+
+  Widget _maybeWrapWithSearchPull({required Widget child}) {
+    if (widget.db == null || widget.noteController == null) return child;
+    return SearchPullScope(
+      db: widget.db!,
+      taskController: widget.controller,
+      folderController: widget.folderController,
+      noteController: widget.noteController!,
+      eventController: widget.eventController,
+      child: child,
     );
   }
 }

@@ -224,6 +224,12 @@ class SpaceManagerProvider extends InheritedWidget {
     return p!.spaceManager;
   }
 
+  static SpaceManager? maybeOf(BuildContext context) {
+    final p =
+        context.dependOnInheritedWidgetOfExactType<SpaceManagerProvider>();
+    return p?.spaceManager;
+  }
+
   @override
   bool updateShouldNotify(SpaceManagerProvider old) =>
       spaceManager != old.spaceManager;

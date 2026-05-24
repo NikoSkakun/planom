@@ -10,11 +10,11 @@ import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
 import '../folders/folder_view.dart';
 import '../folders/list_task_view.dart';
+import '../home_shell.dart';
 import '../notes/note_controller.dart';
-import '../search/search_view.dart';
+import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
-import '../settings/settings_view.dart';
 import '../settings/smart_list_prefs.dart';
 import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
@@ -24,6 +24,7 @@ import 'completed_view.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
 import 'today_view.dart';
+import 'tomorrow_view.dart';
 import 'trash_view.dart';
 import 'upcoming_view.dart';
 
@@ -97,16 +98,24 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
         onSettings: settingsHidden
             ? () {
                 dismiss();
-                Navigator.of(context).push(
-                  FastRoute<void>(
-                    builder: (_) => SettingsView(
-                      controller: widget.settingsController,
-                      backupService: widget.backupService,
-                    ),
-                  ),
-                );
+                HomeShell.openGlobalSettings(context);
               }
             : null,
+        onAddList: () {
+          dismiss();
+          showCreateFolderListSheet(
+            context,
+            widget.folderController,
+          );
+        },
+        onAddFolder: () {
+          dismiss();
+          showCreateFolderListSheet(
+            context,
+            widget.folderController,
+            initialType: CreateSheetInitial.folder,
+          );
+        },
       );
     });
   }
@@ -192,33 +201,13 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
+    final canSearch = widget.db != null &&
+        widget.noteController != null &&
+        widget.eventController != null;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
         middle: Text(s.tabTasks),
-        leading: widget.db != null &&
-                widget.noteController != null &&
-                widget.eventController != null
-            ? Semantics(
-                label: s.search,
-                button: true,
-                child: CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () => Navigator.of(context).push(
-                    FastRoute<void>(
-                      builder: (_) => SearchView(
-                        db: widget.db!,
-                        taskController: widget.controller,
-                        folderController: widget.folderController,
-                        noteController: widget.noteController!,
-                        eventController: widget.eventController!,
-                      ),
-                    ),
-                  ),
-                  child: const Icon(CupertinoIcons.search, size: 22),
-                ),
-              )
-            : null,
         trailing: Semantics(
           label: s.settings,
           button: true,
@@ -232,7 +221,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
       child: SafeArea(
         child: Stack(
           children: [
-            ListenableBuilder(
+            _maybeWrapWithSearchPull(
+              canSearch: canSearch,
+              child: ListenableBuilder(
               listenable: Listenable.merge([
                 widget.controller,
                 widget.folderController,
@@ -243,6 +234,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     widget.folderController.foldersIn(null);
                 final rootLists = widget.folderController.listsIn(null);
                 final todayCount = widget.controller.todayUncompletedCount;
+                final tomorrowCount =
+                    widget.controller.tomorrowUncompletedCount;
                 final upcomingCount =
                     widget.controller.upcomingUncompletedCount;
                 final completedCount =
@@ -256,6 +249,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     widget.settingsController.smartListPrefs;
                 final showToday =
                     _isVisible(prefs.today, todayCount > 0);
+                final showTomorrow =
+                    _isVisible(prefs.tomorrow, tomorrowCount > 0);
                 final showUpcoming =
                     _isVisible(prefs.upcoming, upcomingCount > 0);
                 final showCompleted =
@@ -294,6 +289,29 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => TodayView(
+                                    controller: widget.controller,
+                                    folderController:
+                                        widget.folderController,
+                                    activeDueDate: widget.activeDueDate,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (showTomorrow)
+                            _ListItem(
+                              iconWidget: Icon(
+                                CupertinoIcons.sun_max,
+                                size: 22,
+                                color: CupertinoColors.systemOrange
+                                    .resolveFrom(context),
+                              ),
+                              label: s.tomorrow,
+                              count: tomorrowCount > 0
+                                  ? tomorrowCount
+                                  : null,
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => TomorrowView(
                                     controller: widget.controller,
                                     folderController:
                                         widget.folderController,
@@ -503,17 +521,34 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                 );
               },
             ),
-            Positioned(
-              left: 20,
-              bottom: 16,
-              child: _CircleAddButton(
-                onPressed: () => showCreateFolderListSheet(
-                    context, widget.folderController),
-              ),
             ),
+            if (widget.settingsController.smartListPrefs.showAddFolderButton)
+              Positioned(
+                left: 20,
+                bottom: 16,
+                child: _CircleAddButton(
+                  onPressed: () => showCreateFolderListSheet(
+                      context, widget.folderController),
+                ),
+              ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _maybeWrapWithSearchPull({
+    required bool canSearch,
+    required Widget child,
+  }) {
+    if (!canSearch) return child;
+    return SearchPullScope(
+      db: widget.db!,
+      taskController: widget.controller,
+      folderController: widget.folderController,
+      noteController: widget.noteController!,
+      eventController: widget.eventController!,
+      child: child,
     );
   }
 
@@ -657,21 +692,43 @@ class _ListItem extends StatelessWidget {
 class _TasksOptionsDropdown extends StatelessWidget {
   const _TasksOptionsDropdown({
     required this.onDismiss,
+    required this.onAddList,
+    required this.onAddFolder,
     this.showSettings = false,
     this.onSettings,
   });
 
   final VoidCallback onDismiss;
+  final VoidCallback onAddList;
+  final VoidCallback onAddFolder;
   final bool showSettings;
   final VoidCallback? onSettings;
 
   @override
   Widget build(BuildContext context) {
     final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
-    final items = <Widget>[];
+    final s = S.of(context);
+    final separator = Container(
+      height: 0.5,
+      color: CupertinoColors.separator.resolveFrom(context),
+    );
+    final items = <Widget>[
+      DropdownRow(
+        label: s.addList,
+        icon: CupertinoIcons.add_circled,
+        onTap: onAddList,
+      ),
+      separator,
+      DropdownRow(
+        label: s.addFolder,
+        icon: CupertinoIcons.folder_badge_plus,
+        onTap: onAddFolder,
+      ),
+    ];
     if (showSettings) {
+      items.add(separator);
       items.add(DropdownRow(
-        label: S.of(context).settings,
+        label: s.settings,
         icon: CupertinoIcons.gear_alt,
         onTap: onSettings ?? () {},
       ));
@@ -683,31 +740,29 @@ class _TasksOptionsDropdown extends StatelessWidget {
           onTap: onDismiss,
           child: const SizedBox.expand(),
         ),
-        if (items.isNotEmpty)
-          Positioned(
-            top: topOffset,
-            right: 8,
-            child: Container(
-              width: 220,
-              decoration: BoxDecoration(
-                color:
-                    CupertinoColors.systemBackground.resolveFrom(context),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(
-                    color: AppColors.shadow,
-                    blurRadius: 20,
-                    offset: Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: items,
-              ),
+        Positioned(
+          top: topOffset,
+          right: 8,
+          child: Container(
+            width: 220,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground.resolveFrom(context),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 20,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: items,
             ),
           ),
+        ),
       ],
     );
   }

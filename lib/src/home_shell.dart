@@ -38,6 +38,15 @@ class HomeShell extends StatefulWidget {
 
   static const routeName = '/';
 
+  /// Opens Settings as a global overlay above the tab bar. Used from any
+  /// tab's ⋯ menu when the Settings tab is hidden. While the overlay is
+  /// visible, the tab bar shows every tab as inactive.
+  static void openGlobalSettings(BuildContext context) {
+    context
+        .findRootAncestorStateOfType<_HomeShellState>()
+        ?._openGlobalSettings();
+  }
+
   final SettingsController settingsController;
   final TaskController taskController;
   final FolderController folderController;
@@ -61,8 +70,31 @@ class _HomeShellState extends State<HomeShell> {
   final _notesCollapseSignal = ValueNotifier<int>(0);
   final _calendarResetSignal = ValueNotifier<int>(0);
   final _showPlusButton = ValueNotifier<bool>(true);
+  // True while the user is viewing Settings via the global overlay (i.e. the
+  // Settings tab is hidden but they opened Settings from another tab's ⋯
+  // menu). The tab bar repaints all tabs as inactive while this is true.
+  final ValueNotifier<bool> _globalSettingsOpen = ValueNotifier<bool>(false);
+  Route<void>? _globalSettingsRoute;
   int _lastTabIndex = 0;
   late CupertinoTabController _tabController;
+
+  void _openGlobalSettings() {
+    if (_globalSettingsOpen.value) return;
+    final route = FastRoute<void>(
+      builder: (_) => SettingsView(
+        controller: widget.settingsController,
+        backupService: widget.backupService,
+        securityService: widget.securityService,
+      ),
+    );
+    _globalSettingsRoute = route;
+    _globalSettingsOpen.value = true;
+    Navigator.of(context, rootNavigator: true).push(route).then((_) {
+      if (!mounted) return;
+      _globalSettingsRoute = null;
+      _globalSettingsOpen.value = false;
+    });
+  }
 
   @override
   void initState() {
@@ -122,12 +154,29 @@ class _HomeShellState extends State<HomeShell> {
     _notesCollapseSignal.dispose();
     _calendarResetSignal.dispose();
     _showPlusButton.dispose();
+    _globalSettingsOpen.dispose();
     super.dispose();
   }
 
   void _onSettingsChanged() {
     if (!mounted) return;
     final visibleIndices = _computeVisibleIndices();
+
+    // Settings tab just became visible while the user is viewing Settings via
+    // the global overlay → silently promote the overlay to the real tab.
+    if (_globalSettingsOpen.value && visibleIndices.contains(4)) {
+      final route = _globalSettingsRoute;
+      _globalSettingsRoute = null;
+      if (route != null) {
+        Navigator.of(context, rootNavigator: true).removeRoute(route);
+      }
+      _globalSettingsOpen.value = false;
+      _lastTabIndex = 4;
+      _tabController.index = visibleIndices.indexOf(4);
+      _showPlusButton.value = false;
+      return;
+    }
+
     if (visibleIndices.contains(_lastTabIndex)) {
       _tabController.index = visibleIndices.indexOf(_lastTabIndex);
       return;
@@ -155,17 +204,23 @@ class _HomeShellState extends State<HomeShell> {
   void _reopenSettingsFullScreen() {
     // Pushed synchronously (this runs from the visibility-toggle tap, not a
     // build) so the full-screen Settings covers the scaffold before it repaints
-    // — otherwise the fallback tab would flash for a frame.
+    // — otherwise the fallback tab would flash for a frame. The base Settings
+    // page is tracked so it can be removed when the user re-enables the tab.
     final nav = Navigator.of(context, rootNavigator: true);
-    nav.push(
-      FastRoute<void>(
-        builder: (_) => SettingsView(
-          controller: widget.settingsController,
-          backupService: widget.backupService,
-          securityService: widget.securityService,
-        ),
+    final base = FastRoute<void>(
+      builder: (_) => SettingsView(
+        controller: widget.settingsController,
+        backupService: widget.backupService,
+        securityService: widget.securityService,
       ),
     );
+    _globalSettingsRoute = base;
+    _globalSettingsOpen.value = true;
+    nav.push(base).then((_) {
+      if (!mounted) return;
+      _globalSettingsRoute = null;
+      _globalSettingsOpen.value = false;
+    });
     nav.push(
       FastRoute<void>(
         builder: (_) => TabBarSettingsView(
@@ -258,9 +313,19 @@ class _HomeShellState extends State<HomeShell> {
     return ordered.isEmpty ? [0] : ordered;
   }
 
-  BottomNavigationBarItem _tabItem(
-      BuildContext context, int logicalIdx, bool hideLabels) {
+  BottomNavigationBarItem _tabItem(BuildContext context, int logicalIdx,
+      bool hideLabels,
+      [bool deselectAll = false]) {
     final s = S.of(context);
+    // When the global Settings overlay is active, swap the active icon for the
+    // outline (inactive) version so the active tab matches the others.
+    Widget activeIcon(String asset) => Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: ImageIcon(
+            AssetImage(asset),
+            color: deselectAll ? null : AppColors.accent,
+          ),
+        );
     switch (logicalIdx) {
       case 0:
         return BottomNavigationBarItem(
@@ -268,13 +333,7 @@ class _HomeShellState extends State<HomeShell> {
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(AssetImage('assets/icons/tab_bar/tasks.png')),
           ),
-          activeIcon: Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: ImageIcon(
-              AssetImage('assets/icons/tab_bar/tasks.png'),
-              color: AppColors.accent,
-            ),
-          ),
+          activeIcon: activeIcon('assets/icons/tab_bar/tasks.png'),
           label: hideLabels ? null : s.tabTasks,
         );
       case 1:
@@ -283,13 +342,7 @@ class _HomeShellState extends State<HomeShell> {
             padding: EdgeInsets.only(top: 8),
             child: ImageIcon(AssetImage('assets/icons/tab_bar/notes.png')),
           ),
-          activeIcon: Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: ImageIcon(
-              AssetImage('assets/icons/tab_bar/notes.png'),
-              color: AppColors.accent,
-            ),
-          ),
+          activeIcon: activeIcon('assets/icons/tab_bar/notes.png'),
           label: hideLabels ? null : s.tabNotes,
         );
       case 2:
@@ -299,13 +352,7 @@ class _HomeShellState extends State<HomeShell> {
             child:
                 ImageIcon(AssetImage('assets/icons/tab_bar/calendar.png')),
           ),
-          activeIcon: Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: ImageIcon(
-              AssetImage('assets/icons/tab_bar/calendar.png'),
-              color: AppColors.accent,
-            ),
-          ),
+          activeIcon: activeIcon('assets/icons/tab_bar/calendar.png'),
           label: hideLabels ? null : s.tabCalendar,
         );
       case 3:
@@ -315,13 +362,7 @@ class _HomeShellState extends State<HomeShell> {
             child:
                 ImageIcon(AssetImage('assets/icons/tab_bar/routines.png')),
           ),
-          activeIcon: Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: ImageIcon(
-              AssetImage('assets/icons/tab_bar/routines.png'),
-              color: AppColors.accent,
-            ),
-          ),
+          activeIcon: activeIcon('assets/icons/tab_bar/routines.png'),
           label: hideLabels ? null : s.tabRoutines,
         );
       default:
@@ -331,11 +372,13 @@ class _HomeShellState extends State<HomeShell> {
             child: Icon(CupertinoIcons.gear_alt, size: 24),
           ),
           activeIcon: Padding(
-            padding: EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: 8),
             child: Icon(
-              CupertinoIcons.gear_alt_fill,
+              deselectAll
+                  ? CupertinoIcons.gear_alt
+                  : CupertinoIcons.gear_alt_fill,
               size: 24,
-              color: AppColors.accent,
+              color: deselectAll ? null : AppColors.accent,
             ),
           ),
           label: hideLabels ? null : s.tabSettings,
@@ -362,6 +405,10 @@ class _HomeShellState extends State<HomeShell> {
           collapseSignal: _notesCollapseSignal,
           settingsController: widget.settingsController,
           backupService: widget.backupService,
+          db: SpaceManagerProvider.of(context).db,
+          taskController: widget.taskController,
+          folderController: widget.folderController,
+          eventController: widget.eventController,
         ),
       2 => CalendarView(
           controller: widget.taskController,
@@ -371,11 +418,18 @@ class _HomeShellState extends State<HomeShell> {
           settingsController: widget.settingsController,
           backupService: widget.backupService,
           onDaySelected: (d) => _activeDueDate.value = d,
+          db: SpaceManagerProvider.of(context).db,
+          noteController: widget.noteController,
         ),
       3 => RoutinesView(
           controller: widget.routineController,
           settingsController: widget.settingsController,
           backupService: widget.backupService,
+          db: SpaceManagerProvider.of(context).db,
+          taskController: widget.taskController,
+          folderController: widget.folderController,
+          noteController: widget.noteController,
+          eventController: widget.eventController,
         ),
       _ => SettingsView(
           controller: widget.settingsController,
@@ -412,28 +466,52 @@ class _HomeShellState extends State<HomeShell> {
                 tabContent: _tabContent,
                 onTap: _onTabTapped,
               )
+            else if (visibleIndices.length <= 1)
+              // Single-tab mode: the tab bar disappears entirely so the user
+              // perceives the app as a single screen, not "one tab of many".
+              CupertinoTabView(
+                navigatorKey: _navigatorKeys[visibleIndices.first],
+                navigatorObservers: [
+                  _depthObservers[visibleIndices.first],
+                ],
+                builder: (ctx) =>
+                    _tabContent(ctx, visibleIndices.first),
+              )
             else
-              CupertinoTabScaffold(
-                controller: _tabController,
-                tabBar: CupertinoTabBar(
-                  activeColor: CupertinoColors.label,
-                  inactiveColor: CupertinoColors.secondaryLabel,
-                  backgroundColor: const CupertinoDynamicColor.withBrightness(
-                    color: Color(0xF0F9F9F9),
-                    darkColor: Color(0xF01D1D1D),
-                  ),
-                  onTap: (visualIdx) =>
-                      _onTabTapped(visibleIndices[visualIdx]),
-                  items: visibleIndices
-                      .map((i) => _tabItem(context, i, hideLabels))
-                      .toList(),
-                ),
-                tabBuilder: (context, visualIdx) {
-                  final logicalIdx = visibleIndices[visualIdx];
-                  return CupertinoTabView(
-                    navigatorKey: _navigatorKeys[logicalIdx],
-                    navigatorObservers: [_depthObservers[logicalIdx]],
-                    builder: (ctx) => _tabContent(ctx, logicalIdx),
+              ValueListenableBuilder<bool>(
+                valueListenable: _globalSettingsOpen,
+                builder: (context, overlayOpen, _) {
+                  // When the global Settings overlay is on screen, recolor the
+                  // active tab to match inactive ones so every tab reads as
+                  // "not selected" — the user is in Settings, not in any tab.
+                  final activeColor = overlayOpen
+                      ? CupertinoColors.secondaryLabel
+                      : CupertinoColors.label;
+                  return CupertinoTabScaffold(
+                    controller: _tabController,
+                    tabBar: CupertinoTabBar(
+                      activeColor: activeColor,
+                      inactiveColor: CupertinoColors.secondaryLabel,
+                      backgroundColor:
+                          const CupertinoDynamicColor.withBrightness(
+                        color: Color(0xF0F9F9F9),
+                        darkColor: Color(0xF01D1D1D),
+                      ),
+                      onTap: (visualIdx) =>
+                          _onTabTapped(visibleIndices[visualIdx]),
+                      items: visibleIndices
+                          .map((i) =>
+                              _tabItem(context, i, hideLabels, overlayOpen))
+                          .toList(),
+                    ),
+                    tabBuilder: (context, visualIdx) {
+                      final logicalIdx = visibleIndices[visualIdx];
+                      return CupertinoTabView(
+                        navigatorKey: _navigatorKeys[logicalIdx],
+                        navigatorObservers: [_depthObservers[logicalIdx]],
+                        builder: (ctx) => _tabContent(ctx, logicalIdx),
+                      );
+                    },
                   );
                 },
               ),
@@ -444,9 +522,11 @@ class _HomeShellState extends State<HomeShell> {
                       right: 20,
                       bottom: isWide
                           ? 24
-                          : 50 +
-                              MediaQuery.paddingOf(context).bottom +
-                              12,
+                          : visibleIndices.length <= 1
+                              ? MediaQuery.paddingOf(context).bottom + 16
+                              : 50 +
+                                  MediaQuery.paddingOf(context).bottom +
+                                  12,
                       child: _PlusButton(onPressed: _onPlusPressed),
                     )
                   : const SizedBox.shrink(),
