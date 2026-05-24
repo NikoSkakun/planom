@@ -199,26 +199,34 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
         leading: widget.db != null &&
                 widget.noteController != null &&
                 widget.eventController != null
-            ? CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () => Navigator.of(context).push(
-                  FastRoute<void>(
-                    builder: (_) => SearchView(
-                      db: widget.db!,
-                      taskController: widget.controller,
-                      folderController: widget.folderController,
-                      noteController: widget.noteController!,
-                      eventController: widget.eventController!,
+            ? Semantics(
+                label: s.search,
+                button: true,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => Navigator.of(context).push(
+                    FastRoute<void>(
+                      builder: (_) => SearchView(
+                        db: widget.db!,
+                        taskController: widget.controller,
+                        folderController: widget.folderController,
+                        noteController: widget.noteController!,
+                        eventController: widget.eventController!,
+                      ),
                     ),
                   ),
+                  child: const Icon(CupertinoIcons.search, size: 22),
                 ),
-                child: const Icon(CupertinoIcons.search, size: 22),
               )
             : null,
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => _showDropdown(context),
-          child: const Icon(CupertinoIcons.ellipsis, size: 26),
+        trailing: Semantics(
+          label: s.settings,
+          button: true,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => _showDropdown(context),
+            child: const Icon(CupertinoIcons.ellipsis, size: 26),
+          ),
         ),
       ),
       child: SafeArea(

@@ -312,10 +312,14 @@ class _TaskDetailViewState extends State<TaskDetailView>
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => _showDropdown(context),
-          child: const Icon(CupertinoIcons.ellipsis, size: 26),
+        trailing: Semantics(
+          label: s.info,
+          button: true,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => _showDropdown(context),
+            child: const Icon(CupertinoIcons.ellipsis, size: 26),
+          ),
         ),
       ),
       child: Column(

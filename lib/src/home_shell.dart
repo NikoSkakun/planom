@@ -553,7 +553,11 @@ class _SidebarTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Semantics(
+      label: item.label ?? '',
+      button: true,
+      selected: selected,
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -596,6 +600,7 @@ class _SidebarTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -646,27 +651,31 @@ class _PlusButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      onPressed: onPressed,
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: AppColors.accent,
-          shape: BoxShape.circle,
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x33000000),
-              blurRadius: 8,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Icon(
-          CupertinoIcons.plus,
-          color: CupertinoColors.white,
-          size: 24,
+    return Semantics(
+      label: S.of(context).add,
+      button: true,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: onPressed,
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: AppColors.accent,
+            shape: BoxShape.circle,
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x33000000),
+                blurRadius: 8,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Icon(
+            CupertinoIcons.plus,
+            color: CupertinoColors.white,
+            size: 24,
+          ),
         ),
       ),
     );

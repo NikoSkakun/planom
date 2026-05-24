@@ -139,15 +139,19 @@ class _LockScreenState extends State<LockScreen>
             return SizedBox(
               width: 88,
               height: 72,
-              child: CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: isBack ? _onBackspace : () => _onDigit(d),
-                child: Text(
-                  d,
-                  style: TextStyle(
-                    fontSize: isBack ? 22 : 28,
-                    color: CupertinoColors.label.resolveFrom(context),
-                    fontWeight: FontWeight.w300,
+              child: Semantics(
+                label: isBack ? 'Backspace' : d,
+                button: true,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: isBack ? _onBackspace : () => _onDigit(d),
+                  child: Text(
+                    d,
+                    style: TextStyle(
+                      fontSize: isBack ? 22 : 28,
+                      color: CupertinoColors.label.resolveFrom(context),
+                      fontWeight: FontWeight.w300,
+                    ),
                   ),
                 ),
               ),
