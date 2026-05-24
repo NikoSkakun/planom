@@ -1,7 +1,10 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart' show showModalBottomSheet;
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
@@ -122,28 +125,102 @@ Widget buildFolderItemIcon(
   );
 }
 
-/// Copies [source] into the app's documents directory under `icons/` and
-/// returns the **relative** path (`icons/<timestamp><ext>`) that survives
-/// app reinstalls.
+// Icons are rendered as 22×22 logical px (≤ 88px at 4x). Cap at 256 to give
+// us headroom for future high-density displays without bloating storage.
+const _kMaxIconDimension = 256;
+
+/// Resizes [source] to fit inside [_kMaxIconDimension] (preserving aspect
+/// ratio), re-encodes as PNG and writes the result into the app's documents
+/// directory under `icons/`. Returns the **relative** path
+/// (`icons/<timestamp>.png`) that survives app reinstalls.
+///
+/// Returning PNG even for JPEG sources keeps alpha intact (some chosen
+/// icons have transparent backgrounds) and is plenty small at 256px.
+/// On any decoding failure we fall back to copying the original bytes so
+/// the picker never silently swallows the user's selection.
 Future<String> _copyIconToDocuments(String sourcePath) async {
   _docsPath ??= (await getApplicationDocumentsDirectory()).path;
   final iconsDir = Directory('$_docsPath/icons');
   if (!iconsDir.existsSync()) iconsDir.createSync(recursive: true);
+
+  final file = File(sourcePath);
+  final bytes = await file.readAsBytes();
+  Uint8List? resized;
+  try {
+    resized = await _resizeToFit(bytes, _kMaxIconDimension);
+  } catch (e, st) {
+    debugPrint('icon resize failed, copying original: $e\n$st');
+  }
+
+  final ts = DateTime.now().millisecondsSinceEpoch;
+  if (resized != null) {
+    final outPath = '$_docsPath/icons/$ts.png';
+    await File(outPath).writeAsBytes(resized);
+    return 'icons/$ts.png';
+  }
+  // Fallback: copy as-is preserving extension.
   final ext = p.extension(sourcePath);
-  final filename = '${DateTime.now().millisecondsSinceEpoch}$ext';
-  await File(sourcePath).copy('$_docsPath/icons/$filename');
-  return 'icons/$filename'; // relative — stable across rebuilds
+  final outPath = '$_docsPath/icons/$ts$ext';
+  await file.copy(outPath);
+  return 'icons/$ts$ext';
+}
+
+/// Decodes [src], resizes so the largest side ≤ [maxDimension], and re-encodes
+/// as PNG. Returns null if the image already fits and is therefore not worth
+/// re-encoding (we still keep the original bytes around in the caller).
+Future<Uint8List?> _resizeToFit(Uint8List src, int maxDimension) async {
+  // Probe the source dimensions first so we can skip the resize entirely if
+  // the image is already small.
+  final descriptor = await ui.ImageDescriptor.encoded(
+      await ui.ImmutableBuffer.fromUint8List(src));
+  final srcW = descriptor.width;
+  final srcH = descriptor.height;
+  descriptor.dispose();
+  final longest = srcW > srcH ? srcW : srcH;
+  final int targetW;
+  final int targetH;
+  if (longest <= maxDimension) {
+    // Already small enough — but we still want to re-encode as PNG to drop
+    // EXIF / preview thumbnails / unused metadata that bloats photo-library
+    // exports. Skip if it's already a reasonably small PNG to save CPU.
+    if (src.lengthInBytes < 64 * 1024) return null;
+    targetW = srcW;
+    targetH = srcH;
+  } else {
+    final scale = maxDimension / longest;
+    targetW = (srcW * scale).round();
+    targetH = (srcH * scale).round();
+  }
+
+  final codec = await ui.instantiateImageCodec(
+    src,
+    targetWidth: targetW,
+    targetHeight: targetH,
+  );
+  final frame = await codec.getNextFrame();
+  final image = frame.image;
+  final png = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  codec.dispose();
+  if (png == null) return null;
+  return png.buffer.asUint8List();
 }
 
 /// Opens the system photo picker and returns the relative icon path, or null.
 ///
-/// Mobile uses `image_picker` (the OS gallery UI); desktop has no gallery
-/// concept, so we fall back to `file_picker` with image filetype filters.
+/// Mobile uses `image_picker` (the OS gallery UI) with a max-dimension and
+/// quality hint so big photos are pre-scaled by the platform before they
+/// even reach Dart. Desktop has no gallery concept, so we fall back to
+/// `file_picker` and rely on our own resize pass.
 Future<String?> pickCustomIcon() async {
   if (PlatformCapabilities.supportsImagePicker) {
     final picker = ImagePicker();
-    final xfile =
-        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final xfile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: _kMaxIconDimension.toDouble(),
+      maxHeight: _kMaxIconDimension.toDouble(),
+      imageQuality: 90,
+    );
     if (xfile == null) return null;
     return _copyIconToDocuments(xfile.path);
   }
