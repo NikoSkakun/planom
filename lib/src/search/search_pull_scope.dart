@@ -54,16 +54,26 @@ class _SearchPullScopeState extends State<SearchPullScope>
 
   bool _onNotification(ScrollNotification n) {
     if (_opening) return false;
+    if (n.metrics.axis != Axis.vertical) return false;
 
     if (n is OverscrollNotification) {
-      // Pulled down at the top: overscroll < 0 (scrolling in the negative
-      // direction past pixel 0). Only react to the vertical axis.
-      if (n.metrics.axis == Axis.vertical && n.overscroll < 0) {
+      // ClampingScrollPhysics: scrolling past the boundary emits an
+      // OverscrollNotification with negative overscroll at the top.
+      if (n.overscroll < 0) {
         _accumulated += -n.overscroll;
         _ctrl.value = (_accumulated / _revealDistance).clamp(0.0, 1.0);
       }
     } else if (n is ScrollUpdateNotification) {
-      if (n.metrics.pixels > 0) {
+      // BouncingScrollPhysics (iOS default): the position glides past the
+      // top boundary instead of overscrolling — pixels < minScrollExtent.
+      // Track that as the pull amount, otherwise the reveal animation
+      // never makes progress on iOS.
+      final pixels = n.metrics.pixels;
+      final minExtent = n.metrics.minScrollExtent;
+      if (pixels < minExtent) {
+        _accumulated = minExtent - pixels;
+        _ctrl.value = (_accumulated / _revealDistance).clamp(0.0, 1.0);
+      } else if (pixels > minExtent) {
         _accumulated = 0;
         if (_ctrl.value > 0) _ctrl.reverse();
       }
