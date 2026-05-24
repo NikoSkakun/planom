@@ -164,6 +164,7 @@ class S {
   String get exportFailedBody => t('exportFailedBody');
   String get newSpace => t('newSpace');
   String get spaceName => t('spaceName');
+  String get spaces => t('spaces');
   String get deleteSpace => t('deleteSpace');
   String get deleteSpaceBody => t('deleteSpaceBody');
 
@@ -533,7 +534,7 @@ const Map<String, String> _en = {
   'importFailedRead': 'An error occurred while reading the file.',
   'exportFailed': 'Export Failed',
   'exportFailedBody': 'An error occurred while creating the backup.',
-  'newSpace': 'New Space', 'spaceName': 'Space name',
+  'newSpace': 'New Space', 'spaceName': 'Space name', 'spaces': 'Spaces',
   'a11yToggleComplete': 'Toggle completion',
   'deleteSpace': 'Delete Space?',
   'deleteSpaceBody':
@@ -728,7 +729,7 @@ const Map<String, String> _uk = {
   'importFailedRead': 'Сталася помилка під час читання файлу.',
   'exportFailed': 'Помилка експорту',
   'exportFailedBody': 'Сталася помилка під час створення резервної копії.',
-  'newSpace': 'Новий простір', 'spaceName': 'Назва простору',
+  'newSpace': 'Новий простір', 'spaceName': 'Назва простору', 'spaces': 'Простори',
   'sortTasks': 'Сортування завдань', 'sortDefault': 'За замовчуванням',
   'sortByCreation': 'За датою створення', 'sortByName': 'За назвою',
   'sortByPriority': 'За пріоритетом', 'sortByDateTime': 'За датою і часом',
@@ -838,7 +839,7 @@ const Map<String, String> _es = {
   'importFailedRead': 'Ocurrió un error al leer el archivo.',
   'exportFailed': 'Error al exportar',
   'exportFailedBody': 'Ocurrió un error al crear la copia.',
-  'newSpace': 'Nuevo espacio', 'spaceName': 'Nombre del espacio',
+  'newSpace': 'Nuevo espacio', 'spaceName': 'Nombre del espacio', 'spaces': 'Espacios',
   'sortTasks': 'Ordenar tareas', 'sortDefault': 'Predeterminado',
   'sortByCreation': 'Por fecha de creación', 'sortByName': 'Por nombre',
   'sortByPriority': 'Por prioridad', 'sortByDateTime': 'Por fecha y hora',
@@ -948,7 +949,7 @@ const Map<String, String> _fr = {
   'importFailedRead': 'Une erreur est survenue lors de la lecture du fichier.',
   'exportFailed': 'Échec de l\'export',
   'exportFailedBody': 'Une erreur est survenue lors de la création de la sauvegarde.',
-  'newSpace': 'Nouvel espace', 'spaceName': 'Nom de l\'espace',
+  'newSpace': 'Nouvel espace', 'spaceName': 'Nom de l\'espace', 'spaces': 'Espaces',
   'sortTasks': 'Trier les tâches', 'sortDefault': 'Par défaut',
   'sortByCreation': 'Par date de création', 'sortByName': 'Par nom',
   'sortByPriority': 'Par priorité', 'sortByDateTime': 'Par date et heure',
@@ -1058,7 +1059,7 @@ const Map<String, String> _de = {
   'importFailedRead': 'Beim Lesen der Datei ist ein Fehler aufgetreten.',
   'exportFailed': 'Export fehlgeschlagen',
   'exportFailedBody': 'Beim Erstellen des Backups ist ein Fehler aufgetreten.',
-  'newSpace': 'Neuer Bereich', 'spaceName': 'Bereichsname',
+  'newSpace': 'Neuer Bereich', 'spaceName': 'Bereichsname', 'spaces': 'Bereiche',
   'sortTasks': 'Aufgaben sortieren', 'sortDefault': 'Standard',
   'sortByCreation': 'Nach Erstellungsdatum', 'sortByName': 'Nach Name',
   'sortByPriority': 'Nach Priorität', 'sortByDateTime': 'Nach Datum & Zeit',
@@ -1168,7 +1169,7 @@ const Map<String, String> _it = {
   'importFailedRead': 'Si è verificato un errore durante la lettura del file.',
   'exportFailed': 'Esportazione fallita',
   'exportFailedBody': 'Si è verificato un errore durante la creazione del backup.',
-  'newSpace': 'Nuovo spazio', 'spaceName': 'Nome dello spazio',
+  'newSpace': 'Nuovo spazio', 'spaceName': 'Nome dello spazio', 'spaces': 'Spazi',
   'sortTasks': 'Ordina attività', 'sortDefault': 'Predefinito',
   'sortByCreation': 'Per data creazione', 'sortByName': 'Per nome',
   'sortByPriority': 'Per priorità', 'sortByDateTime': 'Per data e ora',
@@ -1278,7 +1279,7 @@ const Map<String, String> _pt = {
   'importFailedRead': 'Ocorreu um erro ao ler o arquivo.',
   'exportFailed': 'Falha na exportação',
   'exportFailedBody': 'Ocorreu um erro ao criar o backup.',
-  'newSpace': 'Novo espaço', 'spaceName': 'Nome do espaço',
+  'newSpace': 'Novo espaço', 'spaceName': 'Nome do espaço', 'spaces': 'Espaços',
   'sortTasks': 'Ordenar tarefas', 'sortDefault': 'Padrão',
   'sortByCreation': 'Por data de criação', 'sortByName': 'Por nome',
   'sortByPriority': 'Por prioridade', 'sortByDateTime': 'Por data e hora',
@@ -1388,7 +1389,7 @@ const Map<String, String> _ru = {
   'importFailedRead': 'Произошла ошибка при чтении файла.',
   'exportFailed': 'Ошибка экспорта',
   'exportFailedBody': 'Произошла ошибка при создании резервной копии.',
-  'newSpace': 'Новое пространство', 'spaceName': 'Название пространства',
+  'newSpace': 'Новое пространство', 'spaceName': 'Название пространства', 'spaces': 'Пространства',
   'sortTasks': 'Сортировать задачи', 'sortDefault': 'По умолчанию',
   'sortByCreation': 'По дате создания', 'sortByName': 'По имени',
   'sortByPriority': 'По приоритету', 'sortByDateTime': 'По дате и времени',
@@ -1498,7 +1499,7 @@ const Map<String, String> _zh = {
   'importFailedRead': '读取文件时出错。',
   'exportFailed': '导出失败',
   'exportFailedBody': '创建备份时出错。',
-  'newSpace': '新空间', 'spaceName': '空间名称',
+  'newSpace': '新空间', 'spaceName': '空间名称', 'spaces': '空间',
   'sortTasks': '排序任务', 'sortDefault': '默认',
   'sortByCreation': '按创建日期', 'sortByName': '按名称',
   'sortByPriority': '按优先级', 'sortByDateTime': '按日期和时间',
@@ -1608,7 +1609,7 @@ const Map<String, String> _ja = {
   'importFailedRead': 'ファイルの読み込み中にエラーが発生しました。',
   'exportFailed': '書き出し失敗',
   'exportFailedBody': 'バックアップの作成中にエラーが発生しました。',
-  'newSpace': '新規スペース', 'spaceName': 'スペース名',
+  'newSpace': '新規スペース', 'spaceName': 'スペース名', 'spaces': 'スペース',
   'sortTasks': 'タスクを並べ替え', 'sortDefault': 'デフォルト',
   'sortByCreation': '作成日順', 'sortByName': '名前順',
   'sortByPriority': '優先度順', 'sortByDateTime': '日時順',

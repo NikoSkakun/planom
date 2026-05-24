@@ -7,7 +7,6 @@ import '../security/security_service.dart';
 import '../spaces/space_manager.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
-import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
 import 'appearance_view.dart';
@@ -18,6 +17,7 @@ import 'notifications_view.dart';
 import 'security_view.dart';
 import 'settings_controller.dart';
 import 'smart_list_prefs.dart';
+import 'spaces_view.dart';
 import 'sync_settings_view.dart';
 
 class SettingsView extends StatefulWidget {
@@ -36,90 +36,7 @@ class SettingsView extends StatefulWidget {
   State<SettingsView> createState() => _SettingsViewState();
 }
 
-class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
-  void _showSpacesMenu(BuildContext context) {
-    final spaceManager = SpaceManagerProvider.of(context);
-    showDropdown(context, (dismiss) {
-      return _SpacesDropdown(
-        spaceManager: spaceManager,
-        onDismiss: dismiss,
-        onAddSpace: () {
-          dismiss();
-          _showAddSpaceDialog(context, spaceManager);
-        },
-        onDeleteSpace: (id) {
-          dismiss();
-          _confirmDeleteSpace(context, spaceManager, id);
-        },
-      );
-    });
-  }
-
-  void _confirmDeleteSpace(
-      BuildContext context, SpaceManager spaceManager, String id) {
-    final s = S.of(context);
-    showCupertinoDialog<void>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(s.deleteSpace),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(s.deleteSpaceBody),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(s.cancel),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              spaceManager.deleteSpace(id);
-            },
-            child: Text(s.delete),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddSpaceDialog(BuildContext context, SpaceManager spaceManager) {
-    final ctrl = TextEditingController();
-    final s = S.of(context);
-    showCupertinoDialog<void>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(s.newSpace),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: ctrl,
-            placeholder: s.spaceName,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(s.cancel),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () {
-              final name = ctrl.text.trim();
-              if (name.isEmpty) return;
-              Navigator.of(ctx).pop();
-              spaceManager.addSpace(name);
-            },
-            child: Text(s.create),
-          ),
-        ],
-      ),
-    ).then((_) => ctrl.dispose());
-  }
-
+class _SettingsViewState extends State<SettingsView> {
   Future<void> _showVisibilityPicker(
       BuildContext context, String key, SmartListVisibility current) async {
     final s = S.of(context);
@@ -187,11 +104,6 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
       navigationBar: CupertinoNavigationBar(
         border: null,
         middle: Text(s.settings),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => _showSpacesMenu(context),
-          child: const Icon(CupertinoIcons.ellipsis, size: 26),
-        ),
       ),
       child: SafeArea(
         child: ListView(
@@ -350,6 +262,26 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
               },
             ),
 
+            // ── Spaces ──────────────────────────────────────────────────
+            const SizedBox(height: 18),
+            Text(
+              s.spaces,
+              style: TextStyle(
+                fontSize: 13,
+                color: labelColor,
+                letterSpacing: -0.08,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _NavRow(
+              label: s.spaces,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => const SpacesView(),
+                ),
+              ),
+            ),
+
             // ── Tab Bar ─────────────────────────────────────────────────
             const SizedBox(height: 18),
             Text(
@@ -467,157 +399,6 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── Spaces dropdown ──────────────────────────────────────────────────────────
-
-class _SpacesDropdown extends StatelessWidget {
-  const _SpacesDropdown({
-    required this.spaceManager,
-    required this.onDismiss,
-    required this.onAddSpace,
-    required this.onDeleteSpace,
-  });
-
-  final SpaceManager spaceManager;
-  final VoidCallback onDismiss;
-  final VoidCallback onAddSpace;
-  final void Function(String id) onDeleteSpace;
-
-  @override
-  Widget build(BuildContext context) {
-    final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
-    final spaces = spaceManager.spaces;
-    final activeId = spaceManager.activeSpaceId;
-    final s = S.of(context);
-
-    return Stack(
-      children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onDismiss,
-          child: const SizedBox.expand(),
-        ),
-        Positioned(
-          top: topOffset,
-          right: 8,
-          child: Container(
-            width: 220,
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 20,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final space in spaces) ...[
-                  _SpaceRow(
-                    name: space.name,
-                    isActive: space.id == activeId,
-                    onTap: () {
-                      onDismiss();
-                      spaceManager.switchSpace(space.id);
-                    },
-                    // The default space and the active space can't be deleted
-                    // from here (switch away first to delete a non-default one).
-                    onDelete: (space.id != 'default' && space.id != activeId)
-                        ? () => onDeleteSpace(space.id)
-                        : null,
-                  ),
-                  if (space != spaces.last)
-                    Container(
-                      height: 0.5,
-                      color: CupertinoColors.separator.resolveFrom(context),
-                    ),
-                ],
-                Container(
-                  height: 0.5,
-                  color: CupertinoColors.separator.resolveFrom(context),
-                ),
-                _SpaceRow(
-                  name: s.newSpace,
-                  icon: CupertinoIcons.plus,
-                  isActive: false,
-                  onTap: onAddSpace,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SpaceRow extends StatelessWidget {
-  const _SpaceRow({
-    required this.name,
-    required this.isActive,
-    required this.onTap,
-    this.icon,
-    this.onDelete,
-  });
-
-  final String name;
-  final bool isActive;
-  final VoidCallback onTap;
-  final IconData? icon;
-  final VoidCallback? onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = CupertinoColors.label.resolveFrom(context);
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      onPressed: onTap,
-      child: Row(
-        children: [
-          if (icon != null)
-            Icon(icon, size: 18, color: fg)
-          else
-            Icon(
-              CupertinoIcons.circle_fill,
-              size: 10,
-              color: isActive ? AppColors.accent : CupertinoColors.transparent,
-            ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              name,
-              style: TextStyle(fontSize: 16, color: fg),
-            ),
-          ),
-          if (isActive)
-            Icon(
-              CupertinoIcons.checkmark,
-              size: 16,
-              color: AppColors.accent,
-            )
-          else if (onDelete != null)
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onDelete,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Icon(
-                  CupertinoIcons.delete,
-                  size: 16,
-                  color: CupertinoColors.systemRed.resolveFrom(context),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
