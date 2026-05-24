@@ -298,12 +298,16 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 _SectionLabel(text: s.syncFreeSection, color: labelColor),
                 _BackendCard(
                   bg: cardBg,
+                  // iCloud is shown as "Coming soon" until the Apple Developer
+                  // Portal one-time setup (iCloud container + capability link)
+                  // is done. The Dart side is ready; toggling on without those
+                  // entitlements produces opaque runtime errors, so guard it.
                   child: _BackendRow(
                     label: s.syncICloudTitle,
                     sublabel: s.syncICloudSublabel,
                     selected: snap.backend == SyncBackend.icloud,
-                    tag: s.tagFree,
-                    onTap: _busy ? null : _enableICloud,
+                    tag: s.tagComingSoon,
+                    onTap: null,
                   ),
                 ),
                 const SizedBox(height: 20),

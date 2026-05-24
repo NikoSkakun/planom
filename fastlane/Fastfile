@@ -14,161 +14,10 @@ platform :ios do
     )
   end
 
-  # Idempotent — ensures the App ID has the iCloud capability AND that the
-  # named CloudContainer exists AND that the container is linked to the App
-  # ID. Returns `true` when anything changed (caller uses that to decide
-  # whether to force `match` to regenerate the provisioning profile).
-  #
-  # Spaceship's ConnectAPI surface exposes BundleIds + their capabilities but
-  # does not model CloudContainers for API-key auth (only the legacy Apple-ID
-  # Spaceship::Portal does). We call the raw App Store Connect REST endpoints
-  # directly via the existing provisioning client to avoid pulling in
-  # Apple-ID + 2FA secrets.
-  def ensure_icloud_capability(api_key_path:, api_key:, bundle_id:, container_id:, container_name:)
-    require "spaceship"
-    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
-      key_id:    api_key[:key_id],
-      issuer_id: api_key[:issuer_id],
-      filepath:  api_key_path,
-    )
-
-    client = Spaceship::ConnectAPI.provisioning_request_client
-
-    bid = Spaceship::ConnectAPI::BundleId
-      .all(filter: { identifier: bundle_id })
-      .first
-    UI.user_error!("Bundle ID #{bundle_id} not found in App Store Connect.") unless bid
-
-    changed = false
-
-    # 1. iCloud capability on the App ID -----------------------------------
-    caps = bid.get_capabilities || []
-    has_icloud = caps.any? do |c|
-      c.capability_type == Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD
-    end
-
-    if has_icloud
-      UI.message("✓ iCloud capability already enabled on #{bundle_id}")
-    else
-      # `create_capability` takes capability_type as a positional argument
-      # (kwarg form raises ArgumentError). ICLOUD requires a settings payload
-      # pinning the version — XCODE_6 is the modern flavour; covers iCloud
-      # Documents (what we use) and also enables CloudKit, which we simply
-      # don't reference in entitlements.
-      bid.create_capability(
-        Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD,
-        settings: [
-          {
-            key: Spaceship::ConnectAPI::BundleIdCapability::Settings::ICLOUD_VERSION,
-            options: [
-              { key: Spaceship::ConnectAPI::BundleIdCapability::Options::XCODE_6 },
-            ],
-          },
-        ],
-      )
-      UI.success("✅  Enabled iCloud capability on #{bundle_id}")
-      changed = true
-    end
-
-    # 2. CloudContainer resource + bundle-id link --------------------------
-    # The App Store Connect REST API does not expose iCloud Container CRUD
-    # to API-key auth in fastlane 2.234 / OpenAPI v3.8 (verified against
-    # /v1/cloudContainers and /v1/iCloudContainers — both 404). The only
-    # programmatic alternative is Apple-ID + 2FA via legacy Spaceship::Portal,
-    # which we deliberately avoid in CI. Try the two candidate paths; if
-    # both reject, fall through with a clear pointer to the one-time web
-    # portal step.
-    container_ok = _try_manage_cloud_container(
-      client:        client,
-      identifier:    container_id,
-      name:          container_name,
-      bundle_id_id:  bid.id,
-      bundle_id_str: bundle_id,
-    )
-    changed ||= container_ok == :created_or_linked
-
-    changed
-  end
-
-  # Returns one of:
-  #   :already_set        — container exists AND is linked, nothing to do
-  #   :created_or_linked  — we created and/or linked it via the API
-  #   nil                 — Apple's API rejected our calls; printed a clear
-  #                         manual-step pointer and called UI.user_error!
-  def _try_manage_cloud_container(client:, identifier:, name:, bundle_id_id:, bundle_id_str:)
-    # Apple has shipped this resource under both spellings at various API
-    # versions. Try the most-recent first, fall through on path-not-found.
-    %w[v1/iCloudContainers v1/cloudContainers].each do |base|
-      type_name = base.split("/").last
-      begin
-        list = client.get(base, { "filter[identifier]" => identifier })
-        existing = (list.body["data"] || []).first
-
-        if existing
-          UI.message("✓ iCloud container #{identifier} already exists")
-        else
-          created = client.post(base, {
-            data: {
-              type: type_name,
-              attributes: { identifier: identifier, name: name },
-            },
-          })
-          existing = created.body["data"]
-          UI.success("✅  Created iCloud container #{identifier}")
-        end
-
-        container_internal_id = existing["id"]
-
-        # Link relationship. If GET-side already shows the link, skip.
-        linked = false
-        begin
-          rel = client.get("v1/bundleIds/#{bundle_id_id}/#{type_name}")
-          linked = (rel.body["data"] || []).any? { |c| c["id"] == container_internal_id }
-        rescue Spaceship::UnexpectedResponse
-          # GET path also missing under this base — fall through to POST,
-          # ASC dedupes, redundant link is harmless.
-        end
-
-        if linked
-          UI.message("✓ iCloud container already linked to #{bundle_id_str}")
-          return :already_set
-        end
-
-        client.post(
-          "#{base}/#{container_internal_id}/relationships/bundleIds",
-          { data: [{ type: "bundleIds", id: bundle_id_id }] },
-        )
-        UI.success("✅  Linked iCloud container #{identifier} to #{bundle_id_str}")
-        return :created_or_linked
-      rescue Spaceship::UnexpectedResponse => e
-        next if e.message =~ /does not match a defined resource type|not be found|404/i
-        raise
-      end
-    end
-
-    UI.important("")
-    UI.important("⚠️  Apple's App Store Connect API key endpoint for iCloud")
-    UI.important("    Containers is not available (returned 'resource does not")
-    UI.important("    exist' for both v1/iCloudContainers and v1/cloudContainers).")
-    UI.important("")
-    UI.important("    One-time setup in your browser (no Xcode, ~60 seconds):")
-    UI.important("")
-    UI.important("    1. Open https://developer.apple.com/account/resources/identifiers/list/cloudContainer")
-    UI.important("    2. Click + → register a new iCloud Container")
-    UI.important("         Description: #{name}")
-    UI.important("         Identifier:  #{identifier}")
-    UI.important("    3. Open https://developer.apple.com/account/resources/identifiers/list (App IDs)")
-    UI.important("    4. Click #{bundle_id_str} → open the iCloud capability → Edit →")
-    UI.important("         tick #{identifier} → Save")
-    UI.important("    5. Re-run this workflow with force_regen:true")
-    UI.important("")
-    UI.user_error!("iCloud container '#{identifier}' must be set up via the Developer Portal.")
-  end
-
   # ── Lanes ─────────────────────────────────────────────────────────────────────
 
   desc "Build and upload a new beta to TestFlight"
-  lane :beta do |options|
+  lane :beta do
     api_key = load_asc_api_key
 
     # app_store_connect_api_key with key_content: does not populate filepath.
@@ -176,19 +25,6 @@ platform :ios do
     require "tmpdir"
     key_path = File.join(Dir.tmpdir, "AuthKey_#{api_key[:key_id]}.p8")
     File.write(key_path, api_key[:key])
-
-    # Ensure capabilities required by Runner.entitlements exist on the App ID
-    # before match generates the provisioning profile. If we just added iCloud
-    # (or any new entitlement), force-regenerate the profile this run so the
-    # build picks it up; otherwise reuse the cached one and save the round trip.
-    new_capability = ensure_icloud_capability(
-      api_key_path:   key_path,
-      api_key:        api_key,
-      bundle_id:      "app.planom",
-      container_id:   "iCloud.app.planom",
-      container_name: "Planom",
-    )
-    force_regen = new_capability || (options[:force_regen] == true || options[:force_regen] == "true")
 
     # Bump the build number to the current timestamp (YYYYMMDDHHmmSS) so every
     # CI run produces a unique, monotonically increasing build number without
@@ -219,10 +55,6 @@ platform :ios do
       api_key:           api_key,
       keychain_name:     "ci_build.keychain",
       keychain_password: "ci_temp_pass",
-      # Regenerate when entitlements changed this run, or when the workflow
-      # was dispatched with force_regen:true. Otherwise reuse the cached
-      # profile from the certificates repo.
-      force:             force_regen,
     )
 
     build_app(
