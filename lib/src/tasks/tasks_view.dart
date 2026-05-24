@@ -20,6 +20,7 @@ import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
+import '../utils/undo_controller.dart';
 import 'completed_view.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
@@ -395,11 +396,22 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               confirmDismiss: (_) => _confirmDelete(
                                   context, f.name,
                                   isFolder: true),
-                              onDismissed: (_) =>
-                                  widget.folderController.deleteFolderDeep(
-                                f.id,
-                                widget.controller.deleteTasksForList,
-                              ),
+                              onDismissed: (_) async {
+                                final undo = UndoScope.maybeOf(context);
+                                final ts = await widget.folderController
+                                    .deleteFolderDeep(
+                                  f.id,
+                                  widget.controller.deleteTasksForList,
+                                );
+                                undo?.show(
+                                  label: s.folderTrashedToast,
+                                  onUndo: () async {
+                                    await widget.folderController
+                                        .restoreAt(ts);
+                                    await widget.controller.restoreAt(ts);
+                                  },
+                                );
+                              },
                               child: Column(
                                 children: [
                                   _ListItem(
@@ -457,10 +469,21 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                   context, l.name,
                                   isFolder: false),
                               onDismissed: (_) async {
+                                final undo = UndoScope.maybeOf(context);
+                                final ts = DateTime.now();
+                                final savedFolderId = l.folderId;
                                 await widget.controller
-                                    .deleteTasksForList(l.id);
+                                    .deleteTasksForList(l.id, ts);
                                 await widget.folderController
                                     .deleteList(l.id);
+                                undo?.show(
+                                  label: s.listTrashedToast,
+                                  onUndo: () async {
+                                    await widget.folderController
+                                        .restoreList(l.id, savedFolderId);
+                                    await widget.controller.restoreAt(ts);
+                                  },
+                                );
                               },
                               child: _ListItem(
                                 iconAsset: 'assets/icons/list.png',

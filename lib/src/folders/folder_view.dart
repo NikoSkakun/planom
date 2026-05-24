@@ -10,6 +10,7 @@ import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart' show showCreateFolderListSheet, showRenameSheet;
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
@@ -214,12 +215,21 @@ class _FolderViewState extends State<FolderView>
   }
 
   Future<void> _deleteThisFolder(BuildContext context) async {
+    final s = S.of(context);
     final confirmed =
         await _confirmDelete(_currentFolder.name, isFolder: true);
     if (!confirmed || !mounted) return;
-    await widget.folderController.deleteFolderDeep(
+    final undo = UndoScope.maybeOf(context);
+    final ts = await widget.folderController.deleteFolderDeep(
       _currentFolder.id,
       widget.taskController.deleteTasksForList,
+    );
+    undo?.show(
+      label: s.folderTrashedToast,
+      onUndo: () async {
+        await widget.folderController.restoreAt(ts);
+        await widget.taskController.restoreAt(ts);
+      },
     );
     if (mounted) Navigator.of(context).pop();
   }
@@ -285,11 +295,22 @@ class _FolderViewState extends State<FolderView>
                               background: _DeleteBackground(),
                               confirmDismiss: (_) =>
                                   _confirmDelete(f.name, isFolder: true),
-                              onDismissed: (_) =>
-                                  widget.folderController.deleteFolderDeep(
-                                f.id,
-                                widget.taskController.deleteTasksForList,
-                              ),
+                              onDismissed: (_) async {
+                                final undo = UndoScope.maybeOf(context);
+                                final ts = await widget.folderController
+                                    .deleteFolderDeep(
+                                  f.id,
+                                  widget.taskController.deleteTasksForList,
+                                );
+                                undo?.show(
+                                  label: S.of(context).folderTrashedToast,
+                                  onUndo: () async {
+                                    await widget.folderController
+                                        .restoreAt(ts);
+                                    await widget.taskController.restoreAt(ts);
+                                  },
+                                );
+                              },
                               child: Column(
                                 children: [
                                   _FolderListItem(
@@ -344,9 +365,20 @@ class _FolderViewState extends State<FolderView>
                               confirmDismiss: (_) =>
                                   _confirmDelete(l.name, isFolder: false),
                               onDismissed: (_) async {
+                                final undo = UndoScope.maybeOf(context);
+                                final ts = DateTime.now();
+                                final savedFolderId = l.folderId;
                                 await widget.taskController
-                                    .deleteTasksForList(l.id);
+                                    .deleteTasksForList(l.id, ts);
                                 await widget.folderController.deleteList(l.id);
+                                undo?.show(
+                                  label: S.of(context).listTrashedToast,
+                                  onUndo: () async {
+                                    await widget.folderController
+                                        .restoreList(l.id, savedFolderId);
+                                    await widget.taskController.restoreAt(ts);
+                                  },
+                                );
                               },
                               child: _FolderListItem(
                                 icon: buildFolderItemIcon(

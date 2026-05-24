@@ -185,6 +185,12 @@ class S {
   String get folderCounterHidden => t('folderCounterHidden');
   String get showListCount => t('showListCount');
   String get revert => t('revert');
+  String get taskTrashedToast => t('taskTrashedToast');
+  String get listTrashedToast => t('listTrashedToast');
+  String get folderTrashedToast => t('folderTrashedToast');
+  String get noteTrashedToast => t('noteTrashedToast');
+  String get noteFolderTrashedToast => t('noteFolderTrashedToast');
+  String get eventDeletedToast => t('eventDeletedToast');
   String get iconColor => t('iconColor');
   String get useAccentColor => t('useAccentColor');
   String get todayShort => t('todayShort');
@@ -577,6 +583,12 @@ const Map<String, String> _en = {
   'folderCounterHidden': 'Hidden',
   'showListCount': 'List counter',
   'revert': 'Revert',
+  'taskTrashedToast': 'Task moved to Trash',
+  'listTrashedToast': 'List moved to Trash',
+  'folderTrashedToast': 'Folder moved to Trash',
+  'noteTrashedToast': 'Note moved to Trash',
+  'noteFolderTrashedToast': 'Folder moved to Trash',
+  'eventDeletedToast': 'Event deleted',
   'iconColor': 'Icon Color',
   'useAccentColor': 'Use Accent Color',
   'todayShort': 'Today',

@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/undo_controller.dart';
 import '../folders/create_folder_list_sheet.dart' show showRenameSheet;
 import '../folders/move_to_sheet.dart';
 import 'create_note_folder_sheet.dart';
@@ -162,9 +163,15 @@ class _NoteFolderViewState extends State<NoteFolderView>
           dismiss();
           showItemInfoSheet(context, creationDate: _currentFolder.creationDate);
         },
-        onDelete: () {
+        onDelete: () async {
           dismiss();
-          widget.controller.deleteFolderDeep(_currentFolder.id);
+          final undo = UndoScope.maybeOf(context);
+          final ts = await widget.controller
+              .deleteFolderDeep(_currentFolder.id);
+          undo?.show(
+            label: S.of(context).noteFolderTrashedToast,
+            onUndo: () => widget.controller.restoreAt(ts),
+          );
           if (mounted) Navigator.of(context).pop();
         },
       );
@@ -222,8 +229,17 @@ class _NoteFolderViewState extends State<NoteFolderView>
                               key: ValueKey(f.id),
                               direction: DismissDirection.endToStart,
                               background: const NoteDeleteBackground(),
-                              onDismissed: (_) =>
-                                  widget.controller.deleteFolderDeep(f.id),
+                              onDismissed: (_) async {
+                                final undo = UndoScope.maybeOf(context);
+                                final ts = await widget.controller
+                                    .deleteFolderDeep(f.id);
+                                undo?.show(
+                                  label: S.of(context)
+                                      .noteFolderTrashedToast,
+                                  onUndo: () =>
+                                      widget.controller.restoreAt(ts),
+                                );
+                              },
                               child: Column(
                                 children: [
                                   NoteFolderRow(
@@ -266,8 +282,16 @@ class _NoteFolderViewState extends State<NoteFolderView>
                               key: ValueKey(n.id),
                               direction: DismissDirection.endToStart,
                               background: const NoteDeleteBackground(),
-                              onDismissed: (_) =>
-                                  widget.controller.deleteNote(n.id),
+                              onDismissed: (_) {
+                                final savedFolderId = n.folderId;
+                                widget.controller.deleteNote(n.id);
+                                UndoScope.maybeOf(context)?.show(
+                                  label:
+                                      S.of(context).noteTrashedToast,
+                                  onUndo: () => widget.controller
+                                      .restoreNote(n.id, savedFolderId),
+                                );
+                              },
                               child: NoteRow(
                                 note: n,
                                 onTap: () =>

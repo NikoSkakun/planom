@@ -10,6 +10,7 @@ import '../models/note.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/undo_controller.dart';
 import 'markdown_toolbar.dart';
 import 'markdown_view.dart';
 import 'note_controller.dart';
@@ -176,7 +177,14 @@ class _NoteDetailViewState extends State<NoteDetailView>
         onDelete: () {
           dismiss();
           _deleted = true;
+          final savedFolderId = widget.note.folderId;
+          final undo = UndoScope.maybeOf(context);
           widget.controller.deleteNote(widget.note.id);
+          undo?.show(
+            label: S.of(context).noteTrashedToast,
+            onUndo: () => widget.controller
+                .restoreNote(widget.note.id, savedFolderId),
+          );
           Navigator.of(context).pop();
         },
       );

@@ -22,6 +22,7 @@ import 'theme/app_theme.dart';
 import 'utils/fast_route.dart';
 import 'utils/platform_capabilities.dart';
 import 'utils/selection_menu.dart';
+import 'utils/undo_controller.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({
@@ -70,6 +71,7 @@ class _HomeShellState extends State<HomeShell> {
   final _notesCollapseSignal = ValueNotifier<int>(0);
   final _calendarResetSignal = ValueNotifier<int>(0);
   final _showPlusButton = ValueNotifier<bool>(true);
+  final _undoController = UndoController();
   // True while the user is viewing Settings via the global overlay (i.e. the
   // Settings tab is hidden but they opened Settings from another tab's ⋯
   // menu). The tab bar repaints all tabs as inactive while this is true.
@@ -155,6 +157,7 @@ class _HomeShellState extends State<HomeShell> {
     _calendarResetSignal.dispose();
     _showPlusButton.dispose();
     _globalSettingsOpen.dispose();
+    _undoController.dispose();
     super.dispose();
   }
 
@@ -441,6 +444,13 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    return UndoScope(
+      controller: _undoController,
+      child: _buildShell(context),
+    );
+  }
+
+  Widget _buildShell(BuildContext context) {
     return ListenableBuilder(
       listenable: widget.settingsController,
       builder: (context, _) {
@@ -530,6 +540,16 @@ class _HomeShellState extends State<HomeShell> {
                       child: _PlusButton(onPressed: _onPlusPressed),
                     )
                   : const SizedBox.shrink(),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: isWide
+                  ? 0
+                  : visibleIndices.length <= 1
+                      ? MediaQuery.paddingOf(context).bottom
+                      : 50 + MediaQuery.paddingOf(context).bottom,
+              child: UndoBanner(controller: _undoController),
             ),
           ],
         );

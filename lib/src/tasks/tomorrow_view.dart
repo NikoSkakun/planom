@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../folders/folder_controller.dart';
 import '../localization/strings.dart';
 import '../utils/fast_route.dart';
+import '../utils/undo_controller.dart';
 import 'task_controller.dart';
 import 'task_detail_view.dart';
 import 'task_row.dart';
@@ -88,8 +89,15 @@ class _TomorrowViewState extends State<TomorrowView> {
                         key: ValueKey(task.id),
                         direction: DismissDirection.endToStart,
                         background: const TaskDeleteBackground(),
-                        onDismissed: (_) =>
-                            widget.controller.deleteTask(task.id),
+                        onDismissed: (_) {
+                          final savedListId = task.listId;
+                          widget.controller.deleteTask(task.id);
+                          UndoScope.maybeOf(context)?.show(
+                            label: s.taskTrashedToast,
+                            onUndo: () => widget.controller
+                                .restoreTask(task.id, savedListId),
+                          );
+                        },
                         child: TaskRow(
                           task: task,
                           showList: task.listId != null,

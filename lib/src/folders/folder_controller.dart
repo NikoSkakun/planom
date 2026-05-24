@@ -123,6 +123,42 @@ class FolderController with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Restores every folder and list that was soft-deleted at exactly
+  /// [deletedDate] — used by Revert for folder-deep deletes which mark every
+  /// nested item with the same timestamp.
+  Future<void> restoreAt(DateTime deletedDate) async {
+    final ts = deletedDate.millisecondsSinceEpoch;
+    final folders = _trashedFolders
+        .where((f) => f.deletedDate?.millisecondsSinceEpoch == ts)
+        .toList();
+    final lists = _trashedLists
+        .where((l) => l.deletedDate?.millisecondsSinceEpoch == ts)
+        .toList();
+    for (final f in folders) {
+      await _db.restoreFolder(f.id);
+    }
+    for (final l in lists) {
+      await _db.restoreList(l.id);
+    }
+    _trashedFolders = _trashedFolders
+        .where((f) => f.deletedDate?.millisecondsSinceEpoch != ts)
+        .toList();
+    _trashedLists = _trashedLists
+        .where((l) => l.deletedDate?.millisecondsSinceEpoch != ts)
+        .toList();
+    _folders = [
+      ..._folders,
+      ...folders.map((f) =>
+          f.copyWith(isDeleted: false, clearDeletedDate: true)),
+    ];
+    _lists = [
+      ..._lists,
+      ...lists.map((l) =>
+          l.copyWith(isDeleted: false, clearDeletedDate: true)),
+    ];
+    notifyListeners();
+  }
+
   Future<void> permanentlyDeleteList(String id) async {
     await _db.deleteList(id);
     _trashedLists = _trashedLists.where((l) => l.id != id).toList();
@@ -234,26 +270,29 @@ class FolderController with ChangeNotifier {
 
   /// Recursively soft-deletes a folder, all nested subfolders, all lists inside
   /// them, and calls [onDeleteList] for each deleted list so the caller can
-  /// soft-delete associated tasks.
-  Future<void> deleteFolderDeep(
+  /// soft-delete associated tasks. Returns the shared `deletedDate` so a
+  /// caller can later pass it to [restoreAt] / [TaskController.restoreAt] to
+  /// revert the entire subtree in one shot.
+  Future<DateTime> deleteFolderDeep(
     String id,
-    Future<void> Function(String listId) onDeleteList,
+    Future<void> Function(String listId, DateTime deletedDate) onDeleteList,
   ) async {
     final now = DateTime.now();
     await _softDeleteFolderRecursive(id, now, onDeleteList);
     notifyListeners();
+    return now;
   }
 
   Future<void> _softDeleteFolderRecursive(
     String id,
     DateTime deletedDate,
-    Future<void> Function(String listId) onDeleteList,
+    Future<void> Function(String listId, DateTime deletedDate) onDeleteList,
   ) async {
     for (final f in foldersIn(id)) {
       await _softDeleteFolderRecursive(f.id, deletedDate, onDeleteList);
     }
     for (final l in listsIn(id)) {
-      await onDeleteList(l.id);
+      await onDeleteList(l.id, deletedDate);
       await _db.softDeleteList(l.id, deletedDate);
       _lists = _lists.where((x) => x.id != l.id).toList();
       _trashedLists = [

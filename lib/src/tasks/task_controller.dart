@@ -306,8 +306,8 @@ class TaskController with ChangeNotifier {
     NotificationService.instance.cancelTaskReminders(id);
   }
 
-  Future<void> deleteTasksForList(String listId) async {
-    final now = DateTime.now();
+  Future<void> deleteTasksForList(String listId, [DateTime? deletedDate]) async {
+    final now = deletedDate ?? DateTime.now();
     await _db.softDeleteTasksForList(listId, now);
     final toTrash = _tasks
         .where((t) => t.listId == listId)
@@ -317,6 +317,35 @@ class TaskController with ChangeNotifier {
     _trashedTasks = [...toTrash, ..._trashedTasks];
     _updateBadge();
     notifyListeners();
+  }
+
+  /// Restores every task soft-deleted at exactly [deletedDate]. Used by Revert
+  /// for bulk deletions (folder/list trash) that share one timestamp.
+  Future<void> restoreAt(DateTime deletedDate) async {
+    final ts = deletedDate.millisecondsSinceEpoch;
+    final toRestore = _trashedTasks
+        .where((t) => t.deletedDate?.millisecondsSinceEpoch == ts)
+        .toList();
+    if (toRestore.isEmpty) return;
+    for (final t in toRestore) {
+      await _db.restoreTask(t.id);
+    }
+    final restoredIds = toRestore.map((t) => t.id).toSet();
+    _trashedTasks = _trashedTasks
+        .where((t) => !restoredIds.contains(t.id))
+        .toList();
+    _tasks = [
+      ...toRestore.map((t) =>
+          t.copyWith(isDeleted: false, clearDeletedDate: true)),
+      ..._tasks,
+    ];
+    _updateBadge();
+    notifyListeners();
+    for (final t in toRestore) {
+      if (!t.isCompleted) {
+        NotificationService.instance.scheduleTaskReminders(t);
+      }
+    }
   }
 
   Future<void> permanentlyDeleteTask(String id) async {
