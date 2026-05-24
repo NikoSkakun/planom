@@ -55,6 +55,7 @@ class BackupService {
       'exportDate': DateTime.now().millisecondsSinceEpoch,
       'customIcons': customIcons,
       'tasks': await db.exportTasks(),
+      'tags': await db.exportTags(),
       'folders': folders,
       'app_lists': lists,
       'note_folders': noteFolders,
@@ -132,6 +133,7 @@ class BackupService {
       customIcons = (data['customIcons'] as Map<String, dynamic>?) ?? {};
       tables = {
         'tasks': asMaps(data['tasks']),
+        'tags': asMaps(data['tags']),
         'folders': asMaps(data['folders']),
         'app_lists': asMaps(data['app_lists']),
         'note_folders': asMaps(data['note_folders']),

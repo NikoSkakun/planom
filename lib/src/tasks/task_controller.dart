@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 
 import '../database/database_service.dart';
+import '../models/tag.dart';
 import '../models/task.dart';
 import '../notifications/notification_service.dart';
 
@@ -13,6 +14,7 @@ class TaskController with ChangeNotifier {
   final DatabaseService _db;
   List<Task> _tasks = [];
   List<Task> _trashedTasks = [];
+  List<Tag> _tags = [];
 
   TaskSortOrder _sortOrder = TaskSortOrder.defaultOrder;
   final List<String> _completionOrder = [];
@@ -107,7 +109,73 @@ class TaskController with ChangeNotifier {
   Future<void> load() async {
     _tasks = await _db.getTasks();
     _trashedTasks = await _db.getTrashedTasks();
+    _tags = (await _db.getTags()).map(Tag.fromMap).toList();
     _updateBadge();
+    notifyListeners();
+  }
+
+  // ── Tags ─────────────────────────────────────────────────────────────────
+
+  List<Tag> get tags => List.unmodifiable(_tags);
+
+  Tag? tagById(String id) {
+    for (final t in _tags) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
+  List<Tag> tagsForTask(Task task) =>
+      task.tagIds.map(tagById).whereType<Tag>().toList();
+
+  List<Task> tasksWithTag(String tagId) =>
+      _topLevel.where((t) => t.tagIds.contains(tagId)).toList();
+
+  int taskCountForTag(String tagId) =>
+      _topLevel.where((t) => t.tagIds.contains(tagId)).length;
+
+  /// Returns the existing tag if one with the same case-insensitive name
+  /// exists; otherwise creates and persists a new one.
+  Future<Tag> addOrGetTag(String name, {int? color}) async {
+    final trimmed = name.trim();
+    final existing = _tags.firstWhere(
+      (t) => t.name.toLowerCase() == trimmed.toLowerCase(),
+      orElse: () => Tag(name: ''),
+    );
+    if (existing.name.isNotEmpty) return existing;
+    final tag = Tag(name: trimmed, color: color);
+    await _db.insertTag(tag.toMap());
+    _tags = [..._tags, tag]..sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    notifyListeners();
+    return tag;
+  }
+
+  Future<void> updateTag(Tag tag) async {
+    await _db.updateTag(tag.toMap());
+    final i = _tags.indexWhere((t) => t.id == tag.id);
+    if (i == -1) return;
+    _tags = [..._tags]..[i] = tag;
+    _tags.sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    notifyListeners();
+  }
+
+  /// Removes the tag globally; strips its id from every task that referenced
+  /// it so we never leave dangling tagIds behind.
+  Future<void> deleteTag(String tagId) async {
+    await _db.deleteTag(tagId);
+    _tags = _tags.where((t) => t.id != tagId).toList();
+    final affected = _tasks.where((t) => t.tagIds.contains(tagId)).toList();
+    for (int idx = 0; idx < affected.length; idx++) {
+      final t = affected[idx];
+      final updated = t.copyWith(
+        tagIds: t.tagIds.where((id) => id != tagId).toList(),
+      );
+      await _db.updateTask(updated);
+      final taskIdx = _tasks.indexWhere((x) => x.id == t.id);
+      if (taskIdx != -1) _tasks[taskIdx] = updated;
+    }
     notifyListeners();
   }
 

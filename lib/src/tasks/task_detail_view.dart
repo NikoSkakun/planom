@@ -9,6 +9,7 @@ import '../utils/duration_picker.dart';
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../localization/strings.dart';
+import '../models/tag.dart';
 import '../models/task.dart';
 import '../notes/markdown_toolbar.dart';
 import '../notes/markdown_view.dart';
@@ -18,6 +19,7 @@ import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/reminder_picker.dart';
 import 'calendar_date_picker.dart';
+import 'tag_picker_sheet.dart';
 import 'task_controller.dart';
 
 class TaskDetailView extends StatefulWidget {
@@ -49,6 +51,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
   late int? _doTime;
   late int? _duration;
   late List<int> _reminderOffsets;
+  late List<String> _tagIds;
   late bool _isCompleted;
   late String? _listId;
   late int _priority;
@@ -68,6 +71,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _listId = widget.task.listId;
     _priority = widget.task.priority;
     _reminderOffsets = List.of(widget.task.reminderOffsets);
+    _tagIds = List.of(widget.task.tagIds);
     _title.addListener(_scheduleAutosave);
     _note.addListener(_scheduleAutosave);
     _noteFocus.addListener(_onNoteFocusChanged);
@@ -111,7 +115,19 @@ class _TaskDetailViewState extends State<TaskDetailView>
       clearListId: _listId == null,
       priority: _priority,
       reminderOffsets: _reminderOffsets,
+      tagIds: _tagIds,
     ));
+  }
+
+  Future<void> _pickTags() async {
+    final result = await showTagPickerSheet(
+      context,
+      widget.controller,
+      initialSelected: _tagIds,
+    );
+    if (!mounted || result == null) return;
+    setState(() => _tagIds = result);
+    _save();
   }
 
   @override
@@ -449,6 +465,59 @@ class _TaskDetailViewState extends State<TaskDetailView>
                   ),
                   const SizedBox(height: 12),
 
+                  // Tag picker row — chips for selected tags + chevron
+                  _SectionCard(
+                    onTap: _pickTags,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.tag,
+                          size: 18,
+                          color: _tagIds.isNotEmpty
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _tagIds.isEmpty
+                              ? Text(
+                                  s.addTag,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: CupertinoColors.secondaryLabel
+                                        .resolveFrom(context),
+                                  ),
+                                )
+                              : ListenableBuilder(
+                                  listenable: widget.controller,
+                                  builder: (context, _) {
+                                    final tags = _tagIds
+                                        .map(widget.controller.tagById)
+                                        .whereType<Tag>()
+                                        .toList();
+                                    return Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      children: [
+                                        for (final tag in tags)
+                                          _TagChip(tag: tag),
+                                      ],
+                                    );
+                                  },
+                                ),
+                        ),
+                        Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 14,
+                          color: CupertinoColors.secondaryLabel
+                              .resolveFrom(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
                   // Reminder row
                   _SectionCard(
                     onTap: _pickReminders,
@@ -509,6 +578,34 @@ class _TaskDetailViewState extends State<TaskDetailView>
                   showLinkPromptDialog(context, initialText: selected),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  const _TagChip({required this.tag});
+
+  final Tag tag;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = tag.color != null
+        ? Color(tag.color!)
+        : CupertinoColors.systemGrey.resolveFrom(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: accent.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        tag.name,
+        style: TextStyle(
+          fontSize: 12,
+          color: accent,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }

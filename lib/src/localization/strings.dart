@@ -248,6 +248,11 @@ class S {
   String get note => t('note');
   String get subtasks => t('subtasks');
   String get addSubtask => t('addSubtask');
+  String get tags => t('tags');
+  String get noTags => t('noTags');
+  String get addTag => t('addTag');
+  String get createTag => t('createTag');
+  String get searchOrCreateTag => t('searchOrCreateTag');
   String get title => t('title');
   String get folderName => t('folderName');
   String get listName => t('listName');
@@ -526,6 +531,8 @@ const Map<String, String> _en = {
   'deletePermanentlyQuestion': 'Delete "{name}" permanently?',
   'taskName': 'Task name', 'eventName': 'Event name', 'note': 'Note',
   'subtasks': 'Subtasks', 'addSubtask': 'Add subtask',
+  'tags': 'Tags', 'noTags': 'No tags yet', 'addTag': 'Add tag',
+  'createTag': 'Create', 'searchOrCreateTag': 'Search or create tag',
   'title': 'Title', 'folderName': 'Folder name', 'listName': 'List name',
   'routineName': 'Routine name',
   'duration': 'Duration', 'noDuration': 'No Duration', 'noDate': 'No Date',
@@ -631,6 +638,8 @@ const Map<String, String> _uk = {
   'deletePermanentlyQuestion': 'Видалити «{name}» назавжди?',
   'taskName': 'Назва завдання', 'eventName': 'Назва події', 'note': 'Нотатка',
   'subtasks': 'Підзавдання', 'addSubtask': 'Додати підзавдання',
+  'tags': 'Теги', 'noTags': 'Тегів ще немає', 'addTag': 'Додати тег',
+  'createTag': 'Створити', 'searchOrCreateTag': 'Пошук або створення тегу',
   'title': 'Заголовок', 'folderName': 'Назва папки', 'listName': 'Назва списку',
   'routineName': 'Назва звички',
   'duration': 'Тривалість', 'noDuration': 'Без тривалості', 'noDate': 'Без дати',
@@ -736,6 +745,8 @@ const Map<String, String> _es = {
   'deletePermanentlyQuestion': '¿Eliminar "{name}" permanentemente?',
   'taskName': 'Nombre de la tarea', 'eventName': 'Nombre del evento', 'note': 'Nota',
   'subtasks': 'Subtareas', 'addSubtask': 'Añadir subtarea',
+  'tags': 'Etiquetas', 'noTags': 'Sin etiquetas aún', 'addTag': 'Añadir etiqueta',
+  'createTag': 'Crear', 'searchOrCreateTag': 'Buscar o crear etiqueta',
   'title': 'Título', 'folderName': 'Nombre de la carpeta', 'listName': 'Nombre de la lista',
   'routineName': 'Nombre de la rutina',
   'duration': 'Duración', 'noDuration': 'Sin duración', 'noDate': 'Sin fecha',
@@ -841,6 +852,8 @@ const Map<String, String> _fr = {
   'deletePermanentlyQuestion': 'Supprimer « {name} » définitivement ?',
   'taskName': 'Nom de la tâche', 'eventName': 'Nom de l\'événement', 'note': 'Note',
   'subtasks': 'Sous-tâches', 'addSubtask': 'Ajouter une sous-tâche',
+  'tags': 'Étiquettes', 'noTags': 'Aucune étiquette', 'addTag': 'Ajouter une étiquette',
+  'createTag': 'Créer', 'searchOrCreateTag': 'Rechercher ou créer une étiquette',
   'title': 'Titre', 'folderName': 'Nom du dossier', 'listName': 'Nom de la liste',
   'routineName': 'Nom de la routine',
   'duration': 'Durée', 'noDuration': 'Sans durée', 'noDate': 'Sans date',
@@ -946,6 +959,8 @@ const Map<String, String> _de = {
   'deletePermanentlyQuestion': '„{name}" endgültig löschen?',
   'taskName': 'Aufgabenname', 'eventName': 'Ereignisname', 'note': 'Notiz',
   'subtasks': 'Unteraufgaben', 'addSubtask': 'Unteraufgabe hinzufügen',
+  'tags': 'Tags', 'noTags': 'Noch keine Tags', 'addTag': 'Tag hinzufügen',
+  'createTag': 'Erstellen', 'searchOrCreateTag': 'Tag suchen oder erstellen',
   'title': 'Titel', 'folderName': 'Ordnername', 'listName': 'Listenname',
   'routineName': 'Routinename',
   'duration': 'Dauer', 'noDuration': 'Keine Dauer', 'noDate': 'Kein Datum',
@@ -1051,6 +1066,8 @@ const Map<String, String> _it = {
   'deletePermanentlyQuestion': 'Eliminare "{name}" definitivamente?',
   'taskName': 'Nome attività', 'eventName': 'Nome evento', 'note': 'Nota',
   'subtasks': 'Sotto-attività', 'addSubtask': 'Aggiungi sotto-attività',
+  'tags': 'Tag', 'noTags': 'Nessun tag', 'addTag': 'Aggiungi tag',
+  'createTag': 'Crea', 'searchOrCreateTag': 'Cerca o crea tag',
   'title': 'Titolo', 'folderName': 'Nome cartella', 'listName': 'Nome lista',
   'routineName': 'Nome abitudine',
   'duration': 'Durata', 'noDuration': 'Nessuna durata', 'noDate': 'Nessuna data',
@@ -1156,6 +1173,8 @@ const Map<String, String> _pt = {
   'deletePermanentlyQuestion': 'Excluir "{name}" permanentemente?',
   'taskName': 'Nome da tarefa', 'eventName': 'Nome do evento', 'note': 'Nota',
   'subtasks': 'Subtarefas', 'addSubtask': 'Adicionar subtarefa',
+  'tags': 'Etiquetas', 'noTags': 'Sem etiquetas', 'addTag': 'Adicionar etiqueta',
+  'createTag': 'Criar', 'searchOrCreateTag': 'Buscar ou criar etiqueta',
   'title': 'Título', 'folderName': 'Nome da pasta', 'listName': 'Nome da lista',
   'routineName': 'Nome da rotina',
   'duration': 'Duração', 'noDuration': 'Sem duração', 'noDate': 'Sem data',
@@ -1261,6 +1280,8 @@ const Map<String, String> _ru = {
   'deletePermanentlyQuestion': 'Удалить «{name}» навсегда?',
   'taskName': 'Название задачи', 'eventName': 'Название события', 'note': 'Заметка',
   'subtasks': 'Подзадачи', 'addSubtask': 'Добавить подзадачу',
+  'tags': 'Теги', 'noTags': 'Тегов пока нет', 'addTag': 'Добавить тег',
+  'createTag': 'Создать', 'searchOrCreateTag': 'Найти или создать тег',
   'title': 'Заголовок', 'folderName': 'Название папки', 'listName': 'Название списка',
   'routineName': 'Название привычки',
   'duration': 'Длительность', 'noDuration': 'Без длительности', 'noDate': 'Без даты',
@@ -1366,6 +1387,8 @@ const Map<String, String> _zh = {
   'deletePermanentlyQuestion': '永久删除"{name}"？',
   'taskName': '任务名称', 'eventName': '事件名称', 'note': '笔记',
   'subtasks': '子任务', 'addSubtask': '添加子任务',
+  'tags': '标签', 'noTags': '暂无标签', 'addTag': '添加标签',
+  'createTag': '创建', 'searchOrCreateTag': '搜索或创建标签',
   'title': '标题', 'folderName': '文件夹名称', 'listName': '列表名称',
   'routineName': '习惯名称',
   'duration': '时长', 'noDuration': '无时长', 'noDate': '无日期',
@@ -1471,6 +1494,8 @@ const Map<String, String> _ja = {
   'deletePermanentlyQuestion': '「{name}」を完全に削除しますか？',
   'taskName': 'タスク名', 'eventName': 'イベント名', 'note': 'ノート',
   'subtasks': 'サブタスク', 'addSubtask': 'サブタスクを追加',
+  'tags': 'タグ', 'noTags': 'タグがありません', 'addTag': 'タグを追加',
+  'createTag': '作成', 'searchOrCreateTag': 'タグを検索または作成',
   'title': 'タイトル', 'folderName': 'フォルダ名', 'listName': 'リスト名',
   'routineName': '習慣名',
   'duration': '所要時間', 'noDuration': '所要時間なし', 'noDate': '日付なし',

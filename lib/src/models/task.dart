@@ -20,6 +20,7 @@ class Task extends AppItem {
   final DateTime? completionDate;
   final List<int> reminderOffsets;
   final String? parentTaskId;
+  final List<String> tagIds;
 
   Task({
     String? id,
@@ -39,6 +40,7 @@ class Task extends AppItem {
     this.completionDate,
     this.reminderOffsets = const [],
     this.parentTaskId,
+    this.tagIds = const [],
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -67,6 +69,7 @@ class Task extends AppItem {
     List<int>? reminderOffsets,
     String? parentTaskId,
     bool clearParentTaskId = false,
+    List<String>? tagIds,
   }) {
     return Task(
       id: id,
@@ -87,6 +90,7 @@ class Task extends AppItem {
       reminderOffsets: reminderOffsets ?? this.reminderOffsets,
       parentTaskId:
           clearParentTaskId ? null : (parentTaskId ?? this.parentTaskId),
+      tagIds: tagIds ?? this.tagIds,
     );
   }
 
@@ -108,6 +112,7 @@ class Task extends AppItem {
         'completionDate': completionDate?.millisecondsSinceEpoch,
         'reminderOffsets': reminderOffsets.join(','),
         'parentTaskId': parentTaskId,
+        'tagIds': tagIds.join(','),
       };
 
   factory Task.fromMap(Map<String, dynamic> map) => Task(
@@ -135,10 +140,16 @@ class Task extends AppItem {
             : null,
         reminderOffsets: _parseOffsets(map['reminderOffsets'] as String?),
         parentTaskId: map['parentTaskId'] as String?,
+        tagIds: _parseIds(map['tagIds'] as String?),
       );
 
   static List<int> _parseOffsets(String? s) {
     if (s == null || s.isEmpty) return const [];
     return s.split(',').map((e) => int.tryParse(e)).whereType<int>().toList();
+  }
+
+  static List<String> _parseIds(String? s) {
+    if (s == null || s.isEmpty) return const [];
+    return s.split(',').where((e) => e.isNotEmpty).toList();
   }
 }

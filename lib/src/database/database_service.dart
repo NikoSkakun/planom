@@ -14,7 +14,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 18;
+  static const _dbVersion = 19;
 
   Database? _db;
 
@@ -44,7 +44,16 @@ class DatabaseService {
             deletedDate INTEGER,
             completionDate INTEGER,
             reminderOffsets TEXT,
-            parentTaskId TEXT
+            parentTaskId TEXT,
+            tagIds TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE tags (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            color INTEGER,
+            creationDate INTEGER NOT NULL
           )
         ''');
         await db.execute('''
@@ -307,6 +316,17 @@ class DatabaseService {
         }
         if (oldVersion < 18) {
           await db.execute('ALTER TABLE tasks ADD COLUMN parentTaskId TEXT');
+        }
+        if (oldVersion < 19) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN tagIds TEXT');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS tags (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              color INTEGER,
+              creationDate INTEGER NOT NULL
+            )
+          ''');
         }
       },
     );
@@ -765,6 +785,35 @@ class DatabaseService {
     await db.delete('app_lists', where: 'isDeleted = 1');
   }
 
+  // Tags — flat, name-uniqueness enforced in the controller
+  Future<List<Map<String, dynamic>>> getTags() async {
+    final db = await _database;
+    final rows = await db.query('tags', orderBy: 'name COLLATE NOCASE ASC');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<void> insertTag(Map<String, dynamic> tag) async {
+    final db = await _database;
+    await db.insert('tags', tag,
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateTag(Map<String, dynamic> tag) async {
+    final db = await _database;
+    await db.update('tags', tag, where: 'id = ?', whereArgs: [tag['id']]);
+  }
+
+  Future<void> deleteTag(String id) async {
+    final db = await _database;
+    await db.delete('tags', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> exportTags() async {
+    final db = await _database;
+    final rows = await db.query('tags');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
   // App settings — generic key/value store for app-level preferences
   Future<List<Map<String, dynamic>>> getAppSettings() async {
     final db = await _database;
@@ -839,6 +888,7 @@ class DatabaseService {
     'note_folders',
     'app_lists',
     'folders',
+    'tags',
     'tasks',
   ];
 
@@ -874,6 +924,7 @@ class DatabaseService {
     await db.delete('note_folders');
     await db.delete('app_lists');
     await db.delete('folders');
+    await db.delete('tags');
     await db.delete('tasks');
   }
 
