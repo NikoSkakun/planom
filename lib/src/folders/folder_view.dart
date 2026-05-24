@@ -84,7 +84,8 @@ class _FolderViewState extends State<FolderView>
       children: [
         for (final f in subFolders) ...[
           _FolderListItem(
-            icon: buildFolderItemIcon(f.iconId, isFolder: true),
+            icon: buildFolderItemIcon(f.iconId,
+                isFolder: true, iconColor: f.iconColor),
             label: f.name,
             isFolder: true,
             indent: indent,
@@ -108,7 +109,8 @@ class _FolderViewState extends State<FolderView>
         ],
         for (final l in lists) ...[
           _FolderListItem(
-            icon: buildFolderItemIcon(l.iconId, isFolder: false),
+            icon: buildFolderItemIcon(l.iconId,
+                isFolder: false, iconColor: l.iconColor),
             label: l.name,
             indent: indent,
             count: _listCount(l.id),
@@ -175,11 +177,14 @@ class _FolderViewState extends State<FolderView>
           showFolderIconPickerSheet(
             context,
             currentIconId: _currentFolder.iconId,
+            currentIconColor: _currentFolder.iconColor,
             isFolder: true,
-            onSelected: (id) {
+            onSelected: (id, color) {
               final updated = _currentFolder.copyWith(
                 iconId: id,
                 clearIconId: id == null,
+                iconColor: color,
+                clearIconColor: color == null,
               );
               widget.folderController.updateFolder(updated);
               if (mounted) setState(() => _currentFolder = updated);
@@ -317,6 +322,7 @@ class _FolderViewState extends State<FolderView>
                                     icon: buildFolderItemIcon(
                                       f.iconId,
                                       isFolder: true,
+                                      iconColor: f.iconColor,
                                     ),
                                     label: f.name,
                                     isFolder: true,
@@ -384,6 +390,7 @@ class _FolderViewState extends State<FolderView>
                                 icon: buildFolderItemIcon(
                                   l.iconId,
                                   isFolder: false,
+                                  iconColor: l.iconColor,
                                 ),
                                 label: l.name,
                                 count: _listCount(l.id),

@@ -61,7 +61,7 @@ class _CreateSheetState extends State<_CreateSheet> {
       context,
       currentIconId: _selectedIconId,
       isFolder: true,
-      onSelected: (id) {
+      onSelected: (id, _) {
         if (mounted) setState(() => _selectedIconId = id);
       },
     );

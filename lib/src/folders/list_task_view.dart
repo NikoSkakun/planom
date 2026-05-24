@@ -86,11 +86,14 @@ class _ListTaskViewState extends State<ListTaskView>
           showFolderIconPickerSheet(
             context,
             currentIconId: _currentList.iconId,
+            currentIconColor: _currentList.iconColor,
             isFolder: false,
-            onSelected: (id) {
+            onSelected: (id, color) {
               final updated = _currentList.copyWith(
                 iconId: id,
                 clearIconId: id == null,
+                iconColor: color,
+                clearIconColor: color == null,
               );
               widget.folderController.updateList(updated);
               if (mounted) setState(() => _currentList = updated);

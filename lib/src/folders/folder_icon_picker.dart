@@ -77,7 +77,14 @@ String? resolveCustomIconPath(String iconId) {
 }
 
 /// Renders the appropriate icon widget for a folder/list row (22×22).
-Widget buildFolderItemIcon(String? iconId, {required bool isFolder}) {
+///
+/// [iconColor] overrides the SF-symbol tint (defaults to [AppColors.accent]).
+/// It has no effect on custom-image icons — those are rendered as-is.
+Widget buildFolderItemIcon(
+  String? iconId, {
+  required bool isFolder,
+  int? iconColor,
+}) {
   final defaultAsset =
       isFolder ? 'assets/icons/folder.png' : 'assets/icons/list.png';
 
@@ -109,7 +116,7 @@ Widget buildFolderItemIcon(String? iconId, {required bool isFolder}) {
       child: Icon(
         folderItemIconData(iconId),
         size: 20,
-        color: AppColors.accent,
+        color: iconColor != null ? Color(iconColor) : AppColors.accent,
       ),
     ),
   );
@@ -154,13 +161,17 @@ Future<String?> pickCustomIcon() async {
 /// Shows the icon picker bottom sheet.
 ///
 /// [currentIconId] is the currently selected iconId (may be null).
+/// [currentIconColor] is the optional ARGB color override (null = use accent).
 /// [isFolder] controls which default asset is shown as the "none" option.
-/// [onSelected] is called with the new iconId (null = reset to default).
+/// [onSelected] is called with the new iconId + optional iconColor.
+/// Color overrides apply only to SF-symbol icons (not custom images);
+/// picking a custom image passes back the path + null color.
 void showFolderIconPickerSheet(
   BuildContext context, {
   required String? currentIconId,
+  int? currentIconColor,
   required bool isFolder,
-  required void Function(String?) onSelected,
+  required void Function(String? iconId, int? iconColor) onSelected,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -169,22 +180,42 @@ void showFolderIconPickerSheet(
     backgroundColor: const Color(0x00000000),
     builder: (_) => _IconPickerSheet(
       currentIconId: currentIconId,
+      currentIconColor: currentIconColor,
       isFolder: isFolder,
       onSelected: onSelected,
     ),
   );
 }
 
+// Preset color overrides for SF-symbol icons. Matches the list color picker
+// palette so users see a consistent set of swatches across the app.
+const _kIconColorPresets = <int>[
+  0xFFFF3B30,
+  0xFFFF9500,
+  0xFFFFCC00,
+  0xFF34C759,
+  0xFF00C7BE,
+  0xFF32ADE6,
+  0xFF007AFF,
+  0xFF5856D6,
+  0xFFAF52DE,
+  0xFFFF2D55,
+  0xFFA2845E,
+  0xFF8E8E93,
+];
+
 class _IconPickerSheet extends StatefulWidget {
   const _IconPickerSheet({
     required this.currentIconId,
+    required this.currentIconColor,
     required this.isFolder,
     required this.onSelected,
   });
 
   final String? currentIconId;
+  final int? currentIconColor;
   final bool isFolder;
-  final void Function(String?) onSelected;
+  final void Function(String? iconId, int? iconColor) onSelected;
 
   @override
   State<_IconPickerSheet> createState() => _IconPickerSheetState();
@@ -192,12 +223,14 @@ class _IconPickerSheet extends StatefulWidget {
 
 class _IconPickerSheetState extends State<_IconPickerSheet> {
   late String? _selected;
+  int? _color;
   bool _picking = false;
 
   @override
   void initState() {
     super.initState();
     _selected = widget.currentIconId;
+    _color = widget.currentIconColor;
   }
 
   Future<void> _pickFromLibrary() async {
@@ -206,7 +239,8 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
       final path = await pickCustomIcon();
       if (!mounted) return;
       if (path != null) {
-        widget.onSelected(path);
+        // Custom images don't accept a color tint — clear any override.
+        widget.onSelected(path, null);
         Navigator.of(context, rootNavigator: true).pop();
       }
     } finally {
@@ -215,19 +249,35 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
   }
 
   void _selectPreset(String iconId) {
-    widget.onSelected(iconId);
-    Navigator.of(context, rootNavigator: true).pop();
+    setState(() => _selected = iconId);
+    widget.onSelected(iconId, _color);
+  }
+
+  void _selectColor(int? color) {
+    setState(() => _color = color);
+    // If no icon is set yet (default/photo tile), don't propagate — the color
+    // only matters once the user has picked an SF-symbol icon.
+    if (_selected != null && !isCustomIconId(_selected)) {
+      widget.onSelected(_selected, color);
+    }
   }
 
   void _resetToDefault() {
-    widget.onSelected(null);
-    Navigator.of(context, rootNavigator: true).pop();
+    setState(() {
+      _selected = null;
+      _color = null;
+    });
+    widget.onSelected(null, null);
   }
 
   @override
   Widget build(BuildContext context) {
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
     final bottomPad = MediaQuery.paddingOf(context).bottom;
+    final s = S.of(context);
+    final effectiveColor = _color != null
+        ? Color(_color!)
+        : AppColors.accent;
 
     return Container(
       decoration: BoxDecoration(
@@ -251,7 +301,7 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
           ),
           const SizedBox(height: 16),
           Text(
-            S.of(context).chooseIcon,
+            s.chooseIcon,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
@@ -274,7 +324,7 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
               ...kFolderIconPresets.map(
                 (preset) => _IconTile(
                   isSelected: _selected == preset.$1,
-                  color: Color(preset.$2),
+                  color: effectiveColor,
                   onTap: () => _selectPreset(preset.$1),
                   child: Icon(
                     folderItemIconData(preset.$1),
@@ -283,6 +333,31 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
                   ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            s.iconColor,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _ColorDot(
+                isSelected: _color == null,
+                color: AppColors.accent,
+                isDefault: true,
+                onTap: () => _selectColor(null),
+              ),
+              for (final c in _kIconColorPresets)
+                _ColorDot(
+                  isSelected: _color == c,
+                  color: Color(c),
+                  isDefault: false,
+                  onTap: () => _selectColor(c),
+                ),
             ],
           ),
           const SizedBox(height: 20),
@@ -307,8 +382,8 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
                   const SizedBox(width: 8),
                   Text(
                     _picking
-                        ? S.of(context).opening
-                        : S.of(context).chooseFromLibrary,
+                        ? s.opening
+                        : s.chooseFromLibrary,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
@@ -320,6 +395,56 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ColorDot extends StatelessWidget {
+  const _ColorDot({
+    required this.isSelected,
+    required this.color,
+    required this.isDefault,
+    required this.onTap,
+  });
+
+  final bool isSelected;
+  final Color color;
+  final bool isDefault;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color,
+          border: isSelected
+              ? Border.all(
+                  color: CupertinoColors.label.resolveFrom(context),
+                  width: 2.5,
+                )
+              : isDefault
+                  ? Border.all(
+                      color: CupertinoColors.separator.resolveFrom(context),
+                      width: 1,
+                    )
+                  : null,
+        ),
+        child: isDefault
+            ? Icon(
+                CupertinoIcons.circle_grid_3x3_fill,
+                size: 14,
+                color: CupertinoColors.white,
+              )
+            : (isSelected
+                ? const Icon(CupertinoIcons.checkmark,
+                    size: 16, color: CupertinoColors.white)
+                : null),
       ),
     );
   }

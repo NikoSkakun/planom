@@ -7,6 +7,7 @@ class AppFolder {
   final DateTime creationDate;
   final int sortOrder;
   final String? iconId; // null=default asset; SF-symbol key or absolute file path
+  final int? iconColor; // ARGB override for SF-symbol icon; null=use accent
   final bool isDeleted;
   final DateTime? deletedDate;
 
@@ -17,6 +18,7 @@ class AppFolder {
     DateTime? creationDate,
     this.sortOrder = 0,
     this.iconId,
+    this.iconColor,
     this.isDeleted = false,
     this.deletedDate,
   })  : id = id ?? const Uuid().v4(),
@@ -29,6 +31,8 @@ class AppFolder {
     int? sortOrder,
     String? iconId,
     bool clearIconId = false,
+    int? iconColor,
+    bool clearIconColor = false,
     bool? isDeleted,
     DateTime? deletedDate,
     bool clearDeletedDate = false,
@@ -41,6 +45,7 @@ class AppFolder {
         creationDate: creationDate,
         sortOrder: sortOrder ?? this.sortOrder,
         iconId: clearIconId ? null : (iconId ?? this.iconId),
+        iconColor: clearIconColor ? null : (iconColor ?? this.iconColor),
         isDeleted: isDeleted ?? this.isDeleted,
         deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
       );
@@ -52,6 +57,7 @@ class AppFolder {
         'creationDate': creationDate.millisecondsSinceEpoch,
         'sortOrder': sortOrder,
         'iconId': iconId,
+        'iconColor': iconColor,
         'isDeleted': isDeleted ? 1 : 0,
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
       };
@@ -64,6 +70,7 @@ class AppFolder {
             DateTime.fromMillisecondsSinceEpoch(map['creationDate'] as int),
         sortOrder: map['sortOrder'] as int? ?? 0,
         iconId: map['iconId'] as String?,
+        iconColor: map['iconColor'] as int?,
         isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
         deletedDate: map['deletedDate'] != null
             ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)

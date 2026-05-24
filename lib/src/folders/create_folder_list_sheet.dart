@@ -162,6 +162,7 @@ class _CreateSheetState extends State<_CreateSheet> {
   final _nameCtrl = TextEditingController();
   int? _selectedColor;
   String? _selectedIconId;
+  int? _selectedIconColor;
 
   @override
   void dispose() {
@@ -177,6 +178,7 @@ class _CreateSheetState extends State<_CreateSheet> {
         name: name,
         parentFolderId: widget.parentFolderId,
         iconId: _selectedIconId,
+        iconColor: _selectedIconColor,
       ));
     } else {
       await widget.controller.addList(AppList(
@@ -184,6 +186,7 @@ class _CreateSheetState extends State<_CreateSheet> {
         folderId: widget.parentFolderId,
         color: _selectedColor,
         iconId: _selectedIconId,
+        iconColor: _selectedIconColor,
       ));
     }
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -193,9 +196,15 @@ class _CreateSheetState extends State<_CreateSheet> {
     showFolderIconPickerSheet(
       context,
       currentIconId: _selectedIconId,
+      currentIconColor: _selectedIconColor,
       isFolder: _type == _CreateType.folder,
-      onSelected: (id) {
-        if (mounted) setState(() => _selectedIconId = id);
+      onSelected: (id, color) {
+        if (mounted) {
+          setState(() {
+            _selectedIconId = id;
+            _selectedIconColor = color;
+          });
+        }
       },
     );
   }

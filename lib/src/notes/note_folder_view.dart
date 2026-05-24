@@ -133,7 +133,7 @@ class _NoteFolderViewState extends State<NoteFolderView>
             context,
             currentIconId: _currentFolder.iconId,
             isFolder: true,
-            onSelected: (id) {
+            onSelected: (id, _) {
               final updated = _currentFolder.copyWith(
                 iconId: id,
                 clearIconId: id == null,

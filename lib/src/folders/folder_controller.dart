@@ -191,6 +191,7 @@ class FolderController with ChangeNotifier {
       sortOrder: orig.sortOrder,
       color: orig.color,
       iconId: orig.iconId,
+      iconColor: orig.iconColor,
     );
     await _db.restoreList(id);
     if (targetFolderId != orig.folderId) {
@@ -212,6 +213,7 @@ class FolderController with ChangeNotifier {
       creationDate: orig.creationDate,
       sortOrder: orig.sortOrder,
       iconId: orig.iconId,
+      iconColor: orig.iconColor,
     );
     await _db.restoreFolder(id);
     if (targetParentId != orig.parentFolderId) {

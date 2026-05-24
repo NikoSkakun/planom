@@ -167,6 +167,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
           _ListItem(
             iconAsset: 'assets/icons/folder.png',
             iconId: f.iconId,
+            iconColor: f.iconColor,
             isFolder: true,
             label: f.name,
             indent: indent,
@@ -192,6 +193,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
           _ListItem(
             iconAsset: 'assets/icons/list.png',
             iconId: l.iconId,
+            iconColor: l.iconColor,
             isFolder: false,
             label: l.name,
             indent: indent,
@@ -417,6 +419,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                   _ListItem(
                                     iconAsset: 'assets/icons/folder.png',
                                     iconId: f.iconId,
+                                    iconColor: f.iconColor,
                                     isFolder: true,
                                     label: f.name,
                                     count: _folderCount(f.id),
@@ -488,6 +491,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               child: _ListItem(
                                 iconAsset: 'assets/icons/list.png',
                                 iconId: l.iconId,
+                                iconColor: l.iconColor,
                                 isFolder: false,
                                 label: l.name,
                                 count: _listCount(l.id),
@@ -636,6 +640,7 @@ class _ListItem extends StatelessWidget {
     this.iconAsset,
     this.iconWidget,
     this.iconId,
+    this.iconColor,
     this.isFolder = false,
     this.count,
     this.onExpand,
@@ -646,6 +651,7 @@ class _ListItem extends StatelessWidget {
   final String? iconAsset;
   final Widget? iconWidget;
   final String? iconId;
+  final int? iconColor;
   final bool isFolder;
   final String label;
   final VoidCallback onTap;
@@ -660,7 +666,8 @@ class _ListItem extends StatelessWidget {
     if (iconWidget != null) {
       icon = iconWidget!;
     } else if (iconId != null) {
-      icon = buildFolderItemIcon(iconId, isFolder: isFolder);
+      icon = buildFolderItemIcon(iconId,
+          isFolder: isFolder, iconColor: iconColor);
     } else {
       icon = Image.asset(iconAsset!, width: 22, height: 22);
     }
