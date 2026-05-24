@@ -178,6 +178,23 @@ class S {
   String get showHideReminders => t('showHideReminders');
   String get sectionTasksUi => t('sectionTasksUi');
   String get showAddFolderButton => t('showAddFolderButton');
+  String get sectionTaskCounters => t('sectionTaskCounters');
+  String get folderCounter => t('folderCounter');
+  String get folderCounterDirect => t('folderCounterDirect');
+  String get folderCounterRecursive => t('folderCounterRecursive');
+  String get folderCounterHidden => t('folderCounterHidden');
+  String get showListCount => t('showListCount');
+  String get revert => t('revert');
+  String get taskTrashedToast => t('taskTrashedToast');
+  String get listTrashedToast => t('listTrashedToast');
+  String get folderTrashedToast => t('folderTrashedToast');
+  String get noteTrashedToast => t('noteTrashedToast');
+  String get noteFolderTrashedToast => t('noteFolderTrashedToast');
+  String get eventDeletedToast => t('eventDeletedToast');
+  String get iconColor => t('iconColor');
+  String get useAccentColor => t('useAccentColor');
+  String get todayShort => t('todayShort');
+  String get tomorrowShort => t('tomorrowShort');
   String get addList => t('addList');
   String get addFolder => t('addFolder');
   String get deleteSpace => t('deleteSpace');
@@ -559,6 +576,23 @@ const Map<String, String> _en = {
   'showHideReminders': 'Reminders',
   'sectionTasksUi': 'INTERFACE',
   'showAddFolderButton': 'Add-folder button',
+  'sectionTaskCounters': 'COUNTERS',
+  'folderCounter': 'Folder counter',
+  'folderCounterDirect': 'Direct tasks only',
+  'folderCounterRecursive': 'Include nested folders',
+  'folderCounterHidden': 'Hidden',
+  'showListCount': 'List counter',
+  'revert': 'Revert',
+  'taskTrashedToast': 'Task moved to Trash',
+  'listTrashedToast': 'List moved to Trash',
+  'folderTrashedToast': 'Folder moved to Trash',
+  'noteTrashedToast': 'Note moved to Trash',
+  'noteFolderTrashedToast': 'Folder moved to Trash',
+  'eventDeletedToast': 'Event deleted',
+  'iconColor': 'Icon Color',
+  'useAccentColor': 'Use Accent Color',
+  'todayShort': 'Today',
+  'tomorrowShort': 'Tomorrow',
   'addList': 'Add List', 'addFolder': 'Add Folder',
   'a11yToggleComplete': 'Toggle completion',
   'deleteSpace': 'Delete Space?',

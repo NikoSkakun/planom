@@ -171,9 +171,49 @@ class NoteController with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> deleteFolderDeep(String id) async {
+  /// Recursively soft-deletes a folder and all nested notes/folders. Returns
+  /// the shared deletedDate so callers can pass it to [restoreAt] for undo.
+  Future<DateTime> deleteFolderDeep(String id) async {
     final now = DateTime.now();
     await _softDeleteFolderRecursive(id, now);
+    notifyListeners();
+    return now;
+  }
+
+  /// Restores every note + note-folder soft-deleted at exactly [deletedDate].
+  Future<void> restoreAt(DateTime deletedDate) async {
+    final ts = deletedDate.millisecondsSinceEpoch;
+    final notes = _trashedNotes
+        .where((n) => n.deletedDate?.millisecondsSinceEpoch == ts)
+        .toList();
+    final folders = _trashedFolders
+        .where((f) => f.deletedDate?.millisecondsSinceEpoch == ts)
+        .toList();
+    for (final f in folders) {
+      await _db.restoreNoteFolder(f.id);
+    }
+    for (final n in notes) {
+      await _db.restoreNote(n.id);
+    }
+    _trashedFolders = _trashedFolders
+        .where((f) => f.deletedDate?.millisecondsSinceEpoch != ts)
+        .toList();
+    _trashedNotes = _trashedNotes
+        .where((n) => n.deletedDate?.millisecondsSinceEpoch != ts)
+        .toList();
+    _folders = [
+      ..._folders,
+      ...folders.map((f) =>
+          f.copyWith(isDeleted: false, clearDeletedDate: true)),
+    ];
+    _notes = [
+      ..._notes,
+      ...notes.map((n) => n.copyWith(
+            isDeleted: false,
+            clearDeletedDate: true,
+            preserveModifiedDate: true,
+          )),
+    ];
     notifyListeners();
   }
 

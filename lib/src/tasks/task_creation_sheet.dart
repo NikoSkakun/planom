@@ -106,6 +106,27 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
 
+  /// Submits the task but keeps the sheet open with cleared inputs so the
+  /// user can keep typing follow-up tasks (Enter on the keyboard's "Done").
+  Future<void> _submitAndContinue() async {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) return;
+    await widget.controller.addTask(Task(
+      title: title,
+      note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+      dueDate: _dueDate,
+      doTime: _doTime,
+      duration: _duration,
+      listId: _listId,
+      priority: _priority,
+    ));
+    if (!mounted) return;
+    _titleCtrl.clear();
+    _noteCtrl.clear();
+    setState(() => _titleEmpty = true);
+    _titleFocus.requestFocus();
+  }
+
   Future<void> _pickDate() async {
     final saved = _activeFocus;
     final result = await showCalendarDatePicker(
@@ -200,11 +221,15 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
             focusNode: _titleFocus,
             placeholder: s.taskName,
             autofocus: true,
-            textInputAction: TextInputAction.next,
+            // Enter creates the task and stays in the sheet so the user can
+            // keep typing more tasks. The note field is reached by tap, not
+            // by Enter — bulk-add is the common case here.
+            textInputAction: TextInputAction.done,
             textCapitalization: TextCapitalization.sentences,
             style: const TextStyle(
                 fontSize: 17, fontWeight: FontWeight.w500),
             decoration: const BoxDecoration(),
+            onSubmitted: (_) => _submitAndContinue(),
           ),
           Container(
             height: 0.5,

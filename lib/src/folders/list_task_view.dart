@@ -10,6 +10,7 @@ import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
@@ -85,11 +86,14 @@ class _ListTaskViewState extends State<ListTaskView>
           showFolderIconPickerSheet(
             context,
             currentIconId: _currentList.iconId,
+            currentIconColor: _currentList.iconColor,
             isFolder: false,
-            onSelected: (id) {
+            onSelected: (id, color) {
               final updated = _currentList.copyWith(
                 iconId: id,
                 clearIconId: id == null,
+                iconColor: color,
+                clearIconColor: color == null,
               );
               widget.folderController.updateList(updated);
               if (mounted) setState(() => _currentList = updated);
@@ -124,14 +128,25 @@ class _ListTaskViewState extends State<ListTaskView>
   }
 
   Future<void> _deleteThisList(BuildContext context) async {
+    final s = S.of(context);
     final confirmed = await confirmMoveToTrash(
       context,
       name: _currentList.name,
-      body: S.of(context).moveToTrashListBody,
+      body: s.moveToTrashListBody,
     );
     if (!confirmed || !mounted) return;
-    await widget.taskController.deleteTasksForList(_currentList.id);
+    final ts = DateTime.now();
+    final undo = UndoScope.maybeOf(context);
+    await widget.taskController.deleteTasksForList(_currentList.id, ts);
     await widget.folderController.deleteList(_currentList.id);
+    undo?.show(
+      label: s.listTrashedToast,
+      onUndo: () async {
+        await widget.folderController
+            .restoreList(_currentList.id, _currentList.folderId);
+        await widget.taskController.restoreAt(ts);
+      },
+    );
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -188,8 +203,15 @@ class _ListTaskViewState extends State<ListTaskView>
                         key: ValueKey(task.id),
                         direction: DismissDirection.endToStart,
                         background: const TaskDeleteBackground(),
-                        onDismissed: (_) =>
-                            widget.taskController.deleteTask(task.id),
+                        onDismissed: (_) {
+                          final savedListId = task.listId;
+                          widget.taskController.deleteTask(task.id);
+                          UndoScope.maybeOf(context)?.show(
+                            label: S.of(context).taskTrashedToast,
+                            onUndo: () => widget.taskController
+                                .restoreTask(task.id, savedListId),
+                          );
+                        },
                         child: TaskRow(
                           task: task,
                           onToggle: () => widget.taskController

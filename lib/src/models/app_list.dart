@@ -8,6 +8,7 @@ class AppList {
   final int sortOrder;
   final int? color; // ARGB; null = no color
   final String? iconId; // null=default asset; SF-symbol key or absolute file path
+  final int? iconColor; // ARGB override for SF-symbol icon; null=use accent
   final bool isDeleted;
   final DateTime? deletedDate;
 
@@ -19,6 +20,7 @@ class AppList {
     this.sortOrder = 0,
     this.color,
     this.iconId,
+    this.iconColor,
     this.isDeleted = false,
     this.deletedDate,
   })  : id = id ?? const Uuid().v4(),
@@ -33,6 +35,8 @@ class AppList {
     bool clearColor = false,
     String? iconId,
     bool clearIconId = false,
+    int? iconColor,
+    bool clearIconColor = false,
     bool? isDeleted,
     DateTime? deletedDate,
     bool clearDeletedDate = false,
@@ -45,6 +49,7 @@ class AppList {
         sortOrder: sortOrder ?? this.sortOrder,
         color: clearColor ? null : (color ?? this.color),
         iconId: clearIconId ? null : (iconId ?? this.iconId),
+        iconColor: clearIconColor ? null : (iconColor ?? this.iconColor),
         isDeleted: isDeleted ?? this.isDeleted,
         deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
       );
@@ -57,6 +62,7 @@ class AppList {
         'sortOrder': sortOrder,
         'color': color,
         'iconId': iconId,
+        'iconColor': iconColor,
         'isDeleted': isDeleted ? 1 : 0,
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
       };
@@ -70,6 +76,7 @@ class AppList {
         sortOrder: map['sortOrder'] as int? ?? 0,
         color: map['color'] as int?,
         iconId: map['iconId'] as String?,
+        iconColor: map['iconColor'] as int?,
         isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
         deletedDate: map['deletedDate'] != null
             ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)

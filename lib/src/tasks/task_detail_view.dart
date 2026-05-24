@@ -20,6 +20,7 @@ import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/reminder_picker.dart';
 import '../utils/selection_menu.dart';
+import '../utils/undo_controller.dart';
 import 'calendar_date_picker.dart';
 import 'recurrence_picker.dart';
 import 'tag_picker_sheet.dart';
@@ -219,7 +220,14 @@ class _TaskDetailViewState extends State<TaskDetailView>
         onDelete: () {
           dismiss();
           _deleted = true;
+          final savedListId = widget.task.listId;
+          final undo = UndoScope.maybeOf(context);
           widget.controller.deleteTask(widget.task.id);
+          undo?.show(
+            label: S.of(context).taskTrashedToast,
+            onUndo: () => widget.controller
+                .restoreTask(widget.task.id, savedListId),
+          );
           Navigator.of(context).pop();
         },
       );

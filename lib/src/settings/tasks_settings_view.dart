@@ -43,6 +43,38 @@ class TasksSettingsView extends StatelessWidget {
     }
   }
 
+  static String _folderCounterLabel(S s, FolderCounterMode m) {
+    switch (m) {
+      case FolderCounterMode.directOnly:
+        return s.folderCounterDirect;
+      case FolderCounterMode.recursive:
+        return s.folderCounterRecursive;
+      case FolderCounterMode.hidden:
+        return s.folderCounterHidden;
+    }
+  }
+
+  Future<void> _showFolderCounterPicker(
+      BuildContext context, FolderCounterMode current) async {
+    final s = S.of(context);
+    final selected = await showSelectionMenu<FolderCounterMode>(
+      context: context,
+      title: s.folderCounter,
+      current: current,
+      options: FolderCounterMode.values
+          .map((m) => SelectionMenuOption(
+                value: m,
+                label: _folderCounterLabel(s, m),
+              ))
+          .toList(),
+    );
+    if (selected != null) {
+      final next = controller.taskFieldPrefs.copy();
+      next.folderCounterMode = selected;
+      await controller.updateTaskFieldPrefs(next);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -127,6 +159,23 @@ class TasksSettingsView extends StatelessWidget {
                   visibility: prefs.trash,
                   onTap: () =>
                       _showVisibilityPicker(ctx, 'trash', prefs.trash),
+                ),
+
+                const SizedBox(height: 18),
+                SettingsSectionHeader(s.sectionTaskCounters),
+                SettingsNavRow(
+                  label: s.folderCounter,
+                  trailingLabel:
+                      _folderCounterLabel(s, fields.folderCounterMode),
+                  onTap: () => _showFolderCounterPicker(
+                      ctx, fields.folderCounterMode),
+                ),
+                const SizedBox(height: 1),
+                SettingsToggleRow(
+                  label: s.showListCount,
+                  value: fields.showListCount,
+                  onChanged: (v) =>
+                      updateField((p) => p.showListCount = v),
                 ),
 
                 const SizedBox(height: 18),

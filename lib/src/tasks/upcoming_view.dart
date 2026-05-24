@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../folders/folder_controller.dart';
 import '../localization/strings.dart';
 import '../utils/fast_route.dart';
+import '../utils/undo_controller.dart';
 import 'task_controller.dart';
 import 'task_detail_view.dart';
 import 'task_row.dart';
@@ -61,7 +62,15 @@ class UpcomingView extends StatelessWidget {
                         key: ValueKey(task.id),
                         direction: DismissDirection.endToStart,
                         background: const TaskDeleteBackground(),
-                        onDismissed: (_) => controller.deleteTask(task.id),
+                        onDismissed: (_) {
+                          final savedListId = task.listId;
+                          controller.deleteTask(task.id);
+                          UndoScope.maybeOf(context)?.show(
+                            label: s.taskTrashedToast,
+                            onUndo: () =>
+                                controller.restoreTask(task.id, savedListId),
+                          );
+                        },
                         child: TaskRow(
                           task: task,
                           showList: task.listId != null,

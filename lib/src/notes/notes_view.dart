@@ -13,6 +13,7 @@ import '../settings/settings_menu.dart';
 import '../tasks/task_controller.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
+import '../utils/undo_controller.dart';
 import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
 import 'note_detail_view.dart';
@@ -233,8 +234,17 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                               key: ValueKey(f.id),
                               direction: DismissDirection.endToStart,
                               background: const NoteDeleteBackground(),
-                              onDismissed: (_) =>
-                                  widget.controller.deleteFolderDeep(f.id),
+                              onDismissed: (_) async {
+                                final undo = UndoScope.maybeOf(context);
+                                final ts = await widget.controller
+                                    .deleteFolderDeep(f.id);
+                                undo?.show(
+                                  label:
+                                      S.of(context).noteFolderTrashedToast,
+                                  onUndo: () =>
+                                      widget.controller.restoreAt(ts),
+                                );
+                              },
                               child: Column(
                                 children: [
                                   NoteFolderRow(
@@ -279,8 +289,15 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                               key: ValueKey(n.id),
                               direction: DismissDirection.endToStart,
                               background: const NoteDeleteBackground(),
-                              onDismissed: (_) =>
-                                  widget.controller.deleteNote(n.id),
+                              onDismissed: (_) {
+                                final savedFolderId = n.folderId;
+                                widget.controller.deleteNote(n.id);
+                                UndoScope.maybeOf(context)?.show(
+                                  label: S.of(context).noteTrashedToast,
+                                  onUndo: () => widget.controller
+                                      .restoreNote(n.id, savedFolderId),
+                                );
+                              },
                               child: NoteRow(
                                 note: n,
                                 onTap: () =>

@@ -14,7 +14,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 21;
+  static const _dbVersion = 22;
 
   Database? _db;
 
@@ -65,6 +65,7 @@ class DatabaseService {
             creationDate INTEGER NOT NULL,
             sortOrder INTEGER NOT NULL DEFAULT 0,
             iconId TEXT,
+            iconColor INTEGER,
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER
           )
@@ -78,6 +79,7 @@ class DatabaseService {
             sortOrder INTEGER NOT NULL DEFAULT 0,
             color INTEGER,
             iconId TEXT,
+            iconColor INTEGER,
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER
           )
@@ -336,6 +338,10 @@ class DatabaseService {
         if (oldVersion < 21) {
           await _createFtsTables(db);
           await _backfillFts(db);
+        }
+        if (oldVersion < 22) {
+          await db.execute('ALTER TABLE folders ADD COLUMN iconColor INTEGER');
+          await db.execute('ALTER TABLE app_lists ADD COLUMN iconColor INTEGER');
         }
       },
     );

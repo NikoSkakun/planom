@@ -20,9 +20,11 @@ import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
+import '../utils/undo_controller.dart';
 import 'completed_view.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
+import 'task_field_prefs.dart';
 import 'today_view.dart';
 import 'tomorrow_view.dart';
 import 'trash_view.dart';
@@ -131,6 +133,29 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
     );
   }
 
+  /// Computes the task count to show next to a folder row, respecting the
+  /// user's `folderCounterMode` preference. Returns null when no badge should
+  /// render (mode = hidden or computed count is zero).
+  int? _folderCount(String folderId) {
+    final mode = widget.settingsController.taskFieldPrefs.folderCounterMode;
+    final listIds = switch (mode) {
+      FolderCounterMode.hidden => const <String>[],
+      FolderCounterMode.directOnly =>
+        widget.folderController.listIdsIn(folderId),
+      FolderCounterMode.recursive =>
+        widget.folderController.listIdsInRecursive(folderId),
+    };
+    if (mode == FolderCounterMode.hidden) return null;
+    final count = widget.controller.uncompletedCountForLists(listIds);
+    return count > 0 ? count : null;
+  }
+
+  int? _listCount(String listId) {
+    if (!widget.settingsController.taskFieldPrefs.showListCount) return null;
+    final c = widget.controller.uncompletedCountForList(listId);
+    return c > 0 ? c : null;
+  }
+
   Widget _buildFolderChildren(
       BuildContext context, String folderId, double indent) {
     final subFolders = widget.folderController.foldersIn(folderId);
@@ -142,9 +167,11 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
           _ListItem(
             iconAsset: 'assets/icons/folder.png',
             iconId: f.iconId,
+            iconColor: f.iconColor,
             isFolder: true,
             label: f.name,
             indent: indent,
+            count: _folderCount(f.id),
             onTap: () => Navigator.of(context).push(
               FastRoute<void>(
                 builder: (_) => FolderView(
@@ -152,6 +179,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                   folderController: widget.folderController,
                   taskController: widget.controller,
                   activeListId: widget.activeListId,
+                  settingsController: widget.settingsController,
                 ),
               ),
             ),
@@ -165,12 +193,11 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
           _ListItem(
             iconAsset: 'assets/icons/list.png',
             iconId: l.iconId,
+            iconColor: l.iconColor,
             isFolder: false,
             label: l.name,
             indent: indent,
-            count: widget.controller.uncompletedCountForList(l.id) > 0
-                ? widget.controller.uncompletedCountForList(l.id)
-                : null,
+            count: _listCount(l.id),
             onTap: () => Navigator.of(context).push(
               FastRoute<void>(
                 builder: (_) => ListTaskView(
@@ -371,18 +398,31 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               confirmDismiss: (_) => _confirmDelete(
                                   context, f.name,
                                   isFolder: true),
-                              onDismissed: (_) =>
-                                  widget.folderController.deleteFolderDeep(
-                                f.id,
-                                widget.controller.deleteTasksForList,
-                              ),
+                              onDismissed: (_) async {
+                                final undo = UndoScope.maybeOf(context);
+                                final ts = await widget.folderController
+                                    .deleteFolderDeep(
+                                  f.id,
+                                  widget.controller.deleteTasksForList,
+                                );
+                                undo?.show(
+                                  label: s.folderTrashedToast,
+                                  onUndo: () async {
+                                    await widget.folderController
+                                        .restoreAt(ts);
+                                    await widget.controller.restoreAt(ts);
+                                  },
+                                );
+                              },
                               child: Column(
                                 children: [
                                   _ListItem(
                                     iconAsset: 'assets/icons/folder.png',
                                     iconId: f.iconId,
+                                    iconColor: f.iconColor,
                                     isFolder: true,
                                     label: f.name,
+                                    count: _folderCount(f.id),
                                     onTap: () =>
                                         Navigator.of(context).push(
                                       FastRoute<void>(
@@ -392,6 +432,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                               widget.folderController,
                                           taskController: widget.controller,
                                           activeListId: widget.activeListId,
+                                          settingsController:
+                                              widget.settingsController,
                                         ),
                                       ),
                                     ),
@@ -419,8 +461,6 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                         proxyDecorator: _proxyDecorator,
                         itemBuilder: (context, index) {
                           final l = rootLists[index];
-                          final count = widget.controller
-                              .uncompletedCountForList(l.id);
                           return ReorderableDelayedDragStartListener(
                             key: ValueKey('list_${l.id}'),
                             index: index,
@@ -432,17 +472,29 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                   context, l.name,
                                   isFolder: false),
                               onDismissed: (_) async {
+                                final undo = UndoScope.maybeOf(context);
+                                final ts = DateTime.now();
+                                final savedFolderId = l.folderId;
                                 await widget.controller
-                                    .deleteTasksForList(l.id);
+                                    .deleteTasksForList(l.id, ts);
                                 await widget.folderController
                                     .deleteList(l.id);
+                                undo?.show(
+                                  label: s.listTrashedToast,
+                                  onUndo: () async {
+                                    await widget.folderController
+                                        .restoreList(l.id, savedFolderId);
+                                    await widget.controller.restoreAt(ts);
+                                  },
+                                );
                               },
                               child: _ListItem(
                                 iconAsset: 'assets/icons/list.png',
                                 iconId: l.iconId,
+                                iconColor: l.iconColor,
                                 isFolder: false,
                                 label: l.name,
-                                count: count > 0 ? count : null,
+                                count: _listCount(l.id),
                                 onTap: () => Navigator.of(context).push(
                                   FastRoute<void>(
                                     builder: (_) => ListTaskView(
@@ -588,6 +640,7 @@ class _ListItem extends StatelessWidget {
     this.iconAsset,
     this.iconWidget,
     this.iconId,
+    this.iconColor,
     this.isFolder = false,
     this.count,
     this.onExpand,
@@ -598,6 +651,7 @@ class _ListItem extends StatelessWidget {
   final String? iconAsset;
   final Widget? iconWidget;
   final String? iconId;
+  final int? iconColor;
   final bool isFolder;
   final String label;
   final VoidCallback onTap;
@@ -612,7 +666,8 @@ class _ListItem extends StatelessWidget {
     if (iconWidget != null) {
       icon = iconWidget!;
     } else if (iconId != null) {
-      icon = buildFolderItemIcon(iconId, isFolder: isFolder);
+      icon = buildFolderItemIcon(iconId,
+          isFolder: isFolder, iconColor: iconColor);
     } else {
       icon = Image.asset(iconAsset!, width: 22, height: 22);
     }

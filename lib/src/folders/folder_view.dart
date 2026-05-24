@@ -2,12 +2,15 @@ import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
 import '../models/app_folder.dart';
+import '../settings/settings_controller.dart';
 import '../tasks/task_controller.dart';
+import '../tasks/task_field_prefs.dart';
 import '../theme/app_theme.dart';
 import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart' show showCreateFolderListSheet, showRenameSheet;
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
@@ -21,12 +24,14 @@ class FolderView extends StatefulWidget {
     required this.folderController,
     required this.taskController,
     required this.activeListId,
+    this.settingsController,
   });
 
   final AppFolder folder;
   final FolderController folderController;
   final TaskController taskController;
   final ValueNotifier<String?> activeListId;
+  final SettingsController? settingsController;
 
   @override
   State<FolderView> createState() => _FolderViewState();
@@ -53,6 +58,24 @@ class _FolderViewState extends State<FolderView>
     });
   }
 
+  int? _folderCount(String folderId) {
+    final prefs = widget.settingsController?.taskFieldPrefs;
+    final mode = prefs?.folderCounterMode ?? FolderCounterMode.directOnly;
+    if (mode == FolderCounterMode.hidden) return null;
+    final listIds = mode == FolderCounterMode.recursive
+        ? widget.folderController.listIdsInRecursive(folderId)
+        : widget.folderController.listIdsIn(folderId);
+    final count = widget.taskController.uncompletedCountForLists(listIds);
+    return count > 0 ? count : null;
+  }
+
+  int? _listCount(String listId) {
+    final prefs = widget.settingsController?.taskFieldPrefs;
+    if (prefs != null && !prefs.showListCount) return null;
+    final c = widget.taskController.uncompletedCountForList(listId);
+    return c > 0 ? c : null;
+  }
+
   Widget _buildFolderChildren(
       BuildContext context, String folderId, double indent) {
     final subFolders = widget.folderController.foldersIn(folderId);
@@ -61,10 +84,12 @@ class _FolderViewState extends State<FolderView>
       children: [
         for (final f in subFolders) ...[
           _FolderListItem(
-            icon: buildFolderItemIcon(f.iconId, isFolder: true),
+            icon: buildFolderItemIcon(f.iconId,
+                isFolder: true, iconColor: f.iconColor),
             label: f.name,
             isFolder: true,
             indent: indent,
+            count: _folderCount(f.id),
             onTap: () => Navigator.of(context).push(
               FastRoute<void>(
                 builder: (_) => FolderView(
@@ -72,6 +97,7 @@ class _FolderViewState extends State<FolderView>
                   folderController: widget.folderController,
                   taskController: widget.taskController,
                   activeListId: widget.activeListId,
+                  settingsController: widget.settingsController,
                 ),
               ),
             ),
@@ -83,12 +109,11 @@ class _FolderViewState extends State<FolderView>
         ],
         for (final l in lists) ...[
           _FolderListItem(
-            icon: buildFolderItemIcon(l.iconId, isFolder: false),
+            icon: buildFolderItemIcon(l.iconId,
+                isFolder: false, iconColor: l.iconColor),
             label: l.name,
             indent: indent,
-            count: widget.taskController.uncompletedCountForList(l.id) > 0
-                ? widget.taskController.uncompletedCountForList(l.id)
-                : null,
+            count: _listCount(l.id),
             onTap: () => Navigator.of(context).push(
               FastRoute<void>(
                 builder: (_) => ListTaskView(
@@ -152,11 +177,14 @@ class _FolderViewState extends State<FolderView>
           showFolderIconPickerSheet(
             context,
             currentIconId: _currentFolder.iconId,
+            currentIconColor: _currentFolder.iconColor,
             isFolder: true,
-            onSelected: (id) {
+            onSelected: (id, color) {
               final updated = _currentFolder.copyWith(
                 iconId: id,
                 clearIconId: id == null,
+                iconColor: color,
+                clearIconColor: color == null,
               );
               widget.folderController.updateFolder(updated);
               if (mounted) setState(() => _currentFolder = updated);
@@ -192,12 +220,21 @@ class _FolderViewState extends State<FolderView>
   }
 
   Future<void> _deleteThisFolder(BuildContext context) async {
+    final s = S.of(context);
     final confirmed =
         await _confirmDelete(_currentFolder.name, isFolder: true);
     if (!confirmed || !mounted) return;
-    await widget.folderController.deleteFolderDeep(
+    final undo = UndoScope.maybeOf(context);
+    final ts = await widget.folderController.deleteFolderDeep(
       _currentFolder.id,
       widget.taskController.deleteTasksForList,
+    );
+    undo?.show(
+      label: s.folderTrashedToast,
+      onUndo: () async {
+        await widget.folderController.restoreAt(ts);
+        await widget.taskController.restoreAt(ts);
+      },
     );
     if (mounted) Navigator.of(context).pop();
   }
@@ -218,8 +255,12 @@ class _FolderViewState extends State<FolderView>
         child: Stack(
           children: [
             ListenableBuilder(
-              listenable:
-                  Listenable.merge([widget.folderController, widget.taskController]),
+              listenable: Listenable.merge([
+                widget.folderController,
+                widget.taskController,
+                if (widget.settingsController != null)
+                  widget.settingsController!,
+              ]),
               builder: (context, _) {
                 final subFolders =
                     widget.folderController.foldersIn(_currentFolder.id);
@@ -259,20 +300,33 @@ class _FolderViewState extends State<FolderView>
                               background: _DeleteBackground(),
                               confirmDismiss: (_) =>
                                   _confirmDelete(f.name, isFolder: true),
-                              onDismissed: (_) =>
-                                  widget.folderController.deleteFolderDeep(
-                                f.id,
-                                widget.taskController.deleteTasksForList,
-                              ),
+                              onDismissed: (_) async {
+                                final undo = UndoScope.maybeOf(context);
+                                final ts = await widget.folderController
+                                    .deleteFolderDeep(
+                                  f.id,
+                                  widget.taskController.deleteTasksForList,
+                                );
+                                undo?.show(
+                                  label: S.of(context).folderTrashedToast,
+                                  onUndo: () async {
+                                    await widget.folderController
+                                        .restoreAt(ts);
+                                    await widget.taskController.restoreAt(ts);
+                                  },
+                                );
+                              },
                               child: Column(
                                 children: [
                                   _FolderListItem(
                                     icon: buildFolderItemIcon(
                                       f.iconId,
                                       isFolder: true,
+                                      iconColor: f.iconColor,
                                     ),
                                     label: f.name,
                                     isFolder: true,
+                                    count: _folderCount(f.id),
                                     onTap: () => Navigator.of(context).push(
                                       FastRoute<void>(
                                         builder: (_) => FolderView(
@@ -281,6 +335,8 @@ class _FolderViewState extends State<FolderView>
                                               widget.folderController,
                                           taskController: widget.taskController,
                                           activeListId: widget.activeListId,
+                                          settingsController:
+                                              widget.settingsController,
                                         ),
                                       ),
                                     ),
@@ -305,8 +361,6 @@ class _FolderViewState extends State<FolderView>
                         proxyDecorator: _proxyDecorator,
                         itemBuilder: (context, index) {
                           final l = lists[index];
-                          final count = widget.taskController
-                              .uncompletedCountForList(l.id);
                           return ReorderableDelayedDragStartListener(
                             key: ValueKey('fl_${l.id}'),
                             index: index,
@@ -317,17 +371,29 @@ class _FolderViewState extends State<FolderView>
                               confirmDismiss: (_) =>
                                   _confirmDelete(l.name, isFolder: false),
                               onDismissed: (_) async {
+                                final undo = UndoScope.maybeOf(context);
+                                final ts = DateTime.now();
+                                final savedFolderId = l.folderId;
                                 await widget.taskController
-                                    .deleteTasksForList(l.id);
+                                    .deleteTasksForList(l.id, ts);
                                 await widget.folderController.deleteList(l.id);
+                                undo?.show(
+                                  label: S.of(context).listTrashedToast,
+                                  onUndo: () async {
+                                    await widget.folderController
+                                        .restoreList(l.id, savedFolderId);
+                                    await widget.taskController.restoreAt(ts);
+                                  },
+                                );
                               },
                               child: _FolderListItem(
                                 icon: buildFolderItemIcon(
                                   l.iconId,
                                   isFolder: false,
+                                  iconColor: l.iconColor,
                                 ),
                                 label: l.name,
-                                count: count > 0 ? count : null,
+                                count: _listCount(l.id),
                                 onTap: () =>
                                     Navigator.of(context).push(
                                   FastRoute<void>(
