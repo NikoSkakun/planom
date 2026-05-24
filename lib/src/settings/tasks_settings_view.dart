@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
+import '../tasks/task_field_prefs.dart';
 import '../theme/app_theme.dart';
 import '../utils/selection_menu.dart';
 import 'settings_controller.dart';
@@ -55,6 +56,14 @@ class TasksSettingsView extends StatelessWidget {
           listenable: controller,
           builder: (ctx, _) {
             final prefs = controller.smartListPrefs;
+            final fields = controller.taskFieldPrefs;
+
+            Future<void> updateField(void Function(TaskFieldPrefs) m) async {
+              final next = fields.copy();
+              m(next);
+              await controller.updateTaskFieldPrefs(next);
+            }
+
             return ListView(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -118,6 +127,64 @@ class TasksSettingsView extends StatelessWidget {
                   visibility: prefs.trash,
                   onTap: () =>
                       _showVisibilityPicker(ctx, 'trash', prefs.trash),
+                ),
+
+                const SizedBox(height: 18),
+                SettingsSectionHeader(s.sectionTaskFields),
+                SettingsToggleRow(
+                  label: s.showHidePriority,
+                  value: fields.showPriority,
+                  onChanged: (v) =>
+                      updateField((p) => p.showPriority = v),
+                ),
+                const SizedBox(height: 1),
+                SettingsToggleRow(
+                  label: s.showHideDate,
+                  value: fields.showDate,
+                  onChanged: (v) => updateField((p) => p.showDate = v),
+                ),
+                const SizedBox(height: 1),
+                SettingsToggleRow(
+                  label: s.showHideRepeat,
+                  value: fields.showRepeat,
+                  onChanged: (v) => updateField((p) => p.showRepeat = v),
+                ),
+                const SizedBox(height: 1),
+                SettingsToggleRow(
+                  label: s.showHideList,
+                  value: fields.showList,
+                  onChanged: (v) => updateField((p) => p.showList = v),
+                ),
+                const SizedBox(height: 1),
+                SettingsToggleRow(
+                  label: s.showHideDuration,
+                  value: fields.showDuration,
+                  onChanged: (v) => updateField((p) => p.showDuration = v),
+                ),
+                const SizedBox(height: 1),
+                SettingsToggleRow(
+                  label: s.showHideTags,
+                  value: fields.showTags,
+                  onChanged: (v) => updateField((p) => p.showTags = v),
+                ),
+                const SizedBox(height: 1),
+                SettingsToggleRow(
+                  label: s.showHideReminders,
+                  value: fields.showReminders,
+                  onChanged: (v) =>
+                      updateField((p) => p.showReminders = v),
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    s.taskFieldsHint,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: CupertinoColors.secondaryLabel
+                          .resolveFrom(context),
+                    ),
+                  ),
                 ),
               ],
             );

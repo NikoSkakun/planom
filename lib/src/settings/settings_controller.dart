@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../database/database_service.dart';
 import '../localization/strings.dart';
+import '../tasks/task_field_prefs.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 import 'settings_service.dart';
@@ -24,6 +25,9 @@ class SettingsController with ChangeNotifier {
   SmartListPrefs _smartListPrefs = SmartListPrefs();
   SmartListPrefs get smartListPrefs => _smartListPrefs;
   bool get hideTabLabels => _smartListPrefs.hideTabLabels;
+
+  TaskFieldPrefs _taskFieldPrefs = TaskFieldPrefs();
+  TaskFieldPrefs get taskFieldPrefs => _taskFieldPrefs;
 
   Locale _locale = const Locale('en');
   Locale get locale => _locale;
@@ -129,6 +133,8 @@ class SettingsController with ChangeNotifier {
       } else if (key == 'last_tab') {
         final v = int.tryParse(value);
         if (v != null && v >= 0 && v <= 4) _lastOpenedTab = v;
+      } else if (key == TaskFieldPrefs.storageKey) {
+        _taskFieldPrefs = TaskFieldPrefs.fromJson(value);
       }
     }
 
@@ -213,6 +219,12 @@ class SettingsController with ChangeNotifier {
     _smartListPrefs.applyJson(data);
     notifyListeners();
     await _smartListPrefs.save();
+  }
+
+  Future<void> updateTaskFieldPrefs(TaskFieldPrefs prefs) async {
+    _taskFieldPrefs = prefs.copy();
+    notifyListeners();
+    await _db.setAppSetting(TaskFieldPrefs.storageKey, _taskFieldPrefs.toJson());
   }
 
   Future<void> updateSmartListVisibility(

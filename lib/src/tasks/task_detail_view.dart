@@ -14,6 +14,7 @@ import '../models/tag.dart';
 import '../models/task.dart';
 import '../notes/markdown_toolbar.dart';
 import '../notes/markdown_view.dart';
+import '../spaces/space_manager.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
@@ -309,6 +310,46 @@ class _TaskDetailViewState extends State<TaskDetailView>
   Widget build(BuildContext context) {
     final s = S.of(context);
     final showToolbar = _noteFocus.hasFocus;
+    final settingsCtl = SpaceManagerProvider.maybeOf(context)?.settingsController;
+    return ListenableBuilder(
+      listenable: settingsCtl ?? const _NoopListenable(),
+      builder: (context, _) {
+        final fields = settingsCtl?.taskFieldPrefs;
+        final showPriority = fields?.showPriority ?? true;
+        final showDate = fields?.showDate ?? true;
+        final showRepeat = fields?.showRepeat ?? true;
+        final showList = fields?.showList ?? true;
+        final showDuration = fields?.showDuration ?? true;
+        final showTags = fields?.showTags ?? true;
+        final showReminders = fields?.showReminders ?? true;
+        return _buildScaffold(
+          context,
+          s,
+          showToolbar,
+          showPriority: showPriority,
+          showDate: showDate,
+          showRepeat: showRepeat,
+          showList: showList,
+          showDuration: showDuration,
+          showTags: showTags,
+          showReminders: showReminders,
+        );
+      },
+    );
+  }
+
+  Widget _buildScaffold(
+    BuildContext context,
+    S s,
+    bool showToolbar, {
+    required bool showPriority,
+    required bool showDate,
+    required bool showRepeat,
+    required bool showList,
+    required bool showDuration,
+    required bool showTags,
+    required bool showReminders,
+  }) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
@@ -364,32 +405,35 @@ class _TaskDetailViewState extends State<TaskDetailView>
                   const SizedBox(height: 24),
 
                   // Priority picker
-                  _SectionCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(CupertinoIcons.flag_fill,
-                                size: 16,
-                                color: CupertinoColors.secondaryLabel),
-                            const SizedBox(width: 10),
-                            Text(s.priority,
-                                style: const TextStyle(fontSize: 15)),
-                            const Spacer(),
-                            _PriorityPicker(
-                              value: _priority,
-                              onChanged: (v) =>
-                                  setState(() => _priority = v),
-                            ),
-                          ],
-                        ),
-                      ],
+                  if (showPriority) ...[
+                    _SectionCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(CupertinoIcons.flag_fill,
+                                  size: 16,
+                                  color: CupertinoColors.secondaryLabel),
+                              const SizedBox(width: 10),
+                              Text(s.priority,
+                                  style: const TextStyle(fontSize: 15)),
+                              const Spacer(),
+                              _PriorityPicker(
+                                value: _priority,
+                                onChanged: (v) =>
+                                    setState(() => _priority = v),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
+                  ],
 
                   // Date picker row
+                  if (showDate) ...[
                   _SectionCard(
                     onTap: _pickDate,
                     child: Row(
@@ -420,9 +464,11 @@ class _TaskDetailViewState extends State<TaskDetailView>
                     ),
                   ),
                   const SizedBox(height: 12),
+                  ],
 
                   // Repeat row — only meaningful when a date is set; the
                   // recurrence advance fires off the due date.
+                  if (showRepeat) ...[
                   _SectionCard(
                     onTap: _dueDate == null ? null : _pickRecurrence,
                     child: Row(
@@ -451,8 +497,10 @@ class _TaskDetailViewState extends State<TaskDetailView>
                     ),
                   ),
                   const SizedBox(height: 12),
+                  ],
 
                   // List picker row
+                  if (showList) ...[
                   _SectionCard(
                     onTap: _pickList,
                     child: Row(
@@ -484,8 +532,10 @@ class _TaskDetailViewState extends State<TaskDetailView>
                     ),
                   ),
                   const SizedBox(height: 12),
+                  ],
 
                   // Duration picker row
+                  if (showDuration) ...[
                   _SectionCard(
                     onTap: _pickDuration,
                     child: Row(
@@ -515,8 +565,10 @@ class _TaskDetailViewState extends State<TaskDetailView>
                     ),
                   ),
                   const SizedBox(height: 12),
+                  ],
 
                   // Tag picker row — chips for selected tags + chevron
+                  if (showTags) ...[
                   _SectionCard(
                     onTap: _pickTags,
                     child: Row(
@@ -568,8 +620,10 @@ class _TaskDetailViewState extends State<TaskDetailView>
                     ),
                   ),
                   const SizedBox(height: 12),
+                  ],
 
                   // Reminder row
+                  if (showReminders) ...[
                   _SectionCard(
                     onTap: _pickReminders,
                     child: Row(
@@ -596,6 +650,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
                       ],
                     ),
                   ),
+                  ],
                   const SizedBox(height: 24),
 
                   // Subtasks — only on top-level tasks; nesting beyond one
@@ -632,6 +687,16 @@ class _TaskDetailViewState extends State<TaskDetailView>
       ),
     );
   }
+}
+
+/// Stand-in [Listenable] for [ListenableBuilder] when no real notifier is
+/// available, so the call site can keep the same widget shape either way.
+class _NoopListenable extends Listenable {
+  const _NoopListenable();
+  @override
+  void addListener(VoidCallback listener) {}
+  @override
+  void removeListener(VoidCallback listener) {}
 }
 
 class _TagChip extends StatelessWidget {
