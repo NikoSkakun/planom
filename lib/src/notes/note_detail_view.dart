@@ -56,6 +56,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
   late String _savedContent;
   String? _savedFolderId;
 
+  // Latest EditableTextState the body's contextMenuBuilder handed us. We
+  // need it to re-show the selection toolbar after the user taps "Select
+  // All" — the system hides the toolbar in that handoff and Flutter doesn't
+  // re-show it automatically.
+  EditableTextState? _contentEditableState;
+  TextSelection? _lastContentSelection;
+
   @override
   void initState() {
     super.initState();
@@ -68,9 +75,38 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _savedFolderId = widget.note.folderId;
     _title.addListener(_scheduleAutosave);
     _content.addListener(_scheduleAutosave);
+    _content.addListener(_onContentSelectionChanged);
     _contentFocus.addListener(_onContentFocusChanged);
     _titleFocus.addListener(_onTitleFocusChanged);
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Detects the "Select All" gesture (tap empty space → toolbar with the
+  /// single Select-All button → tap it) and re-shows the selection toolbar
+  /// so the user immediately sees Copy / Cut / Paste / Look Up without
+  /// needing a second tap to bring the toolbar back.
+  void _onContentSelectionChanged() {
+    final selection = _content.selection;
+    final text = _content.text;
+    final previous = _lastContentSelection;
+    _lastContentSelection = selection;
+    if (text.isEmpty) return;
+    if (!selection.isValid || selection.isCollapsed) return;
+    final isSelectAll =
+        selection.start == 0 && selection.end == text.length;
+    if (!isSelectAll) return;
+    // Avoid re-showing the toolbar on every keystroke that happens to leave
+    // the whole document selected — only react when the selection just
+    // changed shape (it was collapsed, or it covered a different range).
+    if (previous != null &&
+        !previous.isCollapsed &&
+        previous.start == 0 &&
+        previous.end == text.length) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _contentEditableState?.showToolbar();
+    });
   }
 
   void _onContentFocusChanged() {
@@ -216,6 +252,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _autosaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _save();
+    _content.removeListener(_onContentSelectionChanged);
     _contentFocus.removeListener(_onContentFocusChanged);
     _contentFocus.dispose();
     _titleFocus.removeListener(_onTitleFocusChanged);
@@ -254,6 +291,16 @@ class _NoteDetailViewState extends State<NoteDetailView>
             textAlignVertical: TextAlignVertical.top,
             textCapitalization: TextCapitalization.sentences,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            contextMenuBuilder: (context, editableTextState) {
+              // Cache the state so the selection listener can re-show the
+              // toolbar after a "Select All" gesture (see
+              // _onContentSelectionChanged). Returning the adaptive toolbar
+              // keeps the platform-native look.
+              _contentEditableState = editableTextState;
+              return CupertinoAdaptiveTextSelectionToolbar.editableText(
+                editableTextState: editableTextState,
+              );
+            },
           );
         } else if (_content.text.trim().isEmpty) {
           child = GestureDetector(
