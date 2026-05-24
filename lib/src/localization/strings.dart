@@ -178,6 +178,17 @@ class S {
   String get showHideReminders => t('showHideReminders');
   String get sectionTasksUi => t('sectionTasksUi');
   String get showAddFolderButton => t('showAddFolderButton');
+  String get sectionTaskCounters => t('sectionTaskCounters');
+  String get folderCounter => t('folderCounter');
+  String get folderCounterDirect => t('folderCounterDirect');
+  String get folderCounterRecursive => t('folderCounterRecursive');
+  String get folderCounterHidden => t('folderCounterHidden');
+  String get showListCount => t('showListCount');
+  String get revert => t('revert');
+  String get iconColor => t('iconColor');
+  String get useAccentColor => t('useAccentColor');
+  String get todayShort => t('todayShort');
+  String get tomorrowShort => t('tomorrowShort');
   String get addList => t('addList');
   String get addFolder => t('addFolder');
   String get deleteSpace => t('deleteSpace');
@@ -559,6 +570,17 @@ const Map<String, String> _en = {
   'showHideReminders': 'Reminders',
   'sectionTasksUi': 'INTERFACE',
   'showAddFolderButton': 'Add-folder button',
+  'sectionTaskCounters': 'COUNTERS',
+  'folderCounter': 'Folder counter',
+  'folderCounterDirect': 'Direct tasks only',
+  'folderCounterRecursive': 'Include nested folders',
+  'folderCounterHidden': 'Hidden',
+  'showListCount': 'List counter',
+  'revert': 'Revert',
+  'iconColor': 'Icon Color',
+  'useAccentColor': 'Use Accent Color',
+  'todayShort': 'Today',
+  'tomorrowShort': 'Tomorrow',
   'addList': 'Add List', 'addFolder': 'Add Folder',
   'a11yToggleComplete': 'Toggle completion',
   'deleteSpace': 'Delete Space?',

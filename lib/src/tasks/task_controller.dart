@@ -101,6 +101,16 @@ class TaskController with ChangeNotifier {
   int uncompletedCountForList(String listId) =>
       _topLevel.where((t) => t.listId == listId && !t.isCompleted).length;
 
+  /// Sum of uncompleted top-level tasks across every list in [listIds].
+  int uncompletedCountForLists(Iterable<String> listIds) {
+    if (listIds.isEmpty) return 0;
+    final set = listIds.toSet();
+    return _topLevel
+        .where((t) =>
+            !t.isCompleted && t.listId != null && set.contains(t.listId))
+        .length;
+  }
+
   List<Task> get allCompletedTasks =>
       _topLevel.where((t) => t.isCompleted).toList();
 

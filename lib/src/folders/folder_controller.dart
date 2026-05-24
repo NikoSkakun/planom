@@ -49,6 +49,27 @@ class FolderController with ChangeNotifier {
     }
   }
 
+  /// IDs of every list that lives directly inside [folderId].
+  List<String> listIdsIn(String folderId) =>
+      _lists.where((l) => l.folderId == folderId).map((l) => l.id).toList();
+
+  /// IDs of every list inside [folderId] **and** every nested subfolder.
+  /// Walks the folder tree iteratively to avoid stack growth on deep trees.
+  List<String> listIdsInRecursive(String folderId) {
+    final ids = <String>[];
+    final stack = <String>[folderId];
+    while (stack.isNotEmpty) {
+      final current = stack.removeLast();
+      for (final l in _lists) {
+        if (l.folderId == current) ids.add(l.id);
+      }
+      for (final f in _folders) {
+        if (f.parentFolderId == current) stack.add(f.id);
+      }
+    }
+    return ids;
+  }
+
   Future<void> load() async {
     _folders = await _db.getFolders();
     _lists = await _db.getLists();
