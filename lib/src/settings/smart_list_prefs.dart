@@ -7,6 +7,7 @@ enum SmartListVisibility { show, showIfNotEmpty, hidden }
 
 class SmartListPrefs {
   SmartListVisibility today;
+  SmartListVisibility tomorrow;
   SmartListVisibility upcoming;
   SmartListVisibility completed;
   SmartListVisibility trash;
@@ -14,6 +15,7 @@ class SmartListPrefs {
 
   SmartListPrefs({
     this.today = SmartListVisibility.show,
+    this.tomorrow = SmartListVisibility.showIfNotEmpty,
     this.upcoming = SmartListVisibility.show,
     this.completed = SmartListVisibility.showIfNotEmpty,
     this.trash = SmartListVisibility.showIfNotEmpty,
@@ -33,6 +35,8 @@ class SmartListPrefs {
           jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       return SmartListPrefs(
         today: _parse(data['today']),
+        tomorrow: _parse(data['tomorrow'],
+            fallback: SmartListVisibility.showIfNotEmpty),
         upcoming: _parse(data['upcoming']),
         completed: _parse(data['completed']),
         trash: _parse(data['trash']),
@@ -50,6 +54,7 @@ class SmartListPrefs {
 
   Map<String, dynamic> toJson() => {
         'today': _encode(today),
+        'tomorrow': _encode(tomorrow),
         'upcoming': _encode(upcoming),
         'completed': _encode(completed),
         'trash': _encode(trash),
@@ -58,13 +63,16 @@ class SmartListPrefs {
 
   void applyJson(Map<String, dynamic> data) {
     today = _parse(data['today']);
+    tomorrow =
+        _parse(data['tomorrow'], fallback: SmartListVisibility.showIfNotEmpty);
     upcoming = _parse(data['upcoming']);
     completed = _parse(data['completed']);
     trash = _parse(data['trash']);
     hideTabLabels = data['hideTabLabels'] == true;
   }
 
-  static SmartListVisibility _parse(dynamic value) {
+  static SmartListVisibility _parse(dynamic value,
+      {SmartListVisibility fallback = SmartListVisibility.show}) {
     switch (value) {
       case 'show':
         return SmartListVisibility.show;
@@ -73,7 +81,7 @@ class SmartListPrefs {
       case 'hidden':
         return SmartListVisibility.hidden;
       default:
-        return SmartListVisibility.show;
+        return fallback;
     }
   }
 

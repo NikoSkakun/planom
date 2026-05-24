@@ -24,6 +24,7 @@ import 'completed_view.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
 import 'today_view.dart';
+import 'tomorrow_view.dart';
 import 'trash_view.dart';
 import 'upcoming_view.dart';
 
@@ -243,6 +244,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     widget.folderController.foldersIn(null);
                 final rootLists = widget.folderController.listsIn(null);
                 final todayCount = widget.controller.todayUncompletedCount;
+                final tomorrowCount =
+                    widget.controller.tomorrowUncompletedCount;
                 final upcomingCount =
                     widget.controller.upcomingUncompletedCount;
                 final completedCount =
@@ -256,6 +259,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     widget.settingsController.smartListPrefs;
                 final showToday =
                     _isVisible(prefs.today, todayCount > 0);
+                final showTomorrow =
+                    _isVisible(prefs.tomorrow, tomorrowCount > 0);
                 final showUpcoming =
                     _isVisible(prefs.upcoming, upcomingCount > 0);
                 final showCompleted =
@@ -294,6 +299,29 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => TodayView(
+                                    controller: widget.controller,
+                                    folderController:
+                                        widget.folderController,
+                                    activeDueDate: widget.activeDueDate,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (showTomorrow)
+                            _ListItem(
+                              iconWidget: Icon(
+                                CupertinoIcons.sun_max,
+                                size: 22,
+                                color: CupertinoColors.systemOrange
+                                    .resolveFrom(context),
+                              ),
+                              label: s.tomorrow,
+                              count: tomorrowCount > 0
+                                  ? tomorrowCount
+                                  : null,
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => TomorrowView(
                                     controller: widget.controller,
                                     folderController:
                                         widget.folderController,

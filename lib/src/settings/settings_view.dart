@@ -300,6 +300,19 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                     ),
                     const SizedBox(height: 1),
                     _SmartListRow(
+                      icon: Icon(
+                        CupertinoIcons.sun_max,
+                        size: 22,
+                        color: CupertinoColors.systemOrange
+                            .resolveFrom(ctx),
+                      ),
+                      label: s.tomorrow,
+                      visibility: prefs.tomorrow,
+                      onTap: () => _showVisibilityPicker(
+                          ctx, 'tomorrow', prefs.tomorrow),
+                    ),
+                    const SizedBox(height: 1),
+                    _SmartListRow(
                       icon: Image.asset('assets/icons/upcoming.png',
                           width: 22, height: 22),
                       label: s.upcoming,

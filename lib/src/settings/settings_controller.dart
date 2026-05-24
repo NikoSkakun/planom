@@ -221,6 +221,9 @@ class SettingsController with ChangeNotifier {
       case 'today':
         _smartListPrefs.today = value;
         break;
+      case 'tomorrow':
+        _smartListPrefs.tomorrow = value;
+        break;
       case 'upcoming':
         _smartListPrefs.upcoming = value;
         break;
