@@ -310,7 +310,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
           children: [
             Expanded(
               child: SafeArea(
-                bottom: false,
+                // When the keyboard is open, the markdown toolbar sits below
+                // the content and consumes the bottom inset itself. When the
+                // keyboard is closed, the tab bar overlays the page — so we
+                // need the bottom safe area (CupertinoTabScaffold includes
+                // the tab bar height in MediaQuery.padding.bottom) to keep
+                // the last lines of text off the tab bar.
+                bottom: !showToolbar,
                 child: Column(
                   children: [
                     Padding(
