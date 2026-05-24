@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'src/app.dart';
 import 'src/database/database_service.dart';
@@ -10,18 +11,29 @@ import 'src/security/security_service.dart';
 import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
 import 'src/spaces/space_manager.dart';
+import 'src/utils/platform_capabilities.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-    // iPad opens to a sidebar+detail layout in HomeShell; allowing landscape
-    // here lets users actually use that extra room. Phone bottom-tab layout
-    // still works in landscape too.
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
+
+  // Linux/Windows have no native sqflite backend; swap in the FFI factory
+  // before any controller opens a database. macOS uses the native plugin.
+  if (PlatformCapabilities.sqfliteNeedsFfi) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
+  if (PlatformCapabilities.supportsOrientationLock) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      // iPad opens to a sidebar+detail layout in HomeShell; allowing landscape
+      // here lets users actually use that extra room. Phone bottom-tab layout
+      // still works in landscape too.
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
 
   await initFolderIconService();
   await NotificationService.initTimezone();

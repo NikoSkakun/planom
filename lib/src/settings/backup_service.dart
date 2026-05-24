@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -14,6 +15,7 @@ import '../notes/note_controller.dart';
 import '../routines/routine_controller.dart';
 import '../security/security_service.dart';
 import '../tasks/task_controller.dart';
+import '../utils/platform_capabilities.dart';
 import 'backup_crypto.dart';
 import 'settings_controller.dart';
 
@@ -84,10 +86,34 @@ class BackupService {
         ? await encryptBackup(plainJson, passphrase)
         : plainJson;
 
-    final tempDir = await getTemporaryDirectory();
     final now = DateTime.now();
     final name =
         'planom_backup_${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}.planom';
+
+    // On Linux/Windows there's no useful native share sheet for files; pop the
+    // OS Save-As dialog instead so the user can place the backup somewhere
+    // they'll find it (Downloads, etc.). iOS/Android/macOS still use the
+    // system share sheet, which matches the iPadOS UX the user expects.
+    if (PlatformCapabilities.isLinux || PlatformCapabilities.isWindows) {
+      final dest = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Planom backup',
+        fileName: name,
+        type: FileType.any,
+        bytes: Uint8List.fromList(utf8.encode(fileContent)),
+      );
+      if (dest == null) return; // user cancelled
+      // saveFile only actually writes the bytes when the host plugin supports
+      // it (Linux/Windows do). Belt-and-braces: if the file isn't there yet
+      // because the plugin returned the chosen path without writing, write
+      // it ourselves.
+      final out = File(dest);
+      if (!await out.exists() || (await out.length()) == 0) {
+        await out.writeAsString(fileContent, encoding: utf8);
+      }
+      return;
+    }
+
+    final tempDir = await getTemporaryDirectory();
     final file = File('${tempDir.path}/$name');
     await file.writeAsString(fileContent, encoding: utf8);
 
