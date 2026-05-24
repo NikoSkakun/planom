@@ -12,6 +12,7 @@ class SmartListPrefs {
   SmartListVisibility completed;
   SmartListVisibility trash;
   bool hideTabLabels;
+  bool showAddFolderButton;
 
   SmartListPrefs({
     this.today = SmartListVisibility.show,
@@ -20,6 +21,7 @@ class SmartListPrefs {
     this.completed = SmartListVisibility.showIfNotEmpty,
     this.trash = SmartListVisibility.showIfNotEmpty,
     this.hideTabLabels = false,
+    this.showAddFolderButton = true,
   });
 
   static Future<File> _file() async {
@@ -41,6 +43,7 @@ class SmartListPrefs {
         completed: _parse(data['completed']),
         trash: _parse(data['trash']),
         hideTabLabels: data['hideTabLabels'] == true,
+        showAddFolderButton: data['showAddFolderButton'] != false,
       );
     } catch (_) {
       return SmartListPrefs();
@@ -59,6 +62,7 @@ class SmartListPrefs {
         'completed': _encode(completed),
         'trash': _encode(trash),
         'hideTabLabels': hideTabLabels,
+        'showAddFolderButton': showAddFolderButton,
       };
 
   void applyJson(Map<String, dynamic> data) {
@@ -69,6 +73,7 @@ class SmartListPrefs {
     completed = _parse(data['completed']);
     trash = _parse(data['trash']);
     hideTabLabels = data['hideTabLabels'] == true;
+    showAddFolderButton = data['showAddFolderButton'] != false;
   }
 
   static SmartListVisibility _parse(dynamic value,

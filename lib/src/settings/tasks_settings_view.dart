@@ -186,6 +186,14 @@ class TasksSettingsView extends StatelessWidget {
                     ),
                   ),
                 ),
+
+                const SizedBox(height: 18),
+                SettingsSectionHeader(s.sectionTasksUi),
+                SettingsToggleRow(
+                  label: s.showAddFolderButton,
+                  value: controller.smartListPrefs.showAddFolderButton,
+                  onChanged: controller.updateShowAddFolderButton,
+                ),
               ],
             );
           },

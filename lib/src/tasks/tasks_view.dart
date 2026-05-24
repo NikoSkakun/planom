@@ -108,6 +108,21 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                 );
               }
             : null,
+        onAddList: () {
+          dismiss();
+          showCreateFolderListSheet(
+            context,
+            widget.folderController,
+          );
+        },
+        onAddFolder: () {
+          dismiss();
+          showCreateFolderListSheet(
+            context,
+            widget.folderController,
+            initialType: CreateSheetInitial.folder,
+          );
+        },
       );
     });
   }
@@ -531,14 +546,15 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                 );
               },
             ),
-            Positioned(
-              left: 20,
-              bottom: 16,
-              child: _CircleAddButton(
-                onPressed: () => showCreateFolderListSheet(
-                    context, widget.folderController),
+            if (widget.settingsController.smartListPrefs.showAddFolderButton)
+              Positioned(
+                left: 20,
+                bottom: 16,
+                child: _CircleAddButton(
+                  onPressed: () => showCreateFolderListSheet(
+                      context, widget.folderController),
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -685,21 +701,43 @@ class _ListItem extends StatelessWidget {
 class _TasksOptionsDropdown extends StatelessWidget {
   const _TasksOptionsDropdown({
     required this.onDismiss,
+    required this.onAddList,
+    required this.onAddFolder,
     this.showSettings = false,
     this.onSettings,
   });
 
   final VoidCallback onDismiss;
+  final VoidCallback onAddList;
+  final VoidCallback onAddFolder;
   final bool showSettings;
   final VoidCallback? onSettings;
 
   @override
   Widget build(BuildContext context) {
     final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
-    final items = <Widget>[];
+    final s = S.of(context);
+    final separator = Container(
+      height: 0.5,
+      color: CupertinoColors.separator.resolveFrom(context),
+    );
+    final items = <Widget>[
+      DropdownRow(
+        label: s.addList,
+        icon: CupertinoIcons.add_circled,
+        onTap: onAddList,
+      ),
+      separator,
+      DropdownRow(
+        label: s.addFolder,
+        icon: CupertinoIcons.folder_badge_plus,
+        onTap: onAddFolder,
+      ),
+    ];
     if (showSettings) {
+      items.add(separator);
       items.add(DropdownRow(
-        label: S.of(context).settings,
+        label: s.settings,
         icon: CupertinoIcons.gear_alt,
         onTap: onSettings ?? () {},
       ));
@@ -711,31 +749,29 @@ class _TasksOptionsDropdown extends StatelessWidget {
           onTap: onDismiss,
           child: const SizedBox.expand(),
         ),
-        if (items.isNotEmpty)
-          Positioned(
-            top: topOffset,
-            right: 8,
-            child: Container(
-              width: 220,
-              decoration: BoxDecoration(
-                color:
-                    CupertinoColors.systemBackground.resolveFrom(context),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(
-                    color: AppColors.shadow,
-                    blurRadius: 20,
-                    offset: Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: items,
-              ),
+        Positioned(
+          top: topOffset,
+          right: 8,
+          child: Container(
+            width: 220,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground.resolveFrom(context),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 20,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: items,
             ),
           ),
+        ),
       ],
     );
   }

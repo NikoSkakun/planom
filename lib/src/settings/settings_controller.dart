@@ -214,6 +214,12 @@ class SettingsController with ChangeNotifier {
     await _smartListPrefs.save();
   }
 
+  Future<void> updateShowAddFolderButton(bool value) async {
+    _smartListPrefs.showAddFolderButton = value;
+    notifyListeners();
+    await _smartListPrefs.save();
+  }
+
   /// Replaces in-memory smart-list prefs from a backup map and persists them.
   Future<void> importSmartListPrefs(Map<String, dynamic> data) async {
     _smartListPrefs.applyJson(data);
