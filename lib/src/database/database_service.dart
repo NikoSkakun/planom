@@ -14,7 +14,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 17;
+  static const _dbVersion = 18;
 
   Database? _db;
 
@@ -43,7 +43,8 @@ class DatabaseService {
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
             completionDate INTEGER,
-            reminderOffsets TEXT
+            reminderOffsets TEXT,
+            parentTaskId TEXT
           )
         ''');
         await db.execute('''
@@ -303,6 +304,9 @@ class DatabaseService {
         if (oldVersion < 17) {
           await db.execute('ALTER TABLE tasks ADD COLUMN reminderOffsets TEXT');
           await db.execute('ALTER TABLE events ADD COLUMN reminderOffsets TEXT');
+        }
+        if (oldVersion < 18) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN parentTaskId TEXT');
         }
       },
     );

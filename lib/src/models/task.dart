@@ -19,6 +19,7 @@ class Task extends AppItem {
   final DateTime? deletedDate;
   final DateTime? completionDate;
   final List<int> reminderOffsets;
+  final String? parentTaskId;
 
   Task({
     String? id,
@@ -37,6 +38,7 @@ class Task extends AppItem {
     this.deletedDate,
     this.completionDate,
     this.reminderOffsets = const [],
+    this.parentTaskId,
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -63,6 +65,8 @@ class Task extends AppItem {
     DateTime? completionDate,
     bool clearCompletionDate = false,
     List<int>? reminderOffsets,
+    String? parentTaskId,
+    bool clearParentTaskId = false,
   }) {
     return Task(
       id: id,
@@ -81,6 +85,8 @@ class Task extends AppItem {
       deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
       completionDate: clearCompletionDate ? null : (completionDate ?? this.completionDate),
       reminderOffsets: reminderOffsets ?? this.reminderOffsets,
+      parentTaskId:
+          clearParentTaskId ? null : (parentTaskId ?? this.parentTaskId),
     );
   }
 
@@ -101,6 +107,7 @@ class Task extends AppItem {
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
         'completionDate': completionDate?.millisecondsSinceEpoch,
         'reminderOffsets': reminderOffsets.join(','),
+        'parentTaskId': parentTaskId,
       };
 
   factory Task.fromMap(Map<String, dynamic> map) => Task(
@@ -127,6 +134,7 @@ class Task extends AppItem {
             ? DateTime.fromMillisecondsSinceEpoch(map['completionDate'] as int)
             : null,
         reminderOffsets: _parseOffsets(map['reminderOffsets'] as String?),
+        parentTaskId: map['parentTaskId'] as String?,
       );
 
   static List<int> _parseOffsets(String? s) {

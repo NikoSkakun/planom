@@ -246,6 +246,8 @@ class S {
   String get taskName => t('taskName');
   String get eventName => t('eventName');
   String get note => t('note');
+  String get subtasks => t('subtasks');
+  String get addSubtask => t('addSubtask');
   String get title => t('title');
   String get folderName => t('folderName');
   String get listName => t('listName');
@@ -523,6 +525,7 @@ const Map<String, String> _en = {
   'restoreBody': 'This will be moved back to {destination}.',
   'deletePermanentlyQuestion': 'Delete "{name}" permanently?',
   'taskName': 'Task name', 'eventName': 'Event name', 'note': 'Note',
+  'subtasks': 'Subtasks', 'addSubtask': 'Add subtask',
   'title': 'Title', 'folderName': 'Folder name', 'listName': 'List name',
   'routineName': 'Routine name',
   'duration': 'Duration', 'noDuration': 'No Duration', 'noDate': 'No Date',
@@ -627,6 +630,7 @@ const Map<String, String> _uk = {
   'restoreBody': 'Буде повернуто до {destination}.',
   'deletePermanentlyQuestion': 'Видалити «{name}» назавжди?',
   'taskName': 'Назва завдання', 'eventName': 'Назва події', 'note': 'Нотатка',
+  'subtasks': 'Підзавдання', 'addSubtask': 'Додати підзавдання',
   'title': 'Заголовок', 'folderName': 'Назва папки', 'listName': 'Назва списку',
   'routineName': 'Назва звички',
   'duration': 'Тривалість', 'noDuration': 'Без тривалості', 'noDate': 'Без дати',
@@ -731,6 +735,7 @@ const Map<String, String> _es = {
   'restoreBody': 'Se moverá a {destination}.',
   'deletePermanentlyQuestion': '¿Eliminar "{name}" permanentemente?',
   'taskName': 'Nombre de la tarea', 'eventName': 'Nombre del evento', 'note': 'Nota',
+  'subtasks': 'Subtareas', 'addSubtask': 'Añadir subtarea',
   'title': 'Título', 'folderName': 'Nombre de la carpeta', 'listName': 'Nombre de la lista',
   'routineName': 'Nombre de la rutina',
   'duration': 'Duración', 'noDuration': 'Sin duración', 'noDate': 'Sin fecha',
@@ -835,6 +840,7 @@ const Map<String, String> _fr = {
   'restoreBody': 'Sera déplacé vers {destination}.',
   'deletePermanentlyQuestion': 'Supprimer « {name} » définitivement ?',
   'taskName': 'Nom de la tâche', 'eventName': 'Nom de l\'événement', 'note': 'Note',
+  'subtasks': 'Sous-tâches', 'addSubtask': 'Ajouter une sous-tâche',
   'title': 'Titre', 'folderName': 'Nom du dossier', 'listName': 'Nom de la liste',
   'routineName': 'Nom de la routine',
   'duration': 'Durée', 'noDuration': 'Sans durée', 'noDate': 'Sans date',
@@ -939,6 +945,7 @@ const Map<String, String> _de = {
   'restoreBody': 'Wird zurück nach {destination} verschoben.',
   'deletePermanentlyQuestion': '„{name}" endgültig löschen?',
   'taskName': 'Aufgabenname', 'eventName': 'Ereignisname', 'note': 'Notiz',
+  'subtasks': 'Unteraufgaben', 'addSubtask': 'Unteraufgabe hinzufügen',
   'title': 'Titel', 'folderName': 'Ordnername', 'listName': 'Listenname',
   'routineName': 'Routinename',
   'duration': 'Dauer', 'noDuration': 'Keine Dauer', 'noDate': 'Kein Datum',
@@ -1043,6 +1050,7 @@ const Map<String, String> _it = {
   'restoreBody': 'Verrà ripristinato in {destination}.',
   'deletePermanentlyQuestion': 'Eliminare "{name}" definitivamente?',
   'taskName': 'Nome attività', 'eventName': 'Nome evento', 'note': 'Nota',
+  'subtasks': 'Sotto-attività', 'addSubtask': 'Aggiungi sotto-attività',
   'title': 'Titolo', 'folderName': 'Nome cartella', 'listName': 'Nome lista',
   'routineName': 'Nome abitudine',
   'duration': 'Durata', 'noDuration': 'Nessuna durata', 'noDate': 'Nessuna data',
@@ -1147,6 +1155,7 @@ const Map<String, String> _pt = {
   'restoreBody': 'Será movido de volta para {destination}.',
   'deletePermanentlyQuestion': 'Excluir "{name}" permanentemente?',
   'taskName': 'Nome da tarefa', 'eventName': 'Nome do evento', 'note': 'Nota',
+  'subtasks': 'Subtarefas', 'addSubtask': 'Adicionar subtarefa',
   'title': 'Título', 'folderName': 'Nome da pasta', 'listName': 'Nome da lista',
   'routineName': 'Nome da rotina',
   'duration': 'Duração', 'noDuration': 'Sem duração', 'noDate': 'Sem data',
@@ -1251,6 +1260,7 @@ const Map<String, String> _ru = {
   'restoreBody': 'Будет восстановлено в {destination}.',
   'deletePermanentlyQuestion': 'Удалить «{name}» навсегда?',
   'taskName': 'Название задачи', 'eventName': 'Название события', 'note': 'Заметка',
+  'subtasks': 'Подзадачи', 'addSubtask': 'Добавить подзадачу',
   'title': 'Заголовок', 'folderName': 'Название папки', 'listName': 'Название списка',
   'routineName': 'Название привычки',
   'duration': 'Длительность', 'noDuration': 'Без длительности', 'noDate': 'Без даты',
@@ -1355,6 +1365,7 @@ const Map<String, String> _zh = {
   'restoreBody': '将被恢复到 {destination}。',
   'deletePermanentlyQuestion': '永久删除"{name}"？',
   'taskName': '任务名称', 'eventName': '事件名称', 'note': '笔记',
+  'subtasks': '子任务', 'addSubtask': '添加子任务',
   'title': '标题', 'folderName': '文件夹名称', 'listName': '列表名称',
   'routineName': '习惯名称',
   'duration': '时长', 'noDuration': '无时长', 'noDate': '无日期',
@@ -1459,6 +1470,7 @@ const Map<String, String> _ja = {
   'restoreBody': '{destination} に戻されます。',
   'deletePermanentlyQuestion': '「{name}」を完全に削除しますか？',
   'taskName': 'タスク名', 'eventName': 'イベント名', 'note': 'ノート',
+  'subtasks': 'サブタスク', 'addSubtask': 'サブタスクを追加',
   'title': 'タイトル', 'folderName': 'フォルダ名', 'listName': 'リスト名',
   'routineName': '習慣名',
   'duration': '所要時間', 'noDuration': '所要時間なし', 'noDate': '日付なし',

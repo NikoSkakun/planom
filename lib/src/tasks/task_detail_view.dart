@@ -14,6 +14,7 @@ import '../notes/markdown_toolbar.dart';
 import '../notes/markdown_view.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
+import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/reminder_picker.dart';
 import 'calendar_date_picker.dart';
@@ -42,6 +43,8 @@ class _TaskDetailViewState extends State<TaskDetailView>
   late final TextEditingController _title;
   late final TextEditingController _note;
   final FocusNode _noteFocus = FocusNode();
+  final TextEditingController _newSubtask = TextEditingController();
+  final FocusNode _newSubtaskFocus = FocusNode();
   late DateTime? _dueDate;
   late int? _doTime;
   late int? _duration;
@@ -131,7 +134,37 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _noteFocus.dispose();
     _title.dispose();
     _note.dispose();
+    _newSubtask.dispose();
+    _newSubtaskFocus.dispose();
     super.dispose();
+  }
+
+  void _addSubtask() {
+    final text = _newSubtask.text.trim();
+    if (text.isEmpty) return;
+    // Inherit the parent's list so the subtree stays scoped to a single list,
+    // but never inherit the date — subtasks default to no due date.
+    widget.controller.addTask(Task(
+      title: text,
+      listId: widget.task.listId,
+      parentTaskId: widget.task.id,
+    ));
+    _newSubtask.clear();
+    // Re-focus so the user can chain-enter several subtasks in a row.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _newSubtaskFocus.requestFocus();
+    });
+  }
+
+  void _openSubtask(Task subtask) {
+    Navigator.of(context).push(FastRoute<void>(
+      settings: const RouteSettings(name: TaskDetailView.routeName),
+      builder: (_) => TaskDetailView(
+        task: subtask,
+        controller: widget.controller,
+        folderController: widget.folderController,
+      ),
+    ));
   }
 
   void _showDropdown(BuildContext context) {
@@ -443,6 +476,27 @@ class _TaskDetailViewState extends State<TaskDetailView>
                       ],
                     ),
                   ),
+                  const SizedBox(height: 24),
+
+                  // Subtasks — only on top-level tasks; nesting beyond one
+                  // level adds tree-management cost for little user value.
+                  if (widget.task.parentTaskId == null)
+                    ListenableBuilder(
+                      listenable: widget.controller,
+                      builder: (context, _) {
+                        final subs = widget.controller
+                            .subtasksOf(widget.task.id);
+                        return _SubtasksSection(
+                          subtasks: subs,
+                          newCtrl: _newSubtask,
+                          newFocus: _newSubtaskFocus,
+                          onAdd: _addSubtask,
+                          onToggle: (id) =>
+                              widget.controller.toggleCompleted(id),
+                          onOpen: _openSubtask,
+                        );
+                      },
+                    ),
                 ],
               ),
             ),
@@ -455,6 +509,162 @@ class _TaskDetailViewState extends State<TaskDetailView>
                   showLinkPromptDialog(context, initialText: selected),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _SubtasksSection extends StatelessWidget {
+  const _SubtasksSection({
+    required this.subtasks,
+    required this.newCtrl,
+    required this.newFocus,
+    required this.onAdd,
+    required this.onToggle,
+    required this.onOpen,
+  });
+
+  final List<Task> subtasks;
+  final TextEditingController newCtrl;
+  final FocusNode newFocus;
+  final VoidCallback onAdd;
+  final ValueChanged<String> onToggle;
+  final ValueChanged<Task> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final done = subtasks.where((t) => t.isCompleted).length;
+    final headerLabel = subtasks.isEmpty
+        ? s.subtasks.toUpperCase()
+        : '${s.subtasks.toUpperCase()}  $done/${subtasks.length}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            headerLabel,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            children: [
+              for (int i = 0; i < subtasks.length; i++) ...[
+                _SubtaskRow(
+                  task: subtasks[i],
+                  onToggle: () => onToggle(subtasks[i].id),
+                  onOpen: () => onOpen(subtasks[i]),
+                ),
+                if (i < subtasks.length)
+                  Container(
+                    height: 0.5,
+                    margin: const EdgeInsets.only(left: 44),
+                    color: CupertinoColors.separator.resolveFrom(context),
+                  ),
+              ],
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      CupertinoIcons.add_circled,
+                      size: 20,
+                      color:
+                          CupertinoColors.secondaryLabel.resolveFrom(context),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: CupertinoTextField(
+                        controller: newCtrl,
+                        focusNode: newFocus,
+                        placeholder: s.addSubtask,
+                        style: const TextStyle(fontSize: 15),
+                        decoration: const BoxDecoration(),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        textInputAction: TextInputAction.done,
+                        textCapitalization: TextCapitalization.sentences,
+                        onSubmitted: (_) => onAdd(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubtaskRow extends StatelessWidget {
+  const _SubtaskRow({
+    required this.task,
+    required this.onToggle,
+    required this.onOpen,
+  });
+
+  final Task task;
+  final VoidCallback onToggle;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: task.title,
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: onToggle,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 2, vertical: 2),
+                  child: _RoundedCheckbox(checked: task.isCompleted),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  task.title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: task.isCompleted
+                        ? CupertinoColors.secondaryLabel.resolveFrom(context)
+                        : CupertinoColors.label.resolveFrom(context),
+                    decoration: task.isCompleted
+                        ? TextDecoration.lineThrough
+                        : null,
+                  ),
+                ),
+              ),
+              Icon(
+                CupertinoIcons.chevron_right,
+                size: 14,
+                color:
+                    CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

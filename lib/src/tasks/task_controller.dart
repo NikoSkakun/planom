@@ -24,16 +24,21 @@ class TaskController with ChangeNotifier {
     notifyListeners();
   }
 
+  // Subtasks (parentTaskId != null) are scoped to their parent's detail view
+  // and intentionally excluded from every top-level list, smart list, and
+  // count below. Use `subtasksOf(parentId)` to access them.
+  Iterable<Task> get _topLevel => _tasks.where((t) => t.parentTaskId == null);
+
   List<Task> get inboxTasks => List.unmodifiable(
-      _completedLast(_applySort(_tasks.where((t) => t.listId == null))));
+      _completedLast(_applySort(_topLevel.where((t) => t.listId == null))));
 
   int get inboxUncompletedCount =>
-      _tasks.where((t) => t.listId == null && !t.isCompleted).length;
+      _topLevel.where((t) => t.listId == null && !t.isCompleted).length;
 
   List<Task> get todayTasks {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    return _completedLast(_applySort(_tasks.where((t) {
+    return _completedLast(_applySort(_topLevel.where((t) {
       if (t.dueDate == null) return false;
       final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);
       if (due == today) return true;
@@ -48,7 +53,7 @@ class TaskController with ChangeNotifier {
   List<Task> get upcomingTasks {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final filtered = _tasks.where((t) {
+    final filtered = _topLevel.where((t) {
       if (t.dueDate == null) return false;
       final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);
       return due.isAfter(today);
@@ -64,7 +69,7 @@ class TaskController with ChangeNotifier {
   int get upcomingUncompletedCount =>
       upcomingTasks.where((t) => !t.isCompleted).length;
 
-  List<Task> tasksForDate(DateTime date) => _tasks
+  List<Task> tasksForDate(DateTime date) => _topLevel
       .where((t) =>
           t.dueDate != null &&
           t.dueDate!.year == date.year &&
@@ -73,15 +78,29 @@ class TaskController with ChangeNotifier {
       .toList();
 
   List<Task> tasksForList(String listId) => List.unmodifiable(
-      _completedLast(_applySort(_tasks.where((t) => t.listId == listId))));
+      _completedLast(_applySort(_topLevel.where((t) => t.listId == listId))));
 
   int uncompletedCountForList(String listId) =>
-      _tasks.where((t) => t.listId == listId && !t.isCompleted).length;
+      _topLevel.where((t) => t.listId == listId && !t.isCompleted).length;
 
   List<Task> get allCompletedTasks =>
-      _tasks.where((t) => t.isCompleted).toList();
+      _topLevel.where((t) => t.isCompleted).toList();
 
   int get completedTasksCount => allCompletedTasks.length;
+
+  /// Subtasks of [parentId], in creation order (oldest first) so the list reads
+  /// like a checklist rather than a feed.
+  List<Task> subtasksOf(String parentId) {
+    final subs = _tasks.where((t) => t.parentTaskId == parentId).toList()
+      ..sort((a, b) => a.creationDate.compareTo(b.creationDate));
+    return List.unmodifiable(subs);
+  }
+
+  int subtaskCount(String parentId) =>
+      _tasks.where((t) => t.parentTaskId == parentId).length;
+
+  int subtaskCompletedCount(String parentId) =>
+      _tasks.where((t) => t.parentTaskId == parentId && t.isCompleted).length;
 
   List<Task> get trashedTasks => List.unmodifiable(_trashedTasks);
 
@@ -142,10 +161,26 @@ class TaskController with ChangeNotifier {
     final i = _tasks.indexWhere((t) => t.id == id);
     if (i == -1) return;
     final now = DateTime.now();
-    final trashed = _tasks[i].copyWith(isDeleted: true, deletedDate: now);
+
+    // Soft-delete the task and its entire subtask subtree at the same instant,
+    // so a parent + its children share one deletedDate and surface together in
+    // Trash. Restoring the parent leaves children trashed (handled in restore).
+    final toTrash = <Task>[
+      _tasks[i].copyWith(isDeleted: true, deletedDate: now),
+      ..._tasks
+          .where((t) => t.parentTaskId == id)
+          .map((t) => t.copyWith(isDeleted: true, deletedDate: now)),
+    ];
+
     await _db.softDeleteTask(id, now);
-    _tasks = _tasks.where((t) => t.id != id).toList();
-    _trashedTasks = [trashed, ..._trashedTasks];
+    for (final sub in toTrash.skip(1)) {
+      await _db.softDeleteTask(sub.id, now);
+      NotificationService.instance.cancelTaskReminders(sub.id);
+    }
+
+    final removedIds = toTrash.map((t) => t.id).toSet();
+    _tasks = _tasks.where((t) => !removedIds.contains(t.id)).toList();
+    _trashedTasks = [...toTrash, ..._trashedTasks];
     _updateBadge();
     notifyListeners();
     NotificationService.instance.cancelTaskReminders(id);
