@@ -37,6 +37,15 @@ class NoteController with ChangeNotifier {
     }
   }
 
+  Note? noteById(String id) {
+    for (final n in _notes) {
+      if (n.id == id) return n;
+    }
+    return null;
+  }
+
+  List<Note> get allNotes => List.unmodifiable(_notes);
+
   Future<void> load() async {
     _folders = await _db.getNoteFolders();
     _notes = await _db.getNotes();

@@ -4,10 +4,14 @@ import '../theme/app_theme.dart';
 
 import '../localization/strings.dart';
 import '../folders/create_folder_list_sheet.dart';
+import '../calendar/event_controller.dart';
+import '../database/database_service.dart';
 import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
 import '../folders/folder_view.dart';
 import '../folders/list_task_view.dart';
+import '../notes/note_controller.dart';
+import '../search/search_view.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_view.dart';
@@ -33,6 +37,9 @@ class TasksView extends StatefulWidget {
     required this.activeDueDate,
     required this.collapseSignal,
     this.backupService,
+    this.db,
+    this.noteController,
+    this.eventController,
   });
 
   final TaskController controller;
@@ -42,6 +49,11 @@ class TasksView extends StatefulWidget {
   final ValueNotifier<DateTime?> activeDueDate;
   final ValueNotifier<int> collapseSignal;
   final BackupService? backupService;
+  // Optional: when provided, the nav bar shows a global-search button that
+  // queries all three (tasks, notes, events) via FTS5.
+  final DatabaseService? db;
+  final NoteController? noteController;
+  final EventController? eventController;
 
   @override
   State<TasksView> createState() => _TasksViewState();
@@ -184,6 +196,25 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
       navigationBar: CupertinoNavigationBar(
         border: null,
         middle: Text(s.tabTasks),
+        leading: widget.db != null &&
+                widget.noteController != null &&
+                widget.eventController != null
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () => Navigator.of(context).push(
+                  FastRoute<void>(
+                    builder: (_) => SearchView(
+                      db: widget.db!,
+                      taskController: widget.controller,
+                      folderController: widget.folderController,
+                      noteController: widget.noteController!,
+                      eventController: widget.eventController!,
+                    ),
+                  ),
+                ),
+                child: const Icon(CupertinoIcons.search, size: 22),
+              )
+            : null,
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () => _showDropdown(context),

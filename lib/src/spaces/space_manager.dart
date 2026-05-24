@@ -53,6 +53,10 @@ class SpaceManager with ChangeNotifier {
   RoutineController get routineController => _routineController;
   EventController get eventController => _eventController;
   BackupService get backupService => _backupService;
+  // Exposed for features (e.g. search) that need to query the active space's
+  // DB directly. Always the current space's handle — re-grabbed by widgets
+  // each time the active space switches because MyApp is keyed by space id.
+  DatabaseService get db => _db;
 
   Future<void> load() async {
     await _loadMetadata();

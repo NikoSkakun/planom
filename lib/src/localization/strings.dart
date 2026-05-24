@@ -199,6 +199,10 @@ class S {
   String get setPassphrase => t('setPassphrase');
   String get enterPassphrase => t('enterPassphrase');
   String get passwordRequired => t('passwordRequired');
+  String get search => t('search');
+  String get searchPlaceholder => t('searchPlaceholder');
+  String get searchEmptyHint => t('searchEmptyHint');
+  String get searchNoResults => t('searchNoResults');
 
   // ── Notifications ─────────────────────────────────────────────────────────
   String get sectionNotifications => t('sectionNotifications');
@@ -515,6 +519,9 @@ const Map<String, String> _en = {
   'setPassphrase': 'Set passphrase',
   'enterPassphrase': 'Enter passphrase',
   'passwordRequired': 'Password is required',
+  'search': 'Search', 'searchPlaceholder': 'Search tasks, notes, events',
+  'searchEmptyHint': 'Type to search across tasks, notes, and events.',
+  'searchNoResults': 'No matches.',
   'sectionNotifications': 'Notifications',
   'notificationsEnabled': 'Notifications Enabled',
   'notificationsPermissionHint': 'Open Settings to allow notifications for Planom.',

@@ -107,6 +107,13 @@ class TaskController with ChangeNotifier {
 
   List<Task> get trashedTasks => List.unmodifiable(_trashedTasks);
 
+  Task? taskById(String id) {
+    for (final t in _tasks) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
   Future<void> load() async {
     _tasks = await _db.getTasks();
     _trashedTasks = await _db.getTrashedTasks();

@@ -7,6 +7,7 @@ import 'calendar/event_creation_sheet.dart';
 import 'folders/folder_controller.dart';
 import 'notes/note_controller.dart';
 import 'notes/notes_view.dart';
+import 'spaces/space_manager.dart';
 import 'routines/routine_controller.dart';
 import 'routines/routine_creation_view.dart';
 import 'routines/routines_view.dart';
@@ -351,6 +352,9 @@ class _HomeShellState extends State<HomeShell> {
           activeDueDate: _activeDueDate,
           collapseSignal: _tasksCollapseSignal,
           backupService: widget.backupService,
+          db: SpaceManagerProvider.of(context).db,
+          noteController: widget.noteController,
+          eventController: widget.eventController,
         ),
       1 => NotesView(
           controller: widget.noteController,
