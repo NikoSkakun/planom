@@ -51,5 +51,23 @@
 	<string>Choose a photo to use as the icon for your list or folder.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock Planom.</string>
+	<!--
+	  iCloud Drive sync — paired with the iCloud capability in
+	  Signing & Capabilities (Runner.entitlements). Container id must
+	  match the one passed to ICloudSyncProvider (default
+	  iCloud.com.planom.app). See docs/SYNC_SETUP.md for Xcode steps.
+	-->
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.com.planom.app</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+			<key>NSUbiquitousContainerName</key>
+			<string>Planom</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

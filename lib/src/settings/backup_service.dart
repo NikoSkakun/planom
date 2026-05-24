@@ -36,19 +36,16 @@ class BackupService {
   final EventController eventController;
   final SettingsController settingsController;
 
-  /// Exports the active space. If [passphrase] is non-null and non-empty, the
-  /// payload is AES-GCM-256 encrypted under a key derived from it (PBKDF2-
-  /// SHA256, 100k iterations); the resulting `.planom` file is unreadable
-  /// without the same passphrase.
-  Future<void> exportBackup({String? passphrase}) async {
+  /// Builds the active space's backup payload as a plain JSON string. Used
+  /// both by [exportBackup] (writes to file + share sheet) and by the sync
+  /// subsystem (encrypts in memory + uploads).
+  Future<String> buildPayloadJson() async {
     final docsPath = (await getApplicationDocumentsDirectory()).path;
 
-    // Fetch raw DB maps for tables that may have custom icon paths.
     var folders = await db.exportFolders();
     var lists = await db.exportLists();
     var noteFolders = await db.exportNoteFolders();
 
-    // Collect image bytes keyed by relative path; normalize absolute paths.
     final customIcons = <String, String>{};
     folders = await _inlineIcons(folders, 'iconId', docsPath, customIcons);
     lists = await _inlineIcons(lists, 'iconId', docsPath, customIcons);
@@ -68,16 +65,21 @@ class BackupService {
       'routines': await db.exportRoutines(),
       'routine_entries': await db.exportRoutineEntries(),
       'events': await db.exportEvents(),
-      // Exclude the local passcode (auth_*) so it never leaves the device.
       'app_settings': (await db.exportAppSettings())
           .where((r) => !SecurityService.authSettingKeys.contains(r['key']))
           .toList(),
-      // Smart-list visibility + hideTabLabels live in a JSON file in the docs
-      // directory, not the DB, so we include their raw map here.
       'smart_list_prefs': settingsController.smartListPrefs.toJson(),
     };
 
-    final plainJson = const JsonEncoder.withIndent('  ').convert(payload);
+    return const JsonEncoder.withIndent('  ').convert(payload);
+  }
+
+  /// Exports the active space. If [passphrase] is non-null and non-empty, the
+  /// payload is AES-GCM-256 encrypted under a key derived from it (PBKDF2-
+  /// SHA256, 100k iterations); the resulting `.planom` file is unreadable
+  /// without the same passphrase.
+  Future<void> exportBackup({String? passphrase}) async {
+    final plainJson = await buildPayloadJson();
     final fileContent = (passphrase != null && passphrase.isNotEmpty)
         ? await encryptBackup(plainJson, passphrase)
         : plainJson;
@@ -139,6 +141,23 @@ class BackupService {
       }
     }
 
+    return _applyImportedPayload(data);
+  }
+
+  /// Sync-side entry point: takes already-decrypted JSON (e.g. from a remote
+  /// blob the controller just downloaded) and applies it. Returns `true` when
+  /// the import committed, `false` when the payload was rejected.
+  Future<bool> importPayloadJson(String plainJson) async {
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(plainJson) as Map<String, dynamic>;
+    } catch (_) {
+      return false;
+    }
+    return _applyImportedPayload(data);
+  }
+
+  Future<bool> _applyImportedPayload(Map<String, dynamic> data) async {
     if (data['version'] != 1) return false;
 
     List<Map<String, dynamic>> asMaps(dynamic value) {
@@ -148,14 +167,12 @@ class BackupService {
           .toList();
     }
 
-    // Keep the device's local passcode and never let an imported backup change
-    // it: preserve our own auth_* rows and drop any the backup carries.
+    // Keep the device's local passcode and never let an imported payload
+    // change it: preserve our own auth_* rows and drop any the payload carries.
     final localAuth = (await db.exportAppSettings())
         .where((r) => SecurityService.authSettingKeys.contains(r['key']))
         .toList();
 
-    // Fully parse and validate the payload BEFORE touching any data. If the
-    // backup is malformed, we return early with everything still intact.
     final Map<String, dynamic> customIcons;
     final Map<String, List<Map<String, dynamic>>> tables;
     try {
@@ -180,20 +197,15 @@ class BackupService {
       return false;
     }
 
-    // Restore custom icon files first so DB records can reference them. These
-    // are written before the DB transaction; orphaned files are harmless if
-    // the import is later aborted.
     final docsPath = (await getApplicationDocumentsDirectory()).path;
     final iconsDir = Directory('$docsPath/icons');
     if (!iconsDir.existsSync()) iconsDir.createSync(recursive: true);
     for (final entry in customIcons.entries) {
-      final relPath = entry.key; // 'icons/filename.ext'
+      final relPath = entry.key;
       final bytes = base64Decode(entry.value as String);
       await File('$docsPath/$relPath').writeAsBytes(bytes);
     }
 
-    // Atomic clear + insert: on any failure the transaction rolls back and the
-    // user's existing data is preserved (no half-imported state).
     try {
       await db.replaceAllData(tables);
     } catch (_) {
