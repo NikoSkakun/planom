@@ -391,39 +391,59 @@ class _HomeShellState extends State<HomeShell> {
       builder: (context, _) {
         final hideLabels = widget.settingsController.hideTabLabels;
         final visibleIndices = _computeVisibleIndices();
+        // iPad / large window threshold. Below this the bottom tab bar is
+        // still the right choice; above this we get enough horizontal room
+        // for a persistent sidebar that doesn't waste vertical screen space.
+        final isWide = MediaQuery.sizeOf(context).width >= 700;
 
         return Stack(
           children: [
-            CupertinoTabScaffold(
-              controller: _tabController,
-              tabBar: CupertinoTabBar(
-                activeColor: CupertinoColors.label,
-                inactiveColor: CupertinoColors.secondaryLabel,
-                backgroundColor: const CupertinoDynamicColor.withBrightness(
-                  color: Color(0xF0F9F9F9),
-                  darkColor: Color(0xF01D1D1D),
+            if (isWide)
+              _WideLayout(
+                visibleIndices: visibleIndices,
+                hideLabels: hideLabels,
+                lastTabIndex: _lastTabIndex,
+                navigatorKeys: _navigatorKeys,
+                depthObservers: _depthObservers,
+                tabItem: (ctx, i) => _tabItem(ctx, i, hideLabels),
+                tabContent: _tabContent,
+                onTap: _onTabTapped,
+              )
+            else
+              CupertinoTabScaffold(
+                controller: _tabController,
+                tabBar: CupertinoTabBar(
+                  activeColor: CupertinoColors.label,
+                  inactiveColor: CupertinoColors.secondaryLabel,
+                  backgroundColor: const CupertinoDynamicColor.withBrightness(
+                    color: Color(0xF0F9F9F9),
+                    darkColor: Color(0xF01D1D1D),
+                  ),
+                  onTap: (visualIdx) =>
+                      _onTabTapped(visibleIndices[visualIdx]),
+                  items: visibleIndices
+                      .map((i) => _tabItem(context, i, hideLabels))
+                      .toList(),
                 ),
-                onTap: (visualIdx) =>
-                    _onTabTapped(visibleIndices[visualIdx]),
-                items: visibleIndices
-                    .map((i) => _tabItem(context, i, hideLabels))
-                    .toList(),
+                tabBuilder: (context, visualIdx) {
+                  final logicalIdx = visibleIndices[visualIdx];
+                  return CupertinoTabView(
+                    navigatorKey: _navigatorKeys[logicalIdx],
+                    navigatorObservers: [_depthObservers[logicalIdx]],
+                    builder: (ctx) => _tabContent(ctx, logicalIdx),
+                  );
+                },
               ),
-              tabBuilder: (context, visualIdx) {
-                final logicalIdx = visibleIndices[visualIdx];
-                return CupertinoTabView(
-                  navigatorKey: _navigatorKeys[logicalIdx],
-                  navigatorObservers: [_depthObservers[logicalIdx]],
-                  builder: (ctx) => _tabContent(ctx, logicalIdx),
-                );
-              },
-            ),
             ValueListenableBuilder<bool>(
               valueListenable: _showPlusButton,
               builder: (context, show, child) => show
                   ? Positioned(
                       right: 20,
-                      bottom: 50 + MediaQuery.paddingOf(context).bottom + 12,
+                      bottom: isWide
+                          ? 24
+                          : 50 +
+                              MediaQuery.paddingOf(context).bottom +
+                              12,
                       child: _PlusButton(onPressed: _onPlusPressed),
                     )
                   : const SizedBox.shrink(),
@@ -431,6 +451,152 @@ class _HomeShellState extends State<HomeShell> {
           ],
         );
       },
+    );
+  }
+}
+
+/// iPad layout: persistent left sidebar with the same tab items, content on
+/// the right wrapped in IndexedStack so each tab keeps its scroll/nav state
+/// while inactive.
+class _WideLayout extends StatelessWidget {
+  const _WideLayout({
+    required this.visibleIndices,
+    required this.hideLabels,
+    required this.lastTabIndex,
+    required this.navigatorKeys,
+    required this.depthObservers,
+    required this.tabItem,
+    required this.tabContent,
+    required this.onTap,
+  });
+
+  final List<int> visibleIndices;
+  final bool hideLabels;
+  final int lastTabIndex;
+  final List<GlobalKey<NavigatorState>> navigatorKeys;
+  final List<NavigatorObserver> depthObservers;
+  final BottomNavigationBarItem Function(BuildContext, int) tabItem;
+  final Widget Function(BuildContext, int) tabContent;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeVisualIdx = visibleIndices.indexOf(lastTabIndex);
+    final safeActive = activeVisualIdx < 0 ? 0 : activeVisualIdx;
+    return Row(
+      children: [
+        // Sidebar — fixed-width column with the same icons used in the tab
+        // bar. Keeping the same _tabItem helper means a single source of truth
+        // for the icon set across both layouts.
+        Container(
+          width: hideLabels ? 72 : 200,
+          decoration: BoxDecoration(
+            color: const CupertinoDynamicColor.withBrightness(
+              color: Color(0xF0F4F4F4),
+              darkColor: Color(0xF01A1A1A),
+            ).resolveFrom(context),
+            border: Border(
+              right: BorderSide(
+                color: CupertinoColors.separator.resolveFrom(context),
+                width: 0.5,
+              ),
+            ),
+          ),
+          child: SafeArea(
+            right: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                children: [
+                  for (int i = 0; i < visibleIndices.length; i++)
+                    _SidebarTile(
+                      item: tabItem(context, visibleIndices[i]),
+                      selected: i == safeActive,
+                      hideLabel: hideLabels,
+                      onTap: () => onTap(visibleIndices[i]),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: IndexedStack(
+            index: safeActive,
+            children: [
+              for (final logicalIdx in visibleIndices)
+                CupertinoTabView(
+                  navigatorKey: navigatorKeys[logicalIdx],
+                  navigatorObservers: [depthObservers[logicalIdx]],
+                  builder: (ctx) => tabContent(ctx, logicalIdx),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SidebarTile extends StatelessWidget {
+  const _SidebarTile({
+    required this.item,
+    required this.selected,
+    required this.hideLabel,
+    required this.onTap,
+  });
+
+  final BottomNavigationBarItem item;
+  final bool selected;
+  final bool hideLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.accent.withOpacity(0.15)
+                : null,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: Center(
+                  child: selected ? item.activeIcon : item.icon,
+                ),
+              ),
+              if (!hideLabel && item.label != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.label!,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight:
+                          selected ? FontWeight.w600 : FontWeight.w500,
+                      color: selected
+                          ? AppColors.accent
+                          : CupertinoColors.label.resolveFrom(context),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
