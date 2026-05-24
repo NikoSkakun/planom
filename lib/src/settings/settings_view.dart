@@ -241,6 +241,33 @@ class _SettingsViewState extends State<SettingsView> {
               ),
             ),
 
+            // ── Startup ─────────────────────────────────────────────────
+            // Surfaced at the top level (not buried inside Tab Bar) so the
+            // setting that controls "which tab opens on app launch" is easy
+            // to find — discoverability complaint from real users.
+            const SizedBox(height: 18),
+            Text(
+              s.startup,
+              style: TextStyle(
+                fontSize: 13,
+                color: labelColor,
+                letterSpacing: -0.08,
+              ),
+            ),
+            const SizedBox(height: 6),
+            ListenableBuilder(
+              listenable: widget.controller,
+              builder: (ctx, _) {
+                return _NavRow(
+                  label: s.defaultTab,
+                  trailingLabel: defaultTabLabel(
+                      s, widget.controller),
+                  onTap: () =>
+                      showDefaultTabPicker(context, widget.controller),
+                );
+              },
+            ),
+
             // ── Notifications ────────────────────────────────────────
             const SizedBox(height: 18),
             Text(
@@ -343,42 +370,49 @@ class _SettingsViewState extends State<SettingsView> {
 
 // ── Tab Bar settings sub-page ────────────────────────────────────────────────
 
+String _tabLabel(S s, int tabIndex) {
+  switch (tabIndex) {
+    case 0: return s.tabTasks;
+    case 1: return s.tabNotes;
+    case 2: return s.tabCalendar;
+    case 3: return s.tabRoutines;
+    case 4: return s.tabSettings;
+    default: return '';
+  }
+}
+
+/// Human-readable label for the controller's current default-tab value.
+/// Exposed so both the top-level Settings row and the Tab Bar sub-page can
+/// share one source of truth.
+String defaultTabLabel(S s, SettingsController controller) {
+  final value = controller.defaultTab;
+  if (value == kLastOpenedTab) return s.lastOpenedTab;
+  return _tabLabel(s, int.tryParse(value) ?? 0);
+}
+
+/// Opens the picker that lets the user pick the tab shown on app launch.
+Future<void> showDefaultTabPicker(
+    BuildContext context, SettingsController controller) async {
+  final s = S.of(context);
+  final visible =
+      controller.tabOrder.where(controller.isTabVisible).toList();
+  final selected = await showSelectionMenu<String>(
+    context: context,
+    title: s.defaultTab,
+    current: controller.defaultTab,
+    options: [
+      SelectionMenuOption(value: kLastOpenedTab, label: s.lastOpenedTab),
+      for (final i in visible)
+        SelectionMenuOption(value: i.toString(), label: _tabLabel(s, i)),
+    ],
+  );
+  if (selected != null) controller.updateDefaultTab(selected);
+}
+
 class TabBarSettingsView extends StatelessWidget {
   const TabBarSettingsView({super.key, required this.controller});
 
   final SettingsController controller;
-
-  String _tabLabel(S s, int tabIndex) {
-    switch (tabIndex) {
-      case 0: return s.tabTasks;
-      case 1: return s.tabNotes;
-      case 2: return s.tabCalendar;
-      case 3: return s.tabRoutines;
-      case 4: return s.tabSettings;
-      default: return '';
-    }
-  }
-
-  String _defaultTabLabel(S s, String value) {
-    if (value == kLastOpenedTab) return s.lastOpenedTab;
-    return _tabLabel(s, int.tryParse(value) ?? 0);
-  }
-
-  Future<void> _showDefaultTabPicker(BuildContext context) async {
-    final s = S.of(context);
-    final visible = controller.tabOrder.where(controller.isTabVisible).toList();
-    final selected = await showSelectionMenu<String>(
-      context: context,
-      title: s.defaultTab,
-      current: controller.defaultTab,
-      options: [
-        SelectionMenuOption(value: kLastOpenedTab, label: s.lastOpenedTab),
-        for (final i in visible)
-          SelectionMenuOption(value: i.toString(), label: _tabLabel(s, i)),
-      ],
-    );
-    if (selected != null) controller.updateDefaultTab(selected);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -435,9 +469,8 @@ class TabBarSettingsView extends StatelessWidget {
                   const SizedBox(height: 6),
                   _NavRow(
                     label: s.defaultTab,
-                    trailingLabel:
-                        _defaultTabLabel(s, controller.defaultTab),
-                    onTap: () => _showDefaultTabPicker(context),
+                    trailingLabel: defaultTabLabel(s, controller),
+                    onTap: () => showDefaultTabPicker(context, controller),
                   ),
                   const SizedBox(height: 18),
                   // ── Visible Tabs (reorderable) ─────────────────────────
