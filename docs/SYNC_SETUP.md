@@ -36,35 +36,61 @@ required**.
 
 ### What you need to do once
 
-**Nothing in Xcode.** Two web-only things, ten minutes total:
+**No Xcode required.** Two browser-only steps, one CI trigger, total ~3 min.
 
-1. **App Store Connect** — confirm the bundle id `app.planom` exists (it
-   already does, since this workflow has been shipping builds). Nothing
-   else needed there.
-2. **First build after this PR merges** — go to Actions → TestFlight →
-   *Run workflow* and tick **Force-regenerate the provisioning profile**.
-   This bakes the iCloud entitlement into the certs-repo-stored profile.
-   You only need to do this the first time, or any time entitlements
-   change again. Pushing to `main` without the flag still works once the
-   profile is in place.
+**Step 1 — Create the iCloud Container in your browser (one-time):**
 
-If `ensure_icloud_capability` fails on the first run with "Bundle ID not
-found", double-check the API key has both **App Manager** and **Developer**
-roles in App Store Connect → Users → Keys. Read-only keys can't write
-capabilities.
+The App Store Connect REST API does not expose iCloud Container CRUD to
+API-key authentication (verified against both `/v1/iCloudContainers` and
+`/v1/cloudContainers` — Apple returns "resource does not exist" on both).
+Container management is only available via the legacy Apple-ID Spaceship
+path, which we deliberately avoid in CI. So this one step lives in the
+web portal:
+
+1. Open <https://developer.apple.com/account/resources/identifiers/list/cloudContainer>
+2. Click **+** → register a new iCloud Container
+   - **Description:** `Planom`
+   - **Identifier:** `iCloud.app.planom`
+3. Open <https://developer.apple.com/account/resources/identifiers/list>
+4. Click **app.planom** → scroll to **iCloud** → click **Configure** (or **Edit**) →
+   tick the `iCloud.app.planom` container → **Save**
+
+If you skip Step 1, the first CI run will fail with a clear message and
+the exact two URLs above — you can do it then.
+
+**Step 2 — Trigger the first build with profile regen:**
+
+Actions → TestFlight → **Run workflow** → tick **Force-regenerate the
+provisioning profile** → Run. This bakes the iCloud entitlement +
+container reference into the cached profile in your `ios-certificates`
+repo. Subsequent pushes to `main` rebuild normally without the flag.
+
+If `ensure_icloud_capability` fails with "Bundle ID not found", your ASC
+API key needs both **App Manager** and **Developer** roles (Users → Keys
+in App Store Connect). Read-only keys can't write capabilities.
 
 ### Container identifier
 
 Container id is `iCloud.app.planom` (matches the bundle id, which is what
-Apple recommends). Defined in three places that must stay in sync:
+Apple recommends). Defined in four places that must stay in sync:
 
 - `ios/Runner/Runner.entitlements` → `com.apple.developer.icloud-container-identifiers`
 - `ios/Runner/Info.plist` → `NSUbiquitousContainers` key
 - `lib/src/sync/icloud_sync_provider.dart` → `_defaultContainerId`
+- Apple Developer Portal → CloudContainer record (the one you create in Step 1)
 
-iCloud Drive doesn't need explicit "container records" in the Developer
-Portal — Apple provisions storage on the first upload from a correctly
-signed build, based on the entitlements + Info.plist declarations.
+### What CI handles automatically
+
+On every build, `ensure_icloud_capability` in `fastlane/Fastfile`:
+
+1. Authenticates via ASC API key (no Apple ID needed)
+2. Enables the iCloud capability on `app.planom` if not already enabled
+3. *Tries* to create + link the iCloud container via the ASC REST API
+   under both `/v1/iCloudContainers` and `/v1/cloudContainers`. If Apple
+   accepts either (today they don't, but Apple may add this), CI is fully
+   self-serve and Step 1 above becomes obsolete.
+4. When any of the above flipped state, `match` runs with `force: true`
+   to regenerate the provisioning profile.
 
 ### Testing on devices
 

@@ -70,60 +70,99 @@ platform :ios do
       changed = true
     end
 
-    # 2. CloudContainer resource — raw REST against /v1/cloudContainers ----
-    container_internal_id = _find_or_create_cloud_container(
-      client:     client,
-      identifier: container_id,
-      name:       container_name,
-    ) do
-      changed = true
-    end
-
-    # 3. Bundle ID ⇄ CloudContainer relationship --------------------------
-    if _bundle_already_links_container?(client: client, bundle_id_id: bid.id, container_internal_id: container_internal_id)
-      UI.message("✓ iCloud container already linked to #{bundle_id}")
-    else
-      client.post(
-        "v1/cloudContainers/#{container_internal_id}/relationships/bundleIds",
-        { data: [{ type: "bundleIds", id: bid.id }] },
-      )
-      UI.success("✅  Linked iCloud container #{container_id} to #{bundle_id}")
-      changed = true
-    end
+    # 2. CloudContainer resource + bundle-id link --------------------------
+    # The App Store Connect REST API does not expose iCloud Container CRUD
+    # to API-key auth in fastlane 2.234 / OpenAPI v3.8 (verified against
+    # /v1/cloudContainers and /v1/iCloudContainers — both 404). The only
+    # programmatic alternative is Apple-ID + 2FA via legacy Spaceship::Portal,
+    # which we deliberately avoid in CI. Try the two candidate paths; if
+    # both reject, fall through with a clear pointer to the one-time web
+    # portal step.
+    container_ok = _try_manage_cloud_container(
+      client:        client,
+      identifier:    container_id,
+      name:          container_name,
+      bundle_id_id:  bid.id,
+      bundle_id_str: bundle_id,
+    )
+    changed ||= container_ok == :created_or_linked
 
     changed
   end
 
-  # Returns the internal numeric/UUID id Apple uses for the CloudContainer
-  # whose user-facing identifier is [identifier]. Creates the container if
-  # missing; yields when a create happened so the caller can flip a flag.
-  def _find_or_create_cloud_container(client:, identifier:, name:)
-    lookup = client.get("v1/cloudContainers", { "filter[identifier]" => identifier })
-    existing = (lookup.body["data"] || []).first
-    if existing
-      UI.message("✓ iCloud container #{identifier} already exists")
-      return existing["id"]
+  # Returns one of:
+  #   :already_set        — container exists AND is linked, nothing to do
+  #   :created_or_linked  — we created and/or linked it via the API
+  #   nil                 — Apple's API rejected our calls; printed a clear
+  #                         manual-step pointer and called UI.user_error!
+  def _try_manage_cloud_container(client:, identifier:, name:, bundle_id_id:, bundle_id_str:)
+    # Apple has shipped this resource under both spellings at various API
+    # versions. Try the most-recent first, fall through on path-not-found.
+    %w[v1/iCloudContainers v1/cloudContainers].each do |base|
+      type_name = base.split("/").last
+      begin
+        list = client.get(base, { "filter[identifier]" => identifier })
+        existing = (list.body["data"] || []).first
+
+        if existing
+          UI.message("✓ iCloud container #{identifier} already exists")
+        else
+          created = client.post(base, {
+            data: {
+              type: type_name,
+              attributes: { identifier: identifier, name: name },
+            },
+          })
+          existing = created.body["data"]
+          UI.success("✅  Created iCloud container #{identifier}")
+        end
+
+        container_internal_id = existing["id"]
+
+        # Link relationship. If GET-side already shows the link, skip.
+        linked = false
+        begin
+          rel = client.get("v1/bundleIds/#{bundle_id_id}/#{type_name}")
+          linked = (rel.body["data"] || []).any? { |c| c["id"] == container_internal_id }
+        rescue Spaceship::UnexpectedResponse
+          # GET path also missing under this base — fall through to POST,
+          # ASC dedupes, redundant link is harmless.
+        end
+
+        if linked
+          UI.message("✓ iCloud container already linked to #{bundle_id_str}")
+          return :already_set
+        end
+
+        client.post(
+          "#{base}/#{container_internal_id}/relationships/bundleIds",
+          { data: [{ type: "bundleIds", id: bundle_id_id }] },
+        )
+        UI.success("✅  Linked iCloud container #{identifier} to #{bundle_id_str}")
+        return :created_or_linked
+      rescue Spaceship::UnexpectedResponse => e
+        next if e.message =~ /does not match a defined resource type|not be found|404/i
+        raise
+      end
     end
 
-    created = client.post("v1/cloudContainers", {
-      data: {
-        type: "cloudContainers",
-        attributes: { identifier: identifier, name: name },
-      },
-    })
-    UI.success("✅  Created iCloud container #{identifier}")
-    yield if block_given?
-    created.body["data"]["id"]
-  end
-
-  def _bundle_already_links_container?(client:, bundle_id_id:, container_internal_id:)
-    resp = client.get("v1/bundleIds/#{bundle_id_id}/cloudContainers")
-    (resp.body["data"] || []).any? { |c| c["id"] == container_internal_id }
-  rescue StandardError
-    # If the relationship endpoint errors we conservatively treat the link as
-    # missing — a redundant POST is harmless (ASC dedupes), the alternative
-    # leaves the build broken.
-    false
+    UI.important("")
+    UI.important("⚠️  Apple's App Store Connect API key endpoint for iCloud")
+    UI.important("    Containers is not available (returned 'resource does not")
+    UI.important("    exist' for both v1/iCloudContainers and v1/cloudContainers).")
+    UI.important("")
+    UI.important("    One-time setup in your browser (no Xcode, ~60 seconds):")
+    UI.important("")
+    UI.important("    1. Open https://developer.apple.com/account/resources/identifiers/list/cloudContainer")
+    UI.important("    2. Click + → register a new iCloud Container")
+    UI.important("         Description: #{name}")
+    UI.important("         Identifier:  #{identifier}")
+    UI.important("    3. Open https://developer.apple.com/account/resources/identifiers/list (App IDs)")
+    UI.important("    4. Click #{bundle_id_str} → open the iCloud capability → Edit →")
+    UI.important("         tick #{identifier} → Save")
+    UI.important("    5. Re-run this workflow with force_regen:true")
+    UI.important("")
+    UI.user_error!("iCloud container '#{identifier}' must be set up via the Developer Portal.")
   end
 
   # ── Lanes ─────────────────────────────────────────────────────────────────────
