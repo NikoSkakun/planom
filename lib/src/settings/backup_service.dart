@@ -14,6 +14,7 @@ import '../notes/note_controller.dart';
 import '../routines/routine_controller.dart';
 import '../security/security_service.dart';
 import '../tasks/task_controller.dart';
+import 'backup_crypto.dart';
 import 'settings_controller.dart';
 
 class BackupService {
@@ -35,7 +36,11 @@ class BackupService {
   final EventController eventController;
   final SettingsController settingsController;
 
-  Future<void> exportBackup() async {
+  /// Exports the active space. If [passphrase] is non-null and non-empty, the
+  /// payload is AES-GCM-256 encrypted under a key derived from it (PBKDF2-
+  /// SHA256, 100k iterations); the resulting `.planom` file is unreadable
+  /// without the same passphrase.
+  Future<void> exportBackup({String? passphrase}) async {
     final docsPath = (await getApplicationDocumentsDirectory()).path;
 
     // Fetch raw DB maps for tables that may have custom icon paths.
@@ -72,13 +77,17 @@ class BackupService {
       'smart_list_prefs': settingsController.smartListPrefs.toJson(),
     };
 
-    final json = const JsonEncoder.withIndent('  ').convert(payload);
+    final plainJson = const JsonEncoder.withIndent('  ').convert(payload);
+    final fileContent = (passphrase != null && passphrase.isNotEmpty)
+        ? await encryptBackup(plainJson, passphrase)
+        : plainJson;
+
     final tempDir = await getTemporaryDirectory();
     final now = DateTime.now();
     final name =
         'planom_backup_${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}.planom';
     final file = File('${tempDir.path}/$name');
-    await file.writeAsString(json, encoding: utf8);
+    await file.writeAsString(fileContent, encoding: utf8);
 
     try {
       await Share.shareXFiles([XFile(file.path)], subject: 'Planom Backup');
@@ -93,8 +102,12 @@ class BackupService {
     }
   }
 
-  // Returns true on success, false if file was invalid or picker cancelled.
-  Future<bool> importBackup() async {
+  /// Returns true on success, false if file was invalid or picker cancelled.
+  /// When the backup is encrypted, [passphraseProvider] is awaited to ask the
+  /// user for the passphrase; returning null cancels the import.
+  Future<bool> importBackup({
+    Future<String?> Function()? passphraseProvider,
+  }) async {
     final result = await FilePicker.platform.pickFiles(type: FileType.any);
     if (result == null || result.files.isEmpty) return false;
 
@@ -103,11 +116,27 @@ class BackupService {
 
     final content = await File(path).readAsString(encoding: utf8);
 
-    final Map<String, dynamic> data;
+    final Map<String, dynamic> envelope;
     try {
-      data = jsonDecode(content) as Map<String, dynamic>;
+      envelope = jsonDecode(content) as Map<String, dynamic>;
     } catch (_) {
       return false;
+    }
+
+    // Encrypted (v2): ask the caller for the passphrase, decrypt to the
+    // plain v1 JSON, then fall through to the normal import path.
+    Map<String, dynamic> data = envelope;
+    if (isEncryptedBackup(envelope)) {
+      if (passphraseProvider == null) return false;
+      final pass = await passphraseProvider();
+      if (pass == null || pass.isEmpty) return false;
+      try {
+        final plain = await decryptBackup(envelope, pass);
+        data = jsonDecode(plain) as Map<String, dynamic>;
+      } catch (_) {
+        // Wrong passphrase or corrupt envelope — leave existing data alone.
+        return false;
+      }
     }
 
     if (data['version'] != 1) return false;

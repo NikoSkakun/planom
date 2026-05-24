@@ -194,6 +194,11 @@ class S {
   String get verifyToChange => t('verifyToChange');
   String get useBiometric => t('useBiometric');
   String get unlockPrompt => t('unlockPrompt');
+  String get exportPlain => t('exportPlain');
+  String get exportEncrypted => t('exportEncrypted');
+  String get setPassphrase => t('setPassphrase');
+  String get enterPassphrase => t('enterPassphrase');
+  String get passwordRequired => t('passwordRequired');
 
   // ── Notifications ─────────────────────────────────────────────────────────
   String get sectionNotifications => t('sectionNotifications');
@@ -505,6 +510,11 @@ const Map<String, String> _en = {
   'verifyToChange': 'Enter current password to change lock',
   'useBiometric': 'Use Face ID / Touch ID',
   'unlockPrompt': 'Unlock Planom',
+  'exportPlain': 'Plain backup',
+  'exportEncrypted': 'Encrypted with passphrase…',
+  'setPassphrase': 'Set passphrase',
+  'enterPassphrase': 'Enter passphrase',
+  'passwordRequired': 'Password is required',
   'sectionNotifications': 'Notifications',
   'notificationsEnabled': 'Notifications Enabled',
   'notificationsPermissionHint': 'Open Settings to allow notifications for Planom.',
