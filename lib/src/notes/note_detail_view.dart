@@ -14,6 +14,7 @@ import '../utils/undo_controller.dart';
 import 'markdown_toolbar.dart';
 import 'markdown_view.dart';
 import 'note_controller.dart';
+import 'note_share.dart';
 
 class NoteDetailView extends StatefulWidget {
   const NoteDetailView({
@@ -55,6 +56,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
   late String _savedContent;
   String? _savedFolderId;
 
+  // Latest EditableTextState the body's contextMenuBuilder handed us. We
+  // need it to re-show the selection toolbar after the user taps "Select
+  // All" — the system hides the toolbar in that handoff and Flutter doesn't
+  // re-show it automatically.
+  EditableTextState? _contentEditableState;
+  TextSelection? _lastContentSelection;
+
   @override
   void initState() {
     super.initState();
@@ -67,18 +75,54 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _savedFolderId = widget.note.folderId;
     _title.addListener(_scheduleAutosave);
     _content.addListener(_scheduleAutosave);
+    _content.addListener(_onContentSelectionChanged);
     _contentFocus.addListener(_onContentFocusChanged);
     _titleFocus.addListener(_onTitleFocusChanged);
     WidgetsBinding.instance.addObserver(this);
   }
 
+  /// Detects the "Select All" gesture (tap empty space → toolbar with the
+  /// single Select-All button → tap it) and re-shows the selection toolbar
+  /// so the user immediately sees Copy / Cut / Paste / Look Up without
+  /// needing a second tap to bring the toolbar back.
+  void _onContentSelectionChanged() {
+    final selection = _content.selection;
+    final text = _content.text;
+    final previous = _lastContentSelection;
+    _lastContentSelection = selection;
+    if (text.isEmpty) return;
+    if (!selection.isValid || selection.isCollapsed) return;
+    final isSelectAll =
+        selection.start == 0 && selection.end == text.length;
+    if (!isSelectAll) return;
+    // Avoid re-showing the toolbar on every keystroke that happens to leave
+    // the whole document selected — only react when the selection just
+    // changed shape (it was collapsed, or it covered a different range).
+    if (previous != null &&
+        !previous.isCollapsed &&
+        previous.start == 0 &&
+        previous.end == text.length) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _contentEditableState?.showToolbar();
+    });
+  }
+
   void _onContentFocusChanged() {
-    if (_contentFocus.hasFocus) return;
+    if (!mounted) return;
+    if (_contentFocus.hasFocus) {
+      // Gaining focus (e.g. via the title's "Next" key, tapping the body, or
+      // a programmatic requestFocus). The toolbar's visibility is tied to
+      // hasFocus, so we need a rebuild to render it.
+      setState(() => _isEditing = true);
+      return;
+    }
     // Losing content focus (e.g. dismissing the keyboard, switching tabs,
     // tapping the title) must persist immediately — the debounce timer might
     // not fire before the app is killed or this view is torn down.
     _flushSave();
-    if (mounted) setState(() => _isEditing = false);
+    setState(() => _isEditing = false);
   }
 
   void _onTitleFocusChanged() {
@@ -154,6 +198,18 @@ class _NoteDetailViewState extends State<NoteDetailView>
     showDropdown(context, (dismiss) {
       return _NoteOptionsDropdown(
         onDismiss: dismiss,
+        onShare: () {
+          dismiss();
+          // Persist the latest edit first so the on-disk note matches what
+          // the user just exported — saves accidental drift between the
+          // share payload and the stored copy.
+          _flushSave();
+          showNoteShareMenu(
+            context,
+            title: _title.text,
+            content: _content.text,
+          );
+        },
         onMoveTo: () {
           dismiss();
           showNoteMoveToSheet(
@@ -196,6 +252,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _autosaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _save();
+    _content.removeListener(_onContentSelectionChanged);
     _contentFocus.removeListener(_onContentFocusChanged);
     _contentFocus.dispose();
     _titleFocus.removeListener(_onTitleFocusChanged);
@@ -234,6 +291,16 @@ class _NoteDetailViewState extends State<NoteDetailView>
             textAlignVertical: TextAlignVertical.top,
             textCapitalization: TextCapitalization.sentences,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            contextMenuBuilder: (context, editableTextState) {
+              // Cache the state so the selection listener can re-show the
+              // toolbar after a "Select All" gesture (see
+              // _onContentSelectionChanged). Returning the adaptive toolbar
+              // keeps the platform-native look.
+              _contentEditableState = editableTextState;
+              return CupertinoAdaptiveTextSelectionToolbar.editableText(
+                editableTextState: editableTextState,
+              );
+            },
           );
         } else if (_content.text.trim().isEmpty) {
           child = GestureDetector(
@@ -303,7 +370,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
           children: [
             Expanded(
               child: SafeArea(
-                bottom: false,
+                // When the keyboard is open, the markdown toolbar sits below
+                // the content and consumes the bottom inset itself. When the
+                // keyboard is closed, the tab bar overlays the page — so we
+                // need the bottom safe area (CupertinoTabScaffold includes
+                // the tab bar height in MediaQuery.padding.bottom) to keep
+                // the last lines of text off the tab bar.
+                bottom: !showToolbar,
                 child: Column(
                   children: [
                     Padding(
@@ -322,6 +395,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
                         maxLines: null,
                         textInputAction: TextInputAction.next,
                         textCapitalization: TextCapitalization.sentences,
+                        onSubmitted: (_) => _contentFocus.requestFocus(),
                       ),
                     ),
                     Padding(
@@ -353,19 +427,26 @@ class _NoteDetailViewState extends State<NoteDetailView>
 class _NoteOptionsDropdown extends StatelessWidget {
   const _NoteOptionsDropdown({
     required this.onDismiss,
+    required this.onShare,
     required this.onMoveTo,
     required this.onInfo,
     required this.onDelete,
   });
 
   final VoidCallback onDismiss;
+  final VoidCallback onShare;
   final VoidCallback onMoveTo;
   final VoidCallback onInfo;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    final separator = Container(
+      height: 0.5,
+      color: CupertinoColors.separator.resolveFrom(context),
+    );
     return Stack(
       children: [
         GestureDetector(
@@ -394,25 +475,25 @@ class _NoteOptionsDropdown extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 DropdownRow(
-                  label: S.of(context).moveTo,
+                  label: s.share,
+                  icon: CupertinoIcons.share,
+                  onTap: onShare,
+                ),
+                separator,
+                DropdownRow(
+                  label: s.moveTo,
                   icon: CupertinoIcons.folder,
                   onTap: onMoveTo,
                 ),
-                Container(
-                  height: 0.5,
-                  color: CupertinoColors.separator.resolveFrom(context),
-                ),
+                separator,
                 DropdownRow(
-                  label: S.of(context).info,
+                  label: s.info,
                   icon: CupertinoIcons.info,
                   onTap: onInfo,
                 ),
-                Container(
-                  height: 0.5,
-                  color: CupertinoColors.separator.resolveFrom(context),
-                ),
+                separator,
                 DropdownRow(
-                  label: S.of(context).delete,
+                  label: s.delete,
                   icon: CupertinoIcons.trash,
                   onTap: onDelete,
                   color: CupertinoColors.destructiveRed,

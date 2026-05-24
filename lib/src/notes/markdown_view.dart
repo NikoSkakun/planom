@@ -47,6 +47,20 @@ class MarkdownView extends StatelessWidget {
     final mutedBorder = CupertinoColors.systemGrey4.resolveFrom(context);
 
     final styleSheet = MarkdownStyleSheet(
+      // Force left-aligned text. Some MarkdownStyleSheet defaults wrap
+      // paragraph contents in a Wrap whose alignment otherwise pushes single
+      // lines into the middle of the row.
+      textAlign: WrapAlignment.start,
+      h1Align: WrapAlignment.start,
+      h2Align: WrapAlignment.start,
+      h3Align: WrapAlignment.start,
+      h4Align: WrapAlignment.start,
+      h5Align: WrapAlignment.start,
+      h6Align: WrapAlignment.start,
+      unorderedListAlign: WrapAlignment.start,
+      orderedListAlign: WrapAlignment.start,
+      blockquoteAlign: WrapAlignment.start,
+      codeblockAlign: WrapAlignment.start,
       p: base.copyWith(fontSize: 16, height: 1.35),
       h1: base.copyWith(fontSize: 26, fontWeight: FontWeight.w700),
       h2: base.copyWith(fontSize: 22, fontWeight: FontWeight.w700),

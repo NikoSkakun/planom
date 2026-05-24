@@ -197,6 +197,11 @@ class S {
   String get tomorrowShort => t('tomorrowShort');
   String get addList => t('addList');
   String get addFolder => t('addFolder');
+  String get addNote => t('addNote');
+  String get share => t('share');
+  String get shareAsText => t('shareAsText');
+  String get shareAsPdf => t('shareAsPdf');
+  String get shareAsImage => t('shareAsImage');
   String get deleteSpace => t('deleteSpace');
   String get deleteSpaceBody => t('deleteSpaceBody');
 
@@ -610,7 +615,7 @@ const Map<String, String> _en = {
   'folderCounterRecursive': 'Include nested folders',
   'folderCounterHidden': 'Hidden',
   'showListCount': 'List counter',
-  'revert': 'Revert',
+  'revert': 'Undo',
   'taskTrashedToast': 'Task moved to Trash',
   'listTrashedToast': 'List moved to Trash',
   'folderTrashedToast': 'Folder moved to Trash',
@@ -621,7 +626,9 @@ const Map<String, String> _en = {
   'useAccentColor': 'Use Accent Color',
   'todayShort': 'Today',
   'tomorrowShort': 'Tomorrow',
-  'addList': 'Add List', 'addFolder': 'Add Folder',
+  'addList': 'Add List', 'addFolder': 'Add Folder', 'addNote': 'Add Note',
+  'share': 'Share', 'shareAsText': 'Plain Text',
+  'shareAsPdf': 'PDF', 'shareAsImage': 'Image',
   'a11yToggleComplete': 'Toggle completion',
   'deleteSpace': 'Delete Space?',
   'deleteSpaceBody':

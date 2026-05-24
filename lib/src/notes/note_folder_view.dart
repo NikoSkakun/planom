@@ -115,6 +115,29 @@ class _NoteFolderViewState extends State<NoteFolderView>
     showDropdown(context, (dismiss) {
       return _NoteFolderOptionsDropdown(
         onDismiss: dismiss,
+        onAddNote: () {
+          dismiss();
+          Navigator.of(context).push(
+            FastRoute<void>(
+              settings:
+                  const RouteSettings(name: NoteDetailView.routeName),
+              builder: (_) => NoteDetailView(
+                note: Note(
+                    title: '', content: '', folderId: _currentFolder.id),
+                controller: widget.controller,
+                isNew: true,
+              ),
+            ),
+          );
+        },
+        onAddFolder: () {
+          dismiss();
+          showCreateNoteFolderSheet(
+            context,
+            widget.controller,
+            parentFolderId: _currentFolder.id,
+          );
+        },
         onRename: () {
           dismiss();
           showRenameSheet(
@@ -356,6 +379,8 @@ class _NoteFolderViewState extends State<NoteFolderView>
 class _NoteFolderOptionsDropdown extends StatelessWidget {
   const _NoteFolderOptionsDropdown({
     required this.onDismiss,
+    required this.onAddNote,
+    required this.onAddFolder,
     required this.onRename,
     required this.onChangeIcon,
     required this.onMoveTo,
@@ -364,6 +389,8 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
   });
 
   final VoidCallback onDismiss;
+  final VoidCallback onAddNote;
+  final VoidCallback onAddFolder;
   final VoidCallback onRename;
   final VoidCallback onChangeIcon;
   final VoidCallback onMoveTo;
@@ -385,6 +412,14 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
           right: 8,
           child: _DropdownPanel(
             items: [
+              _DropdownItem(
+                  label: S.of(context).addNote,
+                  icon: CupertinoIcons.add_circled,
+                  onTap: onAddNote),
+              _DropdownItem(
+                  label: S.of(context).addFolder,
+                  icon: CupertinoIcons.folder_badge_plus,
+                  onTap: onAddFolder),
               _DropdownItem(
                   label: S.of(context).rename,
                   icon: CupertinoIcons.pencil,

@@ -105,6 +105,7 @@ class _SettingsViewState extends State<SettingsView> {
                         : s.themeSystem;
                 return _NavRow(
                   label: s.sectionAppearance,
+                  icon: CupertinoIcons.paintbrush,
                   trailingLabel: themeName,
                   onTap: () => Navigator.of(context).push(
                     FastRoute<void>(
@@ -134,6 +135,7 @@ class _SettingsViewState extends State<SettingsView> {
                 final code = widget.controller.locale.languageCode;
                 return _NavRow(
                   label: s.language,
+                  icon: CupertinoIcons.globe,
                   trailingLabel: kLanguageNames[code] ?? code,
                   onTap: () => _showLanguagePicker(context),
                 );
@@ -146,6 +148,7 @@ class _SettingsViewState extends State<SettingsView> {
                 final key = widget.controller.fontKey;
                 return _NavRow(
                   label: s.font,
+                  icon: CupertinoIcons.textformat,
                   trailingLabel: key == kSystemFontKey
                       ? s.systemFont
                       : fontDisplayName(key),
@@ -167,6 +170,7 @@ class _SettingsViewState extends State<SettingsView> {
             const SizedBox(height: 6),
             _NavRow(
               label: s.tabTasks,
+              icon: CupertinoIcons.checkmark_square,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => TasksSettingsView(
@@ -178,15 +182,19 @@ class _SettingsViewState extends State<SettingsView> {
             const SizedBox(height: 1),
             _NavRow(
               label: s.tabNotes,
+              icon: CupertinoIcons.doc_text,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
-                  builder: (_) => const NotesSettingsView(),
+                  builder: (_) => NotesSettingsView(
+                    controller: widget.controller,
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 1),
             _NavRow(
               label: s.tabCalendar,
+              icon: CupertinoIcons.calendar,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => const CalendarSettingsView(),
@@ -196,6 +204,7 @@ class _SettingsViewState extends State<SettingsView> {
             const SizedBox(height: 1),
             _NavRow(
               label: s.tabRoutines,
+              icon: CupertinoIcons.repeat,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => const RoutinesSettingsView(),
@@ -216,6 +225,7 @@ class _SettingsViewState extends State<SettingsView> {
             const SizedBox(height: 6),
             _NavRow(
               label: s.spaces,
+              icon: CupertinoIcons.square_stack_3d_up,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => const SpacesView(),
@@ -236,6 +246,7 @@ class _SettingsViewState extends State<SettingsView> {
             const SizedBox(height: 6),
             _NavRow(
               label: s.tabBar,
+              icon: CupertinoIcons.rectangle_grid_1x2,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => TabBarSettingsView(
@@ -264,6 +275,7 @@ class _SettingsViewState extends State<SettingsView> {
               builder: (ctx, _) {
                 return _NavRow(
                   label: s.defaultTab,
+                  icon: CupertinoIcons.app_badge,
                   trailingLabel: defaultTabLabel(
                       s, widget.controller),
                   onTap: () =>
@@ -285,6 +297,7 @@ class _SettingsViewState extends State<SettingsView> {
             const SizedBox(height: 6),
             _NavRow(
               label: s.sectionNotifications,
+              icon: CupertinoIcons.bell,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => const NotificationsSettingsView(),
@@ -306,6 +319,7 @@ class _SettingsViewState extends State<SettingsView> {
               const SizedBox(height: 6),
               _NavRow(
                 label: s.sectionSecurity,
+                icon: CupertinoIcons.lock,
                 onTap: () => Navigator.of(context).push(
                   FastRoute<void>(
                     builder: (_) => SecuritySettingsView(
@@ -337,6 +351,7 @@ class _SettingsViewState extends State<SettingsView> {
                       : s.googleCalendarOff;
                   return _NavRow(
                     label: s.googleCalendar,
+                    icon: CupertinoIcons.calendar_badge_plus,
                     trailingLabel: trailing,
                     onTap: () => Navigator.of(context).push(
                       FastRoute<void>(
@@ -364,6 +379,7 @@ class _SettingsViewState extends State<SettingsView> {
               const SizedBox(height: 6),
               _NavRow(
                 label: s.sync,
+                icon: CupertinoIcons.arrow_2_circlepath,
                 onTap: () {
                   final syncController =
                       SpaceManagerProvider.of(context).syncController;
@@ -389,6 +405,7 @@ class _SettingsViewState extends State<SettingsView> {
               const SizedBox(height: 6),
               _NavRow(
                 label: s.sectionData,
+                icon: CupertinoIcons.archivebox,
                 onTap: () => Navigator.of(context).push(
                   FastRoute<void>(
                     builder: (_) => DataView(
@@ -633,11 +650,17 @@ class _TabOrderRow extends StatelessWidget {
 // ── Shared row widgets ────────────────────────────────────────────────────────
 
 class _NavRow extends StatelessWidget {
-  const _NavRow({required this.label, required this.onTap, this.trailingLabel});
+  const _NavRow({
+    required this.label,
+    required this.onTap,
+    this.trailingLabel,
+    this.icon,
+  });
 
   final String label;
   final VoidCallback onTap;
   final String? trailingLabel;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -655,6 +678,14 @@ class _NavRow extends StatelessWidget {
         ),
         child: Row(
           children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 20,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+              const SizedBox(width: 12),
+            ],
             Expanded(
               child: Text(
                 label,

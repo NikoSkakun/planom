@@ -7,6 +7,7 @@ import '../models/app_list.dart';
 import '../models/task.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
+import 'calendar_date_picker.dart';
 import 'task_controller.dart';
 import 'task_detail_view.dart';
 import 'task_row.dart' show RoundedCheckbox;
@@ -347,22 +348,18 @@ class _TrashRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final task = entry.task;
-    final Widget leadingIcon = task != null
-        ? RoundedCheckbox(
-            checked: task.isCompleted,
-            priority: task.priority,
-          )
-        : Icon(
-            entry.icon,
-            size: 20,
-            color: CupertinoColors.secondaryLabel.resolveFrom(context),
-          );
-
+    if (task != null) {
+      return _TrashTaskRow(task: task);
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
       child: Row(
         children: [
-          leadingIcon,
+          Icon(
+            entry.icon,
+            size: 20,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -371,6 +368,82 @@ class _TrashRow extends StatelessWidget {
                 fontSize: 16,
                 color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Row for a trashed task. Mirrors the regular TaskRow layout so the date,
+/// note and priority remain visible — only the checkbox is read-only.
+class _TrashTaskRow extends StatelessWidget {
+  const _TrashTaskRow({required this.task});
+
+  final Task task;
+
+  @override
+  Widget build(BuildContext context) {
+    final dueDate = task.dueDate;
+    final dateLabel = dueDate != null
+        ? formatTaskDateRelative(context, dueDate, doTime: task.doTime)
+        : null;
+    final secondaryColor =
+        CupertinoColors.secondaryLabel.resolveFrom(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 7, 16, 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          RoundedCheckbox(
+            checked: task.isCompleted,
+            priority: task.priority,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        task.title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: secondaryColor,
+                        ),
+                      ),
+                    ),
+                    if (dateLabel != null) ...[
+                      const SizedBox(width: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          dateLabel,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: secondaryColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (task.note != null && task.note!.isNotEmpty)
+                  Text(
+                    task.note!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: secondaryColor,
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
