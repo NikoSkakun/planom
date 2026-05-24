@@ -20,6 +20,7 @@ import 'tasks/task_creation_sheet.dart';
 import 'tasks/tasks_view.dart';
 import 'theme/app_theme.dart';
 import 'utils/fast_route.dart';
+import 'utils/platform_capabilities.dart';
 import 'utils/selection_menu.dart';
 
 class HomeShell extends StatefulWidget {
@@ -391,10 +392,12 @@ class _HomeShellState extends State<HomeShell> {
       builder: (context, _) {
         final hideLabels = widget.settingsController.hideTabLabels;
         final visibleIndices = _computeVisibleIndices();
-        // iPad / large window threshold. Below this the bottom tab bar is
-        // still the right choice; above this we get enough horizontal room
-        // for a persistent sidebar that doesn't waste vertical screen space.
-        final isWide = MediaQuery.sizeOf(context).width >= 700;
+        // Desktop (macOS / Linux / Windows) always uses the iPad sidebar
+        // layout — the window is resizable and even a "small" desktop window
+        // has more chrome room than a phone. On iOS/Android we keep the
+        // 700 px threshold so iPhone stays on the bottom tab bar.
+        final isWide = PlatformCapabilities.isDesktop ||
+            MediaQuery.sizeOf(context).width >= 700;
 
         return Stack(
           children: [

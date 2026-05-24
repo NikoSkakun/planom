@@ -6,6 +6,7 @@ import '../models/recurrence.dart';
 import '../models/tag.dart';
 import '../models/task.dart';
 import '../notifications/notification_service.dart';
+import '../utils/platform_capabilities.dart';
 
 enum TaskSortOrder { defaultOrder, creationDate, name, priority, dateTime }
 
@@ -413,11 +414,18 @@ class TaskController with ChangeNotifier {
   }
 
   void _updateBadge() {
+    if (!PlatformCapabilities.supportsAppBadge) return;
     final count = todayUncompletedCount;
-    if (count > 0) {
-      FlutterAppBadger.updateBadgeCount(count);
-    } else {
-      FlutterAppBadger.removeBadge();
+    try {
+      if (count > 0) {
+        FlutterAppBadger.updateBadgeCount(count);
+      } else {
+        FlutterAppBadger.removeBadge();
+      }
+    } catch (e, st) {
+      // Discontinued plugin — swallow rather than crash the controller if the
+      // host OS rejects the channel call (e.g. user hasn't granted badges).
+      debugPrint('badge update failed: $e\n$st');
     }
   }
 }

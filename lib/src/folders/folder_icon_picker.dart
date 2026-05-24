@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../localization/strings.dart';
 import '../theme/app_theme.dart';
+import '../utils/platform_capabilities.dart';
 
 // Preset (iconId, displayColor) pairs.
 const kFolderIconPresets = <(String, int)>[
@@ -127,12 +129,26 @@ Future<String> _copyIconToDocuments(String sourcePath) async {
 }
 
 /// Opens the system photo picker and returns the relative icon path, or null.
+///
+/// Mobile uses `image_picker` (the OS gallery UI); desktop has no gallery
+/// concept, so we fall back to `file_picker` with image filetype filters.
 Future<String?> pickCustomIcon() async {
-  final picker = ImagePicker();
-  final xfile =
-      await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
-  if (xfile == null) return null;
-  return _copyIconToDocuments(xfile.path);
+  if (PlatformCapabilities.supportsImagePicker) {
+    final picker = ImagePicker();
+    final xfile =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (xfile == null) return null;
+    return _copyIconToDocuments(xfile.path);
+  }
+
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.image,
+    allowMultiple: false,
+    withData: false,
+  );
+  final path = result?.files.single.path;
+  if (path == null) return null;
+  return _copyIconToDocuments(path);
 }
 
 /// Shows the icon picker bottom sheet.
