@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
 import '../folders/folder_controller.dart';
+import '../integrations/google/google_calendar_controller.dart';
+import '../integrations/google/remote_event.dart';
 import '../localization/strings.dart';
 import '../models/event.dart';
 import '../models/task.dart';
@@ -14,6 +16,7 @@ import '../utils/fast_route.dart';
 import 'event_controller.dart';
 import 'event_creation_sheet.dart';
 import 'event_detail_view.dart';
+import 'remote_event_detail_view.dart';
 
 Future<void> showDayViewSheet(
   BuildContext context, {
@@ -21,6 +24,7 @@ Future<void> showDayViewSheet(
   required TaskController taskController,
   required EventController eventController,
   required FolderController folderController,
+  GoogleCalendarController? googleCalendarController,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -32,6 +36,7 @@ Future<void> showDayViewSheet(
       taskController: taskController,
       eventController: eventController,
       folderController: folderController,
+      googleCalendarController: googleCalendarController,
     ),
   );
 }
@@ -43,12 +48,14 @@ class DayViewSheet extends StatefulWidget {
     required this.taskController,
     required this.eventController,
     required this.folderController,
+    this.googleCalendarController,
   });
 
   final DateTime date;
   final TaskController taskController;
   final EventController eventController;
   final FolderController folderController;
+  final GoogleCalendarController? googleCalendarController;
 
   @override
   State<DayViewSheet> createState() => _DayViewSheetState();
@@ -100,6 +107,7 @@ class _DayViewSheetState extends State<DayViewSheet> {
                   context,
                   widget.eventController,
                   initialDate: widget.date,
+                  googleCalendarController: widget.googleCalendarController,
                 );
               },
             ),
@@ -130,6 +138,19 @@ class _DayViewSheetState extends State<DayViewSheet> {
         builder: (_) => EventDetailView(
           event: event,
           controller: widget.eventController,
+        ),
+      ),
+    );
+  }
+
+  void _openRemoteEvent(RemoteEvent event) {
+    final c = widget.googleCalendarController;
+    if (c == null) return;
+    Navigator.of(context).push(
+      FastRoute<void>(
+        builder: (_) => RemoteEventDetailView(
+          event: event,
+          controller: c,
         ),
       ),
     );
@@ -206,6 +227,8 @@ class _DayViewSheetState extends State<DayViewSheet> {
                     widget.taskController,
                     widget.eventController,
                     widget.folderController,
+                    if (widget.googleCalendarController != null)
+                      widget.googleCalendarController!,
                   ]),
                   builder: (ctx, _) => _buildList(ctx),
                 ),
@@ -242,19 +265,28 @@ class _DayViewSheetState extends State<DayViewSheet> {
   Widget _buildList(BuildContext context) {
     final tasks = widget.taskController.tasksForDate(widget.date);
     final events = widget.eventController.eventsForDate(widget.date);
+    final remoteEvents = widget.googleCalendarController
+            ?.eventsForDate(widget.date) ??
+        const <RemoteEvent>[];
 
     // Untimed first (tasks then events), then timed sorted by doTime.
     final untimedTasks = tasks.where((t) => t.doTime == null).toList();
     final untimedEvents = events.where((e) => e.doTime == null).toList();
+    final untimedRemote =
+        remoteEvents.where((e) => e.doTime == null).toList();
     final timedItems = <_TimedItem>[
       for (final t in tasks.where((t) => t.doTime != null))
         _TimedItem.task(t),
       for (final e in events.where((e) => e.doTime != null))
         _TimedItem.event(e),
+      for (final e in remoteEvents.where((e) => e.doTime != null))
+        _TimedItem.remoteEvent(e),
     ]..sort((a, b) => a.doTime.compareTo(b.doTime));
 
-    final isEmpty =
-        untimedTasks.isEmpty && untimedEvents.isEmpty && timedItems.isEmpty;
+    final isEmpty = untimedTasks.isEmpty &&
+        untimedEvents.isEmpty &&
+        untimedRemote.isEmpty &&
+        timedItems.isEmpty;
 
     if (isEmpty) {
       return Center(
@@ -284,7 +316,14 @@ class _DayViewSheetState extends State<DayViewSheet> {
           _EventCard(event: e, onTap: () => _openEvent(e)),
           const SizedBox(height: 8),
         ],
-        if (timedItems.isNotEmpty && (untimedTasks.isNotEmpty || untimedEvents.isNotEmpty))
+        for (final e in untimedRemote) ...[
+          _RemoteEventCard(event: e, onTap: () => _openRemoteEvent(e)),
+          const SizedBox(height: 8),
+        ],
+        if (timedItems.isNotEmpty &&
+            (untimedTasks.isNotEmpty ||
+                untimedEvents.isNotEmpty ||
+                untimedRemote.isNotEmpty))
           const SizedBox(height: 4),
         for (final item in timedItems) ...[
           if (item.task != null)
@@ -295,8 +334,13 @@ class _DayViewSheetState extends State<DayViewSheet> {
               onToggle: () =>
                   widget.taskController.toggleCompleted(item.task!.id),
             )
+          else if (item.event != null)
+            _EventCard(event: item.event!, onTap: () => _openEvent(item.event!))
           else
-            _EventCard(event: item.event!, onTap: () => _openEvent(item.event!)),
+            _RemoteEventCard(
+              event: item.remoteEvent!,
+              onTap: () => _openRemoteEvent(item.remoteEvent!),
+            ),
           const SizedBox(height: 8),
         ],
       ],
@@ -390,13 +434,20 @@ class _PickerRow extends StatelessWidget {
 class _TimedItem {
   _TimedItem.task(this.task)
       : event = null,
+        remoteEvent = null,
         doTime = task!.doTime!;
   _TimedItem.event(this.event)
       : task = null,
+        remoteEvent = null,
         doTime = event!.doTime!;
+  _TimedItem.remoteEvent(this.remoteEvent)
+      : task = null,
+        event = null,
+        doTime = remoteEvent!.doTime!;
 
   final Task? task;
   final Event? event;
+  final RemoteEvent? remoteEvent;
   final int doTime;
 }
 
@@ -572,6 +623,113 @@ class _EventCard extends StatelessWidget {
                   color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Remote (Google Calendar) event card ────────────────────────────────────
+
+class _RemoteEventCard extends StatelessWidget {
+  const _RemoteEventCard({required this.event, required this.onTap});
+
+  final RemoteEvent event;
+  final VoidCallback onTap;
+
+  static const _pastAccent = Color(0xFF8E8E93);
+
+  static String _dur(int m) {
+    if (m < 60) return '${m}m';
+    final h = m ~/ 60;
+    final r = m % 60;
+    if (r == 0) return '${h}h';
+    return '${h}h ${r}m';
+  }
+
+  static bool _isPast(RemoteEvent event) {
+    final now = DateTime.now();
+    if (event.doTime != null) {
+      final endMinutes = event.doTime! + (event.duration ?? 0);
+      return event.date.add(Duration(minutes: endMinutes)).isBefore(now);
+    }
+    final eventDay =
+        DateTime(event.date.year, event.date.month, event.date.day);
+    final today = DateTime(now.year, now.month, now.day);
+    return eventDay.isBefore(today);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isPast = _isPast(event);
+    final accent = isPast ? _pastAccent : Color(event.calendarColor);
+    final titleColor = isPast
+        ? CupertinoColors.secondaryLabel.resolveFrom(context)
+        : CupertinoColors.label.resolveFrom(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: accent.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border(left: BorderSide(color: accent, width: 3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    event.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: titleColor,
+                    ),
+                  ),
+                ),
+                // Small Google "G" badge so the source is obvious in the day view.
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'G',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: accent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (event.doTime != null)
+              Text(
+                event.duration != null
+                    ? '${formatDoTime(event.doTime!)} · ${_dur(event.duration!)}'
+                    : formatDoTime(event.doTime!),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            Text(
+              event.calendarName,
+              style: TextStyle(
+                fontSize: 10,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ),
           ],
         ),
       ),

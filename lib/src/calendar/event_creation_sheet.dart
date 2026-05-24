@@ -1,17 +1,25 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../integrations/google/google_calendar_controller.dart';
+import '../integrations/google/remote_event.dart';
 import '../localization/strings.dart';
 import '../models/event.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
 import '../utils/duration_picker.dart';
+import '../utils/selection_menu.dart';
 import 'event_controller.dart';
+
+/// Sentinel calendar id used by the creation sheet to mean "save as a local
+/// Planom event" (i.e. not a Google calendar).
+const String kLocalCalendarId = '__planom_local__';
 
 void showEventCreationSheet(
   BuildContext context,
   EventController controller, {
   required DateTime initialDate,
+  GoogleCalendarController? googleCalendarController,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -21,6 +29,7 @@ void showEventCreationSheet(
     builder: (_) => EventCreationSheet(
       controller: controller,
       initialDate: initialDate,
+      googleCalendarController: googleCalendarController,
     ),
   );
 }
@@ -30,10 +39,12 @@ class EventCreationSheet extends StatefulWidget {
     super.key,
     required this.controller,
     required this.initialDate,
+    this.googleCalendarController,
   });
 
   final EventController controller;
   final DateTime initialDate;
+  final GoogleCalendarController? googleCalendarController;
 
   @override
   State<EventCreationSheet> createState() => _EventCreationSheetState();
@@ -49,12 +60,26 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
   int? _doTime;
   int? _duration; // minutes
   bool _titleEmpty = true;
+  late String _calendarId;
 
   @override
   void initState() {
     super.initState();
     _date = DateTime(
         widget.initialDate.year, widget.initialDate.month, widget.initialDate.day);
+    // Default to the user's chosen Google default calendar when they're
+    // connected and have one set; otherwise create locally.
+    final gc = widget.googleCalendarController;
+    if (gc != null &&
+        gc.isConnected &&
+        gc.defaultCalendarId != null &&
+        gc.defaultCalendarId!.isNotEmpty &&
+        gc.writableSelectedCalendars
+            .any((c) => c.id == gc.defaultCalendarId)) {
+      _calendarId = gc.defaultCalendarId!;
+    } else {
+      _calendarId = kLocalCalendarId;
+    }
     _titleCtrl.addListener(() {
       final empty = _titleCtrl.text.trim().isEmpty;
       if (empty != _titleEmpty) setState(() => _titleEmpty = empty);
@@ -82,14 +107,66 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
   Future<void> _submit() async {
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) return;
-    await widget.controller.addEvent(Event(
-      title: title,
-      note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
-      date: _date,
-      doTime: _doTime,
-      duration: _duration,
-    ));
+    final note = _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
+
+    if (_calendarId == kLocalCalendarId ||
+        widget.googleCalendarController == null) {
+      await widget.controller.addEvent(Event(
+        title: title,
+        note: note,
+        date: _date,
+        doTime: _doTime,
+        duration: _duration,
+      ));
+    } else {
+      // Goes directly to Google. No local Event is created — source of truth
+      // lives in Google and the calendar view picks it up from the next
+      // controller refresh (which createEvent triggers in-memory immediately).
+      await widget.googleCalendarController!.createEvent(
+        RemoteEventDraft(
+          title: title,
+          note: note,
+          date: _date,
+          doTime: _doTime,
+          duration: _duration,
+        ),
+        calendarId: _calendarId,
+      );
+    }
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
+  }
+
+  Future<void> _pickCalendar() async {
+    final s = S.of(context);
+    final gc = widget.googleCalendarController;
+    final options = <SelectionMenuOption<String>>[
+      SelectionMenuOption(value: kLocalCalendarId, label: s.planomLocal),
+      if (gc != null && gc.isConnected)
+        for (final cal in gc.writableSelectedCalendars)
+          SelectionMenuOption(value: cal.id, label: cal.summary),
+    ];
+    if (options.length == 1) return;
+    final saved = _activeFocus;
+    FocusManager.instance.primaryFocus?.unfocus();
+    final pick = await showSelectionMenu<String>(
+      context: context,
+      title: s.eventCalendar,
+      current: _calendarId,
+      options: options,
+    );
+    if (!mounted) return;
+    if (pick != null) setState(() => _calendarId = pick);
+    saved?.requestFocus();
+  }
+
+  String _calendarLabel(S s) {
+    if (_calendarId == kLocalCalendarId) return s.planomLocal;
+    final gc = widget.googleCalendarController;
+    if (gc == null) return s.planomLocal;
+    for (final cal in gc.availableCalendars) {
+      if (cal.id == _calendarId) return cal.summary;
+    }
+    return s.planomLocal;
   }
 
   Future<void> _pickDate() async {
@@ -166,6 +243,31 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
             textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: 16),
+          // Optional calendar picker — only meaningful when a Google account
+          // is connected with at least one writable, selected calendar.
+          if (widget.googleCalendarController != null &&
+              widget.googleCalendarController!.isConnected &&
+              widget.googleCalendarController!.writableSelectedCalendars
+                  .isNotEmpty) ...[
+            GestureDetector(
+              onTap: _pickCalendar,
+              child: Row(
+                children: [
+                  Icon(CupertinoIcons.tray,
+                      size: 16, color: AppColors.accent),
+                  const SizedBox(width: 4),
+                  Text(
+                    _calendarLabel(s),
+                    style:
+                        TextStyle(fontSize: 14, color: AppColors.accent),
+                  ),
+                  Icon(CupertinoIcons.chevron_down,
+                      size: 12, color: AppColors.accent),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

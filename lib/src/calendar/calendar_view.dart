@@ -5,6 +5,8 @@ import '../theme/app_theme.dart';
 import '../database/database_service.dart';
 import '../folders/folder_controller.dart';
 import '../home_shell.dart';
+import '../integrations/google/google_calendar_controller.dart';
+import '../integrations/google/remote_event.dart';
 import '../localization/strings.dart';
 import '../models/event.dart';
 import '../models/task.dart';
@@ -30,6 +32,7 @@ class CalendarView extends StatefulWidget {
     this.onDaySelected,
     this.db,
     this.noteController,
+    this.googleCalendarController,
   });
 
   final TaskController controller;
@@ -41,6 +44,7 @@ class CalendarView extends StatefulWidget {
   final ValueChanged<DateTime?>? onDaySelected;
   final DatabaseService? db;
   final NoteController? noteController;
+  final GoogleCalendarController? googleCalendarController;
 
   @override
   State<CalendarView> createState() => _CalendarViewState();
@@ -137,6 +141,7 @@ class _CalendarViewState extends State<CalendarView>
       taskController: widget.controller,
       eventController: widget.eventController,
       folderController: widget.folderController,
+      googleCalendarController: widget.googleCalendarController,
     );
     if (!mounted) return;
     widget.onDaySelected?.call(null);
@@ -147,6 +152,8 @@ class _CalendarViewState extends State<CalendarView>
           widget.controller,
           widget.folderController,
           widget.eventController,
+          if (widget.googleCalendarController != null)
+            widget.googleCalendarController!,
         ]),
         builder: (context, _) => _MonthSection(
           month: month,
@@ -154,6 +161,7 @@ class _CalendarViewState extends State<CalendarView>
           controller: widget.controller,
           folderController: widget.folderController,
           eventController: widget.eventController,
+          googleCalendarController: widget.googleCalendarController,
           onDayTap: _openDay,
         ),
       );
@@ -283,6 +291,7 @@ class _MonthSection extends StatelessWidget {
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.googleCalendarController,
     required this.onDayTap,
   });
 
@@ -291,6 +300,7 @@ class _MonthSection extends StatelessWidget {
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final GoogleCalendarController? googleCalendarController;
   final ValueChanged<DateTime> onDayTap;
 
   List<DateTime?> _buildGrid() {
@@ -330,6 +340,7 @@ class _MonthSection extends StatelessWidget {
             controller: controller,
             folderController: folderController,
             eventController: eventController,
+            googleCalendarController: googleCalendarController,
             onDayTap: onDayTap,
           ),
       ],
@@ -346,6 +357,7 @@ class _WeekRow extends StatelessWidget {
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.googleCalendarController,
     required this.onDayTap,
   });
 
@@ -354,6 +366,7 @@ class _WeekRow extends StatelessWidget {
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final GoogleCalendarController? googleCalendarController;
   final ValueChanged<DateTime> onDayTap;
 
   @override
@@ -369,6 +382,7 @@ class _WeekRow extends StatelessWidget {
                     controller: controller,
                     folderController: folderController,
                     eventController: eventController,
+                    googleCalendarController: googleCalendarController,
                     onTap: day == null ? null : () => onDayTap(day),
                   ),
                 ))
@@ -387,6 +401,7 @@ class _DayCell extends StatelessWidget {
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.googleCalendarController,
     required this.onTap,
   });
 
@@ -395,6 +410,7 @@ class _DayCell extends StatelessWidget {
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final GoogleCalendarController? googleCalendarController;
   final VoidCallback? onTap;
 
   bool get _isToday =>
@@ -423,10 +439,15 @@ class _DayCell extends StatelessWidget {
     final uncompleted = allTasks.where((t) => !t.isCompleted).toList();
     final completed = allTasks.where((t) => t.isCompleted).toList();
     final events = eventController.eventsForDate(date!);
+    final remoteEvents =
+        googleCalendarController?.eventsForDate(date!) ?? const <RemoteEvent>[];
 
-    // Order: events first, then incomplete tasks, then completed tasks.
+    // Order: events first (local + Google), then incomplete tasks, then
+    // completed tasks. Remote events are rendered with their calendar color
+    // so different Google calendars stay visually distinct.
     final chips = <_ChipData>[
       for (final e in events) _ChipData.event(e),
+      for (final e in remoteEvents) _ChipData.remoteEvent(e),
       for (final t in uncompleted) _ChipData.task(t, false),
       for (final t in completed) _ChipData.task(t, true),
     ];
@@ -479,6 +500,13 @@ class _DayCell extends StatelessWidget {
                   isPast: _eventIsPast(c.event!),
                 );
               }
+              if (c.isRemoteEvent) {
+                return _RemoteEventChip(
+                  title: c.remoteEvent!.title,
+                  color: Color(c.remoteEvent!.calendarColor),
+                  isPast: _remoteEventIsPast(c.remoteEvent!),
+                );
+              }
               final listColor = c.task!.listId != null
                   ? folderController.listById(c.task!.listId!)?.color
                   : null;
@@ -511,17 +539,26 @@ class _ChipData {
   _ChipData.task(Task t, bool c)
       : task = t,
         event = null,
+        remoteEvent = null,
         completed = c;
   _ChipData.event(Event e)
       : task = null,
         event = e,
+        remoteEvent = null,
+        completed = false;
+  _ChipData.remoteEvent(RemoteEvent e)
+      : task = null,
+        event = null,
+        remoteEvent = e,
         completed = false;
 
   final Task? task;
   final Event? event;
+  final RemoteEvent? remoteEvent;
   final bool completed;
 
   bool get isEvent => event != null;
+  bool get isRemoteEvent => remoteEvent != null;
 }
 
 // ─── Task chip ────────────────────────────────────────────────────────────────
@@ -601,4 +638,49 @@ bool _eventIsPast(Event event) {
   final eventDay = DateTime(event.date.year, event.date.month, event.date.day);
   final today = DateTime(now.year, now.month, now.day);
   return eventDay.isBefore(today);
+}
+
+bool _remoteEventIsPast(RemoteEvent event) {
+  final now = DateTime.now();
+  if (event.doTime != null) {
+    final endMinutes = event.doTime! + (event.duration ?? 0);
+    return event.date.add(Duration(minutes: endMinutes)).isBefore(now);
+  }
+  final eventDay = DateTime(event.date.year, event.date.month, event.date.day);
+  final today = DateTime(now.year, now.month, now.day);
+  return eventDay.isBefore(today);
+}
+
+/// Chip for a Google Calendar event. Uses the calendar's color so different
+/// connected calendars stay visually distinct.
+class _RemoteEventChip extends StatelessWidget {
+  const _RemoteEventChip({
+    required this.title,
+    required this.color,
+    this.isPast = false,
+  });
+
+  final String title;
+  final Color color;
+  final bool isPast;
+
+  static const _pastColor = Color(0xFF8E8E93);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      decoration: BoxDecoration(
+        color: isPast ? _pastColor : color,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 9, color: CupertinoColors.white),
+      ),
+    );
+  }
 }

@@ -1,0 +1,175 @@
+import 'package:flutter/foundation.dart';
+import 'package:googleapis/calendar/v3.dart' as gcal;
+
+import 'google_auth_service.dart';
+import 'remote_event.dart';
+
+/// Result of a single calendar's event-list call. Carries the next-sync-token
+/// so the controller can do incremental fetches on subsequent refreshes.
+class CalendarListResult {
+  CalendarListResult({
+    required this.events,
+    required this.nextSyncToken,
+    required this.tokenInvalid,
+  });
+
+  final List<RemoteEvent> events;
+  final String? nextSyncToken;
+
+  /// True when the API returned 410 Gone because the persisted sync token
+  /// expired. The caller should retry with no token (full re-fetch).
+  final bool tokenInvalid;
+}
+
+/// Thin wrapper over [gcal.CalendarApi]. Builds a fresh API client per call
+/// because the underlying HTTP client is owned by [GoogleAuthService] and
+/// shouldn't be cached on this side.
+class GoogleCalendarApi {
+  GoogleCalendarApi(this._auth);
+
+  final GoogleAuthService _auth;
+
+  Future<gcal.CalendarApi?> _api() async {
+    final client = await _auth.authClient();
+    if (client == null) return null;
+    return gcal.CalendarApi(client);
+  }
+
+  // ── Calendars ──────────────────────────────────────────────────────────
+
+  /// Lists the user's calendars. The result is what the settings page shows
+  /// as toggleable rows.
+  Future<List<GoogleCalendarMeta>> listCalendars() async {
+    final api = await _api();
+    if (api == null) return const [];
+    final list = await api.calendarList.list();
+    final items = list.items ?? const [];
+    return items.map((c) {
+      return GoogleCalendarMeta(
+        id: c.id ?? '',
+        summary: c.summaryOverride ?? c.summary ?? c.id ?? '',
+        color: _parseHexColor(c.backgroundColor) ?? 0xFF0A84FF,
+        accessRole: c.accessRole ?? 'reader',
+        primary: c.primary ?? false,
+      );
+    }).where((m) => m.id.isNotEmpty).toList();
+  }
+
+  // ── Events ─────────────────────────────────────────────────────────────
+
+  /// Pulls events for a single calendar in the [timeMin, timeMax] window.
+  /// When [syncToken] is supplied, runs an incremental sync (Google returns
+  /// only the deltas since the previous sync); on 410 Gone, the caller
+  /// should retry without a token.
+  Future<CalendarListResult> listEvents({
+    required GoogleCalendarMeta calendar,
+    DateTime? timeMin,
+    DateTime? timeMax,
+    String? syncToken,
+  }) async {
+    final api = await _api();
+    if (api == null) {
+      return CalendarListResult(
+        events: const [],
+        nextSyncToken: null,
+        tokenInvalid: false,
+      );
+    }
+
+    final events = <RemoteEvent>[];
+    String? pageToken;
+    String? newSyncToken;
+    bool tokenInvalid = false;
+
+    do {
+      try {
+        final page = await api.events.list(
+          calendar.id,
+          // syncToken can't be combined with timeMin/timeMax/orderBy.
+          timeMin: syncToken == null ? timeMin?.toUtc() : null,
+          timeMax: syncToken == null ? timeMax?.toUtc() : null,
+          singleEvents: true,
+          maxResults: 250,
+          pageToken: pageToken,
+          syncToken: syncToken,
+        );
+        for (final ge in page.items ?? const <gcal.Event>[]) {
+          final re = RemoteEvent.fromGoogle(
+            ge,
+            calendarId: calendar.id,
+            calendarName: calendar.summary,
+            calendarColor: calendar.color,
+            isReadOnly: !calendar.canWrite,
+          );
+          if (re != null) events.add(re);
+        }
+        pageToken = page.nextPageToken;
+        if (page.nextSyncToken != null) newSyncToken = page.nextSyncToken;
+      } on gcal.DetailedApiRequestError catch (e) {
+        if (e.status == 410) {
+          tokenInvalid = true;
+          break;
+        }
+        debugPrint('GoogleCalendarApi.list failed: $e');
+        rethrow;
+      }
+    } while (pageToken != null);
+
+    return CalendarListResult(
+      events: events,
+      nextSyncToken: newSyncToken,
+      tokenInvalid: tokenInvalid,
+    );
+  }
+
+  Future<RemoteEvent?> insertEvent({
+    required GoogleCalendarMeta calendar,
+    required RemoteEventDraft draft,
+  }) async {
+    final api = await _api();
+    if (api == null) return null;
+    final created =
+        await api.events.insert(draft.toGoogle(), calendar.id);
+    return RemoteEvent.fromGoogle(
+      created,
+      calendarId: calendar.id,
+      calendarName: calendar.summary,
+      calendarColor: calendar.color,
+      isReadOnly: !calendar.canWrite,
+    );
+  }
+
+  Future<RemoteEvent?> patchEvent(RemoteEvent updated) async {
+    final api = await _api();
+    if (api == null) return null;
+    final patched = await api.events.patch(
+      updated.toGoogle(),
+      updated.calendarId,
+      updated.googleEventId,
+    );
+    return RemoteEvent.fromGoogle(
+      patched,
+      calendarId: updated.calendarId,
+      calendarName: updated.calendarName,
+      calendarColor: updated.calendarColor,
+      isReadOnly: updated.isReadOnly,
+    );
+  }
+
+  Future<void> deleteEvent(RemoteEvent event) async {
+    final api = await _api();
+    if (api == null) return;
+    await api.events.delete(event.calendarId, event.googleEventId);
+  }
+
+  // ── helpers ────────────────────────────────────────────────────────────
+
+  int? _parseHexColor(String? hex) {
+    if (hex == null) return null;
+    final s = hex.replaceFirst('#', '');
+    if (s.length != 6) return null;
+    final v = int.tryParse(s, radix: 16);
+    if (v == null) return null;
+    return 0xFF000000 | v;
+  }
+}

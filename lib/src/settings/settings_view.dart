@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart' show ReorderableDragStartListener, ReorderableListView, ThemeMode;
 
+import '../integrations/google/google_calendar_controller.dart';
 import '../localization/strings.dart';
 import '../security/security_service.dart';
 import '../spaces/space_manager.dart';
@@ -13,6 +14,7 @@ import 'appearance_view.dart';
 import 'backup_service.dart';
 import 'data_view.dart';
 import 'font_picker_view.dart';
+import 'google_calendar_settings_view.dart';
 import 'module_settings_views.dart';
 import 'notifications_view.dart';
 import 'security_view.dart';
@@ -27,11 +29,13 @@ class SettingsView extends StatefulWidget {
     required this.controller,
     this.backupService,
     this.securityService,
+    this.googleCalendarController,
   });
 
   final SettingsController controller;
   final BackupService? backupService;
   final SecurityService? securityService;
+  final GoogleCalendarController? googleCalendarController;
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -309,6 +313,40 @@ class _SettingsViewState extends State<SettingsView> {
                     ),
                   ),
                 ),
+              ),
+            ],
+
+            // ── Integrations ──────────────────────────────────────
+            if (widget.googleCalendarController != null) ...[
+              const SizedBox(height: 18),
+              Text(
+                s.sectionIntegrations,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: labelColor,
+                  letterSpacing: -0.08,
+                ),
+              ),
+              const SizedBox(height: 6),
+              ListenableBuilder(
+                listenable: widget.googleCalendarController!,
+                builder: (ctx, _) {
+                  final gc = widget.googleCalendarController!;
+                  final trailing = gc.isConnected
+                      ? (gc.email ?? s.googleCalendarOn)
+                      : s.googleCalendarOff;
+                  return _NavRow(
+                    label: s.googleCalendar,
+                    trailingLabel: trailing,
+                    onTap: () => Navigator.of(context).push(
+                      FastRoute<void>(
+                        builder: (_) => GoogleCalendarSettingsView(
+                          controller: gc,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
 

@@ -5,6 +5,7 @@ import 'localization/strings.dart';
 import 'calendar/event_controller.dart';
 import 'calendar/event_creation_sheet.dart';
 import 'folders/folder_controller.dart';
+import 'integrations/google/google_calendar_controller.dart';
 import 'notes/note_controller.dart';
 import 'notes/notes_view.dart';
 import 'spaces/space_manager.dart';
@@ -35,6 +36,7 @@ class HomeShell extends StatefulWidget {
     required this.eventController,
     required this.backupService,
     this.securityService,
+    required this.googleCalendarController,
   });
 
   static const routeName = '/';
@@ -56,6 +58,7 @@ class HomeShell extends StatefulWidget {
   final EventController eventController;
   final BackupService backupService;
   final SecurityService? securityService;
+  final GoogleCalendarController googleCalendarController;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -87,6 +90,7 @@ class _HomeShellState extends State<HomeShell> {
         controller: widget.settingsController,
         backupService: widget.backupService,
         securityService: widget.securityService,
+        googleCalendarController: widget.googleCalendarController,
       ),
     );
     _globalSettingsRoute = route;
@@ -215,6 +219,7 @@ class _HomeShellState extends State<HomeShell> {
         controller: widget.settingsController,
         backupService: widget.backupService,
         securityService: widget.securityService,
+        googleCalendarController: widget.googleCalendarController,
       ),
     );
     _globalSettingsRoute = base;
@@ -284,6 +289,7 @@ class _HomeShellState extends State<HomeShell> {
         context,
         widget.eventController,
         initialDate: date,
+        googleCalendarController: widget.googleCalendarController,
       );
     }
   }
@@ -423,6 +429,7 @@ class _HomeShellState extends State<HomeShell> {
           onDaySelected: (d) => _activeDueDate.value = d,
           db: SpaceManagerProvider.of(context).db,
           noteController: widget.noteController,
+          googleCalendarController: widget.googleCalendarController,
         ),
       3 => RoutinesView(
           controller: widget.routineController,
@@ -438,6 +445,7 @@ class _HomeShellState extends State<HomeShell> {
           controller: widget.settingsController,
           backupService: widget.backupService,
           securityService: widget.securityService,
+          googleCalendarController: widget.googleCalendarController,
         ),
     };
   }

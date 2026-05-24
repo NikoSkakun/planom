@@ -35,6 +35,13 @@ dependencies:
   cryptography: ^2.7.0
   icloud_storage: ^2.2.0
   flutter_secure_storage: ^9.2.2
+  # Google Calendar integration. google_sign_in handles native OAuth on iOS,
+  # Android, and macOS; extension_google_sign_in_as_googleapis_auth bridges
+  # its tokens to the googleapis HTTP client so we can call CalendarApi.
+  google_sign_in: ^6.2.1
+  googleapis: ^13.2.0
+  extension_google_sign_in_as_googleapis_auth: ^2.0.12
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:

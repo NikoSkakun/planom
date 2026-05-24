@@ -51,5 +51,29 @@
 	<string>Choose a photo to use as the icon for your list or folder.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock Planom.</string>
+	<!--
+	  Google Calendar integration: replace the placeholders below with the
+	  iOS OAuth client ID from your Google Cloud Console project (and also
+	  fill in kGoogleIosClientId in
+	  lib/src/integrations/google/oauth_config.dart). The URL scheme is the
+	  *reversed* client ID, e.g.:
+	    GIDClientID  = 123456789-abc.apps.googleusercontent.com
+	    URL scheme   = com.googleusercontent.apps.123456789-abc
+	  Until both values are filled in, the in-app Google Calendar settings
+	  page renders a "setup required" state and OAuth is not attempted.
+	-->
+	<key>GIDClientID</key>
+	<string>REPLACE_WITH_IOS_OAUTH_CLIENT_ID.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.REPLACE_WITH_REVERSED_IOS_CLIENT_ID</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

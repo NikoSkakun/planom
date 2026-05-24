@@ -6,6 +6,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'src/app.dart';
 import 'src/database/database_service.dart';
 import 'src/folders/folder_icon_picker.dart';
+import 'src/integrations/google/google_calendar_controller.dart';
 import 'src/notifications/notification_service.dart';
 import 'src/security/security_service.dart';
 import 'src/settings/settings_controller.dart';
@@ -51,6 +52,14 @@ void main() async {
   final securityService = SecurityService(globalDb);
   await securityService.load();
 
+  // Google Calendar integration is global (lives outside any space) so the
+  // same connection appears in every space. Initialisation is best-effort —
+  // a missing client ID or offline state just leaves the controller in its
+  // disconnected default and the rest of the app continues to work.
+  final googleCalendarController =
+      GoogleCalendarController(db: globalDb);
+  await googleCalendarController.load();
+
   final spaceManager =
       SpaceManager(settingsController: settingsController, globalDb: globalDb);
   await spaceManager.load();
@@ -72,6 +81,7 @@ void main() async {
           eventController: spaceManager.eventController,
           backupService: spaceManager.backupService,
           securityService: securityService,
+          googleCalendarController: googleCalendarController,
         ),
       ),
     ),

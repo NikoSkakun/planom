@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'calendar/event_controller.dart';
 import 'folders/folder_controller.dart';
+import 'integrations/google/google_calendar_controller.dart';
 import 'localization/app_localizations.dart';
 import 'home_shell.dart';
 import 'notes/note_controller.dart';
@@ -27,6 +28,7 @@ class MyApp extends StatelessWidget {
     required this.eventController,
     required this.backupService,
     this.securityService,
+    required this.googleCalendarController,
   });
 
   final SettingsController settingsController;
@@ -37,6 +39,7 @@ class MyApp extends StatelessWidget {
   final EventController eventController;
   final BackupService backupService;
   final SecurityService? securityService;
+  final GoogleCalendarController googleCalendarController;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +85,7 @@ class MyApp extends StatelessWidget {
                   eventController: eventController,
                   backupService: backupService,
                   securityService: securityService,
+                  googleCalendarController: googleCalendarController,
                 ),
               ),
             ),

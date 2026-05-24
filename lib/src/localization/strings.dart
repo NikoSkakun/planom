@@ -416,6 +416,34 @@ class S {
   String get insertLink => t('insertLink');
   String get insertLinkTextPlaceholder => t('insertLinkTextPlaceholder');
 
+  // ── Google Calendar integration ──────────────────────────────────────────
+  String get sectionIntegrations => t('sectionIntegrations');
+  String get googleCalendar => t('googleCalendar');
+  String get googleCalendarOn => t('googleCalendarOn');
+  String get googleCalendarOff => t('googleCalendarOff');
+  String get googleCalendarConnect => t('googleCalendarConnect');
+  String get googleCalendarConnected => t('googleCalendarConnected');
+  String get googleCalendarDisconnect => t('googleCalendarDisconnect');
+  String get googleCalendarDisconnectBody => t('googleCalendarDisconnectBody');
+  String get googleCalendarCalendarsSection =>
+      t('googleCalendarCalendarsSection');
+  String get googleCalendarNoCalendars => t('googleCalendarNoCalendars');
+  String get googleCalendarPrimary => t('googleCalendarPrimary');
+  String get googleCalendarReadOnly => t('googleCalendarReadOnly');
+  String get googleCalendarDefaultBadge => t('googleCalendarDefaultBadge');
+  String get googleCalendarDefault => t('googleCalendarDefault');
+  String get googleCalendarDefaultSection => t('googleCalendarDefaultSection');
+  String get googleCalendarNoDefault => t('googleCalendarNoDefault');
+  String get googleCalendarSyncSection => t('googleCalendarSyncSection');
+  String get googleCalendarSyncNow => t('googleCalendarSyncNow');
+  String get googleCalendarNeverSynced => t('googleCalendarNeverSynced');
+  String get googleCalendarLastSynced => t('googleCalendarLastSynced');
+  String get googleCalendarSetupRequired => t('googleCalendarSetupRequired');
+  String get googleCalendarReadOnlyHint => t('googleCalendarReadOnlyHint');
+  String get googleCalendarDeleteBody => t('googleCalendarDeleteBody');
+  String get planomLocal => t('planomLocal');
+  String get eventCalendar => t('eventCalendar');
+
   // ── Parameterized helpers ────────────────────────────────────────────────
   String moveToTrashQuestion(String name) =>
       t('moveToTrashQuestion').replaceAll('{name}', name);
@@ -750,6 +778,36 @@ const Map<String, String> _en = {
   'deleteEventBody': 'This event will be permanently removed.',
   'insertLink': 'Insert Link',
   'insertLinkTextPlaceholder': 'Link text (optional)',
+  // ── Google Calendar integration ────────────────────────────────────────
+  'sectionIntegrations': 'Integrations',
+  'googleCalendar': 'Google Calendar',
+  'googleCalendarOn': 'On',
+  'googleCalendarOff': 'Off',
+  'googleCalendarConnect': 'Connect Google account',
+  'googleCalendarConnected': 'Connected',
+  'googleCalendarDisconnect': 'Disconnect',
+  'googleCalendarDisconnectBody':
+      'Planom will stop reading and writing your Google Calendar from this device. Your Google data is not changed.',
+  'googleCalendarCalendarsSection': 'Calendars',
+  'googleCalendarNoCalendars': 'No calendars found.',
+  'googleCalendarPrimary': 'Primary',
+  'googleCalendarReadOnly': 'Read-only',
+  'googleCalendarDefaultBadge': 'Default for new events',
+  'googleCalendarDefault': 'Default calendar',
+  'googleCalendarDefaultSection': 'New events',
+  'googleCalendarNoDefault': 'None',
+  'googleCalendarSyncSection': 'Sync',
+  'googleCalendarSyncNow': 'Sync now',
+  'googleCalendarNeverSynced': 'Never synced',
+  'googleCalendarLastSynced': 'Last synced {when}',
+  'googleCalendarSetupRequired':
+      'Google Calendar is not configured for this build. Add an OAuth client ID in lib/src/integrations/google/oauth_config.dart and set up the platform-specific URL scheme.',
+  'googleCalendarReadOnlyHint':
+      'This event is on a calendar you only have read access to. To edit it, open Google Calendar.',
+  'googleCalendarDeleteBody':
+      'This event will be permanently removed from Google Calendar.',
+  'planomLocal': 'Planom (local)',
+  'eventCalendar': 'Calendar',
 };
 
 const Map<String, String> _uk = {
