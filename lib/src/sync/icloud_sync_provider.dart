@@ -27,10 +27,12 @@ class ICloudSyncProvider extends SyncProvider {
   ICloudSyncProvider({String? containerId})
       : _containerId = containerId ?? _defaultContainerId;
 
-  // Default convention `iCloud.<bundle-id>` — matches what most apps use and
-  // what the Xcode "Use default container" checkbox produces. Override via
-  // the constructor if a different one is created in App Store Connect.
-  static const _defaultContainerId = 'iCloud.com.planom.app';
+  // Matches the iCloud container declared in ios/Runner/Runner.entitlements
+  // and ios/Runner/Info.plist's NSUbiquitousContainers. Bundle id is
+  // `app.planom`, so the convention `iCloud.<bundle-id>` gives
+  // `iCloud.app.planom`. Override via the constructor only if you create a
+  // different container in App Store Connect.
+  static const _defaultContainerId = 'iCloud.app.planom';
   static const _remoteFileName = 'planom.sync.enc';
 
   final String _containerId;

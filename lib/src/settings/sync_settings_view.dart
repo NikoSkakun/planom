@@ -19,6 +19,20 @@ class SyncSettingsView extends StatefulWidget {
 
 class _SyncSettingsViewState extends State<SyncSettingsView> {
   bool _busy = false;
+  bool _hasPassphrase = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.hasPassphrase().then((v) {
+      if (mounted) setState(() => _hasPassphrase = v);
+    });
+  }
+
+  Future<void> _refreshPassphraseState() async {
+    final has = await widget.controller.hasPassphrase();
+    if (mounted) setState(() => _hasPassphrase = has);
+  }
 
   Future<String?> _promptPassphrase({
     required String title,
@@ -102,25 +116,56 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   }
 
   Future<void> _enableICloud() async {
-    final s = S.of(context);
-    final hasPass = await widget.controller.hasPassphrase();
-    if (!hasPass) {
-      // First device: create a new passphrase. We require confirmation so a
-      // single typo can't lock the user out of every other device forever.
-      final pass = await _promptPassphrase(
-        title: s.setPassphrase,
-        confirm: true,
-      );
-      if (pass == null) return;
-      try {
-        await widget.controller.setPassphrase(pass);
-      } catch (e) {
-        if (!mounted) return;
-        _showAlert(s.exportFailed, e.toString());
-        return;
-      }
-    }
+    // One-tap enable: don't gate on a passphrase. The default ships sync
+    // using Apple's own encryption-at-rest. Users can add client-side E2E
+    // later from the Encryption row below.
     await widget.controller.setBackend(SyncBackend.icloud);
+  }
+
+  Future<void> _setPassphrase() async {
+    final s = S.of(context);
+    final pass = await _promptPassphrase(
+      title: s.setPassphrase,
+      confirm: true,
+    );
+    if (pass == null) return;
+    try {
+      await widget.controller.setPassphrase(pass);
+    } catch (e) {
+      if (!mounted) return;
+      _showAlert(s.exportFailed, e.toString());
+      return;
+    }
+    await _refreshPassphraseState();
+    if (!mounted) return;
+    // Encrypt-and-replace the existing cloud copy so a fresh device pulling
+    // tomorrow gets the new ciphertext, not the old plaintext.
+    await widget.controller.pushNow();
+  }
+
+  Future<void> _removePassphrase() async {
+    final s = S.of(context);
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(s.removeEncryption),
+        content: Text(s.removeEncryptionBody),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(s.cancel),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(s.confirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await widget.controller.clearPassphrase();
+    await _refreshPassphraseState();
   }
 
   Future<void> _disable() async {
@@ -334,11 +379,48 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                       ],
                     ),
                   ),
+
+                  // Encryption — separate section so it reads as an opt-in
+                  // upgrade rather than a required setup step.
+                  const SizedBox(height: 24),
+                  _SectionLabel(
+                      text: s.syncEncryptionSection, color: labelColor),
+                  _BackendCard(
+                    bg: cardBg,
+                    child: Column(
+                      children: [
+                        _InfoRow(
+                          label: s.syncEncryptionLabel,
+                          value: _hasPassphrase
+                              ? s.syncEncryptionOn
+                              : s.syncEncryptionOff,
+                        ),
+                        Container(
+                          height: 0.5,
+                          color:
+                              CupertinoColors.separator.resolveFrom(context),
+                        ),
+                        if (!_hasPassphrase)
+                          _TapRow(
+                            label: s.setPassphrase,
+                            onTap: _busy ? null : _setPassphrase,
+                          )
+                        else
+                          _TapRow(
+                            label: s.removeEncryption,
+                            isDestructive: true,
+                            onTap: _busy ? null : _removePassphrase,
+                          ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
-                      s.syncPassphraseLossHint,
+                      _hasPassphrase
+                          ? s.syncPassphraseLossHint
+                          : s.syncDefaultEncryptionHint,
                       style: TextStyle(fontSize: 13, color: labelColor),
                     ),
                   ),

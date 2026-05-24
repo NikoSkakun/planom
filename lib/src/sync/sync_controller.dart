@@ -94,23 +94,23 @@ class SyncController with ChangeNotifier {
 
   Future<void> clearPassphrase() => _secrets.clear();
 
-  /// Encrypts the active space's current state and uploads to the active
-  /// provider. No-ops if the user hasn't configured sync.
+  /// Encrypts (when a passphrase is set) and uploads the active space's
+  /// current state. When no passphrase is set the payload goes up as plain
+  /// JSON — Apple's iCloud encryption-at-rest still applies, but Apple holds
+  /// the keys. Users can opt into client-side E2E later by setting a
+  /// passphrase from Settings → Sync.
   Future<void> pushNow() async {
     final provider = _provider;
     if (provider == null) return;
-    final passphrase = await _secrets.readPassphrase();
-    if (passphrase == null || passphrase.isEmpty) {
-      _snapshot = _snapshot.copyWith(status: SyncStatus.passphraseRequired);
-      notifyListeners();
-      return;
-    }
 
     _setStatus(SyncStatus.pushing);
     try {
       final plain = await _backupService.buildPayloadJson();
-      final cipherText = await encryptBackup(plain, passphrase);
-      await provider.push(utf8.encode(cipherText));
+      final passphrase = await _secrets.readPassphrase();
+      final payload = (passphrase != null && passphrase.isNotEmpty)
+          ? await encryptBackup(plain, passphrase)
+          : plain;
+      await provider.push(utf8.encode(payload));
       _snapshot = _snapshot.copyWith(
         status: SyncStatus.succeeded,
         lastSyncAt: DateTime.now(),
@@ -132,12 +132,6 @@ class SyncController with ChangeNotifier {
   Future<bool> pullNow() async {
     final provider = _provider;
     if (provider == null) return false;
-    final passphrase = await _secrets.readPassphrase();
-    if (passphrase == null || passphrase.isEmpty) {
-      _snapshot = _snapshot.copyWith(status: SyncStatus.passphraseRequired);
-      notifyListeners();
-      return false;
-    }
 
     _setStatus(SyncStatus.pulling);
     try {
@@ -152,15 +146,36 @@ class SyncController with ChangeNotifier {
         return false;
       }
 
-      final cipherText = utf8.decode(bytes);
+      final content = utf8.decode(bytes);
       Map<String, dynamic> envelope;
       try {
-        envelope = jsonDecode(cipherText) as Map<String, dynamic>;
+        envelope = jsonDecode(content) as Map<String, dynamic>;
       } catch (_) {
         throw SyncException('Remote backup is corrupted.');
       }
 
-      final plain = await decryptBackup(envelope, passphrase);
+      // Two payload shapes share the same iCloud filename: encrypted (v2
+      // envelope) when the producer had a passphrase, plain (v1) otherwise.
+      // Sniff which one we got and route accordingly — a device that never
+      // set a passphrase can still pull a plain payload someone else pushed.
+      String plain;
+      if (isEncryptedBackup(envelope)) {
+        final pass = await _secrets.readPassphrase();
+        if (pass == null || pass.isEmpty) {
+          _snapshot = _snapshot.copyWith(
+            status: SyncStatus.passphraseRequired,
+            lastError:
+                'The cloud backup is encrypted. Set the matching passphrase '
+                'in Settings → Sync → Encryption to pull it.',
+          );
+          notifyListeners();
+          return false;
+        }
+        plain = await decryptBackup(envelope, pass);
+      } else {
+        plain = content;
+      }
+
       final applied = await _backupService.importPayloadJson(plain);
       _snapshot = _snapshot.copyWith(
         status: applied ? SyncStatus.succeeded : SyncStatus.failed,

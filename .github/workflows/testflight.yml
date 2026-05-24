@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:          # allows manual trigger from the Actions tab
+    inputs:
+      force_regen:
+        description: "Force-regenerate the provisioning profile (use after changing entitlements)."
+        type: boolean
+        default: false
 
 concurrency:
   group: testflight-${{ github.ref }}
@@ -72,4 +77,4 @@ jobs:
           MATCH_GITHUB_USER:                   ${{ secrets.MATCH_GITHUB_USER }}
           MATCH_GITHUB_TOKEN:                  ${{ secrets.MATCH_GITHUB_TOKEN }}
 
-        run: bundle exec fastlane beta
+        run: bundle exec fastlane beta force_regen:${{ inputs.force_regen || false }}
