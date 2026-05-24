@@ -15,6 +15,16 @@ class SecuritySettingsView extends StatefulWidget {
 
 class _SecuritySettingsViewState extends State<SecuritySettingsView> {
   PasswordType get _type => widget.securityService.type;
+  bool _biometricAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.securityService.isBiometricAvailable().then((available) {
+      if (!mounted) return;
+      setState(() => _biometricAvailable = available);
+    });
+  }
 
   String _lockTypeLabel(S s, PasswordType t) {
     switch (t) {
@@ -210,6 +220,19 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
                       onTap: () => _handleRemoveLock(context),
                     ),
                   ],
+                  if (_type != PasswordType.none && _biometricAvailable) ...[
+                    Container(
+                        height: 0.5,
+                        color: CupertinoColors.separator.resolveFrom(context)),
+                    _SwitchRow(
+                      label: s.useBiometric,
+                      value: widget.securityService.biometricEnabled,
+                      onChanged: (v) async {
+                        await widget.securityService.setBiometricEnabled(v);
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -231,6 +254,37 @@ class _SecuritySettingsViewState extends State<SecuritySettingsView> {
 }
 
 // ── Simple row widgets ────────────────────────────────────────────────────────
+
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: const TextStyle(fontSize: 16)),
+          ),
+          CupertinoSwitch(
+            value: value,
+            activeColor: AppColors.accent,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _Row extends StatelessWidget {
   const _Row({required this.label, this.trailing, this.hasChevron = true});

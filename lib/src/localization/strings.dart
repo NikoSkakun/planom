@@ -192,6 +192,8 @@ class S {
   String get lockDisabled => t('lockDisabled');
   String get verifyToDisable => t('verifyToDisable');
   String get verifyToChange => t('verifyToChange');
+  String get useBiometric => t('useBiometric');
+  String get unlockPrompt => t('unlockPrompt');
 
   // ── Notifications ─────────────────────────────────────────────────────────
   String get sectionNotifications => t('sectionNotifications');
@@ -501,6 +503,8 @@ const Map<String, String> _en = {
   'lockEnabled': 'Lock enabled', 'lockDisabled': 'Lock disabled',
   'verifyToDisable': 'Enter current password to disable lock',
   'verifyToChange': 'Enter current password to change lock',
+  'useBiometric': 'Use Face ID / Touch ID',
+  'unlockPrompt': 'Unlock Planom',
   'sectionNotifications': 'Notifications',
   'notificationsEnabled': 'Notifications Enabled',
   'notificationsPermissionHint': 'Open Settings to allow notifications for Planom.',
