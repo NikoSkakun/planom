@@ -195,7 +195,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
       ),
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           children: [
             // ── Appearance ──────────────────────────────────────────────
             Text(
@@ -206,7 +206,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                 letterSpacing: -0.08,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             ListenableBuilder(
               listenable: widget.controller,
               builder: (ctx, _) {
@@ -231,7 +231,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             ),
 
             // ── Language ────────────────────────────────────────────────
-            const SizedBox(height: 32),
+            const SizedBox(height: 18),
             Text(
               s.sectionLanguage,
               style: TextStyle(
@@ -240,7 +240,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                 letterSpacing: -0.08,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             ListenableBuilder(
               listenable: widget.controller,
               builder: (ctx, _) {
@@ -268,7 +268,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             ),
 
             // ── Smart Lists ─────────────────────────────────────────────
-            const SizedBox(height: 32),
+            const SizedBox(height: 18),
             Text(
               s.sectionSmartLists,
               style: TextStyle(
@@ -277,7 +277,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                 letterSpacing: -0.08,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             ListenableBuilder(
               listenable: widget.controller,
               builder: (ctx, _) {
@@ -351,7 +351,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             ),
 
             // ── Tab Bar ─────────────────────────────────────────────────
-            const SizedBox(height: 32),
+            const SizedBox(height: 18),
             Text(
               s.sectionCustomization,
               style: TextStyle(
@@ -360,7 +360,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                 letterSpacing: -0.08,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _NavRow(
               label: s.tabBar,
               onTap: () => Navigator.of(context).push(
@@ -373,7 +373,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
             ),
 
             // ── Notifications ────────────────────────────────────────
-            const SizedBox(height: 32),
+            const SizedBox(height: 18),
             Text(
               s.sectionNotifications,
               style: TextStyle(
@@ -382,7 +382,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                 letterSpacing: -0.08,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _NavRow(
               label: s.sectionNotifications,
               onTap: () => Navigator.of(context).push(
@@ -394,7 +394,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
 
             // ── Security ─────────────────────────────────────────────
             if (widget.securityService != null) ...[
-              const SizedBox(height: 32),
+              const SizedBox(height: 18),
               Text(
                 s.sectionSecurity,
                 style: TextStyle(
@@ -403,7 +403,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                   letterSpacing: -0.08,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _NavRow(
                 label: s.sectionSecurity,
                 onTap: () => Navigator.of(context).push(
@@ -418,7 +418,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
 
             if (hasBackup) ...[
               // ── Sync ──────────────────────────────────────────────
-              const SizedBox(height: 32),
+              const SizedBox(height: 18),
               Text(
                 s.sync,
                 style: TextStyle(
@@ -427,7 +427,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                   letterSpacing: -0.08,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _NavRow(
                 label: s.sync,
                 onTap: () {
@@ -443,7 +443,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
               ),
 
               // ── Data ──────────────────────────────────────────────
-              const SizedBox(height: 32),
+              const SizedBox(height: 18),
               Text(
                 s.sectionData,
                 style: TextStyle(
@@ -452,7 +452,7 @@ class _SettingsViewState extends State<SettingsView> with DropdownOverlayMixin {
                   letterSpacing: -0.08,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _NavRow(
                 label: s.sectionData,
                 onTap: () => Navigator.of(context).push(
@@ -685,7 +685,7 @@ class TabBarSettingsView extends StatelessWidget {
 
             return SingleChildScrollView(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -698,13 +698,13 @@ class TabBarSettingsView extends StatelessWidget {
                       letterSpacing: -0.08,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   _ToggleRow(
                     label: s.hideLabels,
                     value: controller.hideTabLabels,
                     onChanged: controller.updateHideTabLabels,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 18),
                   // ── Startup ────────────────────────────────────────────
                   Text(
                     s.startup,
@@ -714,14 +714,14 @@ class TabBarSettingsView extends StatelessWidget {
                       letterSpacing: -0.08,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   _NavRow(
                     label: s.defaultTab,
                     trailingLabel:
                         _defaultTabLabel(s, controller.defaultTab),
                     onTap: () => _showDefaultTabPicker(context),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 18),
                   // ── Visible Tabs (reorderable) ─────────────────────────
                   Text(
                     s.visibleTabs,
@@ -731,7 +731,7 @@ class TabBarSettingsView extends StatelessWidget {
                       letterSpacing: -0.08,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   ReorderableListView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -757,7 +757,7 @@ class TabBarSettingsView extends StatelessWidget {
                     ],
                   ),
                   if (!settingsVisible) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Text(
@@ -804,7 +804,7 @@ class _TabOrderRow extends StatelessWidget {
       opacity: isDisabled ? 0.4 : 1.0,
       child: Container(
         margin: const EdgeInsets.only(bottom: 1),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),
@@ -859,7 +859,7 @@ class _NavRow extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),
@@ -923,7 +923,7 @@ class _SmartListRow extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),
@@ -1003,7 +1003,7 @@ class _ToggleRow extends StatelessWidget {
     return Opacity(
       opacity: enabled ? 1.0 : 0.4,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),
