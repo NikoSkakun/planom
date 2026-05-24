@@ -12,7 +12,7 @@ import '../folders/folder_view.dart';
 import '../folders/list_task_view.dart';
 import '../home_shell.dart';
 import '../notes/note_controller.dart';
-import '../search/search_view.dart';
+import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/smart_list_prefs.dart';
@@ -201,33 +201,13 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
+    final canSearch = widget.db != null &&
+        widget.noteController != null &&
+        widget.eventController != null;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
         middle: Text(s.tabTasks),
-        leading: widget.db != null &&
-                widget.noteController != null &&
-                widget.eventController != null
-            ? Semantics(
-                label: s.search,
-                button: true,
-                child: CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () => Navigator.of(context).push(
-                    FastRoute<void>(
-                      builder: (_) => SearchView(
-                        db: widget.db!,
-                        taskController: widget.controller,
-                        folderController: widget.folderController,
-                        noteController: widget.noteController!,
-                        eventController: widget.eventController!,
-                      ),
-                    ),
-                  ),
-                  child: const Icon(CupertinoIcons.search, size: 22),
-                ),
-              )
-            : null,
         trailing: Semantics(
           label: s.settings,
           button: true,
@@ -241,7 +221,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
       child: SafeArea(
         child: Stack(
           children: [
-            ListenableBuilder(
+            _maybeWrapWithSearchPull(
+              canSearch: canSearch,
+              child: ListenableBuilder(
               listenable: Listenable.merge([
                 widget.controller,
                 widget.folderController,
@@ -539,6 +521,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                 );
               },
             ),
+            ),
             if (widget.settingsController.smartListPrefs.showAddFolderButton)
               Positioned(
                 left: 20,
@@ -551,6 +534,21 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _maybeWrapWithSearchPull({
+    required bool canSearch,
+    required Widget child,
+  }) {
+    if (!canSearch) return child;
+    return SearchPullScope(
+      db: widget.db!,
+      taskController: widget.controller,
+      folderController: widget.folderController,
+      noteController: widget.noteController!,
+      eventController: widget.eventController!,
+      child: child,
     );
   }
 

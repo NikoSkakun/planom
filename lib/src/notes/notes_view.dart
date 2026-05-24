@@ -1,11 +1,16 @@
 import 'package:flutter/cupertino.dart';
 
+import '../calendar/event_controller.dart';
+import '../database/database_service.dart';
+import '../folders/folder_controller.dart';
 import '../home_shell.dart';
 import '../localization/strings.dart';
 import '../models/note.dart';
+import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_menu.dart';
+import '../tasks/task_controller.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import 'create_note_folder_sheet.dart';
@@ -22,12 +27,20 @@ class NotesView extends StatefulWidget {
     required this.collapseSignal,
     this.settingsController,
     this.backupService,
+    this.db,
+    this.taskController,
+    this.folderController,
+    this.eventController,
   });
 
   final NoteController controller;
   final ValueNotifier<int> collapseSignal;
   final SettingsController? settingsController;
   final BackupService? backupService;
+  final DatabaseService? db;
+  final TaskController? taskController;
+  final FolderController? folderController;
+  final EventController? eventController;
 
   @override
   State<NotesView> createState() => _NotesViewState();
@@ -107,6 +120,23 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
     );
   }
 
+  Widget _maybeWrapWithSearchPull({required Widget child}) {
+    if (widget.db == null ||
+        widget.taskController == null ||
+        widget.folderController == null ||
+        widget.eventController == null) {
+      return child;
+    }
+    return SearchPullScope(
+      db: widget.db!,
+      taskController: widget.taskController!,
+      folderController: widget.folderController!,
+      noteController: widget.controller,
+      eventController: widget.eventController!,
+      child: child,
+    );
+  }
+
   Widget _proxyDecorator(
       Widget child, int index, Animation<double> animation) {
     return Container(
@@ -164,7 +194,8 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
       child: SafeArea(
         child: Stack(
           children: [
-            ListenableBuilder(
+            _maybeWrapWithSearchPull(
+              child: ListenableBuilder(
               listenable: widget.controller,
               builder: (context, _) {
                 final folders = widget.controller.foldersIn(null);
@@ -325,6 +356,7 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                   ],
                 );
               },
+            ),
             ),
             Positioned(
               left: 20,

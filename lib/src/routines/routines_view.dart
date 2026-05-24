@@ -1,11 +1,17 @@
 import 'package:flutter/cupertino.dart';
 
+import '../calendar/event_controller.dart';
+import '../database/database_service.dart';
+import '../folders/folder_controller.dart';
 import '../home_shell.dart';
 import '../localization/strings.dart';
 import '../models/routine.dart';
+import '../notes/note_controller.dart';
+import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_menu.dart';
+import '../tasks/task_controller.dart';
 import '../theme/app_theme.dart';
 import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
@@ -21,11 +27,21 @@ class RoutinesView extends StatefulWidget {
     required this.controller,
     this.settingsController,
     this.backupService,
+    this.db,
+    this.taskController,
+    this.folderController,
+    this.noteController,
+    this.eventController,
   });
 
   final RoutineController controller;
   final SettingsController? settingsController;
   final BackupService? backupService;
+  final DatabaseService? db;
+  final TaskController? taskController;
+  final FolderController? folderController;
+  final NoteController? noteController;
+  final EventController? eventController;
 
   @override
   State<RoutinesView> createState() => _RoutinesViewState();
@@ -89,13 +105,33 @@ class _RoutinesViewState extends State<RoutinesView>
             : null,
       ),
       child: SafeArea(
-        child: ListenableBuilder(
-          listenable: widget.controller,
-          builder: (context, _) => _tab == 0
-              ? _TodayContent(controller: widget.controller)
-              : _AllContent(controller: widget.controller),
+        child: _maybeWrapWithSearchPull(
+          child: ListenableBuilder(
+            listenable: widget.controller,
+            builder: (context, _) => _tab == 0
+                ? _TodayContent(controller: widget.controller)
+                : _AllContent(controller: widget.controller),
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _maybeWrapWithSearchPull({required Widget child}) {
+    if (widget.db == null ||
+        widget.taskController == null ||
+        widget.folderController == null ||
+        widget.noteController == null ||
+        widget.eventController == null) {
+      return child;
+    }
+    return SearchPullScope(
+      db: widget.db!,
+      taskController: widget.taskController!,
+      folderController: widget.folderController!,
+      noteController: widget.noteController!,
+      eventController: widget.eventController!,
+      child: child,
     );
   }
 }
