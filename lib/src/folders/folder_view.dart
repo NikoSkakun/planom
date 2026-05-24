@@ -11,7 +11,8 @@ import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/undo_controller.dart';
-import 'create_folder_list_sheet.dart' show showCreateFolderListSheet, showRenameSheet;
+import 'create_folder_list_sheet.dart'
+    show CreateSheetInitial, showCreateFolderListSheet, showRenameSheet;
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
 import 'list_task_view.dart';
@@ -160,6 +161,23 @@ class _FolderViewState extends State<FolderView>
     showDropdown(context, (dismiss) {
       return _FolderOptionsDropdown(
         onDismiss: dismiss,
+        onAddList: () {
+          dismiss();
+          showCreateFolderListSheet(
+            context,
+            widget.folderController,
+            parentFolderId: _currentFolder.id,
+          );
+        },
+        onAddFolder: () {
+          dismiss();
+          showCreateFolderListSheet(
+            context,
+            widget.folderController,
+            parentFolderId: _currentFolder.id,
+            initialType: CreateSheetInitial.folder,
+          );
+        },
         onRename: () {
           dismiss();
           showRenameSheet(
@@ -438,6 +456,8 @@ class _FolderViewState extends State<FolderView>
 class _FolderOptionsDropdown extends StatelessWidget {
   const _FolderOptionsDropdown({
     required this.onDismiss,
+    required this.onAddList,
+    required this.onAddFolder,
     required this.onRename,
     required this.onChangeIcon,
     required this.onMoveTo,
@@ -446,6 +466,8 @@ class _FolderOptionsDropdown extends StatelessWidget {
   });
 
   final VoidCallback onDismiss;
+  final VoidCallback onAddList;
+  final VoidCallback onAddFolder;
   final VoidCallback onRename;
   final VoidCallback onChangeIcon;
   final VoidCallback onMoveTo;
@@ -467,6 +489,14 @@ class _FolderOptionsDropdown extends StatelessWidget {
           right: 8,
           child: _DropdownPanel(
             items: [
+              _DropdownItem(
+                  label: S.of(context).addList,
+                  icon: CupertinoIcons.add_circled,
+                  onTap: onAddList),
+              _DropdownItem(
+                  label: S.of(context).addFolder,
+                  icon: CupertinoIcons.folder_badge_plus,
+                  onTap: onAddFolder),
               _DropdownItem(
                   label: S.of(context).rename,
                   icon: CupertinoIcons.pencil,

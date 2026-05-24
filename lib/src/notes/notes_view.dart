@@ -9,9 +9,10 @@ import '../models/note.dart';
 import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
-import '../settings/settings_menu.dart';
 import '../tasks/task_controller.dart';
+import '../theme/app_theme.dart';
 import '../utils/dropdown_overlay.dart';
+import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
 import '../utils/undo_controller.dart';
 import 'create_note_folder_sheet.dart';
@@ -159,38 +160,59 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
   }
 
   void _showSettingsMenu(BuildContext context) {
-    showDropdown(
-      context,
-      (dismiss) => SettingsMenuOverlay(
+    final sc = widget.settingsController;
+    final settingsHidden = sc != null && !sc.isTabVisible(4);
+    showDropdown(context, (dismiss) {
+      return _NotesOptionsDropdown(
         onDismiss: dismiss,
-        onSettings: () {
+        onAddNote: () {
           dismiss();
-          _openSettings(context);
+          Navigator.of(context).push(
+            FastRoute<void>(
+              settings:
+                  const RouteSettings(name: NoteDetailView.routeName),
+              builder: (_) => NoteDetailView(
+                note: Note(title: '', content: ''),
+                controller: widget.controller,
+                isNew: true,
+              ),
+            ),
+          );
         },
-      ),
-    );
+        onAddFolder: () {
+          dismiss();
+          showCreateNoteFolderSheet(context, widget.controller);
+        },
+        showSettings: settingsHidden,
+        onSettings: settingsHidden
+            ? () {
+                dismiss();
+                _openSettings(context);
+              }
+            : null,
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     final sc = widget.settingsController;
-    final settingsHidden = sc != null && !sc.isTabVisible(4);
+    final showFloatingAddFolder =
+        sc == null || sc.smartListPrefs.showNotesAddFolderButton;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
         middle: Text(s.tabNotes),
-        trailing: settingsHidden
-            ? Semantics(
-                label: s.settings,
-                button: true,
-                child: CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () => _showSettingsMenu(context),
-                  child: const Icon(CupertinoIcons.ellipsis, size: 26),
-                ),
-              )
-            : null,
+        trailing: Semantics(
+          label: s.settings,
+          button: true,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => _showSettingsMenu(context),
+            child: const Icon(CupertinoIcons.ellipsis, size: 26),
+          ),
+        ),
       ),
       child: SafeArea(
         child: Stack(
@@ -375,14 +397,15 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
               },
             ),
             ),
-            Positioned(
-              left: 20,
-              bottom: 16,
-              child: NoteFolderCircleButton(
-                onPressed: () =>
-                    showCreateNoteFolderSheet(context, widget.controller),
+            if (showFloatingAddFolder)
+              Positioned(
+                left: 20,
+                bottom: 16,
+                child: NoteFolderCircleButton(
+                  onPressed: () =>
+                      showCreateNoteFolderSheet(context, widget.controller),
+                ),
               ),
-            ),
             Positioned(
               right: 20,
               bottom: 16,
@@ -403,6 +426,85 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _NotesOptionsDropdown extends StatelessWidget {
+  const _NotesOptionsDropdown({
+    required this.onDismiss,
+    required this.onAddNote,
+    required this.onAddFolder,
+    this.showSettings = false,
+    this.onSettings,
+  });
+
+  final VoidCallback onDismiss;
+  final VoidCallback onAddNote;
+  final VoidCallback onAddFolder;
+  final bool showSettings;
+  final VoidCallback? onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    final s = S.of(context);
+    final separator = Container(
+      height: 0.5,
+      color: CupertinoColors.separator.resolveFrom(context),
+    );
+    final items = <Widget>[
+      DropdownRow(
+        label: s.addNote,
+        icon: CupertinoIcons.add_circled,
+        onTap: onAddNote,
+      ),
+      separator,
+      DropdownRow(
+        label: s.addFolder,
+        icon: CupertinoIcons.folder_badge_plus,
+        onTap: onAddFolder,
+      ),
+    ];
+    if (showSettings) {
+      items.add(separator);
+      items.add(DropdownRow(
+        label: s.settings,
+        icon: CupertinoIcons.gear_alt,
+        onTap: onSettings ?? () {},
+      ));
+    }
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDismiss,
+          child: const SizedBox.expand(),
+        ),
+        Positioned(
+          top: topOffset,
+          right: 8,
+          child: Container(
+            width: 220,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground.resolveFrom(context),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 20,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: items,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

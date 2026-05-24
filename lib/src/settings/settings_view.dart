@@ -180,7 +180,9 @@ class _SettingsViewState extends State<SettingsView> {
               label: s.tabNotes,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
-                  builder: (_) => const NotesSettingsView(),
+                  builder: (_) => NotesSettingsView(
+                    controller: widget.controller,
+                  ),
                 ),
               ),
             ),

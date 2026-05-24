@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
+import 'settings_controller.dart';
+import 'settings_widgets.dart';
 
 /// Per-tab settings sub-pages reached from Settings → (Notes / Calendar /
 /// Routines). They currently host no settings; the page exists so that
@@ -38,10 +40,42 @@ class _EmptySettingsView extends StatelessWidget {
 }
 
 class NotesSettingsView extends StatelessWidget {
-  const NotesSettingsView({super.key});
+  const NotesSettingsView({super.key, required this.controller});
+
+  final SettingsController controller;
+
   @override
-  Widget build(BuildContext context) =>
-      _EmptySettingsView(title: S.of(context).tabNotes);
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        middle: Text(s.tabNotes),
+      ),
+      child: SafeArea(
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) {
+            return SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SettingsSectionHeader(s.sectionTasksUi),
+                  SettingsToggleRow(
+                    label: s.showAddFolderButton,
+                    value: controller.smartListPrefs.showNotesAddFolderButton,
+                    onChanged: controller.updateShowNotesAddFolderButton,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 }
 
 class CalendarSettingsView extends StatelessWidget {
