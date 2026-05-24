@@ -52,14 +52,13 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock Planom.</string>
 	<!--
-	  iCloud Drive sync — paired with the iCloud capability in
-	  Signing & Capabilities (Runner.entitlements). Container id must
-	  match the one passed to ICloudSyncProvider (default
-	  iCloud.com.planom.app). See docs/SYNC_SETUP.md for Xcode steps.
+	  iCloud Drive sync — paired with Runner.entitlements (auto-generated
+	  by CI; do not edit by hand). Container id must match the entitlement
+	  and the value in ICloudSyncProvider.
 	-->
 	<key>NSUbiquitousContainers</key>
 	<dict>
-		<key>iCloud.com.planom.app</key>
+		<key>iCloud.app.planom</key>
 		<dict>
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>

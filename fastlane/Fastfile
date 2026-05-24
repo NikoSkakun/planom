@@ -14,10 +14,44 @@ platform :ios do
     )
   end
 
+  # Idempotent — enables the iCloud capability on the given App ID via the
+  # App Store Connect API if it isn't already enabled. Lets CI add iCloud Drive
+  # sync without anyone touching Xcode or the Developer Portal web UI.
+  #
+  # Containers (iCloud.app.planom) are declared in ios/Runner/Runner.entitlements
+  # and ios/Runner/Info.plist's NSUbiquitousContainers; iCloud Drive doesn't
+  # need explicit container records in the portal — Apple provisions storage
+  # on first upload from a correctly-signed build.
+  def ensure_icloud_capability(api_key_path:, api_key:, bundle_id:)
+    require "spaceship"
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id:    api_key[:key_id],
+      issuer_id: api_key[:issuer_id],
+      filepath:  api_key_path,
+    )
+
+    bid = Spaceship::ConnectAPI::BundleId
+      .all(filter: { identifier: bundle_id })
+      .first
+    UI.user_error!("Bundle ID #{bundle_id} not found in App Store Connect.") unless bid
+
+    caps = bid.get_capabilities || []
+    if caps.any? { |c| c.capability_type == Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD }
+      UI.message("✓ iCloud capability already enabled on #{bundle_id}")
+      return false
+    end
+
+    bid.create_capability(
+      capability_type: Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD,
+    )
+    UI.success("✅  Enabled iCloud capability on #{bundle_id}")
+    true
+  end
+
   # ── Lanes ─────────────────────────────────────────────────────────────────────
 
   desc "Build and upload a new beta to TestFlight"
-  lane :beta do
+  lane :beta do |options|
     api_key = load_asc_api_key
 
     # app_store_connect_api_key with key_content: does not populate filepath.
@@ -25,6 +59,17 @@ platform :ios do
     require "tmpdir"
     key_path = File.join(Dir.tmpdir, "AuthKey_#{api_key[:key_id]}.p8")
     File.write(key_path, api_key[:key])
+
+    # Ensure capabilities required by Runner.entitlements exist on the App ID
+    # before match generates the provisioning profile. If we just added iCloud
+    # (or any new entitlement), force-regenerate the profile this run so the
+    # build picks it up; otherwise reuse the cached one and save the round trip.
+    new_capability = ensure_icloud_capability(
+      api_key_path: key_path,
+      api_key:      api_key,
+      bundle_id:    "app.planom",
+    )
+    force_regen = new_capability || (options[:force_regen] == true || options[:force_regen] == "true")
 
     # Bump the build number to the current timestamp (YYYYMMDDHHmmSS) so every
     # CI run produces a unique, monotonically increasing build number without
@@ -55,6 +100,10 @@ platform :ios do
       api_key:           api_key,
       keychain_name:     "ci_build.keychain",
       keychain_password: "ci_temp_pass",
+      # Regenerate when entitlements changed this run, or when the workflow
+      # was dispatched with force_regen:true. Otherwise reuse the cached
+      # profile from the certificates repo.
+      force:             force_regen,
     )
 
     build_app(

@@ -209,6 +209,13 @@ class S {
   String get syncFreeSection => t('syncFreeSection');
   String get syncPaidSection => t('syncPaidSection');
   String get syncStatusSection => t('syncStatusSection');
+  String get syncEncryptionSection => t('syncEncryptionSection');
+  String get syncEncryptionLabel => t('syncEncryptionLabel');
+  String get syncEncryptionOn => t('syncEncryptionOn');
+  String get syncEncryptionOff => t('syncEncryptionOff');
+  String get removeEncryption => t('removeEncryption');
+  String get removeEncryptionBody => t('removeEncryptionBody');
+  String get syncDefaultEncryptionHint => t('syncDefaultEncryptionHint');
   String get syncICloudTitle => t('syncICloudTitle');
   String get syncICloudSublabel => t('syncICloudSublabel');
   String get syncPlanomTitle => t('syncPlanomTitle');
@@ -558,9 +565,18 @@ const Map<String, String> _en = {
   'syncFreeSection': 'Free',
   'syncPaidSection': 'Cross-device',
   'syncStatusSection': 'Status',
+  'syncEncryptionSection': 'Encryption',
+  'syncEncryptionLabel': 'Encryption',
+  'syncEncryptionOn': 'End-to-end (passphrase)',
+  'syncEncryptionOff': 'Apple-encrypted',
+  'removeEncryption': 'Remove passphrase',
+  'removeEncryptionBody':
+      'Removes the local passphrase. The cloud copy is left as-is until you push again.',
+  'syncDefaultEncryptionHint':
+      'Apple encrypts your data in transit and at rest, but holds the keys. Set a passphrase below to encrypt on this device first so no one — including Apple — can read it.',
   'syncICloudTitle': 'iCloud',
   'syncICloudSublabel':
-      'Free on your iCloud storage. Apple devices only. End-to-end encrypted.',
+      'Free on your iCloud storage. Apple devices only. Apple-encrypted; add a passphrase below for end-to-end.',
   'syncPlanomTitle': 'Planom Account',
   'syncPlanomSublabel':
       'Sync across iOS, Android, and Web with a Planom subscription.',
