@@ -9,6 +9,7 @@ import '../utils/duration_picker.dart';
 import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../localization/strings.dart';
+import '../models/recurrence.dart';
 import '../models/tag.dart';
 import '../models/task.dart';
 import '../notes/markdown_toolbar.dart';
@@ -19,6 +20,7 @@ import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/reminder_picker.dart';
 import 'calendar_date_picker.dart';
+import 'recurrence_picker.dart';
 import 'tag_picker_sheet.dart';
 import 'task_controller.dart';
 
@@ -52,6 +54,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
   late int? _duration;
   late List<int> _reminderOffsets;
   late List<String> _tagIds;
+  late String? _recurrence;
   late bool _isCompleted;
   late String? _listId;
   late int _priority;
@@ -72,6 +75,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _priority = widget.task.priority;
     _reminderOffsets = List.of(widget.task.reminderOffsets);
     _tagIds = List.of(widget.task.tagIds);
+    _recurrence = widget.task.recurrence;
     _title.addListener(_scheduleAutosave);
     _note.addListener(_scheduleAutosave);
     _noteFocus.addListener(_onNoteFocusChanged);
@@ -116,7 +120,19 @@ class _TaskDetailViewState extends State<TaskDetailView>
       priority: _priority,
       reminderOffsets: _reminderOffsets,
       tagIds: _tagIds,
+      recurrence: _recurrence,
+      clearRecurrence: _recurrence == null,
     ));
+  }
+
+  Future<void> _pickRecurrence() async {
+    final result = await showRecurrencePicker(
+      context,
+      Recurrence.parse(_recurrence),
+    );
+    if (!mounted || result == null) return;
+    setState(() => _recurrence = result.value?.toJson());
+    _save();
   }
 
   Future<void> _pickTags() async {
@@ -391,6 +407,37 @@ class _TaskDetailViewState extends State<TaskDetailView>
                           style: TextStyle(
                             fontSize: 15,
                             color: _dueDate != null
+                                ? AppColors.accent
+                                : CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Repeat row — only meaningful when a date is set; the
+                  // recurrence advance fires off the due date.
+                  _SectionCard(
+                    onTap: _dueDate == null ? null : _pickRecurrence,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.repeat,
+                          size: 18,
+                          color: _recurrence != null
+                              ? AppColors.accent
+                              : CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          formatRecurrence(
+                              context, Recurrence.parse(_recurrence)),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: _recurrence != null
                                 ? AppColors.accent
                                 : CupertinoColors.secondaryLabel
                                     .resolveFrom(context),

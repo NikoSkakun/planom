@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 
 import '../database/database_service.dart';
+import '../models/recurrence.dart';
 import '../models/tag.dart';
 import '../models/task.dart';
 import '../notifications/notification_service.dart';
@@ -202,8 +203,27 @@ class TaskController with ChangeNotifier {
   Future<void> toggleCompleted(String id) async {
     final i = _tasks.indexWhere((t) => t.id == id);
     if (i == -1) return;
-    final completing = !_tasks[i].isCompleted;
-    final updated = _tasks[i].copyWith(
+    final original = _tasks[i];
+    final completing = !original.isCompleted;
+
+    // Recurring task being completed: don't actually mark it done — advance
+    // its due date to the next occurrence and reschedule reminders, so the
+    // task keeps showing up forever until the user clears the recurrence.
+    if (completing && original.dueDate != null) {
+      final rule = Recurrence.parse(original.recurrence);
+      if (rule != null) {
+        final nextDate = rule.nextAfter(original.dueDate!);
+        final advanced = original.copyWith(dueDate: nextDate);
+        await _db.updateTask(advanced);
+        _tasks = [..._tasks]..[i] = advanced;
+        _updateBadge();
+        notifyListeners();
+        NotificationService.instance.scheduleTaskReminders(advanced);
+        return;
+      }
+    }
+
+    final updated = original.copyWith(
       isCompleted: completing,
       completionDate: completing ? DateTime.now() : null,
       clearCompletionDate: !completing,

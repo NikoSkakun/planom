@@ -248,6 +248,12 @@ class S {
   String get note => t('note');
   String get subtasks => t('subtasks');
   String get addSubtask => t('addSubtask');
+  String get repeat => t('repeat');
+  String get repeatNone => t('repeatNone');
+  String get repeatDaily => t('repeatDaily');
+  String get repeatWeekly => t('repeatWeekly');
+  String get repeatMonthly => t('repeatMonthly');
+  String get repeatYearly => t('repeatYearly');
   String get tags => t('tags');
   String get noTags => t('noTags');
   String get addTag => t('addTag');
@@ -531,6 +537,9 @@ const Map<String, String> _en = {
   'deletePermanentlyQuestion': 'Delete "{name}" permanently?',
   'taskName': 'Task name', 'eventName': 'Event name', 'note': 'Note',
   'subtasks': 'Subtasks', 'addSubtask': 'Add subtask',
+  'repeat': 'Repeat', 'repeatNone': 'No Repeat',
+  'repeatDaily': 'Daily', 'repeatWeekly': 'Weekly',
+  'repeatMonthly': 'Monthly', 'repeatYearly': 'Yearly',
   'tags': 'Tags', 'noTags': 'No tags yet', 'addTag': 'Add tag',
   'createTag': 'Create', 'searchOrCreateTag': 'Search or create tag',
   'title': 'Title', 'folderName': 'Folder name', 'listName': 'List name',
@@ -638,6 +647,9 @@ const Map<String, String> _uk = {
   'deletePermanentlyQuestion': 'Видалити «{name}» назавжди?',
   'taskName': 'Назва завдання', 'eventName': 'Назва події', 'note': 'Нотатка',
   'subtasks': 'Підзавдання', 'addSubtask': 'Додати підзавдання',
+  'repeat': 'Повтор', 'repeatNone': 'Без повтору',
+  'repeatDaily': 'Щодня', 'repeatWeekly': 'Щотижня',
+  'repeatMonthly': 'Щомісяця', 'repeatYearly': 'Щороку',
   'tags': 'Теги', 'noTags': 'Тегів ще немає', 'addTag': 'Додати тег',
   'createTag': 'Створити', 'searchOrCreateTag': 'Пошук або створення тегу',
   'title': 'Заголовок', 'folderName': 'Назва папки', 'listName': 'Назва списку',
@@ -745,6 +757,9 @@ const Map<String, String> _es = {
   'deletePermanentlyQuestion': '¿Eliminar "{name}" permanentemente?',
   'taskName': 'Nombre de la tarea', 'eventName': 'Nombre del evento', 'note': 'Nota',
   'subtasks': 'Subtareas', 'addSubtask': 'Añadir subtarea',
+  'repeat': 'Repetir', 'repeatNone': 'Sin repetición',
+  'repeatDaily': 'Diariamente', 'repeatWeekly': 'Semanalmente',
+  'repeatMonthly': 'Mensualmente', 'repeatYearly': 'Anualmente',
   'tags': 'Etiquetas', 'noTags': 'Sin etiquetas aún', 'addTag': 'Añadir etiqueta',
   'createTag': 'Crear', 'searchOrCreateTag': 'Buscar o crear etiqueta',
   'title': 'Título', 'folderName': 'Nombre de la carpeta', 'listName': 'Nombre de la lista',
@@ -852,6 +867,9 @@ const Map<String, String> _fr = {
   'deletePermanentlyQuestion': 'Supprimer « {name} » définitivement ?',
   'taskName': 'Nom de la tâche', 'eventName': 'Nom de l\'événement', 'note': 'Note',
   'subtasks': 'Sous-tâches', 'addSubtask': 'Ajouter une sous-tâche',
+  'repeat': 'Répéter', 'repeatNone': 'Aucune répétition',
+  'repeatDaily': 'Quotidien', 'repeatWeekly': 'Hebdomadaire',
+  'repeatMonthly': 'Mensuel', 'repeatYearly': 'Annuel',
   'tags': 'Étiquettes', 'noTags': 'Aucune étiquette', 'addTag': 'Ajouter une étiquette',
   'createTag': 'Créer', 'searchOrCreateTag': 'Rechercher ou créer une étiquette',
   'title': 'Titre', 'folderName': 'Nom du dossier', 'listName': 'Nom de la liste',
@@ -959,6 +977,9 @@ const Map<String, String> _de = {
   'deletePermanentlyQuestion': '„{name}" endgültig löschen?',
   'taskName': 'Aufgabenname', 'eventName': 'Ereignisname', 'note': 'Notiz',
   'subtasks': 'Unteraufgaben', 'addSubtask': 'Unteraufgabe hinzufügen',
+  'repeat': 'Wiederholung', 'repeatNone': 'Keine Wiederholung',
+  'repeatDaily': 'Täglich', 'repeatWeekly': 'Wöchentlich',
+  'repeatMonthly': 'Monatlich', 'repeatYearly': 'Jährlich',
   'tags': 'Tags', 'noTags': 'Noch keine Tags', 'addTag': 'Tag hinzufügen',
   'createTag': 'Erstellen', 'searchOrCreateTag': 'Tag suchen oder erstellen',
   'title': 'Titel', 'folderName': 'Ordnername', 'listName': 'Listenname',
@@ -1066,6 +1087,9 @@ const Map<String, String> _it = {
   'deletePermanentlyQuestion': 'Eliminare "{name}" definitivamente?',
   'taskName': 'Nome attività', 'eventName': 'Nome evento', 'note': 'Nota',
   'subtasks': 'Sotto-attività', 'addSubtask': 'Aggiungi sotto-attività',
+  'repeat': 'Ripeti', 'repeatNone': 'Nessuna ripetizione',
+  'repeatDaily': 'Giornalmente', 'repeatWeekly': 'Settimanalmente',
+  'repeatMonthly': 'Mensilmente', 'repeatYearly': 'Annualmente',
   'tags': 'Tag', 'noTags': 'Nessun tag', 'addTag': 'Aggiungi tag',
   'createTag': 'Crea', 'searchOrCreateTag': 'Cerca o crea tag',
   'title': 'Titolo', 'folderName': 'Nome cartella', 'listName': 'Nome lista',
@@ -1173,6 +1197,9 @@ const Map<String, String> _pt = {
   'deletePermanentlyQuestion': 'Excluir "{name}" permanentemente?',
   'taskName': 'Nome da tarefa', 'eventName': 'Nome do evento', 'note': 'Nota',
   'subtasks': 'Subtarefas', 'addSubtask': 'Adicionar subtarefa',
+  'repeat': 'Repetir', 'repeatNone': 'Sem repetição',
+  'repeatDaily': 'Diariamente', 'repeatWeekly': 'Semanalmente',
+  'repeatMonthly': 'Mensalmente', 'repeatYearly': 'Anualmente',
   'tags': 'Etiquetas', 'noTags': 'Sem etiquetas', 'addTag': 'Adicionar etiqueta',
   'createTag': 'Criar', 'searchOrCreateTag': 'Buscar ou criar etiqueta',
   'title': 'Título', 'folderName': 'Nome da pasta', 'listName': 'Nome da lista',
@@ -1280,6 +1307,9 @@ const Map<String, String> _ru = {
   'deletePermanentlyQuestion': 'Удалить «{name}» навсегда?',
   'taskName': 'Название задачи', 'eventName': 'Название события', 'note': 'Заметка',
   'subtasks': 'Подзадачи', 'addSubtask': 'Добавить подзадачу',
+  'repeat': 'Повтор', 'repeatNone': 'Без повтора',
+  'repeatDaily': 'Ежедневно', 'repeatWeekly': 'Еженедельно',
+  'repeatMonthly': 'Ежемесячно', 'repeatYearly': 'Ежегодно',
   'tags': 'Теги', 'noTags': 'Тегов пока нет', 'addTag': 'Добавить тег',
   'createTag': 'Создать', 'searchOrCreateTag': 'Найти или создать тег',
   'title': 'Заголовок', 'folderName': 'Название папки', 'listName': 'Название списка',
@@ -1387,6 +1417,9 @@ const Map<String, String> _zh = {
   'deletePermanentlyQuestion': '永久删除"{name}"？',
   'taskName': '任务名称', 'eventName': '事件名称', 'note': '笔记',
   'subtasks': '子任务', 'addSubtask': '添加子任务',
+  'repeat': '重复', 'repeatNone': '不重复',
+  'repeatDaily': '每天', 'repeatWeekly': '每周',
+  'repeatMonthly': '每月', 'repeatYearly': '每年',
   'tags': '标签', 'noTags': '暂无标签', 'addTag': '添加标签',
   'createTag': '创建', 'searchOrCreateTag': '搜索或创建标签',
   'title': '标题', 'folderName': '文件夹名称', 'listName': '列表名称',
@@ -1494,6 +1527,9 @@ const Map<String, String> _ja = {
   'deletePermanentlyQuestion': '「{name}」を完全に削除しますか？',
   'taskName': 'タスク名', 'eventName': 'イベント名', 'note': 'ノート',
   'subtasks': 'サブタスク', 'addSubtask': 'サブタスクを追加',
+  'repeat': '繰り返し', 'repeatNone': '繰り返しなし',
+  'repeatDaily': '毎日', 'repeatWeekly': '毎週',
+  'repeatMonthly': '毎月', 'repeatYearly': '毎年',
   'tags': 'タグ', 'noTags': 'タグがありません', 'addTag': 'タグを追加',
   'createTag': '作成', 'searchOrCreateTag': 'タグを検索または作成',
   'title': 'タイトル', 'folderName': 'フォルダ名', 'listName': 'リスト名',
