@@ -412,6 +412,17 @@ class _HomeShellState extends State<HomeShell> {
                 tabContent: _tabContent,
                 onTap: _onTabTapped,
               )
+            else if (visibleIndices.length <= 1)
+              // Single-tab mode: the tab bar disappears entirely so the user
+              // perceives the app as a single screen, not "one tab of many".
+              CupertinoTabView(
+                navigatorKey: _navigatorKeys[visibleIndices.first],
+                navigatorObservers: [
+                  _depthObservers[visibleIndices.first],
+                ],
+                builder: (ctx) =>
+                    _tabContent(ctx, visibleIndices.first),
+              )
             else
               CupertinoTabScaffold(
                 controller: _tabController,
@@ -444,9 +455,11 @@ class _HomeShellState extends State<HomeShell> {
                       right: 20,
                       bottom: isWide
                           ? 24
-                          : 50 +
-                              MediaQuery.paddingOf(context).bottom +
-                              12,
+                          : visibleIndices.length <= 1
+                              ? MediaQuery.paddingOf(context).bottom + 16
+                              : 50 +
+                                  MediaQuery.paddingOf(context).bottom +
+                                  12,
                       child: _PlusButton(onPressed: _onPlusPressed),
                     )
                   : const SizedBox.shrink(),
