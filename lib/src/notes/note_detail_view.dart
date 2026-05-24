@@ -73,12 +73,19 @@ class _NoteDetailViewState extends State<NoteDetailView>
   }
 
   void _onContentFocusChanged() {
-    if (_contentFocus.hasFocus) return;
+    if (!mounted) return;
+    if (_contentFocus.hasFocus) {
+      // Gaining focus (e.g. via the title's "Next" key, tapping the body, or
+      // a programmatic requestFocus). The toolbar's visibility is tied to
+      // hasFocus, so we need a rebuild to render it.
+      setState(() => _isEditing = true);
+      return;
+    }
     // Losing content focus (e.g. dismissing the keyboard, switching tabs,
     // tapping the title) must persist immediately — the debounce timer might
     // not fire before the app is killed or this view is torn down.
     _flushSave();
-    if (mounted) setState(() => _isEditing = false);
+    setState(() => _isEditing = false);
   }
 
   void _onTitleFocusChanged() {
@@ -322,6 +329,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
                         maxLines: null,
                         textInputAction: TextInputAction.next,
                         textCapitalization: TextCapitalization.sentences,
+                        onSubmitted: (_) => _contentFocus.requestFocus(),
                       ),
                     ),
                     Padding(
