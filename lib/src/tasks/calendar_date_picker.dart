@@ -129,6 +129,15 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
     return DateTime(now.year, now.month, now.day, t ~/ 60, t % 60);
   }
 
+  DateTime _todayDate() {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day);
+  }
+
+  void _commitDate(DateTime date) {
+    Navigator.of(context).pop((date, _doTime));
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -146,6 +155,30 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Quick-select chips row: Today / Tomorrow — single tap commits
+            // the date and dismisses the picker, mirroring the Done button.
+            Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(12, 12, 12, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _QuickDateChip(
+                      label: s.todayShort,
+                      onTap: () => _commitDate(_todayDate()),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _QuickDateChip(
+                      label: s.tomorrowShort,
+                      onTap: () =>
+                          _commitDate(_todayDate().add(const Duration(days: 1))),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             // Calendar month grid
             SizedBox(
               height: pageHeight,
@@ -272,6 +305,39 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickDateChip extends StatelessWidget {
+  const _QuickDateChip({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color:
+              CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
+          ),
         ),
       ),
     );
