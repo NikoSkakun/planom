@@ -165,6 +165,8 @@ class S {
   String get newSpace => t('newSpace');
   String get spaceName => t('spaceName');
   String get spaces => t('spaces');
+  String get noOptionsYet => t('noOptionsYet');
+  String get sectionModules => t('sectionModules');
   String get deleteSpace => t('deleteSpace');
   String get deleteSpaceBody => t('deleteSpaceBody');
 
@@ -535,6 +537,7 @@ const Map<String, String> _en = {
   'exportFailed': 'Export Failed',
   'exportFailedBody': 'An error occurred while creating the backup.',
   'newSpace': 'New Space', 'spaceName': 'Space name', 'spaces': 'Spaces',
+  'noOptionsYet': 'No options yet.', 'sectionModules': 'MODULES',
   'a11yToggleComplete': 'Toggle completion',
   'deleteSpace': 'Delete Space?',
   'deleteSpaceBody':
@@ -730,6 +733,7 @@ const Map<String, String> _uk = {
   'exportFailed': 'Помилка експорту',
   'exportFailedBody': 'Сталася помилка під час створення резервної копії.',
   'newSpace': 'Новий простір', 'spaceName': 'Назва простору', 'spaces': 'Простори',
+  'noOptionsYet': 'Параметрів ще немає.', 'sectionModules': 'МОДУЛІ',
   'sortTasks': 'Сортування завдань', 'sortDefault': 'За замовчуванням',
   'sortByCreation': 'За датою створення', 'sortByName': 'За назвою',
   'sortByPriority': 'За пріоритетом', 'sortByDateTime': 'За датою і часом',
@@ -840,6 +844,7 @@ const Map<String, String> _es = {
   'exportFailed': 'Error al exportar',
   'exportFailedBody': 'Ocurrió un error al crear la copia.',
   'newSpace': 'Nuevo espacio', 'spaceName': 'Nombre del espacio', 'spaces': 'Espacios',
+  'noOptionsYet': 'Aún no hay opciones.', 'sectionModules': 'MÓDULOS',
   'sortTasks': 'Ordenar tareas', 'sortDefault': 'Predeterminado',
   'sortByCreation': 'Por fecha de creación', 'sortByName': 'Por nombre',
   'sortByPriority': 'Por prioridad', 'sortByDateTime': 'Por fecha y hora',
@@ -950,6 +955,7 @@ const Map<String, String> _fr = {
   'exportFailed': 'Échec de l\'export',
   'exportFailedBody': 'Une erreur est survenue lors de la création de la sauvegarde.',
   'newSpace': 'Nouvel espace', 'spaceName': 'Nom de l\'espace', 'spaces': 'Espaces',
+  'noOptionsYet': 'Aucune option pour le moment.', 'sectionModules': 'MODULES',
   'sortTasks': 'Trier les tâches', 'sortDefault': 'Par défaut',
   'sortByCreation': 'Par date de création', 'sortByName': 'Par nom',
   'sortByPriority': 'Par priorité', 'sortByDateTime': 'Par date et heure',
@@ -1060,6 +1066,7 @@ const Map<String, String> _de = {
   'exportFailed': 'Export fehlgeschlagen',
   'exportFailedBody': 'Beim Erstellen des Backups ist ein Fehler aufgetreten.',
   'newSpace': 'Neuer Bereich', 'spaceName': 'Bereichsname', 'spaces': 'Bereiche',
+  'noOptionsYet': 'Noch keine Optionen.', 'sectionModules': 'MODULE',
   'sortTasks': 'Aufgaben sortieren', 'sortDefault': 'Standard',
   'sortByCreation': 'Nach Erstellungsdatum', 'sortByName': 'Nach Name',
   'sortByPriority': 'Nach Priorität', 'sortByDateTime': 'Nach Datum & Zeit',
@@ -1170,6 +1177,7 @@ const Map<String, String> _it = {
   'exportFailed': 'Esportazione fallita',
   'exportFailedBody': 'Si è verificato un errore durante la creazione del backup.',
   'newSpace': 'Nuovo spazio', 'spaceName': 'Nome dello spazio', 'spaces': 'Spazi',
+  'noOptionsYet': 'Ancora nessuna opzione.', 'sectionModules': 'MODULI',
   'sortTasks': 'Ordina attività', 'sortDefault': 'Predefinito',
   'sortByCreation': 'Per data creazione', 'sortByName': 'Per nome',
   'sortByPriority': 'Per priorità', 'sortByDateTime': 'Per data e ora',
@@ -1280,6 +1288,7 @@ const Map<String, String> _pt = {
   'exportFailed': 'Falha na exportação',
   'exportFailedBody': 'Ocorreu um erro ao criar o backup.',
   'newSpace': 'Novo espaço', 'spaceName': 'Nome do espaço', 'spaces': 'Espaços',
+  'noOptionsYet': 'Ainda sem opções.', 'sectionModules': 'MÓDULOS',
   'sortTasks': 'Ordenar tarefas', 'sortDefault': 'Padrão',
   'sortByCreation': 'Por data de criação', 'sortByName': 'Por nome',
   'sortByPriority': 'Por prioridade', 'sortByDateTime': 'Por data e hora',
@@ -1390,6 +1399,7 @@ const Map<String, String> _ru = {
   'exportFailed': 'Ошибка экспорта',
   'exportFailedBody': 'Произошла ошибка при создании резервной копии.',
   'newSpace': 'Новое пространство', 'spaceName': 'Название пространства', 'spaces': 'Пространства',
+  'noOptionsYet': 'Пока нет параметров.', 'sectionModules': 'МОДУЛИ',
   'sortTasks': 'Сортировать задачи', 'sortDefault': 'По умолчанию',
   'sortByCreation': 'По дате создания', 'sortByName': 'По имени',
   'sortByPriority': 'По приоритету', 'sortByDateTime': 'По дате и времени',
@@ -1500,6 +1510,7 @@ const Map<String, String> _zh = {
   'exportFailed': '导出失败',
   'exportFailedBody': '创建备份时出错。',
   'newSpace': '新空间', 'spaceName': '空间名称', 'spaces': '空间',
+  'noOptionsYet': '尚无选项。', 'sectionModules': '模块',
   'sortTasks': '排序任务', 'sortDefault': '默认',
   'sortByCreation': '按创建日期', 'sortByName': '按名称',
   'sortByPriority': '按优先级', 'sortByDateTime': '按日期和时间',
@@ -1610,6 +1621,7 @@ const Map<String, String> _ja = {
   'exportFailed': '書き出し失敗',
   'exportFailedBody': 'バックアップの作成中にエラーが発生しました。',
   'newSpace': '新規スペース', 'spaceName': 'スペース名', 'spaces': 'スペース',
+  'noOptionsYet': 'まだ設定はありません。', 'sectionModules': 'モジュール',
   'sortTasks': 'タスクを並べ替え', 'sortDefault': 'デフォルト',
   'sortByCreation': '作成日順', 'sortByName': '名前順',
   'sortByPriority': '優先度順', 'sortByDateTime': '日時順',
