@@ -14,15 +14,17 @@ platform :ios do
     )
   end
 
-  # Idempotent — enables the iCloud capability on the given App ID via the
-  # App Store Connect API if it isn't already enabled. Lets CI add iCloud Drive
-  # sync without anyone touching Xcode or the Developer Portal web UI.
+  # Idempotent — ensures the App ID has the iCloud capability AND that the
+  # named CloudContainer exists AND that the container is linked to the App
+  # ID. Returns `true` when anything changed (caller uses that to decide
+  # whether to force `match` to regenerate the provisioning profile).
   #
-  # Containers (iCloud.app.planom) are declared in ios/Runner/Runner.entitlements
-  # and ios/Runner/Info.plist's NSUbiquitousContainers; iCloud Drive doesn't
-  # need explicit container records in the portal — Apple provisions storage
-  # on first upload from a correctly-signed build.
-  def ensure_icloud_capability(api_key_path:, api_key:, bundle_id:)
+  # Spaceship's ConnectAPI surface exposes BundleIds + their capabilities but
+  # does not model CloudContainers for API-key auth (only the legacy Apple-ID
+  # Spaceship::Portal does). We call the raw App Store Connect REST endpoints
+  # directly via the existing provisioning client to avoid pulling in
+  # Apple-ID + 2FA secrets.
+  def ensure_icloud_capability(api_key_path:, api_key:, bundle_id:, container_id:, container_name:)
     require "spaceship"
     Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
       key_id:    api_key[:key_id],
@@ -30,35 +32,98 @@ platform :ios do
       filepath:  api_key_path,
     )
 
+    client = Spaceship::ConnectAPI.provisioning_request_client
+
     bid = Spaceship::ConnectAPI::BundleId
       .all(filter: { identifier: bundle_id })
       .first
     UI.user_error!("Bundle ID #{bundle_id} not found in App Store Connect.") unless bid
 
+    changed = false
+
+    # 1. iCloud capability on the App ID -----------------------------------
     caps = bid.get_capabilities || []
-    if caps.any? { |c| c.capability_type == Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD }
-      UI.message("✓ iCloud capability already enabled on #{bundle_id}")
-      return false
+    has_icloud = caps.any? do |c|
+      c.capability_type == Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD
     end
 
-    # Spaceship's create_capability takes capability_type as a positional
-    # argument (kwarg form raises ArgumentError). ICLOUD requires a settings
-    # payload pinning the version — XCODE_6 is the modern flavour; it covers
-    # iCloud Documents (what we use) and also enables CloudKit, which we
-    # simply don't reference in entitlements.
-    bid.create_capability(
-      Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD,
-      settings: [
-        {
-          key: Spaceship::ConnectAPI::BundleIdCapability::Settings::ICLOUD_VERSION,
-          options: [
-            { key: Spaceship::ConnectAPI::BundleIdCapability::Options::XCODE_6 },
-          ],
-        },
-      ],
-    )
-    UI.success("✅  Enabled iCloud capability on #{bundle_id}")
-    true
+    if has_icloud
+      UI.message("✓ iCloud capability already enabled on #{bundle_id}")
+    else
+      # `create_capability` takes capability_type as a positional argument
+      # (kwarg form raises ArgumentError). ICLOUD requires a settings payload
+      # pinning the version — XCODE_6 is the modern flavour; covers iCloud
+      # Documents (what we use) and also enables CloudKit, which we simply
+      # don't reference in entitlements.
+      bid.create_capability(
+        Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD,
+        settings: [
+          {
+            key: Spaceship::ConnectAPI::BundleIdCapability::Settings::ICLOUD_VERSION,
+            options: [
+              { key: Spaceship::ConnectAPI::BundleIdCapability::Options::XCODE_6 },
+            ],
+          },
+        ],
+      )
+      UI.success("✅  Enabled iCloud capability on #{bundle_id}")
+      changed = true
+    end
+
+    # 2. CloudContainer resource — raw REST against /v1/cloudContainers ----
+    container_internal_id = _find_or_create_cloud_container(
+      client:     client,
+      identifier: container_id,
+      name:       container_name,
+    ) do
+      changed = true
+    end
+
+    # 3. Bundle ID ⇄ CloudContainer relationship --------------------------
+    if _bundle_already_links_container?(client: client, bundle_id_id: bid.id, container_internal_id: container_internal_id)
+      UI.message("✓ iCloud container already linked to #{bundle_id}")
+    else
+      client.post(
+        "v1/cloudContainers/#{container_internal_id}/relationships/bundleIds",
+        { data: [{ type: "bundleIds", id: bid.id }] },
+      )
+      UI.success("✅  Linked iCloud container #{container_id} to #{bundle_id}")
+      changed = true
+    end
+
+    changed
+  end
+
+  # Returns the internal numeric/UUID id Apple uses for the CloudContainer
+  # whose user-facing identifier is [identifier]. Creates the container if
+  # missing; yields when a create happened so the caller can flip a flag.
+  def _find_or_create_cloud_container(client:, identifier:, name:)
+    lookup = client.get("v1/cloudContainers", { "filter[identifier]" => identifier })
+    existing = (lookup.body["data"] || []).first
+    if existing
+      UI.message("✓ iCloud container #{identifier} already exists")
+      return existing["id"]
+    end
+
+    created = client.post("v1/cloudContainers", {
+      data: {
+        type: "cloudContainers",
+        attributes: { identifier: identifier, name: name },
+      },
+    })
+    UI.success("✅  Created iCloud container #{identifier}")
+    yield if block_given?
+    created.body["data"]["id"]
+  end
+
+  def _bundle_already_links_container?(client:, bundle_id_id:, container_internal_id:)
+    resp = client.get("v1/bundleIds/#{bundle_id_id}/cloudContainers")
+    (resp.body["data"] || []).any? { |c| c["id"] == container_internal_id }
+  rescue StandardError
+    # If the relationship endpoint errors we conservatively treat the link as
+    # missing — a redundant POST is harmless (ASC dedupes), the alternative
+    # leaves the build broken.
+    false
   end
 
   # ── Lanes ─────────────────────────────────────────────────────────────────────
@@ -78,9 +143,11 @@ platform :ios do
     # (or any new entitlement), force-regenerate the profile this run so the
     # build picks it up; otherwise reuse the cached one and save the round trip.
     new_capability = ensure_icloud_capability(
-      api_key_path: key_path,
-      api_key:      api_key,
-      bundle_id:    "app.planom",
+      api_key_path:   key_path,
+      api_key:        api_key,
+      bundle_id:      "app.planom",
+      container_id:   "iCloud.app.planom",
+      container_name: "Planom",
     )
     force_regen = new_capability || (options[:force_regen] == true || options[:force_regen] == "true")
 
