@@ -10,7 +10,6 @@ import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../localization/strings.dart';
 import '../models/recurrence.dart';
-import '../models/tag.dart';
 import '../models/task.dart';
 import '../notes/markdown_toolbar.dart';
 import '../notes/markdown_view.dart';
@@ -20,6 +19,7 @@ import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/reminder_picker.dart';
+import '../utils/selection_menu.dart';
 import 'calendar_date_picker.dart';
 import 'recurrence_picker.dart';
 import 'tag_picker_sheet.dart';
@@ -262,6 +262,55 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _save();
   }
 
+  Future<void> _showPriorityMenu(BuildContext context) async {
+    final s = S.of(context);
+    final labels = [
+      s.priorityNone,
+      s.priorityLow,
+      s.priorityMed,
+      s.priorityHigh,
+    ];
+    final result = await showSelectionMenu<int>(
+      context: context,
+      title: s.priority,
+      current: _priority,
+      options: [
+        for (int i = 0; i < labels.length; i++)
+          SelectionMenuOption(value: i, label: labels[i]),
+      ],
+    );
+    if (result != null && mounted) {
+      setState(() => _priority = result);
+      _save();
+    }
+  }
+
+  static String _priorityShortLabel(S s, int p) {
+    switch (p) {
+      case 1:
+        return s.priorityLow;
+      case 2:
+        return s.priorityMed;
+      case 3:
+        return s.priorityHigh;
+      default:
+        return s.priorityNone;
+    }
+  }
+
+  static Color _priorityColor(int p) {
+    switch (p) {
+      case 1:
+        return CupertinoColors.systemBlue;
+      case 2:
+        return CupertinoColors.systemOrange;
+      case 3:
+        return CupertinoColors.systemRed;
+      default:
+        return CupertinoColors.systemGrey;
+    }
+  }
+
   String _listLabel(BuildContext context) {
     final inbox = S.of(context).inbox;
     if (_listId == null) return inbox;
@@ -397,260 +446,83 @@ class _TaskDetailViewState extends State<TaskDetailView>
                       ),
                     ],
                   ),
+                  // Compact options strip — one row of icons (and short
+                  // value chips for date/priority) sitting right below the
+                  // title, replacing seven full-width cards.
+                  Padding(
+                    padding: const EdgeInsets.only(left: 34, top: 8),
+                    child: _OptionsStrip(
+                      pills: [
+                        if (showPriority)
+                          _OptionPill(
+                            icon: CupertinoIcons.flag_fill,
+                            label: _priority > 0
+                                ? _priorityShortLabel(s, _priority)
+                                : null,
+                            color: _priority > 0
+                                ? _priorityColor(_priority)
+                                : null,
+                            onTap: () => _showPriorityMenu(context),
+                          ),
+                        if (showDate)
+                          _OptionPill(
+                            icon: CupertinoIcons.calendar,
+                            label: _dueDate != null
+                                ? formatTaskDate(context, _dueDate!,
+                                    doTime: _doTime)
+                                : null,
+                            onTap: _pickDate,
+                          ),
+                        if (showRepeat)
+                          _OptionPill(
+                            icon: CupertinoIcons.repeat,
+                            label: _recurrence != null
+                                ? formatRecurrence(context,
+                                    Recurrence.parse(_recurrence))
+                                : null,
+                            onTap:
+                                _dueDate == null ? null : _pickRecurrence,
+                          ),
+                        if (showList)
+                          _OptionPill(
+                            icon: CupertinoIcons.tray,
+                            label: _listId != null
+                                ? _listLabel(context)
+                                : null,
+                            onTap: _pickList,
+                          ),
+                        if (showDuration)
+                          _OptionPill(
+                            icon: CupertinoIcons.timer,
+                            label: _duration != null
+                                ? formatDuration(_duration!)
+                                : null,
+                            onTap: _pickDuration,
+                          ),
+                        if (showTags)
+                          _OptionPill(
+                            icon: CupertinoIcons.tag,
+                            label: _tagIds.isEmpty
+                                ? null
+                                : '${_tagIds.length}',
+                            onTap: _pickTags,
+                          ),
+                        if (showReminders)
+                          _OptionPill(
+                            icon: CupertinoIcons.bell,
+                            label: _reminderOffsets.isEmpty
+                                ? null
+                                : '${_reminderOffsets.length}',
+                            onTap: _pickReminders,
+                          ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.only(left: 34),
                     child: _buildNoteArea(),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Priority picker
-                  if (showPriority) ...[
-                    _SectionCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(CupertinoIcons.flag_fill,
-                                  size: 16,
-                                  color: CupertinoColors.secondaryLabel),
-                              const SizedBox(width: 10),
-                              Text(s.priority,
-                                  style: const TextStyle(fontSize: 15)),
-                              const Spacer(),
-                              _PriorityPicker(
-                                value: _priority,
-                                onChanged: (v) =>
-                                    setState(() => _priority = v),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-
-                  // Date picker row
-                  if (showDate) ...[
-                  _SectionCard(
-                    onTap: _pickDate,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.calendar,
-                          size: 18,
-                          color: _dueDate != null
-                              ? AppColors.accent
-                              : CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          _dueDate != null
-                              ? formatTaskDate(context, _dueDate!,
-                                  doTime: _doTime)
-                              : s.noDate,
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: _dueDate != null
-                                ? AppColors.accent
-                                : CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ],
-
-                  // Repeat row — only meaningful when a date is set; the
-                  // recurrence advance fires off the due date.
-                  if (showRepeat) ...[
-                  _SectionCard(
-                    onTap: _dueDate == null ? null : _pickRecurrence,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.repeat,
-                          size: 18,
-                          color: _recurrence != null
-                              ? AppColors.accent
-                              : CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          formatRecurrence(
-                              context, Recurrence.parse(_recurrence)),
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: _recurrence != null
-                                ? AppColors.accent
-                                : CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ],
-
-                  // List picker row
-                  if (showList) ...[
-                  _SectionCard(
-                    onTap: _pickList,
-                    child: Row(
-                      children: [
-                        Image.asset(
-                          _listId == null
-                              ? 'assets/icons/inbox.png'
-                              : 'assets/icons/list.png',
-                          width: 18,
-                          height: 18,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          _listLabel(context),
-                          style: TextStyle(
-                            fontSize: 15,
-                            color:
-                                CupertinoColors.label.resolveFrom(context),
-                          ),
-                        ),
-                        const Spacer(),
-                        Icon(
-                          CupertinoIcons.chevron_right,
-                          size: 14,
-                          color: CupertinoColors.secondaryLabel
-                              .resolveFrom(context),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ],
-
-                  // Duration picker row
-                  if (showDuration) ...[
-                  _SectionCard(
-                    onTap: _pickDuration,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.timer,
-                          size: 18,
-                          color: _duration != null
-                              ? AppColors.accent
-                              : CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          _duration != null
-                              ? formatDuration(_duration!)
-                              : s.noDuration,
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: _duration != null
-                                ? AppColors.accent
-                                : CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ],
-
-                  // Tag picker row — chips for selected tags + chevron
-                  if (showTags) ...[
-                  _SectionCard(
-                    onTap: _pickTags,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.tag,
-                          size: 18,
-                          color: _tagIds.isNotEmpty
-                              ? AppColors.accent
-                              : CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _tagIds.isEmpty
-                              ? Text(
-                                  s.addTag,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: CupertinoColors.secondaryLabel
-                                        .resolveFrom(context),
-                                  ),
-                                )
-                              : ListenableBuilder(
-                                  listenable: widget.controller,
-                                  builder: (context, _) {
-                                    final tags = _tagIds
-                                        .map(widget.controller.tagById)
-                                        .whereType<Tag>()
-                                        .toList();
-                                    return Wrap(
-                                      spacing: 6,
-                                      runSpacing: 4,
-                                      children: [
-                                        for (final tag in tags)
-                                          _TagChip(tag: tag),
-                                      ],
-                                    );
-                                  },
-                                ),
-                        ),
-                        Icon(
-                          CupertinoIcons.chevron_right,
-                          size: 14,
-                          color: CupertinoColors.secondaryLabel
-                              .resolveFrom(context),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ],
-
-                  // Reminder row
-                  if (showReminders) ...[
-                  _SectionCard(
-                    onTap: _pickReminders,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.bell,
-                          size: 18,
-                          color: _reminderOffsets.isNotEmpty
-                              ? AppColors.accent
-                              : CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          formatReminderOffsets(_reminderOffsets, s),
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: _reminderOffsets.isNotEmpty
-                                ? AppColors.accent
-                                : CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  ],
                   const SizedBox(height: 24),
 
                   // Subtasks — only on top-level tasks; nesting beyond one
@@ -697,34 +569,6 @@ class _NoopListenable extends Listenable {
   void addListener(VoidCallback listener) {}
   @override
   void removeListener(VoidCallback listener) {}
-}
-
-class _TagChip extends StatelessWidget {
-  const _TagChip({required this.tag});
-
-  final Tag tag;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = tag.color != null
-        ? Color(tag.color!)
-        : CupertinoColors.systemGrey.resolveFrom(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: accent.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        tag.name,
-        style: TextStyle(
-          fontSize: 12,
-          color: accent,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
 }
 
 class _SubtasksSection extends StatelessWidget {
@@ -883,81 +727,88 @@ class _SubtaskRow extends StatelessWidget {
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.child, this.onTap});
-  final Widget child;
-  final VoidCallback? onTap;
+/// Horizontal scrollable strip of [_OptionPill] buttons sitting under the
+/// task title. Compact alternative to the old stack of full-width cards.
+class _OptionsStrip extends StatelessWidget {
+  const _OptionsStrip({required this.pills});
+
+  final List<_OptionPill> pills;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: child,
+    if (pills.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 32,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const ClampingScrollPhysics(),
+        itemCount: pills.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (_, i) => pills[i],
       ),
     );
   }
 }
 
-class _PriorityPicker extends StatelessWidget {
-  const _PriorityPicker({required this.value, required this.onChanged});
-  final int value;
-  final ValueChanged<int> onChanged;
+class _OptionPill extends StatelessWidget {
+  const _OptionPill({
+    required this.icon,
+    required this.onTap,
+    this.label,
+    this.color,
+  });
 
-  static List<String> _labelsFor(BuildContext context) {
-    final s = S.of(context);
-    return [s.priorityNone, s.priorityLow, s.priorityMed, s.priorityHigh];
-  }
-  static const _colors = [
-    CupertinoColors.systemGrey,
-    CupertinoColors.systemBlue,
-    CupertinoColors.systemOrange,
-    CupertinoColors.systemRed,
-  ];
+  final IconData icon;
+  final VoidCallback? onTap;
+  final String? label;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final labels = _labelsFor(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(4, (i) {
-        final selected = value == i;
-        return GestureDetector(
-          onTap: () => onChanged(i),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            margin: const EdgeInsets.only(left: 6),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: selected
-                  ? _colors[i].withOpacity(0.15)
-                  : CupertinoColors.systemFill.resolveFrom(context),
-              borderRadius: BorderRadius.circular(8),
-              border: selected
-                  ? Border.all(color: _colors[i], width: 1.5)
-                  : null,
-            ),
-            child: Text(
-              labels[i],
-              style: TextStyle(
-                fontSize: 13,
-                color: selected
-                    ? _colors[i]
-                    : CupertinoColors.secondaryLabel.resolveFrom(context),
-                fontWeight:
-                    selected ? FontWeight.w600 : FontWeight.normal,
+    final hasValue = label != null;
+    final disabled = onTap == null;
+    final accent = color ?? AppColors.accent;
+    final fg = disabled
+        ? CupertinoColors.tertiaryLabel.resolveFrom(context)
+        : hasValue
+            ? accent
+            : CupertinoColors.secondaryLabel.resolveFrom(context);
+    final bg = hasValue && !disabled
+        ? accent.withOpacity(0.12)
+        : CupertinoColors.tertiarySystemFill.resolveFrom(context);
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: fg),
+            if (hasValue) ...[
+              const SizedBox(width: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 130),
+                child: Text(
+                  label!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: fg,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
