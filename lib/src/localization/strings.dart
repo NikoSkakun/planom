@@ -610,7 +610,7 @@ const Map<String, String> _en = {
   'folderCounterRecursive': 'Include nested folders',
   'folderCounterHidden': 'Hidden',
   'showListCount': 'List counter',
-  'revert': 'Revert',
+  'revert': 'Undo',
   'taskTrashedToast': 'Task moved to Trash',
   'listTrashedToast': 'List moved to Trash',
   'folderTrashedToast': 'Folder moved to Trash',
