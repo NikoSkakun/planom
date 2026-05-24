@@ -10,11 +10,11 @@ import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
 import '../folders/folder_view.dart';
 import '../folders/list_task_view.dart';
+import '../home_shell.dart';
 import '../notes/note_controller.dart';
 import '../search/search_view.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
-import '../settings/settings_view.dart';
 import '../settings/smart_list_prefs.dart';
 import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
@@ -98,14 +98,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
         onSettings: settingsHidden
             ? () {
                 dismiss();
-                Navigator.of(context).push(
-                  FastRoute<void>(
-                    builder: (_) => SettingsView(
-                      controller: widget.settingsController,
-                      backupService: widget.backupService,
-                    ),
-                  ),
-                );
+                HomeShell.openGlobalSettings(context);
               }
             : null,
         onAddList: () {

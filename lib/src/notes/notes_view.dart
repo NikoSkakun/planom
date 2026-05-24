@@ -1,11 +1,11 @@
 import 'package:flutter/cupertino.dart';
 
+import '../home_shell.dart';
 import '../localization/strings.dart';
 import '../models/note.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_menu.dart';
-import '../settings/settings_view.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import 'create_note_folder_sheet.dart';
@@ -124,14 +124,7 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
   }
 
   void _openSettings(BuildContext context) {
-    Navigator.of(context).push(
-      FastRoute<void>(
-        builder: (_) => SettingsView(
-          controller: widget.settingsController!,
-          backupService: widget.backupService,
-        ),
-      ),
-    );
+    HomeShell.openGlobalSettings(context);
   }
 
   void _showSettingsMenu(BuildContext context) {

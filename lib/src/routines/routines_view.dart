@@ -1,11 +1,11 @@
 import 'package:flutter/cupertino.dart';
 
+import '../home_shell.dart';
 import '../localization/strings.dart';
 import '../models/routine.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_menu.dart';
-import '../settings/settings_view.dart';
 import '../theme/app_theme.dart';
 import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
@@ -36,14 +36,7 @@ class _RoutinesViewState extends State<RoutinesView>
   int _tab = 0;
 
   void _openSettings(BuildContext context) {
-    Navigator.of(context).push(
-      FastRoute<void>(
-        builder: (_) => SettingsView(
-          controller: widget.settingsController!,
-          backupService: widget.backupService,
-        ),
-      ),
-    );
+    HomeShell.openGlobalSettings(context);
   }
 
   void _showSettingsMenu(BuildContext context) {
