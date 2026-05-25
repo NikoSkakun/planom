@@ -46,9 +46,13 @@ class _SearchPullScopeState extends State<SearchPullScope>
   double _accumulated = 0;
   bool _opening = false;
   // Latched true once the user releases a finger after a pull. Stays true
-  // until they dismiss the bar by scrolling the list down or by opening
-  // the search screen.
+  // until they dismiss the bar by swiping the list up or by opening the
+  // search screen.
   bool _locked = false;
+  // True while a user-initiated drag is in flight. We use this to tell a
+  // genuine upward swipe (which should dismiss the bar) apart from the
+  // ballistic bounce-back that runs after a pull release.
+  bool _userDragging = false;
 
   @override
   void dispose() {
@@ -60,7 +64,13 @@ class _SearchPullScopeState extends State<SearchPullScope>
     if (_opening) return false;
     if (n.metrics.axis != Axis.vertical) return false;
 
-    if (n is OverscrollNotification) {
+    if (n is ScrollStartNotification) {
+      // dragDetails is non-null only for finger-driven scrolls; ballistic
+      // simulations leave it null. That distinction is exactly what lets a
+      // real upward swipe dismiss the latched bar while the bounce-back
+      // after a pull-release does not.
+      _userDragging = n.dragDetails != null;
+    } else if (n is OverscrollNotification) {
       // ClampingScrollPhysics: scrolling past the boundary emits an
       // OverscrollNotification with negative overscroll at the top.
       if (n.overscroll < 0) {
@@ -80,27 +90,34 @@ class _SearchPullScopeState extends State<SearchPullScope>
         // back collapse the bar that the user already revealed.
         final next = (_accumulated / _revealDistance).clamp(0.0, 1.0);
         if (next > _ctrl.value) _ctrl.value = next;
-      } else if (pixels > minExtent && _ctrl.value > 0 && !_locked) {
-        // User scrolled the list down past the top → dismiss the unlatched
-        // reveal in progress. The latched (post-release) state is locked
-        // so a small bounce doesn't tear it away.
-        _accumulated = 0;
-        _ctrl.reverse();
+      } else if (pixels > minExtent && _ctrl.value > 0) {
+        // The bar is visible and the list has scrolled past the top. If
+        // this is an unlatched in-progress reveal, dismiss it on any
+        // forward scroll. If the bar is latched, only dismiss when the
+        // scroll is finger-driven (a real upward swipe) — the ballistic
+        // bounce after release is not.
+        if (!_locked || _userDragging) {
+          _accumulated = 0;
+          _locked = false;
+          _ctrl.reverse();
+        }
       }
     } else if (n is ScrollEndNotification) {
+      _userDragging = false;
       // Pull-and-release: latch the bar fully open once the user has
       // committed to revealing it (≥ 30 % of the threshold). Matches the
       // Mail / Notes / TickTick pattern where the search bar stays put
-      // after a pull and waits for an explicit tap (or a downward scroll,
-      // handled above) to disappear. Anything less is treated as an
-      // accidental tug and snaps back.
+      // after a pull and waits for an explicit upward swipe (or a tap on
+      // the bar) to disappear. Anything less is treated as an accidental
+      // tug and snaps back.
       if (_ctrl.value >= 0.3) {
         _locked = true;
         _ctrl.forward();
-      } else {
+      } else if (_ctrl.value > 0 && !_locked) {
         _accumulated = 0;
-        _locked = false;
         _ctrl.reverse();
+      } else if (!_locked) {
+        _accumulated = 0;
       }
     }
     return false;
@@ -126,6 +143,27 @@ class _SearchPullScopeState extends State<SearchPullScope>
     _opening = false;
   }
 
+  /// Tracks vertical drag *on the search bar itself*. When the user swipes
+  /// up directly on the bar (not on the list below), the scroll listener
+  /// never fires, so we collapse the bar here as well.
+  void _onBarDragUpdate(DragUpdateDetails details) {
+    if (details.delta.dy < 0 && _ctrl.value > 0) {
+      // Move the reveal toward 0 proportionally to the upward drag.
+      _ctrl.value =
+          (_ctrl.value + details.delta.dy / _revealDistance).clamp(0.0, 1.0);
+    }
+  }
+
+  void _onBarDragEnd(DragEndDetails details) {
+    if (_ctrl.value < 0.5) {
+      _accumulated = 0;
+      _locked = false;
+      _ctrl.reverse();
+    } else {
+      _ctrl.forward();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -145,6 +183,8 @@ class _SearchPullScopeState extends State<SearchPullScope>
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: _openSearch,
+                      onVerticalDragUpdate: _onBarDragUpdate,
+                      onVerticalDragEnd: _onBarDragEnd,
                       child: Container(
                         decoration: BoxDecoration(
                           color: CupertinoColors.tertiarySystemFill
