@@ -13,8 +13,6 @@ import '../utils/item_info_sheet.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
-import 'folder_icon_picker.dart';
-import 'list_color_picker.dart';
 import 'move_to_sheet.dart';
 
 class ListTaskView extends StatefulWidget {
@@ -58,47 +56,9 @@ class _ListTaskViewState extends State<ListTaskView>
     showDropdown(context, (dismiss) {
       return _ListOptionsDropdown(
         onDismiss: dismiss,
-        onRename: () {
+        onEdit: () {
           dismiss();
-          showRenameSheet(
-            context,
-            currentName: _currentList.name,
-            onRename: (name) async {
-              final updated = _currentList.copyWith(name: name);
-              await widget.folderController.updateList(updated);
-              if (mounted) setState(() => _currentList = updated);
-            },
-          );
-        },
-        onChangeColor: () {
-          dismiss();
-          showListColorPickerSheet(context, _currentList.color, (color) {
-            final updated = _currentList.copyWith(
-              color: color,
-              clearColor: color == null,
-            );
-            widget.folderController.updateList(updated);
-            if (mounted) setState(() => _currentList = updated);
-          });
-        },
-        onChangeIcon: () {
-          dismiss();
-          showFolderIconPickerSheet(
-            context,
-            currentIconId: _currentList.iconId,
-            currentIconColor: _currentList.iconColor,
-            isFolder: false,
-            onSelected: (id, color) {
-              final updated = _currentList.copyWith(
-                iconId: id,
-                clearIconId: id == null,
-                iconColor: color,
-                clearIconColor: color == null,
-              );
-              widget.folderController.updateList(updated);
-              if (mounted) setState(() => _currentList = updated);
-            },
-          );
+          _openEditSheet();
         },
         onMoveTo: () {
           dismiss();
@@ -125,6 +85,32 @@ class _ListTaskViewState extends State<ListTaskView>
         },
       );
     });
+  }
+
+  Future<void> _openEditSheet() async {
+    final result = await showEditItemSheet(
+      context,
+      args: EditItemArgs(
+        name: _currentList.name,
+        iconId: _currentList.iconId,
+        iconColor: _currentList.iconColor,
+        color: _currentList.color,
+        isFolder: false,
+        supportsColor: true,
+      ),
+    );
+    if (result == null || !mounted) return;
+    final updated = _currentList.copyWith(
+      name: result.name,
+      iconId: result.iconId,
+      clearIconId: result.iconId == null,
+      iconColor: result.iconColor,
+      clearIconColor: result.iconColor == null,
+      color: result.color,
+      clearColor: result.color == null,
+    );
+    await widget.folderController.updateList(updated);
+    if (mounted) setState(() => _currentList = updated);
   }
 
   Future<void> _deleteThisList(BuildContext context) async {
@@ -244,18 +230,14 @@ class _ListTaskViewState extends State<ListTaskView>
 class _ListOptionsDropdown extends StatelessWidget {
   const _ListOptionsDropdown({
     required this.onDismiss,
-    required this.onRename,
-    required this.onChangeColor,
-    required this.onChangeIcon,
+    required this.onEdit,
     required this.onMoveTo,
     required this.onInfo,
     required this.onDelete,
   });
 
   final VoidCallback onDismiss;
-  final VoidCallback onRename;
-  final VoidCallback onChangeColor;
-  final VoidCallback onChangeIcon;
+  final VoidCallback onEdit;
   final VoidCallback onMoveTo;
   final VoidCallback onInfo;
   final VoidCallback onDelete;
@@ -276,17 +258,9 @@ class _ListOptionsDropdown extends StatelessWidget {
           child: _DropdownPanel(
             items: [
               _DropdownItem(
-                  label: S.of(context).rename,
+                  label: S.of(context).editList,
                   icon: CupertinoIcons.pencil,
-                  onTap: onRename),
-              _DropdownItem(
-                  label: S.of(context).changeIcon,
-                  icon: CupertinoIcons.photo,
-                  onTap: onChangeIcon),
-              _DropdownItem(
-                  label: S.of(context).changeColor,
-                  icon: CupertinoIcons.paintbrush_fill,
-                  onTap: onChangeColor),
+                  onTap: onEdit),
               _DropdownItem(
                   label: S.of(context).moveTo,
                   icon: CupertinoIcons.folder,

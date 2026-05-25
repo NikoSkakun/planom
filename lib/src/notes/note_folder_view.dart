@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 
-import '../folders/folder_icon_picker.dart';
 import '../localization/strings.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
@@ -10,7 +9,8 @@ import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/undo_controller.dart';
-import '../folders/create_folder_list_sheet.dart' show showRenameSheet;
+import '../folders/create_folder_list_sheet.dart'
+    show EditItemArgs, showEditItemSheet;
 import '../folders/move_to_sheet.dart';
 import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
@@ -56,41 +56,69 @@ class _NoteFolderViewState extends State<NoteFolderView>
 
   Widget _buildFolderChildren(
       BuildContext context, String folderId, double indent) {
+    final s = S.of(context);
     final subFolders = widget.controller.foldersIn(folderId);
     final notes = widget.controller.notesIn(folderId);
     return Column(
       children: [
         for (final f in subFolders) ...[
-          NoteFolderRow(
-            folder: f,
-            noteCount: widget.controller.notesIn(f.id).length,
-            indent: indent,
-            onTap: () => Navigator.of(context).push(
-              FastRoute<void>(
-                builder: (_) => NoteFolderView(
-                  folder: f,
-                  controller: widget.controller,
-                  settingsController: widget.settingsController,
+          Dismissible(
+            key: ValueKey('exp_nf_${f.id}'),
+            direction: DismissDirection.endToStart,
+            background: const NoteDeleteBackground(),
+            onDismissed: (_) async {
+              final undo = UndoScope.maybeOf(context);
+              final ts = await widget.controller.deleteFolderDeep(f.id);
+              undo?.show(
+                label: s.noteFolderTrashedToast,
+                onUndo: () => widget.controller.restoreAt(ts),
+              );
+            },
+            child: NoteFolderRow(
+              folder: f,
+              noteCount: widget.controller.notesIn(f.id).length,
+              indent: indent,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => NoteFolderView(
+                    folder: f,
+                    controller: widget.controller,
+                    settingsController: widget.settingsController,
+                  ),
                 ),
               ),
+              onExpand: () => _toggle(f.id),
+              isExpanded: _expandedIds.contains(f.id),
             ),
-            onExpand: () => _toggle(f.id),
-            isExpanded: _expandedIds.contains(f.id),
           ),
           if (_expandedIds.contains(f.id))
             _buildFolderChildren(context, f.id, indent + 24),
         ],
         for (final n in notes)
-          NoteRow(
-            note: n,
-            indent: indent,
-            onTap: () => Navigator.of(context).push(
-              FastRoute<void>(
-                settings:
-                    const RouteSettings(name: NoteDetailView.routeName),
-                builder: (_) => NoteDetailView(
-                  note: n,
-                  controller: widget.controller,
+          Dismissible(
+            key: ValueKey('exp_note_${n.id}'),
+            direction: DismissDirection.endToStart,
+            background: const NoteDeleteBackground(),
+            onDismissed: (_) {
+              final savedFolderId = n.folderId;
+              widget.controller.deleteNote(n.id);
+              UndoScope.maybeOf(context)?.show(
+                label: s.noteTrashedToast,
+                onUndo: () =>
+                    widget.controller.restoreNote(n.id, savedFolderId),
+              );
+            },
+            child: NoteRow(
+              note: n,
+              indent: indent,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  settings:
+                      const RouteSettings(name: NoteDetailView.routeName),
+                  builder: (_) => NoteDetailView(
+                    note: n,
+                    controller: widget.controller,
+                  ),
                 ),
               ),
             ),
@@ -113,6 +141,28 @@ class _NoteFolderViewState extends State<NoteFolderView>
       ),
       child: child,
     );
+  }
+
+  Future<void> _openEditSheet() async {
+    final result = await showEditItemSheet(
+      context,
+      args: EditItemArgs(
+        name: _currentFolder.name,
+        iconId: _currentFolder.iconId,
+        iconColor: null,
+        color: null,
+        isFolder: true,
+        supportsColor: false,
+      ),
+    );
+    if (result == null || !mounted) return;
+    final updated = _currentFolder.copyWith(
+      name: result.name,
+      iconId: result.iconId,
+      clearIconId: result.iconId == null,
+    );
+    await widget.controller.updateFolder(updated);
+    if (mounted) setState(() => _currentFolder = updated);
   }
 
   void _showDropdown(BuildContext context) {
@@ -142,33 +192,9 @@ class _NoteFolderViewState extends State<NoteFolderView>
             parentFolderId: _currentFolder.id,
           );
         },
-        onRename: () {
+        onEdit: () {
           dismiss();
-          showRenameSheet(
-            context,
-            currentName: _currentFolder.name,
-            onRename: (name) async {
-              final updated = _currentFolder.copyWith(name: name);
-              await widget.controller.updateFolder(updated);
-              if (mounted) setState(() => _currentFolder = updated);
-            },
-          );
-        },
-        onChangeIcon: () {
-          dismiss();
-          showFolderIconPickerSheet(
-            context,
-            currentIconId: _currentFolder.iconId,
-            isFolder: true,
-            onSelected: (id, _) {
-              final updated = _currentFolder.copyWith(
-                iconId: id,
-                clearIconId: id == null,
-              );
-              widget.controller.updateFolder(updated);
-              if (mounted) setState(() => _currentFolder = updated);
-            },
-          );
+          _openEditSheet();
         },
         onMoveTo: () {
           dismiss();
@@ -252,27 +278,30 @@ class _NoteFolderViewState extends State<NoteFolderView>
                           return ReorderableDelayedDragStartListener(
                             key: ValueKey('sf_${f.id}'),
                             index: index,
-                            child: Dismissible(
-                              key: ValueKey(f.id),
-                              direction: DismissDirection.endToStart,
-                              background: const NoteDeleteBackground(),
-                              onDismissed: (_) async {
-                                final undo = UndoScope.maybeOf(context);
-                                final ts = await widget.controller
-                                    .deleteFolderDeep(f.id);
-                                undo?.show(
-                                  label: S.of(context)
-                                      .noteFolderTrashedToast,
-                                  onUndo: () =>
-                                      widget.controller.restoreAt(ts),
-                                );
-                              },
-                              child: Column(
-                                children: [
-                                  NoteFolderRow(
+                            child: Column(
+                              children: [
+                                Dismissible(
+                                  key: ValueKey(f.id),
+                                  direction: DismissDirection.endToStart,
+                                  background: const NoteDeleteBackground(),
+                                  onDismissed: (_) async {
+                                    final undo =
+                                        UndoScope.maybeOf(context);
+                                    final ts = await widget.controller
+                                        .deleteFolderDeep(f.id);
+                                    undo?.show(
+                                      label: S
+                                          .of(context)
+                                          .noteFolderTrashedToast,
+                                      onUndo: () =>
+                                          widget.controller.restoreAt(ts),
+                                    );
+                                  },
+                                  child: NoteFolderRow(
                                     folder: f,
-                                    noteCount:
-                                        widget.controller.notesIn(f.id).length,
+                                    noteCount: widget.controller
+                                        .notesIn(f.id)
+                                        .length,
                                     onTap: () => Navigator.of(context).push(
                                       FastRoute<void>(
                                         builder: (_) => NoteFolderView(
@@ -286,10 +315,10 @@ class _NoteFolderViewState extends State<NoteFolderView>
                                     onExpand: () => _toggle(f.id),
                                     isExpanded: _expandedIds.contains(f.id),
                                   ),
-                                  if (_expandedIds.contains(f.id))
-                                    _buildFolderChildren(context, f.id, 24),
-                                ],
-                              ),
+                                ),
+                                if (_expandedIds.contains(f.id))
+                                  _buildFolderChildren(context, f.id, 24),
+                              ],
                             ),
                           );
                         },
@@ -390,8 +419,7 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
     required this.onDismiss,
     required this.onAddNote,
     required this.onAddFolder,
-    required this.onRename,
-    required this.onChangeIcon,
+    required this.onEdit,
     required this.onMoveTo,
     required this.onInfo,
     required this.onDelete,
@@ -400,8 +428,7 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
   final VoidCallback onDismiss;
   final VoidCallback onAddNote;
   final VoidCallback onAddFolder;
-  final VoidCallback onRename;
-  final VoidCallback onChangeIcon;
+  final VoidCallback onEdit;
   final VoidCallback onMoveTo;
   final VoidCallback onInfo;
   final VoidCallback onDelete;
@@ -430,13 +457,9 @@ class _NoteFolderOptionsDropdown extends StatelessWidget {
                   icon: CupertinoIcons.folder_badge_plus,
                   onTap: onAddFolder),
               _DropdownItem(
-                  label: S.of(context).rename,
+                  label: S.of(context).editFolder,
                   icon: CupertinoIcons.pencil,
-                  onTap: onRename),
-              _DropdownItem(
-                  label: S.of(context).changeIcon,
-                  icon: CupertinoIcons.photo,
-                  onTap: onChangeIcon),
+                  onTap: onEdit),
               _DropdownItem(
                   label: S.of(context).moveTo,
                   icon: CupertinoIcons.folder,

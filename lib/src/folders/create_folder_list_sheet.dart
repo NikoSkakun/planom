@@ -27,6 +27,55 @@ Future<void> showRenameSheet(
   );
 }
 
+/// Bundles all editable fields the Edit sheet needs to know about. Color is
+/// only meaningful for lists — folders pass null and `supportsColor: false`.
+class EditItemArgs {
+  const EditItemArgs({
+    required this.name,
+    required this.iconId,
+    required this.iconColor,
+    required this.color,
+    required this.isFolder,
+    required this.supportsColor,
+  });
+
+  final String name;
+  final String? iconId;
+  final int? iconColor;
+  final int? color;
+  final bool isFolder;
+  final bool supportsColor;
+}
+
+class EditItemResult {
+  const EditItemResult({
+    required this.name,
+    required this.iconId,
+    required this.iconColor,
+    required this.color,
+  });
+
+  final String name;
+  final String? iconId;
+  final int? iconColor;
+  final int? color;
+}
+
+/// Single sheet that composes Rename + Change Icon + (for lists) Change Color.
+/// Used by both list and folder edit dropdowns. Returns null if dismissed.
+Future<EditItemResult?> showEditItemSheet(
+  BuildContext context, {
+  required EditItemArgs args,
+}) {
+  return showModalBottomSheet<EditItemResult>(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    backgroundColor: const Color(0x00000000),
+    builder: (_) => _EditItemSheet(args: args),
+  );
+}
+
 class _RenameSheet extends StatefulWidget {
   const _RenameSheet({required this.currentName, required this.onRename});
   final String currentName;
@@ -332,6 +381,173 @@ class _CreateSheetState extends State<_CreateSheet> {
               isFolder
                   ? S.of(context).createFolder
                   : S.of(context).createList,
+              style: const TextStyle(
+                color: CupertinoColors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EditItemSheet extends StatefulWidget {
+  const _EditItemSheet({required this.args});
+
+  final EditItemArgs args;
+
+  @override
+  State<_EditItemSheet> createState() => _EditItemSheetState();
+}
+
+class _EditItemSheetState extends State<_EditItemSheet> {
+  late final TextEditingController _nameCtrl;
+  late String? _iconId;
+  late int? _iconColor;
+  late int? _color;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.args.name);
+    _iconId = widget.args.iconId;
+    _iconColor = widget.args.iconColor;
+    _color = widget.args.color;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) return;
+    Navigator.of(context, rootNavigator: true).pop(EditItemResult(
+      name: name,
+      iconId: _iconId,
+      iconColor: _iconColor,
+      color: _color,
+    ));
+  }
+
+  void _openIconPicker() {
+    showFolderIconPickerSheet(
+      context,
+      currentIconId: _iconId,
+      currentIconColor: _iconColor,
+      isFolder: widget.args.isFolder,
+      onSelected: (id, color) {
+        if (mounted) {
+          setState(() {
+            _iconId = id;
+            _iconColor = color;
+          });
+        }
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bg = CupertinoColors.systemBackground.resolveFrom(context);
+    final s = S.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: CupertinoColors.separator.resolveFrom(context),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: Text(
+              widget.args.isFolder ? s.editFolder : s.editList,
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: _openIconPicker,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.tertiarySystemFill
+                        .resolveFrom(context),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: buildFolderItemIcon(
+                      _iconId,
+                      isFolder: widget.args.isFolder,
+                      iconColor: _iconColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: CupertinoTextField(
+                  controller: _nameCtrl,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w500),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.tertiarySystemFill
+                        .resolveFrom(context),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+          if (widget.args.supportsColor) ...[
+            const SizedBox(height: 16),
+            _ColorPickerButton(
+              selectedColor: _color,
+              onTap: () => showListColorPickerSheet(
+                context,
+                _color,
+                (c) {
+                  if (mounted) setState(() => _color = c);
+                },
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          CupertinoButton(
+            color: AppColors.accent,
+            borderRadius: BorderRadius.circular(12),
+            onPressed: _submit,
+            child: Text(
+              s.save,
               style: const TextStyle(
                 color: CupertinoColors.white,
                 fontWeight: FontWeight.w600,

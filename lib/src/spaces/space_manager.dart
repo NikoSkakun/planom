@@ -73,6 +73,17 @@ class SpaceManager with ChangeNotifier {
     await switchSpace(id);
   }
 
+  Future<void> renameSpace(String id, String newName) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return;
+    final index = _spaces.indexWhere((s) => s.id == id);
+    if (index < 0) return;
+    if (_spaces[index].name == trimmed) return;
+    _spaces[index] = _spaces[index].copyWith(name: trimmed);
+    await _saveMetadata();
+    notifyListeners();
+  }
+
   Future<void> switchSpace(String id) async {
     if (id == _activeSpaceId && _initialized) return;
     _activeSpaceId = id;
