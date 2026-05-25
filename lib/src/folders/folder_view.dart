@@ -12,7 +12,11 @@ import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart'
-    show CreateSheetInitial, showCreateFolderListSheet, showRenameSheet;
+    show
+        CreateSheetInitial,
+        EditItemArgs,
+        showCreateFolderListSheet,
+        showEditItemSheet;
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
 import 'list_task_view.dart';
@@ -178,36 +182,9 @@ class _FolderViewState extends State<FolderView>
             initialType: CreateSheetInitial.folder,
           );
         },
-        onRename: () {
+        onEdit: () {
           dismiss();
-          showRenameSheet(
-            context,
-            currentName: _currentFolder.name,
-            onRename: (name) async {
-              final updated = _currentFolder.copyWith(name: name);
-              await widget.folderController.updateFolder(updated);
-              if (mounted) setState(() => _currentFolder = updated);
-            },
-          );
-        },
-        onChangeIcon: () {
-          dismiss();
-          showFolderIconPickerSheet(
-            context,
-            currentIconId: _currentFolder.iconId,
-            currentIconColor: _currentFolder.iconColor,
-            isFolder: true,
-            onSelected: (id, color) {
-              final updated = _currentFolder.copyWith(
-                iconId: id,
-                clearIconId: id == null,
-                iconColor: color,
-                clearIconColor: color == null,
-              );
-              widget.folderController.updateFolder(updated);
-              if (mounted) setState(() => _currentFolder = updated);
-            },
-          );
+          _openEditSheet();
         },
         onMoveTo: () {
           dismiss();
@@ -235,6 +212,30 @@ class _FolderViewState extends State<FolderView>
         },
       );
     });
+  }
+
+  Future<void> _openEditSheet() async {
+    final result = await showEditItemSheet(
+      context,
+      args: EditItemArgs(
+        name: _currentFolder.name,
+        iconId: _currentFolder.iconId,
+        iconColor: _currentFolder.iconColor,
+        color: null,
+        isFolder: true,
+        supportsColor: false,
+      ),
+    );
+    if (result == null || !mounted) return;
+    final updated = _currentFolder.copyWith(
+      name: result.name,
+      iconId: result.iconId,
+      clearIconId: result.iconId == null,
+      iconColor: result.iconColor,
+      clearIconColor: result.iconColor == null,
+    );
+    await widget.folderController.updateFolder(updated);
+    if (mounted) setState(() => _currentFolder = updated);
   }
 
   Future<void> _deleteThisFolder(BuildContext context) async {
@@ -460,8 +461,7 @@ class _FolderOptionsDropdown extends StatelessWidget {
     required this.onDismiss,
     required this.onAddList,
     required this.onAddFolder,
-    required this.onRename,
-    required this.onChangeIcon,
+    required this.onEdit,
     required this.onMoveTo,
     required this.onInfo,
     required this.onDelete,
@@ -470,8 +470,7 @@ class _FolderOptionsDropdown extends StatelessWidget {
   final VoidCallback onDismiss;
   final VoidCallback onAddList;
   final VoidCallback onAddFolder;
-  final VoidCallback onRename;
-  final VoidCallback onChangeIcon;
+  final VoidCallback onEdit;
   final VoidCallback onMoveTo;
   final VoidCallback onInfo;
   final VoidCallback onDelete;
@@ -500,13 +499,9 @@ class _FolderOptionsDropdown extends StatelessWidget {
                   icon: CupertinoIcons.folder_badge_plus,
                   onTap: onAddFolder),
               _DropdownItem(
-                  label: S.of(context).rename,
+                  label: S.of(context).editFolder,
                   icon: CupertinoIcons.pencil,
-                  onTap: onRename),
-              _DropdownItem(
-                  label: S.of(context).changeIcon,
-                  icon: CupertinoIcons.photo,
-                  onTap: onChangeIcon),
+                  onTap: onEdit),
               _DropdownItem(
                   label: S.of(context).moveTo,
                   icon: CupertinoIcons.folder,

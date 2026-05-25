@@ -372,6 +372,8 @@ class S {
   String get priorityHigh => t('priorityHigh');
   String get changeIcon => t('changeIcon');
   String get changeColor => t('changeColor');
+  String get editList => t('editList');
+  String get editFolder => t('editFolder');
   String get listColor => t('listColor');
   String get customColor => t('customColor');
   String get selectColor => t('selectColor');
@@ -756,6 +758,7 @@ const Map<String, String> _en = {
   'priorityNone': 'None', 'priorityLow': 'Low',
   'priorityMed': 'Med', 'priorityHigh': 'High',
   'changeIcon': 'Change Icon', 'changeColor': 'Change Color',
+  'editList': 'Edit List', 'editFolder': 'Edit Folder',
   'listColor': 'List Color', 'customColor': 'Custom Color',
   'selectColor': 'Select Color', 'otherDots': 'Other…',
   'chooseIcon': 'Choose Icon', 'opening': 'Opening…',
@@ -906,6 +909,7 @@ const Map<String, String> _uk = {
   'priorityNone': 'Немає', 'priorityLow': 'Низький',
   'priorityMed': 'Середній', 'priorityHigh': 'Високий',
   'changeIcon': 'Змінити іконку', 'changeColor': 'Змінити колір',
+  'editList': 'Редагувати список', 'editFolder': 'Редагувати теку',
   'listColor': 'Колір списку', 'customColor': 'Власний колір',
   'selectColor': 'Вибрати колір', 'otherDots': 'Інше…',
   'chooseIcon': 'Вибрати іконку', 'opening': 'Відкриття…',
@@ -1026,6 +1030,7 @@ const Map<String, String> _es = {
   'priorityNone': 'Ninguna', 'priorityLow': 'Baja',
   'priorityMed': 'Media', 'priorityHigh': 'Alta',
   'changeIcon': 'Cambiar icono', 'changeColor': 'Cambiar color',
+  'editList': 'Editar lista', 'editFolder': 'Editar carpeta',
   'listColor': 'Color de la lista', 'customColor': 'Color personalizado',
   'selectColor': 'Seleccionar color', 'otherDots': 'Otro…',
   'chooseIcon': 'Elegir icono', 'opening': 'Abriendo…',
@@ -1146,6 +1151,7 @@ const Map<String, String> _fr = {
   'priorityNone': 'Aucune', 'priorityLow': 'Basse',
   'priorityMed': 'Moyenne', 'priorityHigh': 'Haute',
   'changeIcon': 'Changer l\'icône', 'changeColor': 'Changer la couleur',
+  'editList': 'Modifier la liste', 'editFolder': 'Modifier le dossier',
   'listColor': 'Couleur de la liste', 'customColor': 'Couleur personnalisée',
   'selectColor': 'Sélectionner', 'otherDots': 'Autre…',
   'chooseIcon': 'Choisir une icône', 'opening': 'Ouverture…',
@@ -1266,6 +1272,7 @@ const Map<String, String> _de = {
   'priorityNone': 'Keine', 'priorityLow': 'Niedrig',
   'priorityMed': 'Mittel', 'priorityHigh': 'Hoch',
   'changeIcon': 'Symbol ändern', 'changeColor': 'Farbe ändern',
+  'editList': 'Liste bearbeiten', 'editFolder': 'Ordner bearbeiten',
   'listColor': 'Listenfarbe', 'customColor': 'Eigene Farbe',
   'selectColor': 'Farbe wählen', 'otherDots': 'Andere…',
   'chooseIcon': 'Symbol wählen', 'opening': 'Öffne…',
@@ -1386,6 +1393,7 @@ const Map<String, String> _it = {
   'priorityNone': 'Nessuna', 'priorityLow': 'Bassa',
   'priorityMed': 'Media', 'priorityHigh': 'Alta',
   'changeIcon': 'Cambia icona', 'changeColor': 'Cambia colore',
+  'editList': 'Modifica elenco', 'editFolder': 'Modifica cartella',
   'listColor': 'Colore della lista', 'customColor': 'Colore personalizzato',
   'selectColor': 'Seleziona colore', 'otherDots': 'Altro…',
   'chooseIcon': 'Scegli icona', 'opening': 'Apertura…',
@@ -1506,6 +1514,7 @@ const Map<String, String> _pt = {
   'priorityNone': 'Nenhuma', 'priorityLow': 'Baixa',
   'priorityMed': 'Média', 'priorityHigh': 'Alta',
   'changeIcon': 'Mudar ícone', 'changeColor': 'Mudar cor',
+  'editList': 'Editar lista', 'editFolder': 'Editar pasta',
   'listColor': 'Cor da lista', 'customColor': 'Cor personalizada',
   'selectColor': 'Selecionar cor', 'otherDots': 'Outro…',
   'chooseIcon': 'Escolher ícone', 'opening': 'Abrindo…',
@@ -1626,6 +1635,7 @@ const Map<String, String> _ru = {
   'priorityNone': 'Нет', 'priorityLow': 'Низкий',
   'priorityMed': 'Средний', 'priorityHigh': 'Высокий',
   'changeIcon': 'Изменить значок', 'changeColor': 'Изменить цвет',
+  'editList': 'Изменить список', 'editFolder': 'Изменить папку',
   'listColor': 'Цвет списка', 'customColor': 'Свой цвет',
   'selectColor': 'Выбрать цвет', 'otherDots': 'Другое…',
   'chooseIcon': 'Выбрать значок', 'opening': 'Открытие…',
@@ -1746,6 +1756,7 @@ const Map<String, String> _zh = {
   'priorityNone': '无', 'priorityLow': '低',
   'priorityMed': '中', 'priorityHigh': '高',
   'changeIcon': '更改图标', 'changeColor': '更改颜色',
+  'editList': '编辑列表', 'editFolder': '编辑文件夹',
   'listColor': '列表颜色', 'customColor': '自定义颜色',
   'selectColor': '选择颜色', 'otherDots': '其他…',
   'chooseIcon': '选择图标', 'opening': '打开中…',
@@ -1866,6 +1877,7 @@ const Map<String, String> _ja = {
   'priorityNone': 'なし', 'priorityLow': '低',
   'priorityMed': '中', 'priorityHigh': '高',
   'changeIcon': 'アイコンを変更', 'changeColor': '色を変更',
+  'editList': 'リストを編集', 'editFolder': 'フォルダを編集',
   'listColor': 'リストの色', 'customColor': 'カスタムカラー',
   'selectColor': '色を選択', 'otherDots': 'その他…',
   'chooseIcon': 'アイコンを選択', 'opening': '開いています…',
