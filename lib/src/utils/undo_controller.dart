@@ -138,8 +138,8 @@ class _BannerBody extends StatelessWidget {
     final s = S.of(context);
     final bg = CupertinoDynamicColor.resolve(
       const CupertinoDynamicColor.withBrightness(
-        color: Color(0xF01C1C1E),
-        darkColor: Color(0xF0E5E5EA),
+        color: Color(0xD01C1C1E),
+        darkColor: Color(0xD0E5E5EA),
       ),
       context,
     );
@@ -153,16 +153,16 @@ class _BannerBody extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(11),
         boxShadow: const [
           BoxShadow(
             color: Color(0x26000000),
-            blurRadius: 10,
+            blurRadius: 11,
             offset: Offset(0, 3),
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(14, 6, 4, 6),
+      padding: const EdgeInsets.fromLTRB(15, 8, 5, 8),
       child: Row(
         children: [
           Expanded(
@@ -170,14 +170,14 @@ class _BannerBody extends StatelessWidget {
               label,
               style: TextStyle(
                 color: fg,
-                fontSize: 14,
+                fontSize: 14.5,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
           CupertinoButton(
             padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
             minSize: 0,
             onPressed: onUndo,
             child: Text(
@@ -185,7 +185,7 @@ class _BannerBody extends StatelessWidget {
               style: TextStyle(
                 color: AppColors.accent,
                 fontWeight: FontWeight.w600,
-                fontSize: 14,
+                fontSize: 14.5,
               ),
             ),
           ),
