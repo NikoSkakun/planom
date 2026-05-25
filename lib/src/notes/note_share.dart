@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data' show ByteData;
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -71,27 +69,6 @@ Future<void> _shareAsText({
   await Share.share(body, subject: title);
 }
 
-/// Caches the bundled font byte data after the first PDF export, so
-/// subsequent shares don't re-read the same assets from disk.
-class _FontCache {
-  static ByteData? _regular;
-  static ByteData? _bold;
-  static ByteData? _emoji;
-
-  static Future<ByteData> regular() async =>
-      _regular ??= await rootBundle.load('assets/fonts/NotoSans-Regular.ttf');
-  static Future<ByteData> bold() async =>
-      _bold ??= await rootBundle.load('assets/fonts/NotoSans-Bold.ttf');
-  static Future<ByteData?> emoji() async {
-    if (_emoji != null) return _emoji;
-    try {
-      return _emoji = await rootBundle.load('assets/fonts/NotoEmoji.ttf');
-    } catch (_) {
-      return null;
-    }
-  }
-}
-
 Future<void> _shareAsPdf(
   BuildContext rootContext, {
   required String title,
@@ -100,32 +77,24 @@ Future<void> _shareAsPdf(
   final progress = _ProgressController();
   // Show a modal progress sheet so the user knows something is happening
   // and can bail out if it's taking too long.
-  _showProgress(rootContext, progress: progress, label: S.of(rootContext).preparingPdf);
+  _showProgress(rootContext,
+      progress: progress, label: S.of(rootContext).preparingPdf);
 
   Future<void> run() async {
     try {
-      // 1) Load Unicode-capable fonts bundled with the app. Reading from
-      //    rootBundle is fast and works offline — no flaky CDN downloads.
-      final regularBytes = await _FontCache.regular();
-      if (progress.isCanceled) return;
-      final boldBytes = await _FontCache.bold();
-      if (progress.isCanceled) return;
-      final emojiBytes = await _FontCache.emoji();
       if (progress.isCanceled) return;
 
-      final regular = pw.Font.ttf(regularBytes);
-      final bold = pw.Font.ttf(boldBytes);
-      final emoji = emojiBytes == null ? null : pw.Font.ttf(emojiBytes);
-      final fallback = emoji == null ? <pw.Font>[] : <pw.Font>[emoji];
+      // Use the built-in Type 1 Helvetica fonts. They're embedded in the
+      // pdf package itself, so generation never has to wait on disk or
+      // network. They only cover WinAnsi (basic Latin-1), so non-Latin
+      // characters and emoji get replaced with placeholder glyphs — the
+      // tradeoff is "PDF always generates" over "every glyph survives".
+      final regular = pw.Font.helvetica();
+      final bold = pw.Font.helveticaBold();
 
-      // 2) Build the document.
       final doc = pw.Document(
-        title: title,
-        theme: pw.ThemeData.withFont(
-          base: regular,
-          bold: bold,
-          fontFallback: fallback,
-        ),
+        title: _safeForPdf(title),
+        theme: pw.ThemeData.withFont(base: regular, bold: bold),
       );
       doc.addPage(
         pw.MultiPage(
@@ -133,22 +102,20 @@ Future<void> _shareAsPdf(
           margin: const pw.EdgeInsets.all(36),
           build: (context) => [
             pw.Text(
-              title,
+              _safeForPdf(title),
               style: pw.TextStyle(
                 font: bold,
                 fontSize: 20,
                 fontWeight: pw.FontWeight.bold,
-                fontFallback: fallback,
               ),
             ),
             pw.SizedBox(height: 14),
             pw.Text(
-              content,
+              _safeForPdf(content),
               style: pw.TextStyle(
                 font: regular,
                 fontSize: 12,
                 lineSpacing: 4,
-                fontFallback: fallback,
               ),
             ),
           ],
@@ -157,16 +124,16 @@ Future<void> _shareAsPdf(
       final bytes = await doc.save();
       if (progress.isCanceled) return;
 
-      // 3) Persist to a temp file. Using `flush: true` so the bytes are
-      //    fsynced before we hand them to the share sheet.
+      // Persist to a temp file. `flush: true` fsyncs the bytes before
+      // handing the path to the share sheet.
       final dir = await getTemporaryDirectory();
       final fileName = '${_sanitizeFileName(title)}.pdf';
       final file = File('${dir.path}/$fileName');
       await file.writeAsBytes(bytes, flush: true);
       if (progress.isCanceled) return;
 
-      // 4) Hide the progress dialog before opening the share sheet so the
-      //    user sees the system share UI immediately.
+      // Hide the progress dialog before opening the share sheet so the
+      // user sees the system share UI immediately.
       progress.close();
 
       await Share.shareXFiles(
@@ -174,7 +141,8 @@ Future<void> _shareAsPdf(
         subject: title,
       );
     } catch (e, st) {
-      debugPrint('Note PDF export failed: $e\n$st');
+      // ignore: avoid_print
+      print('Note PDF export failed: $e\n$st');
       progress.close();
       if (rootContext.mounted) {
         _showError(rootContext, message: '$e');
@@ -186,6 +154,21 @@ Future<void> _shareAsPdf(
   // already on screen and its cancel button will short-circuit run() by
   // flipping progress.isCanceled.
   unawaited(run());
+}
+
+/// Replaces every code point outside the WinAnsi range (which is all
+/// Type-1 Helvetica supports) with '?', so the pdf package's text
+/// encoder never throws on a Cyrillic/CJK/emoji character.
+String _safeForPdf(String input) {
+  final buffer = StringBuffer();
+  for (final rune in input.runes) {
+    if (rune <= 0xFF) {
+      buffer.writeCharCode(rune);
+    } else {
+      buffer.write('?');
+    }
+  }
+  return buffer.toString();
 }
 
 Future<void> _shareAsImage(
