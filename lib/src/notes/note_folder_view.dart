@@ -56,41 +56,69 @@ class _NoteFolderViewState extends State<NoteFolderView>
 
   Widget _buildFolderChildren(
       BuildContext context, String folderId, double indent) {
+    final s = S.of(context);
     final subFolders = widget.controller.foldersIn(folderId);
     final notes = widget.controller.notesIn(folderId);
     return Column(
       children: [
         for (final f in subFolders) ...[
-          NoteFolderRow(
-            folder: f,
-            noteCount: widget.controller.notesIn(f.id).length,
-            indent: indent,
-            onTap: () => Navigator.of(context).push(
-              FastRoute<void>(
-                builder: (_) => NoteFolderView(
-                  folder: f,
-                  controller: widget.controller,
-                  settingsController: widget.settingsController,
+          Dismissible(
+            key: ValueKey('exp_nf_${f.id}'),
+            direction: DismissDirection.endToStart,
+            background: const NoteDeleteBackground(),
+            onDismissed: (_) async {
+              final undo = UndoScope.maybeOf(context);
+              final ts = await widget.controller.deleteFolderDeep(f.id);
+              undo?.show(
+                label: s.noteFolderTrashedToast,
+                onUndo: () => widget.controller.restoreAt(ts),
+              );
+            },
+            child: NoteFolderRow(
+              folder: f,
+              noteCount: widget.controller.notesIn(f.id).length,
+              indent: indent,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => NoteFolderView(
+                    folder: f,
+                    controller: widget.controller,
+                    settingsController: widget.settingsController,
+                  ),
                 ),
               ),
+              onExpand: () => _toggle(f.id),
+              isExpanded: _expandedIds.contains(f.id),
             ),
-            onExpand: () => _toggle(f.id),
-            isExpanded: _expandedIds.contains(f.id),
           ),
           if (_expandedIds.contains(f.id))
             _buildFolderChildren(context, f.id, indent + 24),
         ],
         for (final n in notes)
-          NoteRow(
-            note: n,
-            indent: indent,
-            onTap: () => Navigator.of(context).push(
-              FastRoute<void>(
-                settings:
-                    const RouteSettings(name: NoteDetailView.routeName),
-                builder: (_) => NoteDetailView(
-                  note: n,
-                  controller: widget.controller,
+          Dismissible(
+            key: ValueKey('exp_note_${n.id}'),
+            direction: DismissDirection.endToStart,
+            background: const NoteDeleteBackground(),
+            onDismissed: (_) {
+              final savedFolderId = n.folderId;
+              widget.controller.deleteNote(n.id);
+              UndoScope.maybeOf(context)?.show(
+                label: s.noteTrashedToast,
+                onUndo: () =>
+                    widget.controller.restoreNote(n.id, savedFolderId),
+              );
+            },
+            child: NoteRow(
+              note: n,
+              indent: indent,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  settings:
+                      const RouteSettings(name: NoteDetailView.routeName),
+                  builder: (_) => NoteDetailView(
+                    note: n,
+                    controller: widget.controller,
+                  ),
                 ),
               ),
             ),
@@ -250,27 +278,30 @@ class _NoteFolderViewState extends State<NoteFolderView>
                           return ReorderableDelayedDragStartListener(
                             key: ValueKey('sf_${f.id}'),
                             index: index,
-                            child: Dismissible(
-                              key: ValueKey(f.id),
-                              direction: DismissDirection.endToStart,
-                              background: const NoteDeleteBackground(),
-                              onDismissed: (_) async {
-                                final undo = UndoScope.maybeOf(context);
-                                final ts = await widget.controller
-                                    .deleteFolderDeep(f.id);
-                                undo?.show(
-                                  label: S.of(context)
-                                      .noteFolderTrashedToast,
-                                  onUndo: () =>
-                                      widget.controller.restoreAt(ts),
-                                );
-                              },
-                              child: Column(
-                                children: [
-                                  NoteFolderRow(
+                            child: Column(
+                              children: [
+                                Dismissible(
+                                  key: ValueKey(f.id),
+                                  direction: DismissDirection.endToStart,
+                                  background: const NoteDeleteBackground(),
+                                  onDismissed: (_) async {
+                                    final undo =
+                                        UndoScope.maybeOf(context);
+                                    final ts = await widget.controller
+                                        .deleteFolderDeep(f.id);
+                                    undo?.show(
+                                      label: S
+                                          .of(context)
+                                          .noteFolderTrashedToast,
+                                      onUndo: () =>
+                                          widget.controller.restoreAt(ts),
+                                    );
+                                  },
+                                  child: NoteFolderRow(
                                     folder: f,
-                                    noteCount:
-                                        widget.controller.notesIn(f.id).length,
+                                    noteCount: widget.controller
+                                        .notesIn(f.id)
+                                        .length,
                                     onTap: () => Navigator.of(context).push(
                                       FastRoute<void>(
                                         builder: (_) => NoteFolderView(
@@ -284,10 +315,10 @@ class _NoteFolderViewState extends State<NoteFolderView>
                                     onExpand: () => _toggle(f.id),
                                     isExpanded: _expandedIds.contains(f.id),
                                   ),
-                                  if (_expandedIds.contains(f.id))
-                                    _buildFolderChildren(context, f.id, 24),
-                                ],
-                              ),
+                                ),
+                                if (_expandedIds.contains(f.id))
+                                  _buildFolderChildren(context, f.id, 24),
+                              ],
                             ),
                           );
                         },
