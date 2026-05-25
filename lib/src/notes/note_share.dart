@@ -76,11 +76,30 @@ Future<void> _shareAsPdf({
 }) async {
   // Built-in PDF fonts (Helvetica) cover only the basic Latin range, so any
   // emoji, Cyrillic, CJK or other non-Latin glyph would render as a tofu
-  // box. Load Noto Sans for the body text and Noto Color Emoji as a
-  // fallback so the document keeps the user's original characters.
-  final regular = await PdfGoogleFonts.notoSansRegular();
-  final bold = await PdfGoogleFonts.notoSansBold();
-  final emoji = await PdfGoogleFonts.notoColorEmoji();
+  // box. Try to fetch Noto Sans / Noto Color Emoji from the printing
+  // package's Google Fonts mirror for proper coverage — but fall back to
+  // Helvetica if the download stalls or fails so the share never silently
+  // hangs (which was Issue 10 follow-up).
+  Future<pw.Font> loadFontOr(
+    Future<pw.Font> Function() loader,
+    pw.Font fallback,
+  ) async {
+    try {
+      return await loader().timeout(const Duration(seconds: 6));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  // Load in parallel so we don't pay for three sequential round-trips.
+  final results = await Future.wait<pw.Font>([
+    loadFontOr(PdfGoogleFonts.notoSansRegular, pw.Font.helvetica()),
+    loadFontOr(PdfGoogleFonts.notoSansBold, pw.Font.helveticaBold()),
+    loadFontOr(PdfGoogleFonts.notoColorEmoji, pw.Font.helvetica()),
+  ]);
+  final regular = results[0];
+  final bold = results[1];
+  final emoji = results[2];
 
   final doc = pw.Document(
     title: title,
@@ -98,6 +117,7 @@ Future<void> _shareAsPdf({
         pw.Text(
           title,
           style: pw.TextStyle(
+            font: bold,
             fontSize: 20,
             fontWeight: pw.FontWeight.bold,
             fontFallback: [emoji],
@@ -107,6 +127,7 @@ Future<void> _shareAsPdf({
         pw.Text(
           content,
           style: pw.TextStyle(
+            font: regular,
             fontSize: 12,
             lineSpacing: 4,
             fontFallback: [emoji],
@@ -119,8 +140,11 @@ Future<void> _shareAsPdf({
   final dir = await getTemporaryDirectory();
   final fileName = '${_sanitizeFileName(title)}.pdf';
   final file = File('${dir.path}/$fileName');
-  await file.writeAsBytes(bytes);
-  await Share.shareXFiles([XFile(file.path)], subject: title);
+  await file.writeAsBytes(bytes, flush: true);
+  await Share.shareXFiles(
+    [XFile(file.path, mimeType: 'application/pdf', name: fileName)],
+    subject: title,
+  );
 }
 
 Future<void> _shareAsImage(
