@@ -44,6 +44,44 @@ class SpacesView extends StatelessWidget {
     if (result != null) await mgr.addSpace(result);
   }
 
+  Future<void> _renameSpace(BuildContext context, SpaceManager mgr,
+      String id, String currentName) async {
+    final s = S.of(context);
+    final ctrl = TextEditingController(text: currentName);
+    final result = await showCupertinoDialog<String>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(s.rename),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: ctrl,
+            placeholder: s.spaceName,
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.cancel),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () {
+              final name = ctrl.text.trim();
+              if (name.isEmpty) return;
+              Navigator.of(ctx).pop(name);
+            },
+            child: Text(s.save),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (result != null) await mgr.renameSpace(id, result);
+  }
+
   Future<void> _confirmDelete(
       BuildContext context, SpaceManager mgr, String id) async {
     final s = S.of(context);
@@ -95,6 +133,8 @@ class SpacesView extends StatelessWidget {
                     name: spaces[i].name,
                     isActive: spaces[i].id == activeId,
                     onTap: () => mgr.switchSpace(spaces[i].id),
+                    onRename: () => _renameSpace(
+                        context, mgr, spaces[i].id, spaces[i].name),
                     onDelete: (spaces[i].id != 'default' &&
                             spaces[i].id != activeId)
                         ? () => _confirmDelete(context, mgr, spaces[i].id)
@@ -121,12 +161,14 @@ class _SpaceRow extends StatelessWidget {
     required this.name,
     required this.isActive,
     required this.onTap,
+    required this.onRename,
     this.onDelete,
   });
 
   final String name;
   final bool isActive;
   final VoidCallback onTap;
+  final VoidCallback onRename;
   final VoidCallback? onDelete;
 
   @override
@@ -160,18 +202,34 @@ class _SpaceRow extends StatelessWidget {
                 ),
               ),
             ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onRename,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 2),
+                child: Icon(
+                  CupertinoIcons.pencil,
+                  size: 18,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            ),
             if (isActive)
-              Icon(
-                CupertinoIcons.checkmark,
-                size: 16,
-                color: AppColors.accent,
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Icon(
+                  CupertinoIcons.checkmark,
+                  size: 16,
+                  color: AppColors.accent,
+                ),
               )
             else if (onDelete != null)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onDelete,
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.only(left: 6),
                   child: Icon(
                     CupertinoIcons.delete,
                     size: 18,
