@@ -94,6 +94,7 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                 builder: (_) => NoteFolderView(
                   folder: f,
                   controller: widget.controller,
+                  settingsController: widget.settingsController,
                 ),
               ),
             ),
@@ -280,6 +281,8 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                                         builder: (_) => NoteFolderView(
                                           folder: f,
                                           controller: widget.controller,
+                                          settingsController:
+                                              widget.settingsController,
                                         ),
                                       ),
                                     ),

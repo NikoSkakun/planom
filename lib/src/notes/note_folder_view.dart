@@ -4,6 +4,7 @@ import '../folders/folder_icon_picker.dart';
 import '../localization/strings.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
+import '../settings/settings_controller.dart';
 import '../theme/app_theme.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
@@ -21,10 +22,12 @@ class NoteFolderView extends StatefulWidget {
     super.key,
     required this.folder,
     required this.controller,
+    this.settingsController,
   });
 
   final NoteFolder folder;
   final NoteController controller;
+  final SettingsController? settingsController;
 
   @override
   State<NoteFolderView> createState() => _NoteFolderViewState();
@@ -67,6 +70,7 @@ class _NoteFolderViewState extends State<NoteFolderView>
                 builder: (_) => NoteFolderView(
                   folder: f,
                   controller: widget.controller,
+                  settingsController: widget.settingsController,
                 ),
               ),
             ),
@@ -274,6 +278,8 @@ class _NoteFolderViewState extends State<NoteFolderView>
                                         builder: (_) => NoteFolderView(
                                           folder: f,
                                           controller: widget.controller,
+                                          settingsController:
+                                              widget.settingsController,
                                         ),
                                       ),
                                     ),
@@ -340,17 +346,20 @@ class _NoteFolderViewState extends State<NoteFolderView>
                 );
               },
             ),
-            Positioned(
-              left: 20,
-              bottom: 16,
-              child: NoteFolderCircleButton(
-                onPressed: () => showCreateNoteFolderSheet(
-                  context,
-                  widget.controller,
-                  parentFolderId: _currentFolder.id,
+            if (widget.settingsController == null ||
+                widget.settingsController!
+                    .smartListPrefs.showNotesAddFolderButton)
+              Positioned(
+                left: 20,
+                bottom: 16,
+                child: NoteFolderCircleButton(
+                  onPressed: () => showCreateNoteFolderSheet(
+                    context,
+                    widget.controller,
+                    parentFolderId: _currentFolder.id,
+                  ),
                 ),
               ),
-            ),
             Positioned(
               right: 20,
               bottom: 16,
