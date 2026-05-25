@@ -43,7 +43,6 @@ dependencies:
   extension_google_sign_in_as_googleapis_auth: ^2.0.12
   http: ^1.2.0
   pdf: ^3.11.3
-  printing: ^5.14.3
 
 dev_dependencies:
   flutter_test:
@@ -58,3 +57,4 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/icons/tab_bar/
+    - assets/fonts/
