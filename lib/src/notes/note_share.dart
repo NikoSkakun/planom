@@ -110,8 +110,12 @@ Future<void> _shareAsPdf(
               ),
             ),
             pw.SizedBox(height: 14),
+            // overflow: span lets long content split across pages instead
+            // of bumping itself onto the next blank page (which left the
+            // title sitting alone on page 1).
             pw.Text(
               _safeForPdf(content),
+              overflow: pw.TextOverflow.span,
               style: pw.TextStyle(
                 font: regular,
                 fontSize: 12,
