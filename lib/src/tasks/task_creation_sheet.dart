@@ -106,6 +106,28 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
 
+  /// Creates the task but keeps the sheet open with the title cleared so
+  /// the user can keep adding follow-up tasks back-to-back. Wired to the
+  /// title field's "Next" return key.
+  Future<void> _submitAndContinue() async {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) return;
+    await widget.controller.addTask(Task(
+      title: title,
+      note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+      dueDate: _dueDate,
+      doTime: _doTime,
+      duration: _duration,
+      listId: _listId,
+      priority: _priority,
+    ));
+    if (!mounted) return;
+    _titleCtrl.clear();
+    _noteCtrl.clear();
+    setState(() => _titleEmpty = true);
+    _titleFocus.requestFocus();
+  }
+
   Future<void> _pickDate() async {
     final saved = _activeFocus;
     final result = await showCalendarDatePicker(
@@ -200,16 +222,17 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
             focusNode: _titleFocus,
             placeholder: s.taskName,
             autofocus: true,
-            // The keyboard's return key reads "Next" and moves focus to the
-            // note field. Use the explicit "Add" button below to create the
-            // task — that keeps the bulk-add flow available while letting
-            // users tab through fields like they would in any other form.
+            // The keyboard's return key reads "Next" (visual cue that you can
+            // keep adding more) but pressing it creates the task and leaves
+            // the sheet open with an empty title — the standard bulk-add
+            // pattern. The Add button to the right does the same plus closes
+            // the sheet.
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.sentences,
             style: const TextStyle(
                 fontSize: 17, fontWeight: FontWeight.w500),
             decoration: const BoxDecoration(),
-            onSubmitted: (_) => _noteFocus.requestFocus(),
+            onSubmitted: (_) => _submitAndContinue(),
           ),
           Container(
             height: 0.5,
