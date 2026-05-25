@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../localization/strings.dart';
@@ -73,7 +74,22 @@ Future<void> _shareAsPdf({
   required String title,
   required String content,
 }) async {
-  final doc = pw.Document(title: title);
+  // Built-in PDF fonts (Helvetica) cover only the basic Latin range, so any
+  // emoji, Cyrillic, CJK or other non-Latin glyph would render as a tofu
+  // box. Load Noto Sans for the body text and Noto Color Emoji as a
+  // fallback so the document keeps the user's original characters.
+  final regular = await PdfGoogleFonts.notoSansRegular();
+  final bold = await PdfGoogleFonts.notoSansBold();
+  final emoji = await PdfGoogleFonts.notoColorEmoji();
+
+  final doc = pw.Document(
+    title: title,
+    theme: pw.ThemeData.withFont(
+      base: regular,
+      bold: bold,
+      fontFallback: [emoji],
+    ),
+  );
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
@@ -84,12 +100,17 @@ Future<void> _shareAsPdf({
           style: pw.TextStyle(
             fontSize: 20,
             fontWeight: pw.FontWeight.bold,
+            fontFallback: [emoji],
           ),
         ),
         pw.SizedBox(height: 14),
         pw.Text(
           content,
-          style: const pw.TextStyle(fontSize: 12, lineSpacing: 4),
+          style: pw.TextStyle(
+            fontSize: 12,
+            lineSpacing: 4,
+            fontFallback: [emoji],
+          ),
         ),
       ],
     ),
