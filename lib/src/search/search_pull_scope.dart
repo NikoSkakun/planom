@@ -45,6 +45,10 @@ class _SearchPullScopeState extends State<SearchPullScope>
   );
   double _accumulated = 0;
   bool _opening = false;
+  // Latched true once the user releases a finger after a pull. Stays true
+  // until they dismiss the bar by scrolling the list down or by opening
+  // the search screen.
+  bool _locked = false;
 
   @override
   void dispose() {
@@ -72,16 +76,30 @@ class _SearchPullScopeState extends State<SearchPullScope>
       final minExtent = n.metrics.minScrollExtent;
       if (pixels < minExtent) {
         _accumulated = minExtent - pixels;
-        _ctrl.value = (_accumulated / _revealDistance).clamp(0.0, 1.0);
-      } else if (pixels > minExtent) {
+        // Only grow the reveal during a pull — never let an in-flight bounce
+        // back collapse the bar that the user already revealed.
+        final next = (_accumulated / _revealDistance).clamp(0.0, 1.0);
+        if (next > _ctrl.value) _ctrl.value = next;
+      } else if (pixels > minExtent && _ctrl.value > 0 && !_locked) {
+        // User scrolled the list down past the top → dismiss the unlatched
+        // reveal in progress. The latched (post-release) state is locked
+        // so a small bounce doesn't tear it away.
         _accumulated = 0;
-        if (_ctrl.value > 0) _ctrl.reverse();
+        _ctrl.reverse();
       }
     } else if (n is ScrollEndNotification) {
-      if (_ctrl.value >= 1.0) {
-        _openSearch();
+      // Pull-and-release: latch the bar fully open once the user has
+      // committed to revealing it (≥ 30 % of the threshold). Matches the
+      // Mail / Notes / TickTick pattern where the search bar stays put
+      // after a pull and waits for an explicit tap (or a downward scroll,
+      // handled above) to disappear. Anything less is treated as an
+      // accidental tug and snaps back.
+      if (_ctrl.value >= 0.3) {
+        _locked = true;
+        _ctrl.forward();
       } else {
         _accumulated = 0;
+        _locked = false;
         _ctrl.reverse();
       }
     }
@@ -104,6 +122,7 @@ class _SearchPullScopeState extends State<SearchPullScope>
     if (!mounted) return;
     _accumulated = 0;
     _ctrl.value = 0;
+    _locked = false;
     _opening = false;
   }
 

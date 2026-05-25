@@ -435,17 +435,19 @@ class _FolderViewState extends State<FolderView>
                 );
               },
             ),
-            Positioned(
-              left: 20,
-              bottom: 16,
-              child: _CircleButton(
-                onPressed: () => showCreateFolderListSheet(
-                  context,
-                  widget.folderController,
-                  parentFolderId: _currentFolder.id,
+            if (widget.settingsController == null ||
+                widget.settingsController!.smartListPrefs.showAddFolderButton)
+              Positioned(
+                left: 20,
+                bottom: 16,
+                child: _CircleButton(
+                  onPressed: () => showCreateFolderListSheet(
+                    context,
+                    widget.folderController,
+                    parentFolderId: _currentFolder.id,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
