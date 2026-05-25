@@ -97,12 +97,21 @@ class MarkdownView extends StatelessWidget {
     final body = shrinkWrap
         ? Padding(
             padding: padding,
-            child: MarkdownBody(
-              data: data,
-              selectable: false,
-              styleSheet: styleSheet,
-              softLineBreak: true,
-              onTapLink: (text, href, title) => _openLink(href),
+            // Force the MarkdownBody to lay out at its intrinsic size from
+            // the leading edge. Without this, some host layouts that hand
+            // MarkdownBody loose vertical constraints (e.g. the note editor's
+            // ConstrainedBox with `minHeight: viewport`) leave the body
+            // visually centered inside the spare space.
+            child: Align(
+              alignment: AlignmentDirectional.topStart,
+              child: MarkdownBody(
+                data: data,
+                selectable: false,
+                fitContent: true,
+                styleSheet: styleSheet,
+                softLineBreak: true,
+                onTapLink: (text, href, title) => _openLink(href),
+              ),
             ),
           )
         : Markdown(
