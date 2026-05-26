@@ -269,7 +269,10 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _handleDropOnDay(DateTime date) {
-    _activeDueDate.value = date;
+    // Don't write to _activeDueDate here — that's intended for tab-state
+    // (selected day in calendar) and persists until the calendar sheet
+    // closes. Just route the chosen date directly into the picker so
+    // subsequent +-button taps don't keep re-using this date.
     _showCalendarItemPicker(date);
   }
 
