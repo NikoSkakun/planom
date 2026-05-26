@@ -23,6 +23,7 @@ import '../utils/selection_menu.dart';
 import '../utils/undo_controller.dart';
 import 'calendar_date_picker.dart';
 import 'recurrence_picker.dart';
+import 'task_field_prefs.dart';
 import 'tag_picker_sheet.dart';
 import 'task_controller.dart';
 
@@ -918,20 +919,32 @@ class _RoundedCheckbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final style = TaskCheckboxAppearance.current;
+    final borderColor = CupertinoColors.tertiaryLabel.resolveFrom(context);
+    final BoxDecoration deco;
+    switch (style) {
+      case TaskCheckboxStyle.sharpRect:
+        deco = BoxDecoration(
+          color: checked ? AppColors.accent : null,
+          border: checked ? null : Border.all(color: borderColor, width: 1.5),
+        );
+      case TaskCheckboxStyle.circle:
+        deco = BoxDecoration(
+          shape: BoxShape.circle,
+          color: checked ? AppColors.accent : null,
+          border: checked ? null : Border.all(color: borderColor, width: 1.5),
+        );
+      case TaskCheckboxStyle.roundedRect:
+        deco = BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          color: checked ? AppColors.accent : null,
+          border: checked ? null : Border.all(color: borderColor, width: 1.5),
+        );
+    }
     return Container(
       width: 22,
       height: 22,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6),
-        color: checked ? AppColors.accent : null,
-        border: checked
-            ? null
-            : Border.all(
-                color:
-                    CupertinoColors.tertiaryLabel.resolveFrom(context),
-                width: 1.5,
-              ),
-      ),
+      decoration: deco,
       child: checked
           ? const Icon(CupertinoIcons.checkmark,
               size: 13, color: CupertinoColors.white)

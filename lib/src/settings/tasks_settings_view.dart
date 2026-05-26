@@ -75,6 +75,38 @@ class TasksSettingsView extends StatelessWidget {
     }
   }
 
+  static String _checkboxStyleLabel(S s, TaskCheckboxStyle style) {
+    switch (style) {
+      case TaskCheckboxStyle.roundedRect:
+        return s.checkboxStyleRoundedRect;
+      case TaskCheckboxStyle.sharpRect:
+        return s.checkboxStyleSharpRect;
+      case TaskCheckboxStyle.circle:
+        return s.checkboxStyleCircle;
+    }
+  }
+
+  Future<void> _showCheckboxStylePicker(
+      BuildContext context, TaskCheckboxStyle current) async {
+    final s = S.of(context);
+    final selected = await showSelectionMenu<TaskCheckboxStyle>(
+      context: context,
+      title: s.checkboxStyle,
+      current: current,
+      options: TaskCheckboxStyle.values
+          .map((v) => SelectionMenuOption(
+                value: v,
+                label: _checkboxStyleLabel(s, v),
+              ))
+          .toList(),
+    );
+    if (selected != null) {
+      final next = controller.taskFieldPrefs.copy();
+      next.checkboxStyle = selected;
+      await controller.updateTaskFieldPrefs(next);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -275,6 +307,14 @@ class TasksSettingsView extends StatelessWidget {
                   label: s.showAddFolderButton,
                   value: controller.smartListPrefs.showAddFolderButton,
                   onChanged: controller.updateShowAddFolderButton,
+                ),
+                const SizedBox(height: 1),
+                SettingsNavRow(
+                  label: s.checkboxStyle,
+                  trailingLabel:
+                      _checkboxStyleLabel(s, fields.checkboxStyle),
+                  onTap: () =>
+                      _showCheckboxStylePicker(ctx, fields.checkboxStyle),
                 ),
               ],
             );

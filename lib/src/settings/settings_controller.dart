@@ -138,6 +138,11 @@ class SettingsController with ChangeNotifier {
       }
     }
 
+    // Keep the global checkbox-style mirror in sync with persisted prefs so
+    // every TaskRow/_RoundedCheckbox renders in the user-selected style without
+    // having to thread the value through every callsite.
+    TaskCheckboxAppearance.current = _taskFieldPrefs.checkboxStyle;
+
     notifyListeners();
   }
 
@@ -241,6 +246,7 @@ class SettingsController with ChangeNotifier {
 
   Future<void> updateTaskFieldPrefs(TaskFieldPrefs prefs) async {
     _taskFieldPrefs = prefs.copy();
+    TaskCheckboxAppearance.current = _taskFieldPrefs.checkboxStyle;
     notifyListeners();
     await _db.setAppSetting(TaskFieldPrefs.storageKey, _taskFieldPrefs.toJson());
   }

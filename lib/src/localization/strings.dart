@@ -207,6 +207,10 @@ class S {
   String get folderCounterDirect => t('folderCounterDirect');
   String get folderCounterRecursive => t('folderCounterRecursive');
   String get folderCounterHidden => t('folderCounterHidden');
+  String get checkboxStyle => t('checkboxStyle');
+  String get checkboxStyleRoundedRect => t('checkboxStyleRoundedRect');
+  String get checkboxStyleSharpRect => t('checkboxStyleSharpRect');
+  String get checkboxStyleCircle => t('checkboxStyleCircle');
   String get showListCount => t('showListCount');
   String get revert => t('revert');
   String get taskTrashedToast => t('taskTrashedToast');
@@ -691,6 +695,10 @@ const Map<String, String> _en = {
   'folderCounterDirect': 'Direct tasks only',
   'folderCounterRecursive': 'Include nested folders',
   'folderCounterHidden': 'Hidden',
+  'checkboxStyle': 'Checkbox style',
+  'checkboxStyleRoundedRect': 'Rounded square',
+  'checkboxStyleSharpRect': 'Square',
+  'checkboxStyleCircle': 'Circle',
   'showListCount': 'List counter',
   'revert': 'Undo',
   'taskTrashedToast': 'Task moved to Trash',
