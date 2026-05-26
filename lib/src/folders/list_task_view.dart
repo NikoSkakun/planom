@@ -15,6 +15,8 @@ import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/plus_drag_controller.dart';
+import '../utils/plus_drag_payload.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
@@ -394,9 +396,18 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DragTarget<String>(
+    return DragTarget<Object>(
       onWillAcceptWithDetails: (_) => true,
-      onAcceptWithDetails: (d) => onAcceptTask(d.data),
+      onAcceptWithDetails: (d) {
+        final data = d.data;
+        if (data is String) {
+          onAcceptTask(data);
+        } else if (data is PlusDragPayload) {
+          PlusDragScope.of(context)
+              ?.onDropOnSection
+              ?.call(section.listId, section.id);
+        }
+      },
       builder: (context, candidates, _) {
         final highlighted = candidates.isNotEmpty;
         return GestureDetector(

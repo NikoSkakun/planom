@@ -16,6 +16,7 @@ void showTaskCreationSheet(
   FolderController folderController, {
   String? initialListId,
   DateTime? initialDueDate,
+  String? initialSectionId,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -27,6 +28,7 @@ void showTaskCreationSheet(
       folderController: folderController,
       initialListId: initialListId,
       initialDueDate: initialDueDate,
+      initialSectionId: initialSectionId,
     ),
   );
 }
@@ -38,12 +40,14 @@ class TaskCreationSheet extends StatefulWidget {
     required this.folderController,
     this.initialListId,
     this.initialDueDate,
+    this.initialSectionId,
   });
 
   final TaskController controller;
   final FolderController folderController;
   final String? initialListId;
   final DateTime? initialDueDate;
+  final String? initialSectionId;
 
   @override
   State<TaskCreationSheet> createState() => _TaskCreationSheetState();
@@ -102,6 +106,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
       duration: _duration,
       listId: _listId,
       priority: _priority,
+      sectionId: widget.initialSectionId,
     ));
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
@@ -120,6 +125,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
       duration: _duration,
       listId: _listId,
       priority: _priority,
+      sectionId: widget.initialSectionId,
     ));
     if (!mounted) return;
     _titleCtrl.clear();

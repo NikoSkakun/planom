@@ -17,6 +17,8 @@ import '../settings/settings_controller.dart';
 import '../settings/settings_menu.dart';
 import '../tasks/task_controller.dart';
 import '../utils/dropdown_overlay.dart';
+import '../utils/plus_drag_controller.dart';
+import '../utils/plus_drag_payload.dart';
 import 'day_view_sheet.dart';
 import 'event_controller.dart';
 
@@ -459,12 +461,19 @@ class _DayCell extends StatelessWidget {
       for (final t in completed) _ChipData.task(t, true),
     ];
 
-    return GestureDetector(
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (_) =>
+          PlusDragScope.of(context)?.onDropOnDay?.call(date!),
+      builder: (context, candidates, _) {
+        final highlighted = candidates.isNotEmpty;
+        return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
         constraints: const BoxConstraints(minHeight: 88),
         decoration: BoxDecoration(
+          color: highlighted ? AppColors.accent.withOpacity(0.15) : null,
           border: Border(
             top: BorderSide(
               color: CupertinoColors.separator.resolveFrom(context),
@@ -541,6 +550,8 @@ class _DayCell extends StatelessWidget {
           ],
         ),
       ),
+    );
+      },
     );
   }
 }
