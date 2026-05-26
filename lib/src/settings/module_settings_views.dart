@@ -104,6 +104,25 @@ class NotesSettingsView extends StatelessWidget {
                         context, prefs.notesTrash),
                   ),
                   const SizedBox(height: 18),
+                  SettingsSectionHeader(s.sectionBody),
+                  SettingsToggleRow(
+                    label: s.useMarkdown,
+                    value: prefs.notesUseMarkdown,
+                    onChanged: controller.updateNotesUseMarkdown,
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      s.useMarkdownHint,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   SettingsSectionHeader(s.sectionTasksUi),
                   SettingsToggleRow(
                     label: s.showAddFolderButton,

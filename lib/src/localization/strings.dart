@@ -170,6 +170,9 @@ class S {
   String get sectionModules => t('sectionModules');
   String get sectionTaskFields => t('sectionTaskFields');
   String get taskFieldsHint => t('taskFieldsHint');
+  String get sectionBody => t('sectionBody');
+  String get useMarkdown => t('useMarkdown');
+  String get useMarkdownHint => t('useMarkdownHint');
   String get showHidePriority => t('showHidePriority');
   String get showHideDate => t('showHideDate');
   String get showHideRepeat => t('showHideRepeat');
@@ -624,6 +627,8 @@ const Map<String, String> _en = {
   'noOptionsYet': 'No options yet.', 'sectionModules': 'MODULES',
   'sectionTaskFields': 'TASK FIELDS',
   'taskFieldsHint': 'Hidden fields are not shown when editing a task.',
+  'sectionBody': 'BODY', 'useMarkdown': 'Format with Markdown',
+  'useMarkdownHint': 'When off, the body is shown and edited as plain text and the formatting toolbar is hidden.',
   'showHidePriority': 'Priority', 'showHideDate': 'Date',
   'showHideRepeat': 'Repeat', 'showHideList': 'List',
   'showHideDuration': 'Duration', 'showHideTags': 'Tags',
@@ -891,6 +896,8 @@ const Map<String, String> _uk = {
   'noOptionsYet': 'Параметрів ще немає.', 'sectionModules': 'МОДУЛІ',
   'sectionTaskFields': 'ПОЛЯ ЗАВДАННЯ',
   'taskFieldsHint': 'Приховані поля не показуються при редагуванні завдання.',
+  'sectionBody': 'ТІЛО', 'useMarkdown': 'Форматувати з Markdown',
+  'useMarkdownHint': 'Коли вимкнено, тіло відображається й редагується як простий текст, а панель форматування прихована.',
   'showHidePriority': 'Пріоритет', 'showHideDate': 'Дата',
   'showHideRepeat': 'Повтор', 'showHideList': 'Список',
   'showHideDuration': 'Тривалість', 'showHideTags': 'Мітки',
@@ -1022,6 +1029,8 @@ const Map<String, String> _es = {
   'noOptionsYet': 'Aún no hay opciones.', 'sectionModules': 'MÓDULOS',
   'sectionTaskFields': 'CAMPOS DE TAREA',
   'taskFieldsHint': 'Los campos ocultos no se muestran al editar una tarea.',
+  'sectionBody': 'CUERPO', 'useMarkdown': 'Formatear con Markdown',
+  'useMarkdownHint': 'Cuando está desactivado, el cuerpo se muestra y edita como texto plano y la barra de formato queda oculta.',
   'showHidePriority': 'Prioridad', 'showHideDate': 'Fecha',
   'showHideRepeat': 'Repetir', 'showHideList': 'Lista',
   'showHideDuration': 'Duración', 'showHideTags': 'Etiquetas',
@@ -1153,6 +1162,8 @@ const Map<String, String> _fr = {
   'noOptionsYet': 'Aucune option pour le moment.', 'sectionModules': 'MODULES',
   'sectionTaskFields': 'CHAMPS DE TÂCHE',
   'taskFieldsHint': "Les champs masqués ne s'affichent pas lors de l'édition d'une tâche.",
+  'sectionBody': 'CORPS', 'useMarkdown': 'Formater en Markdown',
+  'useMarkdownHint': "Lorsque désactivé, le corps est affiché et modifié en texte brut, et la barre de mise en forme est masquée.",
   'showHidePriority': 'Priorité', 'showHideDate': 'Date',
   'showHideRepeat': 'Répéter', 'showHideList': 'Liste',
   'showHideDuration': 'Durée', 'showHideTags': 'Étiquettes',
@@ -1284,6 +1295,8 @@ const Map<String, String> _de = {
   'noOptionsYet': 'Noch keine Optionen.', 'sectionModules': 'MODULE',
   'sectionTaskFields': 'AUFGABENFELDER',
   'taskFieldsHint': 'Ausgeblendete Felder erscheinen nicht beim Bearbeiten einer Aufgabe.',
+  'sectionBody': 'KÖRPER', 'useMarkdown': 'Mit Markdown formatieren',
+  'useMarkdownHint': 'Wenn aus, wird der Text als Klartext angezeigt und bearbeitet, und die Formatierungsleiste ist ausgeblendet.',
   'showHidePriority': 'Priorität', 'showHideDate': 'Datum',
   'showHideRepeat': 'Wiederholen', 'showHideList': 'Liste',
   'showHideDuration': 'Dauer', 'showHideTags': 'Tags',
@@ -1415,6 +1428,8 @@ const Map<String, String> _it = {
   'noOptionsYet': 'Ancora nessuna opzione.', 'sectionModules': 'MODULI',
   'sectionTaskFields': 'CAMPI ATTIVITÀ',
   'taskFieldsHint': "I campi nascosti non vengono mostrati durante la modifica di un'attività.",
+  'sectionBody': 'CORPO', 'useMarkdown': 'Formatta con Markdown',
+  'useMarkdownHint': 'Se disattivato, il corpo viene mostrato e modificato come testo semplice e la barra di formattazione è nascosta.',
   'showHidePriority': 'Priorità', 'showHideDate': 'Data',
   'showHideRepeat': 'Ripeti', 'showHideList': 'Elenco',
   'showHideDuration': 'Durata', 'showHideTags': 'Tag',
@@ -1546,6 +1561,8 @@ const Map<String, String> _pt = {
   'noOptionsYet': 'Ainda sem opções.', 'sectionModules': 'MÓDULOS',
   'sectionTaskFields': 'CAMPOS DE TAREFA',
   'taskFieldsHint': 'Os campos ocultos não aparecem ao editar uma tarefa.',
+  'sectionBody': 'CORPO', 'useMarkdown': 'Formatar com Markdown',
+  'useMarkdownHint': 'Quando desativado, o corpo é exibido e editado como texto simples e a barra de formatação fica oculta.',
   'showHidePriority': 'Prioridade', 'showHideDate': 'Data',
   'showHideRepeat': 'Repetir', 'showHideList': 'Lista',
   'showHideDuration': 'Duração', 'showHideTags': 'Etiquetas',
@@ -1677,6 +1694,8 @@ const Map<String, String> _ru = {
   'noOptionsYet': 'Пока нет параметров.', 'sectionModules': 'МОДУЛИ',
   'sectionTaskFields': 'ПОЛЯ ЗАДАЧИ',
   'taskFieldsHint': 'Скрытые поля не отображаются при редактировании задачи.',
+  'sectionBody': 'ТЕЛО', 'useMarkdown': 'Форматировать с Markdown',
+  'useMarkdownHint': 'Если выключено, тело отображается и редактируется как простой текст, панель форматирования скрыта.',
   'showHidePriority': 'Приоритет', 'showHideDate': 'Дата',
   'showHideRepeat': 'Повтор', 'showHideList': 'Список',
   'showHideDuration': 'Длительность', 'showHideTags': 'Метки',
@@ -1808,6 +1827,8 @@ const Map<String, String> _zh = {
   'noOptionsYet': '尚无选项。', 'sectionModules': '模块',
   'sectionTaskFields': '任务字段',
   'taskFieldsHint': '隐藏的字段在编辑任务时不会显示。',
+  'sectionBody': '正文', 'useMarkdown': '使用 Markdown 格式',
+  'useMarkdownHint': '关闭时，正文将以纯文本显示和编辑，格式工具栏被隐藏。',
   'showHidePriority': '优先级', 'showHideDate': '日期',
   'showHideRepeat': '重复', 'showHideList': '列表',
   'showHideDuration': '时长', 'showHideTags': '标签',
@@ -1939,6 +1960,8 @@ const Map<String, String> _ja = {
   'noOptionsYet': 'まだ設定はありません。', 'sectionModules': 'モジュール',
   'sectionTaskFields': 'タスク項目',
   'taskFieldsHint': '非表示の項目はタスク編集時に表示されません。',
+  'sectionBody': '本文', 'useMarkdown': 'Markdown でフォーマット',
+  'useMarkdownHint': 'オフにすると、本文はプレーンテキストとして表示・編集され、書式バーは非表示になります。',
   'showHidePriority': '優先度', 'showHideDate': '日付',
   'showHideRepeat': '繰り返し', 'showHideList': 'リスト',
   'showHideDuration': '所要時間', 'showHideTags': 'タグ',

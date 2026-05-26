@@ -16,6 +16,9 @@ class SmartListPrefs {
   bool hideTabLabels;
   bool showAddFolderButton;
   bool showNotesAddFolderButton;
+  // When false, note bodies are rendered/edited as plain text. The markdown
+  // toolbar in NoteDetailView is also hidden in that mode.
+  bool notesUseMarkdown;
 
   SmartListPrefs({
     this.today = SmartListVisibility.show,
@@ -28,6 +31,7 @@ class SmartListPrefs {
     this.hideTabLabels = false,
     this.showAddFolderButton = true,
     this.showNotesAddFolderButton = true,
+    this.notesUseMarkdown = true,
   });
 
   static Future<File> _file() async {
@@ -56,6 +60,7 @@ class SmartListPrefs {
         showAddFolderButton: data['showAddFolderButton'] != false,
         showNotesAddFolderButton:
             data['showNotesAddFolderButton'] != false,
+        notesUseMarkdown: data['notesUseMarkdown'] != false,
       );
     } catch (_) {
       return SmartListPrefs();
@@ -78,6 +83,7 @@ class SmartListPrefs {
         'hideTabLabels': hideTabLabels,
         'showAddFolderButton': showAddFolderButton,
         'showNotesAddFolderButton': showNotesAddFolderButton,
+        'notesUseMarkdown': notesUseMarkdown,
       };
 
   void applyJson(Map<String, dynamic> data) {
@@ -94,6 +100,7 @@ class SmartListPrefs {
     showAddFolderButton = data['showAddFolderButton'] != false;
     showNotesAddFolderButton =
         data['showNotesAddFolderButton'] != false;
+    notesUseMarkdown = data['notesUseMarkdown'] != false;
   }
 
   static SmartListVisibility _parse(dynamic value,
