@@ -9,6 +9,7 @@ class SmartListPrefs {
   SmartListVisibility today;
   SmartListVisibility tomorrow;
   SmartListVisibility upcoming;
+  SmartListVisibility allTasks;
   SmartListVisibility completed;
   SmartListVisibility trash;
   bool hideTabLabels;
@@ -19,6 +20,7 @@ class SmartListPrefs {
     this.today = SmartListVisibility.show,
     this.tomorrow = SmartListVisibility.showIfNotEmpty,
     this.upcoming = SmartListVisibility.show,
+    this.allTasks = SmartListVisibility.hidden,
     this.completed = SmartListVisibility.showIfNotEmpty,
     this.trash = SmartListVisibility.showIfNotEmpty,
     this.hideTabLabels = false,
@@ -42,6 +44,8 @@ class SmartListPrefs {
         tomorrow: _parse(data['tomorrow'],
             fallback: SmartListVisibility.showIfNotEmpty),
         upcoming: _parse(data['upcoming']),
+        allTasks: _parse(data['allTasks'],
+            fallback: SmartListVisibility.hidden),
         completed: _parse(data['completed']),
         trash: _parse(data['trash']),
         hideTabLabels: data['hideTabLabels'] == true,
@@ -63,6 +67,7 @@ class SmartListPrefs {
         'today': _encode(today),
         'tomorrow': _encode(tomorrow),
         'upcoming': _encode(upcoming),
+        'allTasks': _encode(allTasks),
         'completed': _encode(completed),
         'trash': _encode(trash),
         'hideTabLabels': hideTabLabels,
@@ -75,6 +80,7 @@ class SmartListPrefs {
     tomorrow =
         _parse(data['tomorrow'], fallback: SmartListVisibility.showIfNotEmpty);
     upcoming = _parse(data['upcoming']);
+    allTasks = _parse(data['allTasks'], fallback: SmartListVisibility.hidden);
     completed = _parse(data['completed']);
     trash = _parse(data['trash']);
     hideTabLabels = data['hideTabLabels'] == true;

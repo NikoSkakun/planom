@@ -21,6 +21,7 @@ import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
 import '../utils/undo_controller.dart';
+import 'all_tasks_view.dart';
 import 'completed_view.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
@@ -309,6 +310,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     widget.controller.tomorrowUncompletedCount;
                 final upcomingCount =
                     widget.controller.upcomingUncompletedCount;
+                final allTasksCount =
+                    widget.controller.allTasksUncompletedCount;
                 final completedCount =
                     widget.controller.completedTasksCount;
                 final hasTrashContent =
@@ -324,6 +327,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     _isVisible(prefs.tomorrow, tomorrowCount > 0);
                 final showUpcoming =
                     _isVisible(prefs.upcoming, upcomingCount > 0);
+                final showAllTasks =
+                    _isVisible(prefs.allTasks, allTasksCount > 0);
                 final showCompleted =
                     _isVisible(prefs.completed, completedCount > 0);
                 final showTrash =
@@ -401,6 +406,28 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => UpcomingView(
+                                    controller: widget.controller,
+                                    folderController:
+                                        widget.folderController,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (showAllTasks)
+                            _ListItem(
+                              iconWidget: Icon(
+                                CupertinoIcons.tray_full,
+                                size: 22,
+                                color: CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                              ),
+                              label: s.allTasks,
+                              count: allTasksCount > 0
+                                  ? allTasksCount
+                                  : null,
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => AllTasksView(
                                     controller: widget.controller,
                                     folderController:
                                         widget.folderController,

@@ -113,6 +113,7 @@ class S {
   String get yesterday => t('yesterday');
   String get tomorrow => t('tomorrow');
   String get upcoming => t('upcoming');
+  String get allTasks => t('allTasks');
   String get completed => t('completed');
   String get trash => t('trash');
 
@@ -577,6 +578,7 @@ const Map<String, String> _en = {
   'tabTasks': 'Tasks', 'tabNotes': 'Notes', 'tabCalendar': 'Calendar',
   'tabRoutines': 'Routines', 'tabSettings': 'Settings',
   'inbox': 'Inbox', 'today': 'Today', 'yesterday': 'Yesterday', 'tomorrow': 'Tomorrow', 'upcoming': 'Upcoming',
+  'allTasks': 'All Tasks',
   'completed': 'Completed', 'trash': 'Trash',
   'settings': 'Settings',
   'sectionAppearance': 'Appearance', 'themeLight': 'Light',
@@ -834,6 +836,7 @@ const Map<String, String> _uk = {
   'tabTasks': 'Завдання', 'tabNotes': 'Нотатки', 'tabCalendar': 'Календар',
   'tabRoutines': 'Звички', 'tabSettings': 'Налаштування',
   'inbox': 'Вхідні', 'today': 'Сьогодні', 'yesterday': 'Вчора', 'tomorrow': 'Завтра', 'upcoming': 'Майбутні',
+  'allTasks': 'Всі завдання',
   'completed': 'Виконані', 'trash': 'Кошик',
   'settings': 'Налаштування',
   'sectionAppearance': 'Зовнішній вигляд', 'themeLight': 'Світла',
@@ -955,6 +958,7 @@ const Map<String, String> _es = {
   'tabTasks': 'Tareas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendario',
   'tabRoutines': 'Rutinas', 'tabSettings': 'Ajustes',
   'inbox': 'Bandeja', 'today': 'Hoy', 'yesterday': 'Ayer', 'tomorrow': 'Mañana', 'upcoming': 'Próximas',
+  'allTasks': 'Todas las tareas',
   'completed': 'Completadas', 'trash': 'Papelera',
   'settings': 'Ajustes',
   'sectionAppearance': 'Apariencia', 'themeLight': 'Claro',
@@ -1076,6 +1080,7 @@ const Map<String, String> _fr = {
   'tabTasks': 'Tâches', 'tabNotes': 'Notes', 'tabCalendar': 'Calendrier',
   'tabRoutines': 'Routines', 'tabSettings': 'Réglages',
   'inbox': 'Boîte', 'today': "Aujourd'hui", 'yesterday': 'Hier', 'tomorrow': 'Demain', 'upcoming': 'À venir',
+  'allTasks': 'Toutes les tâches',
   'completed': 'Terminé', 'trash': 'Corbeille',
   'settings': 'Réglages',
   'sectionAppearance': 'Apparence', 'themeLight': 'Clair',
@@ -1197,6 +1202,7 @@ const Map<String, String> _de = {
   'tabTasks': 'Aufgaben', 'tabNotes': 'Notizen', 'tabCalendar': 'Kalender',
   'tabRoutines': 'Routinen', 'tabSettings': 'Einstellungen',
   'inbox': 'Eingang', 'today': 'Heute', 'yesterday': 'Gestern', 'tomorrow': 'Morgen', 'upcoming': 'Anstehend',
+  'allTasks': 'Alle Aufgaben',
   'completed': 'Erledigt', 'trash': 'Papierkorb',
   'settings': 'Einstellungen',
   'sectionAppearance': 'Erscheinungsbild', 'themeLight': 'Hell',
@@ -1318,6 +1324,7 @@ const Map<String, String> _it = {
   'tabTasks': 'Attività', 'tabNotes': 'Note', 'tabCalendar': 'Calendario',
   'tabRoutines': 'Abitudini', 'tabSettings': 'Impostazioni',
   'inbox': 'In arrivo', 'today': 'Oggi', 'yesterday': 'Ieri', 'tomorrow': 'Domani', 'upcoming': 'In arrivo',
+  'allTasks': 'Tutte le attività',
   'completed': 'Completate', 'trash': 'Cestino',
   'settings': 'Impostazioni',
   'sectionAppearance': 'Aspetto', 'themeLight': 'Chiaro',
@@ -1439,6 +1446,7 @@ const Map<String, String> _pt = {
   'tabTasks': 'Tarefas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendário',
   'tabRoutines': 'Rotinas', 'tabSettings': 'Ajustes',
   'inbox': 'Caixa', 'today': 'Hoje', 'yesterday': 'Ontem', 'tomorrow': 'Amanhã', 'upcoming': 'Próximas',
+  'allTasks': 'Todas as tarefas',
   'completed': 'Concluídas', 'trash': 'Lixeira',
   'settings': 'Ajustes',
   'sectionAppearance': 'Aparência', 'themeLight': 'Claro',
@@ -1560,6 +1568,7 @@ const Map<String, String> _ru = {
   'tabTasks': 'Задачи', 'tabNotes': 'Заметки', 'tabCalendar': 'Календарь',
   'tabRoutines': 'Привычки', 'tabSettings': 'Настройки',
   'inbox': 'Входящие', 'today': 'Сегодня', 'yesterday': 'Вчера', 'tomorrow': 'Завтра', 'upcoming': 'Предстоящие',
+  'allTasks': 'Все задачи',
   'completed': 'Выполненные', 'trash': 'Корзина',
   'settings': 'Настройки',
   'sectionAppearance': 'Внешний вид', 'themeLight': 'Светлая',
@@ -1681,6 +1690,7 @@ const Map<String, String> _zh = {
   'tabTasks': '任务', 'tabNotes': '笔记', 'tabCalendar': '日历',
   'tabRoutines': '习惯', 'tabSettings': '设置',
   'inbox': '收件箱', 'today': '今天', 'yesterday': '昨天', 'tomorrow': '明天', 'upcoming': '即将',
+  'allTasks': '所有任务',
   'completed': '已完成', 'trash': '垃圾箱',
   'settings': '设置',
   'sectionAppearance': '外观', 'themeLight': '浅色',
@@ -1802,6 +1812,7 @@ const Map<String, String> _ja = {
   'tabTasks': 'タスク', 'tabNotes': 'ノート', 'tabCalendar': 'カレンダー',
   'tabRoutines': '習慣', 'tabSettings': '設定',
   'inbox': '受信箱', 'today': '今日', 'yesterday': '昨日', 'tomorrow': '明日', 'upcoming': '今後',
+  'allTasks': 'すべてのタスク',
   'completed': '完了済み', 'trash': 'ゴミ箱',
   'settings': '設定',
   'sectionAppearance': '外観', 'themeLight': 'ライト',

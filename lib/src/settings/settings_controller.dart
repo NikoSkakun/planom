@@ -251,6 +251,9 @@ class SettingsController with ChangeNotifier {
       case 'upcoming':
         _smartListPrefs.upcoming = value;
         break;
+      case 'allTasks':
+        _smartListPrefs.allTasks = value;
+        break;
       case 'completed':
         _smartListPrefs.completed = value;
         break;

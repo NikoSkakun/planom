@@ -116,6 +116,16 @@ class TaskController with ChangeNotifier {
 
   int get completedTasksCount => allCompletedTasks.length;
 
+  /// Every top-level task across every list and Inbox (active, non-trashed).
+  /// Drives the "All Tasks" smart list.
+  List<Task> get allTasks =>
+      List.unmodifiable(_completedLast(_applySort(_topLevel)));
+
+  int get allTasksCount => _topLevel.length;
+
+  int get allTasksUncompletedCount =>
+      _topLevel.where((t) => !t.isCompleted).length;
+
   /// Subtasks of [parentId], in creation order (oldest first) so the list reads
   /// like a checklist rather than a feed.
   List<Task> subtasksOf(String parentId) {
