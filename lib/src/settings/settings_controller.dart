@@ -41,6 +41,11 @@ class SettingsController with ChangeNotifier {
   Color _completionColor = AppColors.systemGreen;
   Color get completionColor => _completionColor;
 
+  // ISO weekday number for the first day of the week: 1=Monday … 7=Sunday.
+  // Default is Monday to match the existing calendar grid.
+  int _firstDayOfWeek = DateTime.monday;
+  int get firstDayOfWeek => _firstDayOfWeek;
+
   /// Bumped whenever the accent/completion color changes. Those colors live in
   /// AppColors statics read all over the tree, so instead of firing the main
   /// notifier (which rebuilds the whole CupertinoApp, including routing, locale
@@ -133,6 +138,9 @@ class SettingsController with ChangeNotifier {
       } else if (key == 'last_tab') {
         final v = int.tryParse(value);
         if (v != null && v >= 0 && v <= 4) _lastOpenedTab = v;
+      } else if (key == 'first_day_of_week') {
+        final v = int.tryParse(value);
+        if (v != null && v >= 1 && v <= 7) _firstDayOfWeek = v;
       } else if (key == TaskFieldPrefs.storageKey) {
         _taskFieldPrefs = TaskFieldPrefs.fromJson(value);
       }
@@ -180,6 +188,14 @@ class SettingsController with ChangeNotifier {
     _themeMode = newThemeMode;
     notifyListeners();
     await _settingsService.updateThemeMode(newThemeMode);
+  }
+
+  Future<void> updateFirstDayOfWeek(int isoDay) async {
+    if (isoDay < 1 || isoDay > 7) return;
+    if (isoDay == _firstDayOfWeek) return;
+    _firstDayOfWeek = isoDay;
+    notifyListeners();
+    await _db.setAppSetting('first_day_of_week', isoDay.toString());
   }
 
   Future<void> updateLocale(Locale locale) async {

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart' show ThemeMode;
 
 import '../localization/strings.dart';
 import '../theme/app_theme.dart';
+import '../utils/selection_menu.dart';
 import 'settings_controller.dart';
+import 'settings_widgets.dart';
 
 // ── Preset palettes ───────────────────────────────────────────────────────────
 
@@ -122,12 +124,50 @@ class AppearanceView extends StatelessWidget {
                   selected: controller.completionColor,
                   onSelect: controller.updateCompletionColor,
                 ),
+
+                // ── Calendar ─────────────────────────────────────────────
+                const SizedBox(height: 32),
+                Text(
+                  s.tabCalendar,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: labelColor,
+                    letterSpacing: -0.08,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SettingsNavRow(
+                  label: s.firstDayOfWeek,
+                  trailingLabel: _firstDayLabel(s, controller.firstDayOfWeek),
+                  onTap: () => _pickFirstDay(context, controller),
+                ),
               ],
             );
           },
         ),
       ),
     );
+  }
+
+  static String _firstDayLabel(S s, int day) {
+    final long = kWeekdaysLong[s.locale.languageCode] ?? kWeekdaysLong['en']!;
+    // long is Mon=0..Sun=6; ISO day is 1..7
+    return long[(day - 1).clamp(0, 6)];
+  }
+
+  Future<void> _pickFirstDay(
+      BuildContext context, SettingsController controller) async {
+    final s = S.of(context);
+    final selected = await showSelectionMenu<int>(
+      context: context,
+      title: s.firstDayOfWeek,
+      current: controller.firstDayOfWeek,
+      options: [
+        for (var d = 1; d <= 7; d++)
+          SelectionMenuOption(value: d, label: _firstDayLabel(s, d)),
+      ],
+    );
+    if (selected != null) await controller.updateFirstDayOfWeek(selected);
   }
 }
 

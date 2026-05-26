@@ -118,8 +118,9 @@ class _CalendarViewState extends State<CalendarView>
   Future<void> _openDay(DateTime date) async {
     final monthsFromNow =
         (date.year - _now.year) * 12 + (date.month - _now.month);
+    final firstDay = widget.settingsController?.firstDayOfWeek ?? DateTime.monday;
     final firstWeekday =
-        DateTime(date.year, date.month, 1).weekday - 1; // 0..6
+        weekdayColumn(DateTime(date.year, date.month, 1), firstDay);
     final weekIndex = (firstWeekday + date.day - 1) ~/ 7;
 
     // Approximate: month header ~30px, each week row ~88px.
@@ -163,10 +164,13 @@ class _CalendarViewState extends State<CalendarView>
           widget.contactController,
           if (widget.googleCalendarController != null)
             widget.googleCalendarController!,
+          if (widget.settingsController != null) widget.settingsController!,
         ]),
         builder: (context, _) => _MonthSection(
           month: month,
           today: _now,
+          firstDayOfWeek:
+              widget.settingsController?.firstDayOfWeek ?? DateTime.monday,
           controller: widget.controller,
           folderController: widget.folderController,
           eventController: widget.eventController,
@@ -217,7 +221,14 @@ class _CalendarViewState extends State<CalendarView>
         child: _maybeWrapWithSearchPull(
           child: Column(
           children: [
-            _WeekdayHeader(),
+            ListenableBuilder(
+              listenable: widget.settingsController ??
+                  const _NeverNotifier(),
+              builder: (_, __) => _WeekdayHeader(
+                firstDayOfWeek: widget.settingsController?.firstDayOfWeek ??
+                    DateTime.monday,
+              ),
+            ),
             Expanded(
               child: CustomScrollView(
                 center: _centerKey,
@@ -265,15 +276,28 @@ class _CalendarViewState extends State<CalendarView>
 
 // ─── Weekday header ───────────────────────────────────────────────────────────
 
+class _NeverNotifier extends Listenable {
+  const _NeverNotifier();
+  @override
+  void addListener(VoidCallback listener) {}
+  @override
+  void removeListener(VoidCallback listener) {}
+}
+
 class _WeekdayHeader extends StatelessWidget {
+  const _WeekdayHeader({required this.firstDayOfWeek});
+
+  final int firstDayOfWeek;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 32,
       color: CupertinoColors.systemBackground.resolveFrom(context),
       child: Row(
-        children: weekdaysShort(context)
-            .map((l) => Expanded(
+        children:
+            rotateWeekdays(weekdaysShort(context), firstDayOfWeek)
+                .map((l) => Expanded(
                   child: Center(
                     child: Text(
                       l,
@@ -298,6 +322,7 @@ class _MonthSection extends StatelessWidget {
   const _MonthSection({
     required this.month,
     required this.today,
+    required this.firstDayOfWeek,
     required this.controller,
     required this.folderController,
     required this.eventController,
@@ -308,6 +333,7 @@ class _MonthSection extends StatelessWidget {
 
   final DateTime month;
   final DateTime today;
+  final int firstDayOfWeek;
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
@@ -317,7 +343,8 @@ class _MonthSection extends StatelessWidget {
 
   List<DateTime?> _buildGrid() {
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    final startOffset = DateTime(month.year, month.month, 1).weekday - 1;
+    final startOffset =
+        weekdayColumn(DateTime(month.year, month.month, 1), firstDayOfWeek);
     final cells = <DateTime?>[];
     for (var i = 0; i < startOffset; i++) {
       cells.add(null);

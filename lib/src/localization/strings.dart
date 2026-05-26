@@ -211,6 +211,7 @@ class S {
   String get checkboxStyleRoundedRect => t('checkboxStyleRoundedRect');
   String get checkboxStyleSharpRect => t('checkboxStyleSharpRect');
   String get checkboxStyleCircle => t('checkboxStyleCircle');
+  String get firstDayOfWeek => t('firstDayOfWeek');
   String get showListCount => t('showListCount');
   String get revert => t('revert');
   String get taskTrashedToast => t('taskTrashedToast');
@@ -592,6 +593,24 @@ List<String> weekdaysLong(BuildContext context) {
   return kWeekdaysLong[code] ?? kWeekdaysLong['en']!;
 }
 
+/// Reorders a Mon..Sun weekday list so [firstDayOfWeek] (1=Mon..7=Sun) is the
+/// first element. Used by the calendar header so the column order matches the
+/// user's preference.
+List<T> rotateWeekdays<T>(List<T> mondayFirst, int firstDayOfWeek) {
+  final shift = ((firstDayOfWeek - 1) % 7 + 7) % 7;
+  if (shift == 0) return mondayFirst;
+  return [...mondayFirst.sublist(shift), ...mondayFirst.sublist(0, shift)];
+}
+
+/// Column index (0..6) for a [DateTime] given [firstDayOfWeek] (1=Mon..7=Sun).
+/// E.g. firstDayOfWeek=1 (Mon): Mon→0, Sun→6. firstDayOfWeek=7 (Sun): Sun→0,
+/// Sat→6.
+int weekdayColumn(DateTime date, int firstDayOfWeek) {
+  final mondayIndex = date.weekday - 1; // 0=Mon..6=Sun
+  final shift = ((firstDayOfWeek - 1) % 7 + 7) % 7;
+  return (mondayIndex - shift + 7) % 7;
+}
+
 List<String> monthsShort(BuildContext context) {
   final code = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
   return kMonthsShort[code] ?? kMonthsShort['en']!;
@@ -699,6 +718,7 @@ const Map<String, String> _en = {
   'checkboxStyleRoundedRect': 'Rounded square',
   'checkboxStyleSharpRect': 'Square',
   'checkboxStyleCircle': 'Circle',
+  'firstDayOfWeek': 'First day of week',
   'showListCount': 'List counter',
   'revert': 'Undo',
   'taskTrashedToast': 'Task moved to Trash',
