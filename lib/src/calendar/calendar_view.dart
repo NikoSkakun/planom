@@ -2,12 +2,14 @@ import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
 
+import '../contacts/contact_controller.dart';
 import '../database/database_service.dart';
 import '../folders/folder_controller.dart';
 import '../home_shell.dart';
 import '../integrations/google/google_calendar_controller.dart';
 import '../integrations/google/remote_event.dart';
 import '../localization/strings.dart';
+import '../models/contact.dart';
 import '../models/event.dart';
 import '../models/task.dart';
 import '../notes/note_controller.dart';
@@ -28,6 +30,7 @@ class CalendarView extends StatefulWidget {
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.contactController,
     required this.resetSignal,
     this.settingsController,
     this.backupService,
@@ -40,6 +43,7 @@ class CalendarView extends StatefulWidget {
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final ContactController contactController;
   final ValueNotifier<int> resetSignal;
   final SettingsController? settingsController;
   final BackupService? backupService;
@@ -143,6 +147,7 @@ class _CalendarViewState extends State<CalendarView>
       taskController: widget.controller,
       eventController: widget.eventController,
       folderController: widget.folderController,
+      contactController: widget.contactController,
       googleCalendarController: widget.googleCalendarController,
     );
     if (!mounted) return;
@@ -154,6 +159,7 @@ class _CalendarViewState extends State<CalendarView>
           widget.controller,
           widget.folderController,
           widget.eventController,
+          widget.contactController,
           if (widget.googleCalendarController != null)
             widget.googleCalendarController!,
         ]),
@@ -163,6 +169,7 @@ class _CalendarViewState extends State<CalendarView>
           controller: widget.controller,
           folderController: widget.folderController,
           eventController: widget.eventController,
+          contactController: widget.contactController,
           googleCalendarController: widget.googleCalendarController,
           onDayTap: _openDay,
         ),
@@ -293,6 +300,7 @@ class _MonthSection extends StatelessWidget {
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.contactController,
     required this.googleCalendarController,
     required this.onDayTap,
   });
@@ -302,6 +310,7 @@ class _MonthSection extends StatelessWidget {
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final ContactController contactController;
   final GoogleCalendarController? googleCalendarController;
   final ValueChanged<DateTime> onDayTap;
 
@@ -342,6 +351,7 @@ class _MonthSection extends StatelessWidget {
             controller: controller,
             folderController: folderController,
             eventController: eventController,
+            contactController: contactController,
             googleCalendarController: googleCalendarController,
             onDayTap: onDayTap,
           ),
@@ -359,6 +369,7 @@ class _WeekRow extends StatelessWidget {
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.contactController,
     required this.googleCalendarController,
     required this.onDayTap,
   });
@@ -368,6 +379,7 @@ class _WeekRow extends StatelessWidget {
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final ContactController contactController;
   final GoogleCalendarController? googleCalendarController;
   final ValueChanged<DateTime> onDayTap;
 
@@ -384,6 +396,7 @@ class _WeekRow extends StatelessWidget {
                     controller: controller,
                     folderController: folderController,
                     eventController: eventController,
+                    contactController: contactController,
                     googleCalendarController: googleCalendarController,
                     onTap: day == null ? null : () => onDayTap(day),
                   ),
@@ -403,6 +416,7 @@ class _DayCell extends StatelessWidget {
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.contactController,
     required this.googleCalendarController,
     required this.onTap,
   });
@@ -412,6 +426,7 @@ class _DayCell extends StatelessWidget {
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final ContactController contactController;
   final GoogleCalendarController? googleCalendarController;
   final VoidCallback? onTap;
 
@@ -438,14 +453,9 @@ class _DayCell extends StatelessWidget {
     }
 
     final allTasks = controller.tasksForDate(date!);
-    final birthdays = controller.birthdaysForDate(date!);
-    // Filter out birthday tasks already surfaced via dueDate — we'd otherwise
-    // double-count the year where birthDay==dueDate.
-    final nonBirthdayTasks = allTasks.where((t) => !t.isBirthday).toList();
-    final uncompleted =
-        nonBirthdayTasks.where((t) => !t.isCompleted).toList();
-    final completed =
-        nonBirthdayTasks.where((t) => t.isCompleted).toList();
+    final birthdays = contactController.contactsForDate(date!);
+    final uncompleted = allTasks.where((t) => !t.isCompleted).toList();
+    final completed = allTasks.where((t) => t.isCompleted).toList();
     final events = eventController.eventsForDate(date!);
     final remoteEvents =
         googleCalendarController?.eventsForDate(date!) ?? const <RemoteEvent>[];
@@ -524,7 +534,7 @@ class _DayCell extends StatelessWidget {
                 );
               }
               if (c.isBirthday) {
-                return _BirthdayChip(title: c.birthday!.title);
+                return _BirthdayChip(title: c.birthday!.name);
               }
               final listColor = c.task!.listId != null
                   ? folderController.listById(c.task!.listId!)?.color
@@ -575,7 +585,7 @@ class _ChipData {
         remoteEvent = e,
         birthday = null,
         completed = false;
-  _ChipData.birthday(Task b)
+  _ChipData.birthday(Contact b)
       : task = null,
         event = null,
         remoteEvent = null,
@@ -585,7 +595,7 @@ class _ChipData {
   final Task? task;
   final Event? event;
   final RemoteEvent? remoteEvent;
-  final Task? birthday;
+  final Contact? birthday;
   final bool completed;
 
   bool get isEvent => event != null;

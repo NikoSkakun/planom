@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_theme.dart';
 
 import '../localization/strings.dart';
+import '../contacts/contact_controller.dart';
 import '../folders/create_folder_list_sheet.dart';
 import '../calendar/event_controller.dart';
 import '../database/database_service.dart';
@@ -38,6 +39,7 @@ class TasksView extends StatefulWidget {
     super.key,
     required this.controller,
     required this.folderController,
+    required this.contactController,
     required this.settingsController,
     required this.activeListId,
     required this.activeDueDate,
@@ -50,6 +52,7 @@ class TasksView extends StatefulWidget {
 
   final TaskController controller;
   final FolderController folderController;
+  final ContactController contactController;
   final SettingsController settingsController;
   final ValueNotifier<String?> activeListId;
   final ValueNotifier<DateTime?> activeDueDate;
@@ -204,6 +207,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     folder: f,
                     folderController: widget.folderController,
                     taskController: widget.controller,
+                    contactController: widget.contactController,
                     activeListId: widget.activeListId,
                     settingsController: widget.settingsController,
                   ),
@@ -254,6 +258,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     list: l,
                     taskController: widget.controller,
                     folderController: widget.folderController,
+                    contactController: widget.contactController,
                     activeListId: widget.activeListId,
                   ),
                 ),
@@ -514,6 +519,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                           folderController:
                                               widget.folderController,
                                           taskController: widget.controller,
+                                          contactController:
+                                              widget.contactController,
                                           activeListId: widget.activeListId,
                                           settingsController:
                                               widget.settingsController,
@@ -587,6 +594,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                       taskController: widget.controller,
                                       folderController:
                                           widget.folderController,
+                                      contactController:
+                                          widget.contactController,
                                       activeListId: widget.activeListId,
                                     ),
                                   ),

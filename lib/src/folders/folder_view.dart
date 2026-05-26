@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../contacts/contact_controller.dart';
 import '../localization/strings.dart';
 import '../models/app_folder.dart';
 import '../settings/settings_controller.dart';
@@ -30,6 +31,7 @@ class FolderView extends StatefulWidget {
     required this.folder,
     required this.folderController,
     required this.taskController,
+    required this.contactController,
     required this.activeListId,
     this.settingsController,
   });
@@ -37,6 +39,7 @@ class FolderView extends StatefulWidget {
   final AppFolder folder;
   final FolderController folderController;
   final TaskController taskController;
+  final ContactController contactController;
   final ValueNotifier<String?> activeListId;
   final SettingsController? settingsController;
 
@@ -125,6 +128,7 @@ class _FolderViewState extends State<FolderView>
                     folder: f,
                     folderController: widget.folderController,
                     taskController: widget.taskController,
+                    contactController: widget.contactController,
                     activeListId: widget.activeListId,
                     settingsController: widget.settingsController,
                   ),
@@ -173,6 +177,7 @@ class _FolderViewState extends State<FolderView>
                     list: l,
                     taskController: widget.taskController,
                     folderController: widget.folderController,
+                    contactController: widget.contactController,
                     activeListId: widget.activeListId,
                   ),
                 ),
@@ -413,6 +418,8 @@ class _FolderViewState extends State<FolderView>
                                               widget.folderController,
                                           taskController:
                                               widget.taskController,
+                                          contactController:
+                                              widget.contactController,
                                           activeListId: widget.activeListId,
                                           settingsController:
                                               widget.settingsController,
@@ -484,6 +491,8 @@ class _FolderViewState extends State<FolderView>
                                       list: l,
                                       taskController: widget.taskController,
                                       folderController: widget.folderController,
+                                      contactController:
+                                          widget.contactController,
                                       activeListId: widget.activeListId,
                                     ),
                                   ),

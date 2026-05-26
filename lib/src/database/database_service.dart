@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
+import '../models/contact.dart';
 import '../models/event.dart';
 import '../models/list_section.dart';
 import '../models/note.dart';
@@ -15,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 24;
+  static const _dbVersion = 25;
 
   Database? _db;
 
@@ -48,11 +49,26 @@ class DatabaseService {
             parentTaskId TEXT,
             tagIds TEXT,
             recurrence TEXT,
-            birthMonth INTEGER,
-            birthDay INTEGER,
-            birthYear INTEGER,
-            isCompletable INTEGER NOT NULL DEFAULT 1,
             sectionId TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE contacts (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            note TEXT,
+            listId TEXT NOT NULL,
+            birthMonth INTEGER NOT NULL,
+            birthDay INTEGER NOT NULL,
+            birthYear INTEGER,
+            isCompletable INTEGER NOT NULL DEFAULT 0,
+            isCompleted INTEGER NOT NULL DEFAULT 0,
+            completionDate INTEGER,
+            reminderOffsets TEXT,
+            creationDate INTEGER NOT NULL,
+            sortOrder INTEGER NOT NULL DEFAULT 0,
+            isDeleted INTEGER NOT NULL DEFAULT 0,
+            deletedDate INTEGER
           )
         ''');
         await db.execute('''
@@ -381,6 +397,98 @@ class DatabaseService {
               creationDate INTEGER NOT NULL
             )
           ''');
+        }
+        if (oldVersion < 25) {
+          // Move birthday tasks to the new contacts table, then drop the
+          // birthday columns from tasks. SQLite can't drop columns directly
+          // pre-3.35, so we recreate the tasks table.
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS contacts (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              note TEXT,
+              listId TEXT NOT NULL,
+              birthMonth INTEGER NOT NULL,
+              birthDay INTEGER NOT NULL,
+              birthYear INTEGER,
+              isCompletable INTEGER NOT NULL DEFAULT 0,
+              isCompleted INTEGER NOT NULL DEFAULT 0,
+              completionDate INTEGER,
+              reminderOffsets TEXT,
+              creationDate INTEGER NOT NULL,
+              sortOrder INTEGER NOT NULL DEFAULT 0,
+              isDeleted INTEGER NOT NULL DEFAULT 0,
+              deletedDate INTEGER
+            )
+          ''');
+          await db.execute('''
+            INSERT INTO contacts (
+              id, name, note, listId,
+              birthMonth, birthDay, birthYear,
+              isCompletable, isCompleted, completionDate,
+              reminderOffsets, creationDate, sortOrder,
+              isDeleted, deletedDate
+            )
+            SELECT id, title, note, listId,
+                   birthMonth, birthDay, birthYear,
+                   isCompletable, isCompleted, completionDate,
+                   reminderOffsets, creationDate, sortOrder,
+                   isDeleted, deletedDate
+            FROM tasks
+            WHERE birthMonth IS NOT NULL AND birthDay IS NOT NULL
+          ''');
+          await db.execute('''
+            DELETE FROM tasks
+            WHERE birthMonth IS NOT NULL AND birthDay IS NOT NULL
+          ''');
+          // Recreate `tasks` without the birthday columns. Preserve every
+          // remaining row by copying through a temp table.
+          await db.execute('''
+            CREATE TABLE tasks_new (
+              id TEXT PRIMARY KEY,
+              creationDate INTEGER NOT NULL,
+              iconId TEXT NOT NULL,
+              title TEXT NOT NULL,
+              note TEXT,
+              isCompleted INTEGER NOT NULL DEFAULT 0,
+              dueDate INTEGER,
+              doTime INTEGER,
+              duration INTEGER,
+              listId TEXT,
+              priority INTEGER NOT NULL DEFAULT 0,
+              sortOrder INTEGER NOT NULL DEFAULT 0,
+              isDeleted INTEGER NOT NULL DEFAULT 0,
+              deletedDate INTEGER,
+              completionDate INTEGER,
+              reminderOffsets TEXT,
+              parentTaskId TEXT,
+              tagIds TEXT,
+              recurrence TEXT,
+              sectionId TEXT
+            )
+          ''');
+          await db.execute('''
+            INSERT INTO tasks_new (
+              id, creationDate, iconId, title, note, isCompleted,
+              dueDate, doTime, duration, listId, priority, sortOrder,
+              isDeleted, deletedDate, completionDate, reminderOffsets,
+              parentTaskId, tagIds, recurrence, sectionId
+            )
+            SELECT id, creationDate, iconId, title, note, isCompleted,
+                   dueDate, doTime, duration, listId, priority, sortOrder,
+                   isDeleted, deletedDate, completionDate, reminderOffsets,
+                   parentTaskId, tagIds, recurrence, sectionId
+            FROM tasks
+          ''');
+          await db.execute('DROP TABLE tasks');
+          await db.execute('ALTER TABLE tasks_new RENAME TO tasks');
+          // FTS triggers reference the old `tasks` table by name and
+          // SQLite re-points them automatically when the table is renamed;
+          // but to be safe, drop and recreate them.
+          await db.execute('DROP TRIGGER IF EXISTS tasks_ai');
+          await db.execute('DROP TRIGGER IF EXISTS tasks_ad');
+          await db.execute('DROP TRIGGER IF EXISTS tasks_au');
+          await _createTaskFtsTriggers(db);
         }
       },
     );
@@ -870,6 +978,86 @@ class DatabaseService {
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
+  // Contacts — birthday entries that belong to a Birthdays-type AppList.
+  Future<List<Contact>> getContacts() async {
+    final db = await _database;
+    final rows = await db.query('contacts',
+        where: 'isDeleted = 0',
+        orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(Contact.fromMap).toList();
+  }
+
+  Future<List<Contact>> getTrashedContacts() async {
+    final db = await _database;
+    final rows = await db.query('contacts',
+        where: 'isDeleted = 1', orderBy: 'deletedDate DESC');
+    return rows.map(Contact.fromMap).toList();
+  }
+
+  Future<void> insertContact(Contact contact) async {
+    final db = await _database;
+    await db.insert('contacts', contact.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateContact(Contact contact) async {
+    final db = await _database;
+    await db.update('contacts', contact.toMap(),
+        where: 'id = ?', whereArgs: [contact.id]);
+  }
+
+  Future<void> softDeleteContact(String id, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'contacts',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> softDeleteContactsForList(
+      String listId, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'contacts',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'listId = ? AND isDeleted = 0',
+      whereArgs: [listId],
+    );
+  }
+
+  Future<void> restoreContact(String id) async {
+    final db = await _database;
+    await db.update(
+      'contacts',
+      {'isDeleted': 0, 'deletedDate': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> permanentlyDeleteContact(String id) async {
+    final db = await _database;
+    await db.delete('contacts', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteContactsForList(String listId) async {
+    final db = await _database;
+    await db.delete('contacts', where: 'listId = ?', whereArgs: [listId]);
+  }
+
+  Future<void> clearTrashedContacts() async {
+    final db = await _database;
+    await db.delete('contacts', where: 'isDeleted = 1');
+  }
+
+  Future<List<Map<String, dynamic>>> exportContacts() async {
+    final db = await _database;
+    final rows = await db.query('contacts');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
 
   Future<void> clearTrashedTasks() async {
     final db = await _database;
@@ -981,6 +1169,7 @@ class DatabaseService {
   }
 
   static const _allTables = [
+    'contacts',
     'events',
     'list_sections',
     'app_settings',
@@ -1019,6 +1208,7 @@ class DatabaseService {
 
   Future<void> resetUserData() async {
     final db = await _database;
+    await db.delete('contacts');
     await db.delete('events');
     await db.delete('list_sections');
     await db.delete('routine_entries');
@@ -1086,25 +1276,7 @@ class DatabaseService {
       USING fts5(id UNINDEXED, title, body, tokenize='unicode61');
     ''');
 
-    await db.execute('''
-      CREATE TRIGGER IF NOT EXISTS tasks_ai AFTER INSERT ON tasks BEGIN
-        DELETE FROM tasks_fts WHERE id = new.id;
-        INSERT INTO tasks_fts(id, title, body)
-          VALUES (new.id, new.title, COALESCE(new.note, ''));
-      END;
-    ''');
-    await db.execute('''
-      CREATE TRIGGER IF NOT EXISTS tasks_ad AFTER DELETE ON tasks BEGIN
-        DELETE FROM tasks_fts WHERE id = old.id;
-      END;
-    ''');
-    await db.execute('''
-      CREATE TRIGGER IF NOT EXISTS tasks_au AFTER UPDATE ON tasks BEGIN
-        DELETE FROM tasks_fts WHERE id = old.id;
-        INSERT INTO tasks_fts(id, title, body)
-          VALUES (new.id, new.title, COALESCE(new.note, ''));
-      END;
-    ''');
+    await _createTaskFtsTriggers(db);
 
     await db.execute('''
       CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
@@ -1142,6 +1314,30 @@ class DatabaseService {
       CREATE TRIGGER IF NOT EXISTS events_au AFTER UPDATE ON events BEGIN
         DELETE FROM events_fts WHERE id = old.id;
         INSERT INTO events_fts(id, title, body)
+          VALUES (new.id, new.title, COALESCE(new.note, ''));
+      END;
+    ''');
+  }
+
+  /// Tasks FTS triggers — extracted so [onUpgrade] can re-create them after
+  /// rebuilding the `tasks` table (DROP/RENAME breaks the original triggers).
+  static Future<void> _createTaskFtsTriggers(Database db) async {
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS tasks_ai AFTER INSERT ON tasks BEGIN
+        DELETE FROM tasks_fts WHERE id = new.id;
+        INSERT INTO tasks_fts(id, title, body)
+          VALUES (new.id, new.title, COALESCE(new.note, ''));
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS tasks_ad AFTER DELETE ON tasks BEGIN
+        DELETE FROM tasks_fts WHERE id = old.id;
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS tasks_au AFTER UPDATE ON tasks BEGIN
+        DELETE FROM tasks_fts WHERE id = old.id;
+        INSERT INTO tasks_fts(id, title, body)
           VALUES (new.id, new.title, COALESCE(new.note, ''));
       END;
     ''');

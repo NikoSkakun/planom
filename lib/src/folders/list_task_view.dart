@@ -1,12 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Material;
 
+import '../contacts/contact_controller.dart';
+import '../contacts/contact_list_view.dart';
 import '../localization/strings.dart';
 import '../models/app_list.dart';
 import '../models/list_section.dart';
 import '../models/list_type.dart';
 import '../models/task.dart';
-import '../tasks/birthday_list_view.dart';
 import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
@@ -29,12 +30,14 @@ class ListTaskView extends StatefulWidget {
     required this.list,
     required this.taskController,
     required this.folderController,
+    required this.contactController,
     required this.activeListId,
   });
 
   final AppList list;
   final TaskController taskController;
   final FolderController folderController;
+  final ContactController contactController;
   final ValueNotifier<String?> activeListId;
 
   @override
@@ -152,6 +155,8 @@ class _ListTaskViewState extends State<ListTaskView>
     final ts = DateTime.now();
     final undo = UndoScope.maybeOf(context);
     await widget.taskController.deleteTasksForList(_currentList.id, ts);
+    await widget.contactController
+        .deleteContactsForList(_currentList.id, ts);
     await widget.folderController.deleteList(_currentList.id);
     undo?.show(
       label: s.listTrashedToast,
@@ -159,6 +164,7 @@ class _ListTaskViewState extends State<ListTaskView>
         await widget.folderController
             .restoreList(_currentList.id, _currentList.folderId);
         await widget.taskController.restoreAt(ts);
+        await widget.contactController.restoreAt(ts);
       },
     );
     if (mounted) Navigator.of(context).pop();
@@ -178,10 +184,9 @@ class _ListTaskViewState extends State<ListTaskView>
       ),
       child: SafeArea(
         child: _currentList.listType == ListType.birthdays
-            ? BirthdayListView(
+            ? ContactListView(
                 listId: _currentList.id,
-                taskController: widget.taskController,
-                folderController: widget.folderController,
+                controller: widget.contactController,
               )
             : _SectionedListBody(
                 list: _currentList,

@@ -22,15 +22,6 @@ class Task extends AppItem {
   final String? parentTaskId;
   final List<String> tagIds;
   final String? recurrence;
-  // Birthday-list specific fields. Set only when the task belongs to a list
-  // whose listType is `birthdays`; ignored otherwise.
-  final int? birthMonth; // 1–12
-  final int? birthDay;   // 1–31
-  final int? birthYear;  // optional year (null = year unknown)
-  // For birthday entries: whether the row shows a checkbox (i.e. the user
-  // marks the birthday as "celebrated this year"). Defaults to false for
-  // birthdays — they're recurring annual events, not a checklist item.
-  final bool isCompletable;
   // ID of the section inside the list this task belongs to (introduced for
   // user-defined sections). null = the default top section.
   final String? sectionId;
@@ -55,18 +46,12 @@ class Task extends AppItem {
     this.parentTaskId,
     this.tagIds = const [],
     this.recurrence,
-    this.birthMonth,
-    this.birthDay,
-    this.birthYear,
-    this.isCompletable = true,
     this.sectionId,
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
           iconId: iconId,
         );
-
-  bool get isBirthday => birthMonth != null && birthDay != null;
 
   Task copyWith({
     String? title,
@@ -93,13 +78,6 @@ class Task extends AppItem {
     List<String>? tagIds,
     String? recurrence,
     bool clearRecurrence = false,
-    int? birthMonth,
-    bool clearBirthMonth = false,
-    int? birthDay,
-    bool clearBirthDay = false,
-    int? birthYear,
-    bool clearBirthYear = false,
-    bool? isCompletable,
     String? sectionId,
     bool clearSectionId = false,
   }) {
@@ -125,10 +103,6 @@ class Task extends AppItem {
       tagIds: tagIds ?? this.tagIds,
       recurrence:
           clearRecurrence ? null : (recurrence ?? this.recurrence),
-      birthMonth: clearBirthMonth ? null : (birthMonth ?? this.birthMonth),
-      birthDay: clearBirthDay ? null : (birthDay ?? this.birthDay),
-      birthYear: clearBirthYear ? null : (birthYear ?? this.birthYear),
-      isCompletable: isCompletable ?? this.isCompletable,
       sectionId: clearSectionId ? null : (sectionId ?? this.sectionId),
     );
   }
@@ -153,10 +127,6 @@ class Task extends AppItem {
         'parentTaskId': parentTaskId,
         'tagIds': tagIds.join(','),
         'recurrence': recurrence,
-        'birthMonth': birthMonth,
-        'birthDay': birthDay,
-        'birthYear': birthYear,
-        'isCompletable': isCompletable ? 1 : 0,
         'sectionId': sectionId,
       };
 
@@ -187,10 +157,6 @@ class Task extends AppItem {
         parentTaskId: map['parentTaskId'] as String?,
         tagIds: _parseIds(map['tagIds'] as String?),
         recurrence: map['recurrence'] as String?,
-        birthMonth: map['birthMonth'] as int?,
-        birthDay: map['birthDay'] as int?,
-        birthYear: map['birthYear'] as int?,
-        isCompletable: (map['isCompletable'] as int? ?? 1) == 1,
         sectionId: map['sectionId'] as String?,
       );
 

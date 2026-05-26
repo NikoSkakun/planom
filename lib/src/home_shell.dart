@@ -4,6 +4,8 @@ import 'calendar/calendar_view.dart';
 import 'localization/strings.dart';
 import 'calendar/event_controller.dart';
 import 'calendar/event_creation_sheet.dart';
+import 'contacts/contact_controller.dart';
+import 'contacts/contact_creation_sheet.dart';
 import 'folders/folder_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
 import 'models/list_type.dart';
@@ -17,7 +19,6 @@ import 'security/security_service.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
-import 'tasks/birthday_creation_sheet.dart';
 import 'tasks/task_controller.dart';
 import 'tasks/task_creation_sheet.dart';
 import 'tasks/tasks_view.dart';
@@ -40,6 +41,7 @@ class HomeShell extends StatefulWidget {
     required this.noteController,
     required this.routineController,
     required this.eventController,
+    required this.contactController,
     required this.backupService,
     this.securityService,
     required this.googleCalendarController,
@@ -62,6 +64,7 @@ class HomeShell extends StatefulWidget {
   final NoteController noteController;
   final RoutineController routineController;
   final EventController eventController;
+  final ContactController contactController;
   final BackupService backupService;
   final SecurityService? securityService;
   final GoogleCalendarController googleCalendarController;
@@ -170,9 +173,9 @@ class _HomeShellState extends State<HomeShell> {
   void _handleDropOnList(String listId) {
     final list = widget.folderController.listById(listId);
     if (list?.listType == ListType.birthdays) {
-      showBirthdayCreationSheet(
+      showContactCreationSheet(
         context,
-        widget.taskController,
+        widget.contactController,
         listId: listId,
       );
       return;
@@ -352,15 +355,15 @@ class _HomeShellState extends State<HomeShell> {
       return;
     }
 
-    // When the active list is a Birthdays list, open the birthday creator
+    // When the active list is a Birthdays list, open the contact creator
     // instead of the standard task sheet.
     final listId = _activeListId.value;
     if (listId != null) {
       final list = widget.folderController.listById(listId);
       if (list?.listType == ListType.birthdays) {
-        showBirthdayCreationSheet(
+        showContactCreationSheet(
           context,
-          widget.taskController,
+          widget.contactController,
           listId: listId,
         );
         return;
@@ -510,6 +513,7 @@ class _HomeShellState extends State<HomeShell> {
       0 => TasksView(
           controller: widget.taskController,
           folderController: widget.folderController,
+          contactController: widget.contactController,
           settingsController: widget.settingsController,
           activeListId: _activeListId,
           activeDueDate: _activeDueDate,
@@ -533,6 +537,7 @@ class _HomeShellState extends State<HomeShell> {
           controller: widget.taskController,
           folderController: widget.folderController,
           eventController: widget.eventController,
+          contactController: widget.contactController,
           resetSignal: _calendarResetSignal,
           settingsController: widget.settingsController,
           backupService: widget.backupService,
