@@ -21,6 +21,7 @@ import 'security/security_service.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
+import 'settings/tab_bar_config.dart';
 import 'tasks/task_controller.dart';
 import 'tasks/task_creation_sheet.dart';
 import 'tasks/tasks_view.dart';
@@ -93,6 +94,9 @@ class _HomeShellState extends State<HomeShell> {
   final ValueNotifier<bool> _globalSettingsOpen = ValueNotifier<bool>(false);
   Route<void>? _globalSettingsRoute;
   int _lastTabIndex = 0;
+  // Which page of the multi-page tab bar is currently visible. Swiping
+  // horizontally on the tab bar moves between pages.
+  int _currentPage = 0;
   late CupertinoTabController _tabController;
 
   void _openGlobalSettings() {
@@ -507,10 +511,20 @@ class _HomeShellState extends State<HomeShell> {
     widget.settingsController.setLastOpenedTab(tappedIndex);
   }
 
+  /// Builtin tab indices appearing in the currently visible page's items,
+  /// in display order. Shortcut items don't count toward this — they're
+  /// rendered on the bar but don't have their own navigator slot.
   List<int> _computeVisibleIndices() {
-    final sc = widget.settingsController;
-    final ordered = sc.tabOrder.where((i) => sc.isTabVisible(i)).toList();
-    return ordered.isEmpty ? [0] : ordered;
+    final pages = widget.settingsController.tabBarConfig.pages;
+    if (pages.isEmpty) return [0];
+    final pageIdx = _currentPage.clamp(0, pages.length - 1);
+    final builtins = <int>[];
+    for (final item in pages[pageIdx]) {
+      if (item.kind == TabKind.builtin && item.builtinIndex != null) {
+        builtins.add(item.builtinIndex!);
+      }
+    }
+    return builtins.isEmpty ? [0] : builtins;
   }
 
   BottomNavigationBarItem _tabItem(BuildContext context, int logicalIdx,
@@ -729,6 +743,46 @@ class _HomeShellState extends State<HomeShell> {
                   );
                 },
               ),
+            // Multi-page tab bar swipe overlay — covers the tab bar area and
+            // detects horizontal pan to switch between pages. Only active when
+            // there's more than one page configured and we're in the narrow
+            // (bottom tab bar) layout.
+            if (!isWide &&
+                visibleIndices.length > 1 &&
+                widget.settingsController.tabBarConfig.pages.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 50 + MediaQuery.paddingOf(context).bottom,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragEnd: (d) {
+                    final vel = d.primaryVelocity ?? 0;
+                    if (vel.abs() < 200) return;
+                    _switchPage(vel < 0 ? 1 : -1);
+                  },
+                ),
+              ),
+            // Page indicator dots, shown just above the tab bar when there's
+            // more than one page configured.
+            if (!isWide &&
+                visibleIndices.length > 1 &&
+                widget.settingsController.tabBarConfig.pages.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 50 + MediaQuery.paddingOf(context).bottom + 2,
+                child: IgnorePointer(
+                  child: _PageDots(
+                    count: widget.settingsController.tabBarConfig.pages.length,
+                    current: _currentPage.clamp(
+                        0,
+                        widget.settingsController.tabBarConfig.pages.length -
+                            1),
+                  ),
+                ),
+              ),
             ValueListenableBuilder<bool>(
               valueListenable: _showPlusButton,
               builder: (context, show, child) => show
@@ -758,6 +812,50 @@ class _HomeShellState extends State<HomeShell> {
           ],
         );
       },
+    );
+  }
+
+  void _switchPage(int delta) {
+    final pages = widget.settingsController.tabBarConfig.pages;
+    if (pages.length <= 1) return;
+    final next = (_currentPage + delta).clamp(0, pages.length - 1);
+    if (next == _currentPage) return;
+    setState(() => _currentPage = next);
+    // Recompute initial visible tab so _tabController points to a valid index
+    // on the new page.
+    final visible = _computeVisibleIndices();
+    if (!visible.contains(_lastTabIndex)) {
+      _lastTabIndex = visible.first;
+    }
+    _tabController.index = visible.indexOf(_lastTabIndex);
+  }
+}
+
+/// Tiny page indicator (○ ● ○ …) shown above the tab bar.
+class _PageDots extends StatelessWidget {
+  const _PageDots({required this.count, required this.current});
+
+  final int count;
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < count; i++)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: i == current ? 7 : 5,
+            height: i == current ? 7 : 5,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: i == current
+                  ? CupertinoColors.label.resolveFrom(context)
+                  : CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ),
+      ],
     );
   }
 }

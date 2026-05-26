@@ -8,6 +8,7 @@ import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 import 'settings_service.dart';
 import 'smart_list_prefs.dart';
+import 'tab_bar_config.dart';
 
 /// Sentinel [SettingsController.defaultTab] value: open whichever tab was last
 /// open when the app was closed, rather than a fixed tab.
@@ -82,6 +83,12 @@ class SettingsController with ChangeNotifier {
   double get textScale => _textScale;
   bool _useSystemTextScale = false;
   bool get useSystemTextScale => _useSystemTextScale;
+
+  /// Multi-page tab bar layout — supersedes the legacy [tabOrder] +
+  /// [tabVisibility] booleans. On first load the legacy values are migrated
+  /// into a single-page layout if no `tab_bar_config` row exists yet.
+  TabBarConfig _tabBarConfig = TabBarConfig.defaultLayout();
+  TabBarConfig get tabBarConfig => _tabBarConfig;
 
   // Default icons applied when the user creates a new task/list/folder/note
   // folder without picking one. Strings match the existing iconId scheme:
@@ -207,6 +214,9 @@ class SettingsController with ChangeNotifier {
         if (v != null && v >= 0.5 && v <= 2.5) _textScale = v;
       } else if (key == 'use_system_text_scale') {
         _useSystemTextScale = value == 'true';
+      } else if (key == 'tab_bar_config') {
+        final parsed = TabBarConfig.tryParse(value);
+        if (parsed != null) _tabBarConfig = parsed;
       } else if (key == TaskFieldPrefs.storageKey) {
         _taskFieldPrefs = TaskFieldPrefs.fromJson(value);
       }
@@ -222,7 +232,26 @@ class SettingsController with ChangeNotifier {
     AppDefaults.noteFolderIcon = _defaultNoteFolderIcon;
     AppScale.factor = _textScale;
 
+    // Migrate the legacy single-row tab layout to TabBarConfig the first time
+    // a user opens the new tab-bar UI. Existing _tabBarConfig is the default
+    // if no `tab_bar_config` row was loaded above; merge the user's visibility
+    // + order into it so they don't lose their existing layout.
+    final loadedConfig =
+        rows.any((r) => r['key'] == 'tab_bar_config');
+    if (!loadedConfig) {
+      _tabBarConfig = TabBarConfig.fromLegacy(
+        tabVisibility: _tabVisibility,
+        tabOrder: _tabOrder,
+      );
+    }
+
     notifyListeners();
+  }
+
+  Future<void> updateTabBarConfig(TabBarConfig config) async {
+    _tabBarConfig = config;
+    notifyListeners();
+    await _db.setAppSetting('tab_bar_config', config.toJsonString());
   }
 
   Future<void> setTabVisible(int index, bool visible) async {

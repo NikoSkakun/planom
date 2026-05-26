@@ -228,6 +228,19 @@ class S {
   String get textSize => t('textSize');
   String get useSystemTextSize => t('useSystemTextSize');
   String get textSizeHint => t('textSizeHint');
+  String get tabBarPages => t('tabBarPages');
+  String get tabBarPagesHint => t('tabBarPagesHint');
+  String get addPage => t('addPage');
+  String get removePageTitle => t('removePageTitle');
+  String get removePageBody => t('removePageBody');
+  String get addTab => t('addTab');
+  String get tabKindBuiltin => t('tabKindBuiltin');
+  String get tabKindShortcut => t('tabKindShortcut');
+  String get tabShortcutList => t('tabShortcutList');
+  String get tabShortcutFolder => t('tabShortcutFolder');
+  String get tabShortcutNoteFolder => t('tabShortcutNoteFolder');
+  String pageNumberLabel(int n) =>
+      t('pageNumberLabel').replaceFirst('{n}', n.toString());
   String get showListCount => t('showListCount');
   String get revert => t('revert');
   String get taskTrashedToast => t('taskTrashedToast');
@@ -751,6 +764,18 @@ const Map<String, String> _en = {
   'textSize': 'Text size',
   'useSystemTextSize': 'Use system text size',
   'textSizeHint': 'Scales all text in the app. UI elements next to text grow with the chosen size.',
+  'tabBarPages': 'Tab Bar Pages',
+  'tabBarPagesHint': 'Add more pages to fit more than 5 tabs. Swipe horizontally on the tab bar to switch between pages.',
+  'addPage': 'Add page',
+  'removePageTitle': 'Remove page?',
+  'removePageBody': 'All tabs on this page will be removed too.',
+  'addTab': 'Add tab',
+  'tabKindBuiltin': 'Built-in tab',
+  'tabKindShortcut': 'Shortcut',
+  'tabShortcutList': 'List…',
+  'tabShortcutFolder': 'Folder…',
+  'tabShortcutNoteFolder': 'Note folder…',
+  'pageNumberLabel': 'PAGE {n}',
   'showListCount': 'List counter',
   'revert': 'Undo',
   'taskTrashedToast': 'Task moved to Trash',

@@ -21,6 +21,7 @@ import 'security_view.dart';
 import 'settings_controller.dart';
 import 'spaces_view.dart';
 import 'sync_settings_view.dart';
+import 'tab_bar_pages_view.dart';
 import 'tasks_settings_view.dart';
 
 class SettingsView extends StatefulWidget {
@@ -575,6 +576,36 @@ class TabBarSettingsView extends StatelessWidget {
                       ),
                     ),
                   ],
+                  // ── Pages (multi-page tab bar) ─────────────────────────
+                  const SizedBox(height: 18),
+                  Text(
+                    s.tabBarPages,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: labelColor,
+                      letterSpacing: -0.08,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _NavRow(
+                    label: s.tabBarPages,
+                    trailingLabel:
+                        '${controller.tabBarConfig.pages.length}',
+                    onTap: () => Navigator.of(context).push(
+                      FastRoute<void>(
+                        builder: (_) =>
+                            TabBarPagesView(controller: controller),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      s.tabBarPagesHint,
+                      style: TextStyle(fontSize: 13, color: labelColor),
+                    ),
+                  ),
                 ],
               ),
             );
