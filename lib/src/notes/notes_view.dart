@@ -9,6 +9,7 @@ import '../models/note.dart';
 import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
+import '../settings/smart_list_prefs.dart';
 import '../tasks/task_controller.dart';
 import '../theme/app_theme.dart';
 import '../utils/dropdown_overlay.dart';
@@ -261,13 +262,25 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
           children: [
             _maybeWrapWithSearchPull(
               child: ListenableBuilder(
-              listenable: widget.controller,
+              listenable: Listenable.merge([
+                widget.controller,
+                if (widget.settingsController != null)
+                  widget.settingsController!,
+              ]),
               builder: (context, _) {
                 final folders = widget.controller.foldersIn(null);
                 final notes = widget.controller.notesIn(null);
-                final hasTrash =
+                final hasTrashContent =
                     widget.controller.trashedNotes.isNotEmpty ||
                         widget.controller.trashedFolders.isNotEmpty;
+                final notesTrashPref =
+                    widget.settingsController?.smartListPrefs.notesTrash ??
+                        SmartListVisibility.showIfNotEmpty;
+                final hasTrash = switch (notesTrashPref) {
+                  SmartListVisibility.show => true,
+                  SmartListVisibility.showIfNotEmpty => hasTrashContent,
+                  SmartListVisibility.hidden => false,
+                };
                 if (folders.isEmpty && notes.isEmpty && !hasTrash) {
                   return Center(
                     child: Text(

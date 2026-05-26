@@ -260,6 +260,9 @@ class SettingsController with ChangeNotifier {
       case 'trash':
         _smartListPrefs.trash = value;
         break;
+      case 'notesTrash':
+        _smartListPrefs.notesTrash = value;
+        break;
     }
     notifyListeners();
     await _smartListPrefs.save();

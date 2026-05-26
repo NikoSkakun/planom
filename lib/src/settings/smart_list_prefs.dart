@@ -12,6 +12,7 @@ class SmartListPrefs {
   SmartListVisibility allTasks;
   SmartListVisibility completed;
   SmartListVisibility trash;
+  SmartListVisibility notesTrash;
   bool hideTabLabels;
   bool showAddFolderButton;
   bool showNotesAddFolderButton;
@@ -23,6 +24,7 @@ class SmartListPrefs {
     this.allTasks = SmartListVisibility.hidden,
     this.completed = SmartListVisibility.showIfNotEmpty,
     this.trash = SmartListVisibility.showIfNotEmpty,
+    this.notesTrash = SmartListVisibility.showIfNotEmpty,
     this.hideTabLabels = false,
     this.showAddFolderButton = true,
     this.showNotesAddFolderButton = true,
@@ -48,6 +50,8 @@ class SmartListPrefs {
             fallback: SmartListVisibility.hidden),
         completed: _parse(data['completed']),
         trash: _parse(data['trash']),
+        notesTrash: _parse(data['notesTrash'],
+            fallback: SmartListVisibility.showIfNotEmpty),
         hideTabLabels: data['hideTabLabels'] == true,
         showAddFolderButton: data['showAddFolderButton'] != false,
         showNotesAddFolderButton:
@@ -70,6 +74,7 @@ class SmartListPrefs {
         'allTasks': _encode(allTasks),
         'completed': _encode(completed),
         'trash': _encode(trash),
+        'notesTrash': _encode(notesTrash),
         'hideTabLabels': hideTabLabels,
         'showAddFolderButton': showAddFolderButton,
         'showNotesAddFolderButton': showNotesAddFolderButton,
@@ -83,6 +88,8 @@ class SmartListPrefs {
     allTasks = _parse(data['allTasks'], fallback: SmartListVisibility.hidden);
     completed = _parse(data['completed']);
     trash = _parse(data['trash']);
+    notesTrash = _parse(data['notesTrash'],
+        fallback: SmartListVisibility.showIfNotEmpty);
     hideTabLabels = data['hideTabLabels'] == true;
     showAddFolderButton = data['showAddFolderButton'] != false;
     showNotesAddFolderButton =
