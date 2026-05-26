@@ -24,6 +24,9 @@ import '../utils/fast_route.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
 import '../utils/reorder_drag.dart';
+import '../utils/selection_checkbox.dart';
+import '../utils/selection_controller.dart';
+import '../utils/selection_toolbar.dart';
 import '../utils/undo_controller.dart';
 import 'all_tasks_view.dart';
 import 'completed_view.dart';
@@ -71,6 +74,7 @@ class TasksView extends StatefulWidget {
 
 class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
   final Set<String> _expandedIds = {};
+  final _selection = SelectionController();
 
   @override
   void initState() {
@@ -81,7 +85,79 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
   @override
   void dispose() {
     widget.collapseSignal.removeListener(_collapseAll);
+    _selection.dispose();
     super.dispose();
+  }
+
+  // ── Selection batch actions ──────────────────────────────────────────────
+
+  Future<void> _batchDeleteFolders() async {
+    for (final id in _selection.selectedIds.toList()) {
+      await widget.folderController.deleteFolderDeep(
+          id, widget.controller.deleteTasksForList);
+    }
+    _selection.cancel();
+  }
+
+  Future<void> _batchDeleteLists() async {
+    final ts = DateTime.now();
+    for (final id in _selection.selectedIds.toList()) {
+      await widget.controller.deleteTasksForList(id, ts);
+      await widget.folderController.deleteList(id);
+    }
+    _selection.cancel();
+  }
+
+  Widget _wrapForSelection(String id, SelectionItemKind kind, String label,
+      IconData icon, Widget child) {
+    if (!_selection.active) return child;
+    final selected = _selection.isSelected(id);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _selection.toggle(id, kind),
+      child: Container(
+        color: selected ? AppColors.accent.withOpacity(0.10) : null,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            SelectionCheckbox(checked: selected),
+            const SizedBox(width: 12),
+            Icon(icon,
+                size: 22,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(label,
+                  style: const TextStyle(fontSize: 16),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<SelectionAction> _buildBatchActions(S s) {
+    final empty = _selection.isEmpty;
+    if (_selection.kind == SelectionItemKind.folder) {
+      return [
+        SelectionAction(
+          label: s.delete,
+          icon: CupertinoIcons.trash,
+          onTap: empty ? () {} : _batchDeleteFolders,
+          isDestructive: true,
+        ),
+      ];
+    }
+    return [
+      SelectionAction(
+        label: s.delete,
+        icon: CupertinoIcons.trash,
+        onTap: empty ? () {} : _batchDeleteLists,
+        isDestructive: true,
+      ),
+    ];
   }
 
   void _collapseAll() {
@@ -110,6 +186,10 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                 HomeShell.openGlobalSettings(context);
               }
             : null,
+        onSelect: () {
+          dismiss();
+          _selection.start();
+        },
         onAddList: () {
           dismiss();
           showCreateFolderListSheet(
@@ -292,22 +372,83 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
     final canSearch = widget.db != null &&
         widget.noteController != null &&
         widget.eventController != null;
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
+    return ListenableBuilder(
+      listenable: _selection,
+      builder: (context, _) {
+        final selecting = _selection.active;
+        final rootFolders = widget.folderController.foldersIn(null);
+        final rootLists = widget.folderController.listsIn(null);
+        final hasMixed = rootFolders.isNotEmpty && rootLists.isNotEmpty;
+        final selectKind = _selection.kind;
+        Iterable<String>? selectAllIds;
+        if (selectKind == SelectionItemKind.folder) {
+          selectAllIds = rootFolders.map((f) => f.id);
+        } else if (selectKind == SelectionItemKind.list) {
+          selectAllIds = rootLists.map((l) => l.id);
+        } else if (!hasMixed) {
+          if (rootLists.isNotEmpty) {
+            selectAllIds = rootLists.map((l) => l.id);
+          } else if (rootFolders.isNotEmpty) {
+            selectAllIds = rootFolders.map((f) => f.id);
+          }
+        }
+        final allIds = selectAllIds?.toSet() ?? <String>{};
+        final allSelected = allIds.isNotEmpty &&
+            _selection.selectedIds.containsAll(allIds) &&
+            _selection.count >= allIds.length;
+        return CupertinoPageScaffold(
+          navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: Text(s.tabTasks),
-        trailing: Semantics(
-          label: s.settings,
-          button: true,
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => _showDropdown(context),
-            child: const Icon(CupertinoIcons.ellipsis, size: 26),
-          ),
-        ),
+        leading: selecting
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _selection.cancel,
+                child: Text(s.cancel),
+              )
+            : null,
+        automaticallyImplyLeading: !selecting,
+        middle: Text(selecting
+            ? (_selection.count == 0
+                ? s.selectItems
+                : s.selectedCount(_selection.count))
+            : s.tabTasks),
+        trailing: selecting
+            ? (selectAllIds != null
+                ? CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: () {
+                      if (allSelected) {
+                        _selection.replaceAll(const [],
+                            selectKind ?? SelectionItemKind.list);
+                      } else {
+                        _selection.replaceAll(
+                            allIds,
+                            selectKind ??
+                                (rootLists.isNotEmpty
+                                    ? SelectionItemKind.list
+                                    : SelectionItemKind.folder));
+                      }
+                    },
+                    child: Text(
+                        allSelected ? s.deselectAll : s.selectAll),
+                  )
+                : null)
+            : Semantics(
+                label: s.settings,
+                button: true,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _showDropdown(context),
+                  child: const Icon(CupertinoIcons.ellipsis, size: 26),
+                ),
+              ),
       ),
       child: SafeArea(
-        child: Stack(
+        bottom: !selecting,
+        child: Column(
+          children: [
+            Expanded(
+              child: Stack(
           children: [
             _maybeWrapWithSearchPull(
               canSearch: canSearch,
@@ -532,7 +673,12 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                           },
                                         );
                                       },
-                                      child: _ListItem(
+                                      child: _wrapForSelection(
+                                          f.id,
+                                          SelectionItemKind.folder,
+                                          f.name,
+                                          CupertinoIcons.folder,
+                                          _ListItem(
                                         iconAsset: 'assets/icons/folder.png',
                                         iconId: f.iconId,
                                         iconColor: f.iconColor,
@@ -566,7 +712,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                         onExpand: () => _toggle(f.id),
                                         isExpanded:
                                             _expandedIds.contains(f.id),
-                                      ),
+                                      )),
                                     ),
                                   ),
                                 ),
@@ -639,7 +785,12 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                       },
                                     );
                                   },
-                                  child: _ListItem(
+                                  child: _wrapForSelection(
+                                      l.id,
+                                      SelectionItemKind.list,
+                                      l.name,
+                                      CupertinoIcons.list_bullet,
+                                      _ListItem(
                                     iconAsset: 'assets/icons/list.png',
                                     iconId: l.iconId,
                                     iconColor: l.iconColor,
@@ -663,7 +814,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                         ),
                                       ),
                                     ),
-                                  ),
+                                  )),
                                 ),
                               ),
                             );
@@ -746,7 +897,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
               },
             ),
             ),
-            if (widget.settingsController.smartListPrefs.showAddFolderButton)
+            if (widget.settingsController.smartListPrefs.showAddFolderButton &&
+                !selecting)
               Positioned(
                 left: 20,
                 bottom: 16,
@@ -760,7 +912,17 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
               ),
           ],
         ),
+            ),
+            if (selecting)
+              SelectionToolbar(
+                bottomInset: MediaQuery.paddingOf(context).bottom,
+                actions: _buildBatchActions(s),
+              ),
+          ],
+        ),
       ),
+        );
+      },
     );
   }
 
@@ -1048,6 +1210,7 @@ class _TasksOptionsDropdown extends StatelessWidget {
     required this.onDismiss,
     required this.onAddList,
     required this.onAddFolder,
+    required this.onSelect,
     this.showSettings = false,
     this.onSettings,
   });
@@ -1055,6 +1218,7 @@ class _TasksOptionsDropdown extends StatelessWidget {
   final VoidCallback onDismiss;
   final VoidCallback onAddList;
   final VoidCallback onAddFolder;
+  final VoidCallback onSelect;
   final bool showSettings;
   final VoidCallback? onSettings;
 
@@ -1067,6 +1231,12 @@ class _TasksOptionsDropdown extends StatelessWidget {
       color: CupertinoColors.separator.resolveFrom(context),
     );
     final items = <Widget>[
+      DropdownRow(
+        label: s.select,
+        icon: CupertinoIcons.checkmark_circle,
+        onTap: onSelect,
+      ),
+      separator,
       DropdownRow(
         label: s.addList,
         icon: CupertinoIcons.add_circled,

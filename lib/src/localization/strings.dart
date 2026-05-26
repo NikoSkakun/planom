@@ -170,6 +170,29 @@ class S {
   String get sectionModules => t('sectionModules');
   String get sectionTaskFields => t('sectionTaskFields');
   String get taskFieldsHint => t('taskFieldsHint');
+  String get sectionBody => t('sectionBody');
+  String get useMarkdown => t('useMarkdown');
+  String get useMarkdownHint => t('useMarkdownHint');
+  String get storage => t('storage');
+  String get storageSublabel => t('storageSublabel');
+  String get storageAppCaches => t('storageAppCaches');
+  String get storageCustomIcons => t('storageCustomIcons');
+  String get storageFontsCache => t('storageFontsCache');
+  String get storageTempCache => t('storageTempCache');
+  String get storageClearOrphans => t('storageClearOrphans');
+  String get storageFoldersLists => t('storageFoldersLists');
+  String get storageTotal => t('storageTotal');
+  String get storageItemsSuffix => t('storageItemsSuffix');
+  String get storageFilesSuffix => t('storageFilesSuffix');
+  String storageDataIn(String space) =>
+      t('storageDataIn').replaceFirst('{space}', space);
+  String get space => t('space');
+  String get clearFontsCacheQ => t('clearFontsCacheQ');
+  String get clearFontsCacheBody => t('clearFontsCacheBody');
+  String get clearTempCacheQ => t('clearTempCacheQ');
+  String get clearTempCacheBody => t('clearTempCacheBody');
+  String get clearOrphanIconsQ => t('clearOrphanIconsQ');
+  String get clearOrphanIconsBody => t('clearOrphanIconsBody');
   String get showHidePriority => t('showHidePriority');
   String get showHideDate => t('showHideDate');
   String get showHideRepeat => t('showHideRepeat');
@@ -393,6 +416,12 @@ class S {
   String get turns => t('turns');
   String get customColor => t('customColor');
   String get selectColor => t('selectColor');
+  String get select => t('select');
+  String get selectAll => t('selectAll');
+  String get deselectAll => t('deselectAll');
+  String get selectItems => t('selectItems');
+  String selectedCount(int n) => t('selectedCount').replaceFirst('{n}', '$n');
+  String get duplicate => t('duplicate');
   String get otherDots => t('otherDots');
   String get chooseIcon => t('chooseIcon');
   String get opening => t('opening');
@@ -590,6 +619,9 @@ const Map<String, String> _en = {
   'create': 'Create', 'save': 'Save', 'delete': 'Delete', 'deleteAll': 'Delete All',
   'edit': 'Edit', 'rename': 'Rename', 'confirm': 'Confirm', 'insert': 'Insert',
   'move': 'Move', 'putBack': 'Put Back', 'clear': 'Clear', 'untitled': 'Untitled',
+  'select': 'Select', 'selectAll': 'Select All', 'deselectAll': 'Deselect All',
+  'selectItems': 'Select Items', 'selectedCount': '{n} selected',
+  'duplicate': 'Duplicate',
   'tabTasks': 'Tasks', 'tabNotes': 'Notes', 'tabCalendar': 'Calendar',
   'tabRoutines': 'Routines', 'tabSettings': 'Settings',
   'inbox': 'Inbox', 'today': 'Today', 'yesterday': 'Yesterday', 'tomorrow': 'Tomorrow', 'upcoming': 'Upcoming',
@@ -624,6 +656,30 @@ const Map<String, String> _en = {
   'noOptionsYet': 'No options yet.', 'sectionModules': 'MODULES',
   'sectionTaskFields': 'TASK FIELDS',
   'taskFieldsHint': 'Hidden fields are not shown when editing a task.',
+  'sectionBody': 'BODY', 'useMarkdown': 'Format with Markdown',
+  'useMarkdownHint': 'When off, the body is shown and edited as plain text and the formatting toolbar is hidden.',
+  'storage': 'Storage',
+  'storageSublabel': "Disk usage by category · clear caches",
+  'storageAppCaches': 'APP CACHES',
+  'storageCustomIcons': 'Custom icons',
+  'storageFontsCache': 'Fonts cache',
+  'storageTempCache': 'Temporary files',
+  'storageClearOrphans': 'Clear orphans',
+  'storageFoldersLists': 'Folders & lists',
+  'storageTotal': 'Total',
+  'storageItemsSuffix': 'items',
+  'storageFilesSuffix': 'files',
+  'storageDataIn': 'DATA IN {space}',
+  'space': 'Space',
+  'clearFontsCacheQ': 'Clear fonts cache?',
+  'clearFontsCacheBody':
+      'Removes cached Google Fonts files. They will be re-downloaded when needed.',
+  'clearTempCacheQ': 'Clear temporary files?',
+  'clearTempCacheBody':
+      'Removes the OS temporary directory. Doesn\'t affect saved data.',
+  'clearOrphanIconsQ': 'Clear orphan icons?',
+  'clearOrphanIconsBody':
+      'Removes custom icon files that are no longer referenced by any folder or list across every space.',
   'showHidePriority': 'Priority', 'showHideDate': 'Date',
   'showHideRepeat': 'Repeat', 'showHideList': 'List',
   'showHideDuration': 'Duration', 'showHideTags': 'Tags',
@@ -855,6 +911,9 @@ const Map<String, String> _uk = {
   'cancel': 'Скасувати', 'done': 'Готово', 'ok': 'OK', 'add': 'Додати',
   'create': 'Створити', 'save': 'Зберегти', 'delete': 'Видалити',
   'deleteAll': 'Видалити все', 'edit': 'Редагувати', 'rename': 'Перейменувати',
+  'select': 'Вибрати', 'selectAll': 'Вибрати все', 'deselectAll': 'Скасувати вибір',
+  'selectItems': 'Виберіть елементи', 'selectedCount': 'Вибрано: {n}',
+  'duplicate': 'Дублювати',
   'confirm': 'Підтвердити', 'insert': 'Вставити', 'move': 'Перемістити',
   'putBack': 'Відновити', 'clear': 'Очистити', 'untitled': 'Без назви',
   'tabTasks': 'Завдання', 'tabNotes': 'Нотатки', 'tabCalendar': 'Календар',
@@ -891,6 +950,8 @@ const Map<String, String> _uk = {
   'noOptionsYet': 'Параметрів ще немає.', 'sectionModules': 'МОДУЛІ',
   'sectionTaskFields': 'ПОЛЯ ЗАВДАННЯ',
   'taskFieldsHint': 'Приховані поля не показуються при редагуванні завдання.',
+  'sectionBody': 'ТІЛО', 'useMarkdown': 'Форматувати з Markdown',
+  'useMarkdownHint': 'Коли вимкнено, тіло відображається й редагується як простий текст, а панель форматування прихована.',
   'showHidePriority': 'Пріоритет', 'showHideDate': 'Дата',
   'showHideRepeat': 'Повтор', 'showHideList': 'Список',
   'showHideDuration': 'Тривалість', 'showHideTags': 'Мітки',
@@ -986,6 +1047,9 @@ const Map<String, String> _es = {
   'cancel': 'Cancelar', 'done': 'Listo', 'ok': 'OK', 'add': 'Añadir',
   'create': 'Crear', 'save': 'Guardar', 'delete': 'Eliminar',
   'deleteAll': 'Eliminar todo', 'edit': 'Editar', 'rename': 'Renombrar',
+  'select': 'Seleccionar', 'selectAll': 'Seleccionar todo',
+  'deselectAll': 'Deseleccionar todo', 'selectItems': 'Seleccionar elementos',
+  'selectedCount': '{n} seleccionados', 'duplicate': 'Duplicar',
   'confirm': 'Confirmar', 'insert': 'Insertar', 'move': 'Mover',
   'putBack': 'Restaurar', 'clear': 'Borrar', 'untitled': 'Sin título',
   'tabTasks': 'Tareas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendario',
@@ -1022,6 +1086,8 @@ const Map<String, String> _es = {
   'noOptionsYet': 'Aún no hay opciones.', 'sectionModules': 'MÓDULOS',
   'sectionTaskFields': 'CAMPOS DE TAREA',
   'taskFieldsHint': 'Los campos ocultos no se muestran al editar una tarea.',
+  'sectionBody': 'CUERPO', 'useMarkdown': 'Formatear con Markdown',
+  'useMarkdownHint': 'Cuando está desactivado, el cuerpo se muestra y edita como texto plano y la barra de formato queda oculta.',
   'showHidePriority': 'Prioridad', 'showHideDate': 'Fecha',
   'showHideRepeat': 'Repetir', 'showHideList': 'Lista',
   'showHideDuration': 'Duración', 'showHideTags': 'Etiquetas',
@@ -1117,6 +1183,9 @@ const Map<String, String> _fr = {
   'cancel': 'Annuler', 'done': 'Terminé', 'ok': 'OK', 'add': 'Ajouter',
   'create': 'Créer', 'save': 'Enregistrer', 'delete': 'Supprimer',
   'deleteAll': 'Tout supprimer', 'edit': 'Modifier', 'rename': 'Renommer',
+  'select': 'Sélectionner', 'selectAll': 'Tout sélectionner',
+  'deselectAll': 'Tout désélectionner', 'selectItems': 'Sélectionner des éléments',
+  'selectedCount': '{n} sélectionnés', 'duplicate': 'Dupliquer',
   'confirm': 'Confirmer', 'insert': 'Insérer', 'move': 'Déplacer',
   'putBack': 'Restaurer', 'clear': 'Effacer', 'untitled': 'Sans titre',
   'tabTasks': 'Tâches', 'tabNotes': 'Notes', 'tabCalendar': 'Calendrier',
@@ -1153,6 +1222,8 @@ const Map<String, String> _fr = {
   'noOptionsYet': 'Aucune option pour le moment.', 'sectionModules': 'MODULES',
   'sectionTaskFields': 'CHAMPS DE TÂCHE',
   'taskFieldsHint': "Les champs masqués ne s'affichent pas lors de l'édition d'une tâche.",
+  'sectionBody': 'CORPS', 'useMarkdown': 'Formater en Markdown',
+  'useMarkdownHint': "Lorsque désactivé, le corps est affiché et modifié en texte brut, et la barre de mise en forme est masquée.",
   'showHidePriority': 'Priorité', 'showHideDate': 'Date',
   'showHideRepeat': 'Répéter', 'showHideList': 'Liste',
   'showHideDuration': 'Durée', 'showHideTags': 'Étiquettes',
@@ -1248,6 +1319,9 @@ const Map<String, String> _de = {
   'cancel': 'Abbrechen', 'done': 'Fertig', 'ok': 'OK', 'add': 'Hinzufügen',
   'create': 'Erstellen', 'save': 'Speichern', 'delete': 'Löschen',
   'deleteAll': 'Alle löschen', 'edit': 'Bearbeiten', 'rename': 'Umbenennen',
+  'select': 'Auswählen', 'selectAll': 'Alle auswählen',
+  'deselectAll': 'Auswahl aufheben', 'selectItems': 'Elemente auswählen',
+  'selectedCount': '{n} ausgewählt', 'duplicate': 'Duplizieren',
   'confirm': 'Bestätigen', 'insert': 'Einfügen', 'move': 'Verschieben',
   'putBack': 'Wiederherstellen', 'clear': 'Löschen', 'untitled': 'Ohne Titel',
   'tabTasks': 'Aufgaben', 'tabNotes': 'Notizen', 'tabCalendar': 'Kalender',
@@ -1284,6 +1358,8 @@ const Map<String, String> _de = {
   'noOptionsYet': 'Noch keine Optionen.', 'sectionModules': 'MODULE',
   'sectionTaskFields': 'AUFGABENFELDER',
   'taskFieldsHint': 'Ausgeblendete Felder erscheinen nicht beim Bearbeiten einer Aufgabe.',
+  'sectionBody': 'KÖRPER', 'useMarkdown': 'Mit Markdown formatieren',
+  'useMarkdownHint': 'Wenn aus, wird der Text als Klartext angezeigt und bearbeitet, und die Formatierungsleiste ist ausgeblendet.',
   'showHidePriority': 'Priorität', 'showHideDate': 'Datum',
   'showHideRepeat': 'Wiederholen', 'showHideList': 'Liste',
   'showHideDuration': 'Dauer', 'showHideTags': 'Tags',
@@ -1379,6 +1455,9 @@ const Map<String, String> _it = {
   'cancel': 'Annulla', 'done': 'Fatto', 'ok': 'OK', 'add': 'Aggiungi',
   'create': 'Crea', 'save': 'Salva', 'delete': 'Elimina',
   'deleteAll': 'Elimina tutto', 'edit': 'Modifica', 'rename': 'Rinomina',
+  'select': 'Seleziona', 'selectAll': 'Seleziona tutto',
+  'deselectAll': 'Deseleziona tutto', 'selectItems': 'Seleziona elementi',
+  'selectedCount': '{n} selezionati', 'duplicate': 'Duplica',
   'confirm': 'Conferma', 'insert': 'Inserisci', 'move': 'Sposta',
   'putBack': 'Ripristina', 'clear': 'Cancella', 'untitled': 'Senza titolo',
   'tabTasks': 'Attività', 'tabNotes': 'Note', 'tabCalendar': 'Calendario',
@@ -1415,6 +1494,8 @@ const Map<String, String> _it = {
   'noOptionsYet': 'Ancora nessuna opzione.', 'sectionModules': 'MODULI',
   'sectionTaskFields': 'CAMPI ATTIVITÀ',
   'taskFieldsHint': "I campi nascosti non vengono mostrati durante la modifica di un'attività.",
+  'sectionBody': 'CORPO', 'useMarkdown': 'Formatta con Markdown',
+  'useMarkdownHint': 'Se disattivato, il corpo viene mostrato e modificato come testo semplice e la barra di formattazione è nascosta.',
   'showHidePriority': 'Priorità', 'showHideDate': 'Data',
   'showHideRepeat': 'Ripeti', 'showHideList': 'Elenco',
   'showHideDuration': 'Durata', 'showHideTags': 'Tag',
@@ -1510,6 +1591,9 @@ const Map<String, String> _pt = {
   'cancel': 'Cancelar', 'done': 'Concluído', 'ok': 'OK', 'add': 'Adicionar',
   'create': 'Criar', 'save': 'Salvar', 'delete': 'Excluir',
   'deleteAll': 'Excluir tudo', 'edit': 'Editar', 'rename': 'Renomear',
+  'select': 'Selecionar', 'selectAll': 'Selecionar tudo',
+  'deselectAll': 'Desmarcar tudo', 'selectItems': 'Selecionar itens',
+  'selectedCount': '{n} selecionados', 'duplicate': 'Duplicar',
   'confirm': 'Confirmar', 'insert': 'Inserir', 'move': 'Mover',
   'putBack': 'Restaurar', 'clear': 'Limpar', 'untitled': 'Sem título',
   'tabTasks': 'Tarefas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendário',
@@ -1546,6 +1630,8 @@ const Map<String, String> _pt = {
   'noOptionsYet': 'Ainda sem opções.', 'sectionModules': 'MÓDULOS',
   'sectionTaskFields': 'CAMPOS DE TAREFA',
   'taskFieldsHint': 'Os campos ocultos não aparecem ao editar uma tarefa.',
+  'sectionBody': 'CORPO', 'useMarkdown': 'Formatar com Markdown',
+  'useMarkdownHint': 'Quando desativado, o corpo é exibido e editado como texto simples e a barra de formatação fica oculta.',
   'showHidePriority': 'Prioridade', 'showHideDate': 'Data',
   'showHideRepeat': 'Repetir', 'showHideList': 'Lista',
   'showHideDuration': 'Duração', 'showHideTags': 'Etiquetas',
@@ -1641,6 +1727,9 @@ const Map<String, String> _ru = {
   'cancel': 'Отмена', 'done': 'Готово', 'ok': 'OK', 'add': 'Добавить',
   'create': 'Создать', 'save': 'Сохранить', 'delete': 'Удалить',
   'deleteAll': 'Удалить всё', 'edit': 'Изменить', 'rename': 'Переименовать',
+  'select': 'Выбрать', 'selectAll': 'Выбрать всё',
+  'deselectAll': 'Снять выделение', 'selectItems': 'Выберите элементы',
+  'selectedCount': 'Выбрано: {n}', 'duplicate': 'Дублировать',
   'confirm': 'Подтвердить', 'insert': 'Вставить', 'move': 'Переместить',
   'putBack': 'Восстановить', 'clear': 'Очистить', 'untitled': 'Без названия',
   'tabTasks': 'Задачи', 'tabNotes': 'Заметки', 'tabCalendar': 'Календарь',
@@ -1677,6 +1766,8 @@ const Map<String, String> _ru = {
   'noOptionsYet': 'Пока нет параметров.', 'sectionModules': 'МОДУЛИ',
   'sectionTaskFields': 'ПОЛЯ ЗАДАЧИ',
   'taskFieldsHint': 'Скрытые поля не отображаются при редактировании задачи.',
+  'sectionBody': 'ТЕЛО', 'useMarkdown': 'Форматировать с Markdown',
+  'useMarkdownHint': 'Если выключено, тело отображается и редактируется как простой текст, панель форматирования скрыта.',
   'showHidePriority': 'Приоритет', 'showHideDate': 'Дата',
   'showHideRepeat': 'Повтор', 'showHideList': 'Список',
   'showHideDuration': 'Длительность', 'showHideTags': 'Метки',
@@ -1772,6 +1863,8 @@ const Map<String, String> _zh = {
   'cancel': '取消', 'done': '完成', 'ok': '好', 'add': '添加',
   'create': '创建', 'save': '保存', 'delete': '删除',
   'deleteAll': '全部删除', 'edit': '编辑', 'rename': '重命名',
+  'select': '选择', 'selectAll': '全选', 'deselectAll': '取消全选',
+  'selectItems': '选择项目', 'selectedCount': '已选 {n} 项', 'duplicate': '复制',
   'confirm': '确认', 'insert': '插入', 'move': '移动',
   'putBack': '恢复', 'clear': '清除', 'untitled': '无标题',
   'tabTasks': '任务', 'tabNotes': '笔记', 'tabCalendar': '日历',
@@ -1808,6 +1901,8 @@ const Map<String, String> _zh = {
   'noOptionsYet': '尚无选项。', 'sectionModules': '模块',
   'sectionTaskFields': '任务字段',
   'taskFieldsHint': '隐藏的字段在编辑任务时不会显示。',
+  'sectionBody': '正文', 'useMarkdown': '使用 Markdown 格式',
+  'useMarkdownHint': '关闭时，正文将以纯文本显示和编辑，格式工具栏被隐藏。',
   'showHidePriority': '优先级', 'showHideDate': '日期',
   'showHideRepeat': '重复', 'showHideList': '列表',
   'showHideDuration': '时长', 'showHideTags': '标签',
@@ -1903,6 +1998,8 @@ const Map<String, String> _ja = {
   'cancel': 'キャンセル', 'done': '完了', 'ok': 'OK', 'add': '追加',
   'create': '作成', 'save': '保存', 'delete': '削除',
   'deleteAll': 'すべて削除', 'edit': '編集', 'rename': '名前変更',
+  'select': '選択', 'selectAll': 'すべて選択', 'deselectAll': 'すべて解除',
+  'selectItems': '項目を選択', 'selectedCount': '{n}件選択', 'duplicate': '複製',
   'confirm': '確認', 'insert': '挿入', 'move': '移動',
   'putBack': '戻す', 'clear': 'クリア', 'untitled': '無題',
   'tabTasks': 'タスク', 'tabNotes': 'ノート', 'tabCalendar': 'カレンダー',
@@ -1939,6 +2036,8 @@ const Map<String, String> _ja = {
   'noOptionsYet': 'まだ設定はありません。', 'sectionModules': 'モジュール',
   'sectionTaskFields': 'タスク項目',
   'taskFieldsHint': '非表示の項目はタスク編集時に表示されません。',
+  'sectionBody': '本文', 'useMarkdown': 'Markdown でフォーマット',
+  'useMarkdownHint': 'オフにすると、本文はプレーンテキストとして表示・編集され、書式バーは非表示になります。',
   'showHidePriority': '優先度', 'showHideDate': '日付',
   'showHideRepeat': '繰り返し', 'showHideList': 'リスト',
   'showHideDuration': '所要時間', 'showHideTags': 'タグ',

@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart' show WidgetsBindingObserver, AppLifecycleS
 
 import '../folders/move_to_sheet.dart';
 import '../localization/strings.dart';
+import '../spaces/space_manager.dart';
 import '../theme/app_theme.dart';
 import '../models/note.dart';
 import '../utils/dropdown_overlay.dart';
@@ -270,7 +271,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
     });
   }
 
-  Widget _buildContentArea() {
+  Widget _buildContentArea({required bool useMarkdown}) {
     // A single scroll view hosts every mode (edit / preview / placeholder) so
     // its scroll offset survives the mode switch. The inner child is forced to
     // at least the viewport height so the whole area is tappable-to-edit and
@@ -321,6 +322,23 @@ class _NoteDetailViewState extends State<NoteDetailView>
               ),
             ),
           );
+        } else if (!useMarkdown) {
+          // Plain-text mode: skip the markdown parser entirely and show the
+          // body verbatim. Tap-to-edit still triggers via the GestureDetector.
+          child = GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _startEditing,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Text(
+                  _content.text,
+                  style: const TextStyle(fontSize: 16, height: 1.35),
+                ),
+              ),
+            ),
+          );
         } else {
           child = MarkdownView(
             data: _content.text,
@@ -343,85 +361,110 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   @override
   Widget build(BuildContext context) {
-    final showToolbar = _contentFocus.hasFocus;
-    return PopScope(
-      // The pop completes immediately for iOS swipe-back, but unfocusing
-      // here forces the IME to commit any in-flight composition into
-      // _content.text before dispose() runs _save(), so the user's last
-      // typed word isn't lost.
-      canPop: true,
-      onPopInvokedWithResult: (didPop, _) {
-        _titleFocus.unfocus();
-        _contentFocus.unfocus();
-        _flushSave();
-      },
-      child: CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(
-          border: null,
-          trailing: widget.isNew
-              ? null
-              : CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () => _showDropdown(context),
-                  child: const Icon(CupertinoIcons.ellipsis, size: 26),
-                ),
-        ),
-        child: Column(
-          children: [
-            Expanded(
-              child: SafeArea(
-                // When the keyboard is open, the markdown toolbar sits below
-                // the content and consumes the bottom inset itself. When the
-                // keyboard is closed, the tab bar overlays the page — so we
-                // need the bottom safe area (CupertinoTabScaffold includes
-                // the tab bar height in MediaQuery.padding.bottom) to keep
-                // the last lines of text off the tab bar.
-                bottom: !showToolbar,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                      child: CupertinoTextField(
-                        controller: _title,
-                        focusNode: _titleFocus,
-                        placeholder: S.of(context).title,
-                        autofocus: widget.isNew,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        decoration: const BoxDecoration(),
-                        padding: EdgeInsets.zero,
-                        maxLines: null,
-                        textInputAction: TextInputAction.next,
-                        textCapitalization: TextCapitalization.sentences,
-                        onSubmitted: (_) => _contentFocus.requestFocus(),
-                      ),
+    final settingsCtl =
+        SpaceManagerProvider.maybeOf(context)?.settingsController;
+    return ListenableBuilder(
+      listenable: settingsCtl ?? const _NoopListenable(),
+      builder: (context, _) {
+        final useMarkdown =
+            settingsCtl?.smartListPrefs.notesUseMarkdown ?? true;
+        final showToolbar = _contentFocus.hasFocus && useMarkdown;
+        return PopScope(
+          // The pop completes immediately for iOS swipe-back, but unfocusing
+          // here forces the IME to commit any in-flight composition into
+          // _content.text before dispose() runs _save(), so the user's last
+          // typed word isn't lost.
+          canPop: true,
+          onPopInvokedWithResult: (didPop, _) {
+            _titleFocus.unfocus();
+            _contentFocus.unfocus();
+            _flushSave();
+          },
+          child: CupertinoPageScaffold(
+            navigationBar: CupertinoNavigationBar(
+              border: null,
+              trailing: widget.isNew
+                  ? null
+                  : CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _showDropdown(context),
+                      child: const Icon(CupertinoIcons.ellipsis, size: 26),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Container(
-                        height: 0.5,
-                        color: CupertinoColors.separator,
-                      ),
-                    ),
-                    Expanded(child: _buildContentArea()),
-                  ],
-                ),
-              ),
             ),
-            if (showToolbar)
-              MarkdownToolbar(
-                controller: _content,
-                focusNode: _contentFocus,
-                onPromptLink: (selected) =>
-                    showLinkPromptDialog(context, initialText: selected),
-              ),
-          ],
-        ),
-      ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: SafeArea(
+                    // When the keyboard is open, the markdown toolbar sits
+                    // below the content and consumes the bottom inset
+                    // itself. When the keyboard is closed, the tab bar
+                    // overlays the page — so we need the bottom safe area
+                    // (CupertinoTabScaffold includes the tab bar height in
+                    // MediaQuery.padding.bottom) to keep the last lines of
+                    // text off the tab bar.
+                    bottom: !showToolbar,
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding:
+                              const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                          child: CupertinoTextField(
+                            controller: _title,
+                            focusNode: _titleFocus,
+                            placeholder: S.of(context).title,
+                            autofocus: widget.isNew,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            decoration: const BoxDecoration(),
+                            padding: EdgeInsets.zero,
+                            maxLines: null,
+                            textInputAction: TextInputAction.next,
+                            textCapitalization: TextCapitalization.sentences,
+                            onSubmitted: (_) =>
+                                _contentFocus.requestFocus(),
+                          ),
+                        ),
+                        Padding(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 20),
+                          child: Container(
+                            height: 0.5,
+                            color: CupertinoColors.separator,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildContentArea(useMarkdown: useMarkdown),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (showToolbar)
+                  MarkdownToolbar(
+                    controller: _content,
+                    focusNode: _contentFocus,
+                    onPromptLink: (selected) =>
+                        showLinkPromptDialog(context, initialText: selected),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
+}
+
+/// Stand-in [Listenable] for when no SettingsController is available
+/// in the widget tree — keeps the build shape identical.
+class _NoopListenable extends Listenable {
+  const _NoopListenable();
+  @override
+  void addListener(VoidCallback listener) {}
+  @override
+  void removeListener(VoidCallback listener) {}
 }
 
 class _NoteOptionsDropdown extends StatelessWidget {

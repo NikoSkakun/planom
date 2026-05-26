@@ -2,11 +2,8 @@ import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_controller.dart';
 import '../localization/strings.dart';
-import '../utils/fast_route.dart';
-import '../utils/undo_controller.dart';
+import 'selectable_task_list_shell.dart';
 import 'task_controller.dart';
-import 'task_detail_view.dart';
-import 'task_row.dart';
 
 class CompletedView extends StatelessWidget {
   const CompletedView({
@@ -21,71 +18,12 @@ class CompletedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        border: null,
-        middle: Text(s.completed),
-      ),
-      child: SafeArea(
-        child: ListenableBuilder(
-          listenable: controller,
-          builder: (context, _) {
-            final tasks = controller.allCompletedTasks;
-
-            if (tasks.isEmpty) {
-              return Center(
-                child: Text(
-                  s.noCompletedTasks,
-                  style: const TextStyle(color: CupertinoColors.secondaryLabel),
-                ),
-              );
-            }
-
-            return CustomScrollView(
-              slivers: [
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) {
-                      final task = tasks[i];
-                      return Dismissible(
-                        key: ValueKey(task.id),
-                        direction: DismissDirection.endToStart,
-                        background: const TaskDeleteBackground(),
-                        onDismissed: (_) {
-                          final savedListId = task.listId;
-                          controller.deleteTask(task.id);
-                          UndoScope.maybeOf(context)?.show(
-                            label: s.taskTrashedToast,
-                            onUndo: () =>
-                                controller.restoreTask(task.id, savedListId),
-                          );
-                        },
-                        child: TaskRow(
-                          task: task,
-                          onToggle: () =>
-                              controller.toggleCompleted(task.id),
-                          onTap: () => Navigator.of(context).push(
-                            FastRoute<void>(
-                              settings: const RouteSettings(
-                                  name: TaskDetailView.routeName),
-                              builder: (_) => TaskDetailView(
-                                task: task,
-                                controller: controller,
-                                folderController: folderController,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                    childCount: tasks.length,
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+    return SelectableTaskListShell(
+      title: s.completed,
+      taskController: controller,
+      folderController: folderController,
+      tasks: () => controller.allCompletedTasks,
+      emptyText: s.noCompletedTasks,
     );
   }
 }

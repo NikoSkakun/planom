@@ -12,9 +12,13 @@ class SmartListPrefs {
   SmartListVisibility allTasks;
   SmartListVisibility completed;
   SmartListVisibility trash;
+  SmartListVisibility notesTrash;
   bool hideTabLabels;
   bool showAddFolderButton;
   bool showNotesAddFolderButton;
+  // When false, note bodies are rendered/edited as plain text. The markdown
+  // toolbar in NoteDetailView is also hidden in that mode.
+  bool notesUseMarkdown;
 
   SmartListPrefs({
     this.today = SmartListVisibility.show,
@@ -23,9 +27,11 @@ class SmartListPrefs {
     this.allTasks = SmartListVisibility.hidden,
     this.completed = SmartListVisibility.showIfNotEmpty,
     this.trash = SmartListVisibility.showIfNotEmpty,
+    this.notesTrash = SmartListVisibility.showIfNotEmpty,
     this.hideTabLabels = false,
     this.showAddFolderButton = true,
     this.showNotesAddFolderButton = true,
+    this.notesUseMarkdown = true,
   });
 
   static Future<File> _file() async {
@@ -48,10 +54,13 @@ class SmartListPrefs {
             fallback: SmartListVisibility.hidden),
         completed: _parse(data['completed']),
         trash: _parse(data['trash']),
+        notesTrash: _parse(data['notesTrash'],
+            fallback: SmartListVisibility.showIfNotEmpty),
         hideTabLabels: data['hideTabLabels'] == true,
         showAddFolderButton: data['showAddFolderButton'] != false,
         showNotesAddFolderButton:
             data['showNotesAddFolderButton'] != false,
+        notesUseMarkdown: data['notesUseMarkdown'] != false,
       );
     } catch (_) {
       return SmartListPrefs();
@@ -70,9 +79,11 @@ class SmartListPrefs {
         'allTasks': _encode(allTasks),
         'completed': _encode(completed),
         'trash': _encode(trash),
+        'notesTrash': _encode(notesTrash),
         'hideTabLabels': hideTabLabels,
         'showAddFolderButton': showAddFolderButton,
         'showNotesAddFolderButton': showNotesAddFolderButton,
+        'notesUseMarkdown': notesUseMarkdown,
       };
 
   void applyJson(Map<String, dynamic> data) {
@@ -83,10 +94,13 @@ class SmartListPrefs {
     allTasks = _parse(data['allTasks'], fallback: SmartListVisibility.hidden);
     completed = _parse(data['completed']);
     trash = _parse(data['trash']);
+    notesTrash = _parse(data['notesTrash'],
+        fallback: SmartListVisibility.showIfNotEmpty);
     hideTabLabels = data['hideTabLabels'] == true;
     showAddFolderButton = data['showAddFolderButton'] != false;
     showNotesAddFolderButton =
         data['showNotesAddFolderButton'] != false;
+    notesUseMarkdown = data['notesUseMarkdown'] != false;
   }
 
   static SmartListVisibility _parse(dynamic value,

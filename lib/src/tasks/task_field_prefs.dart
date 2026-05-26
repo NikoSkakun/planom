@@ -24,6 +24,7 @@ class TaskFieldPrefs {
     this.showTags = true,
     this.showReminders = true,
     this.showListCount = true,
+    this.useMarkdown = true,
     this.folderCounterMode = FolderCounterMode.directOnly,
   });
 
@@ -35,6 +36,9 @@ class TaskFieldPrefs {
   bool showTags;
   bool showReminders;
   bool showListCount;
+  // When false, the task note is rendered and edited as plain text — the
+  // markdown preview and the formatting toolbar are skipped entirely.
+  bool useMarkdown;
   FolderCounterMode folderCounterMode;
 
   static const String storageKey = 'task_fields';
@@ -52,6 +56,7 @@ class TaskFieldPrefs {
         showTags: m['tags'] != false,
         showReminders: m['reminders'] != false,
         showListCount: m['listCount'] != false,
+        useMarkdown: m['useMarkdown'] != false,
         folderCounterMode: _parseFolderMode(m['folderCounter']),
       );
     } catch (_) {
@@ -68,6 +73,7 @@ class TaskFieldPrefs {
         'tags': showTags,
         'reminders': showReminders,
         'listCount': showListCount,
+        'useMarkdown': useMarkdown,
         'folderCounter': _encodeFolderMode(folderCounterMode),
       });
 
@@ -80,6 +86,7 @@ class TaskFieldPrefs {
         showTags: showTags,
         showReminders: showReminders,
         showListCount: showListCount,
+        useMarkdown: useMarkdown,
         folderCounterMode: folderCounterMode,
       );
 

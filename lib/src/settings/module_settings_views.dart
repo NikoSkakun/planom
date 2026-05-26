@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
+import '../utils/selection_menu.dart';
 import 'settings_controller.dart';
 import 'settings_widgets.dart';
+import 'smart_list_prefs.dart';
 
 /// Per-tab settings sub-pages reached from Settings → (Notes / Calendar /
 /// Routines). They currently host no settings; the page exists so that
@@ -44,6 +46,36 @@ class NotesSettingsView extends StatelessWidget {
 
   final SettingsController controller;
 
+  static String _visibilityLabel(S s, SmartListVisibility v) {
+    switch (v) {
+      case SmartListVisibility.show:
+        return s.visibilityShow;
+      case SmartListVisibility.showIfNotEmpty:
+        return s.visibilityIfNotEmpty;
+      case SmartListVisibility.hidden:
+        return s.visibilityHidden;
+    }
+  }
+
+  Future<void> _showTrashVisibilityPicker(
+      BuildContext context, SmartListVisibility current) async {
+    final s = S.of(context);
+    final selected = await showSelectionMenu<SmartListVisibility>(
+      context: context,
+      title: s.visibility,
+      current: current,
+      options: SmartListVisibility.values
+          .map((v) => SelectionMenuOption(
+                value: v,
+                label: _visibilityLabel(s, v),
+              ))
+          .toList(),
+    );
+    if (selected != null) {
+      controller.updateSmartListVisibility('notesTrash', selected);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -56,12 +88,41 @@ class NotesSettingsView extends StatelessWidget {
         child: ListenableBuilder(
           listenable: controller,
           builder: (context, _) {
+            final prefs = controller.smartListPrefs;
             return SingleChildScrollView(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SettingsSectionHeader(s.sectionSmartLists),
+                  SettingsNavRow(
+                    label: s.trash,
+                    trailingLabel:
+                        _visibilityLabel(s, prefs.notesTrash),
+                    onTap: () => _showTrashVisibilityPicker(
+                        context, prefs.notesTrash),
+                  ),
+                  const SizedBox(height: 18),
+                  SettingsSectionHeader(s.sectionBody),
+                  SettingsToggleRow(
+                    label: s.useMarkdown,
+                    value: prefs.notesUseMarkdown,
+                    onChanged: controller.updateNotesUseMarkdown,
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      s.useMarkdownHint,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   SettingsSectionHeader(s.sectionTasksUi),
                   SettingsToggleRow(
                     label: s.showAddFolderButton,

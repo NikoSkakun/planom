@@ -325,7 +325,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
     return widget.folderController.listById(_listId!)?.name ?? inbox;
   }
 
-  Widget _buildNoteArea() {
+  Widget _buildNoteArea({required bool useMarkdown}) {
     final notePlaceholder = S.of(context).note;
     if (_isEditingNote || _noteFocus.hasFocus) {
       return CupertinoTextField(
@@ -355,6 +355,19 @@ class _TaskDetailViewState extends State<TaskDetailView>
         ),
       );
     }
+    if (!useMarkdown) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _startEditingNote,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            _note.text,
+            style: const TextStyle(fontSize: 16, height: 1.35),
+          ),
+        ),
+      );
+    }
     return MarkdownView(
       data: _note.text,
       shrinkWrap: true,
@@ -379,10 +392,11 @@ class _TaskDetailViewState extends State<TaskDetailView>
         final showDuration = fields?.showDuration ?? true;
         final showTags = fields?.showTags ?? true;
         final showReminders = fields?.showReminders ?? true;
+        final useMarkdown = fields?.useMarkdown ?? true;
         return _buildScaffold(
           context,
           s,
-          showToolbar,
+          showToolbar && useMarkdown,
           showPriority: showPriority,
           showDate: showDate,
           showRepeat: showRepeat,
@@ -390,6 +404,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
           showDuration: showDuration,
           showTags: showTags,
           showReminders: showReminders,
+          useMarkdown: useMarkdown,
         );
       },
     );
@@ -406,6 +421,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
     required bool showDuration,
     required bool showTags,
     required bool showReminders,
+    required bool useMarkdown,
   }) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -529,7 +545,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.only(left: 34),
-                    child: _buildNoteArea(),
+                    child: _buildNoteArea(useMarkdown: useMarkdown),
                   ),
                   const SizedBox(height: 24),
 
