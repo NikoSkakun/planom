@@ -396,6 +396,12 @@ class S {
   String get turns => t('turns');
   String get customColor => t('customColor');
   String get selectColor => t('selectColor');
+  String get select => t('select');
+  String get selectAll => t('selectAll');
+  String get deselectAll => t('deselectAll');
+  String get selectItems => t('selectItems');
+  String selectedCount(int n) => t('selectedCount').replaceFirst('{n}', '$n');
+  String get duplicate => t('duplicate');
   String get otherDots => t('otherDots');
   String get chooseIcon => t('chooseIcon');
   String get opening => t('opening');
@@ -593,6 +599,9 @@ const Map<String, String> _en = {
   'create': 'Create', 'save': 'Save', 'delete': 'Delete', 'deleteAll': 'Delete All',
   'edit': 'Edit', 'rename': 'Rename', 'confirm': 'Confirm', 'insert': 'Insert',
   'move': 'Move', 'putBack': 'Put Back', 'clear': 'Clear', 'untitled': 'Untitled',
+  'select': 'Select', 'selectAll': 'Select All', 'deselectAll': 'Deselect All',
+  'selectItems': 'Select Items', 'selectedCount': '{n} selected',
+  'duplicate': 'Duplicate',
   'tabTasks': 'Tasks', 'tabNotes': 'Notes', 'tabCalendar': 'Calendar',
   'tabRoutines': 'Routines', 'tabSettings': 'Settings',
   'inbox': 'Inbox', 'today': 'Today', 'yesterday': 'Yesterday', 'tomorrow': 'Tomorrow', 'upcoming': 'Upcoming',
@@ -860,6 +869,9 @@ const Map<String, String> _uk = {
   'cancel': 'Скасувати', 'done': 'Готово', 'ok': 'OK', 'add': 'Додати',
   'create': 'Створити', 'save': 'Зберегти', 'delete': 'Видалити',
   'deleteAll': 'Видалити все', 'edit': 'Редагувати', 'rename': 'Перейменувати',
+  'select': 'Вибрати', 'selectAll': 'Вибрати все', 'deselectAll': 'Скасувати вибір',
+  'selectItems': 'Виберіть елементи', 'selectedCount': 'Вибрано: {n}',
+  'duplicate': 'Дублювати',
   'confirm': 'Підтвердити', 'insert': 'Вставити', 'move': 'Перемістити',
   'putBack': 'Відновити', 'clear': 'Очистити', 'untitled': 'Без назви',
   'tabTasks': 'Завдання', 'tabNotes': 'Нотатки', 'tabCalendar': 'Календар',
@@ -993,6 +1005,9 @@ const Map<String, String> _es = {
   'cancel': 'Cancelar', 'done': 'Listo', 'ok': 'OK', 'add': 'Añadir',
   'create': 'Crear', 'save': 'Guardar', 'delete': 'Eliminar',
   'deleteAll': 'Eliminar todo', 'edit': 'Editar', 'rename': 'Renombrar',
+  'select': 'Seleccionar', 'selectAll': 'Seleccionar todo',
+  'deselectAll': 'Deseleccionar todo', 'selectItems': 'Seleccionar elementos',
+  'selectedCount': '{n} seleccionados', 'duplicate': 'Duplicar',
   'confirm': 'Confirmar', 'insert': 'Insertar', 'move': 'Mover',
   'putBack': 'Restaurar', 'clear': 'Borrar', 'untitled': 'Sin título',
   'tabTasks': 'Tareas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendario',
@@ -1126,6 +1141,9 @@ const Map<String, String> _fr = {
   'cancel': 'Annuler', 'done': 'Terminé', 'ok': 'OK', 'add': 'Ajouter',
   'create': 'Créer', 'save': 'Enregistrer', 'delete': 'Supprimer',
   'deleteAll': 'Tout supprimer', 'edit': 'Modifier', 'rename': 'Renommer',
+  'select': 'Sélectionner', 'selectAll': 'Tout sélectionner',
+  'deselectAll': 'Tout désélectionner', 'selectItems': 'Sélectionner des éléments',
+  'selectedCount': '{n} sélectionnés', 'duplicate': 'Dupliquer',
   'confirm': 'Confirmer', 'insert': 'Insérer', 'move': 'Déplacer',
   'putBack': 'Restaurer', 'clear': 'Effacer', 'untitled': 'Sans titre',
   'tabTasks': 'Tâches', 'tabNotes': 'Notes', 'tabCalendar': 'Calendrier',
@@ -1259,6 +1277,9 @@ const Map<String, String> _de = {
   'cancel': 'Abbrechen', 'done': 'Fertig', 'ok': 'OK', 'add': 'Hinzufügen',
   'create': 'Erstellen', 'save': 'Speichern', 'delete': 'Löschen',
   'deleteAll': 'Alle löschen', 'edit': 'Bearbeiten', 'rename': 'Umbenennen',
+  'select': 'Auswählen', 'selectAll': 'Alle auswählen',
+  'deselectAll': 'Auswahl aufheben', 'selectItems': 'Elemente auswählen',
+  'selectedCount': '{n} ausgewählt', 'duplicate': 'Duplizieren',
   'confirm': 'Bestätigen', 'insert': 'Einfügen', 'move': 'Verschieben',
   'putBack': 'Wiederherstellen', 'clear': 'Löschen', 'untitled': 'Ohne Titel',
   'tabTasks': 'Aufgaben', 'tabNotes': 'Notizen', 'tabCalendar': 'Kalender',
@@ -1392,6 +1413,9 @@ const Map<String, String> _it = {
   'cancel': 'Annulla', 'done': 'Fatto', 'ok': 'OK', 'add': 'Aggiungi',
   'create': 'Crea', 'save': 'Salva', 'delete': 'Elimina',
   'deleteAll': 'Elimina tutto', 'edit': 'Modifica', 'rename': 'Rinomina',
+  'select': 'Seleziona', 'selectAll': 'Seleziona tutto',
+  'deselectAll': 'Deseleziona tutto', 'selectItems': 'Seleziona elementi',
+  'selectedCount': '{n} selezionati', 'duplicate': 'Duplica',
   'confirm': 'Conferma', 'insert': 'Inserisci', 'move': 'Sposta',
   'putBack': 'Ripristina', 'clear': 'Cancella', 'untitled': 'Senza titolo',
   'tabTasks': 'Attività', 'tabNotes': 'Note', 'tabCalendar': 'Calendario',
@@ -1525,6 +1549,9 @@ const Map<String, String> _pt = {
   'cancel': 'Cancelar', 'done': 'Concluído', 'ok': 'OK', 'add': 'Adicionar',
   'create': 'Criar', 'save': 'Salvar', 'delete': 'Excluir',
   'deleteAll': 'Excluir tudo', 'edit': 'Editar', 'rename': 'Renomear',
+  'select': 'Selecionar', 'selectAll': 'Selecionar tudo',
+  'deselectAll': 'Desmarcar tudo', 'selectItems': 'Selecionar itens',
+  'selectedCount': '{n} selecionados', 'duplicate': 'Duplicar',
   'confirm': 'Confirmar', 'insert': 'Inserir', 'move': 'Mover',
   'putBack': 'Restaurar', 'clear': 'Limpar', 'untitled': 'Sem título',
   'tabTasks': 'Tarefas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendário',
@@ -1658,6 +1685,9 @@ const Map<String, String> _ru = {
   'cancel': 'Отмена', 'done': 'Готово', 'ok': 'OK', 'add': 'Добавить',
   'create': 'Создать', 'save': 'Сохранить', 'delete': 'Удалить',
   'deleteAll': 'Удалить всё', 'edit': 'Изменить', 'rename': 'Переименовать',
+  'select': 'Выбрать', 'selectAll': 'Выбрать всё',
+  'deselectAll': 'Снять выделение', 'selectItems': 'Выберите элементы',
+  'selectedCount': 'Выбрано: {n}', 'duplicate': 'Дублировать',
   'confirm': 'Подтвердить', 'insert': 'Вставить', 'move': 'Переместить',
   'putBack': 'Восстановить', 'clear': 'Очистить', 'untitled': 'Без названия',
   'tabTasks': 'Задачи', 'tabNotes': 'Заметки', 'tabCalendar': 'Календарь',
@@ -1791,6 +1821,8 @@ const Map<String, String> _zh = {
   'cancel': '取消', 'done': '完成', 'ok': '好', 'add': '添加',
   'create': '创建', 'save': '保存', 'delete': '删除',
   'deleteAll': '全部删除', 'edit': '编辑', 'rename': '重命名',
+  'select': '选择', 'selectAll': '全选', 'deselectAll': '取消全选',
+  'selectItems': '选择项目', 'selectedCount': '已选 {n} 项', 'duplicate': '复制',
   'confirm': '确认', 'insert': '插入', 'move': '移动',
   'putBack': '恢复', 'clear': '清除', 'untitled': '无标题',
   'tabTasks': '任务', 'tabNotes': '笔记', 'tabCalendar': '日历',
@@ -1924,6 +1956,8 @@ const Map<String, String> _ja = {
   'cancel': 'キャンセル', 'done': '完了', 'ok': 'OK', 'add': '追加',
   'create': '作成', 'save': '保存', 'delete': '削除',
   'deleteAll': 'すべて削除', 'edit': '編集', 'rename': '名前変更',
+  'select': '選択', 'selectAll': 'すべて選択', 'deselectAll': 'すべて解除',
+  'selectItems': '項目を選択', 'selectedCount': '{n}件選択', 'duplicate': '複製',
   'confirm': '確認', 'insert': '挿入', 'move': '移動',
   'putBack': '戻す', 'clear': 'クリア', 'untitled': '無題',
   'tabTasks': 'タスク', 'tabNotes': 'ノート', 'tabCalendar': 'カレンダー',

@@ -8,6 +8,7 @@ import '../models/app_list.dart';
 import '../models/list_section.dart';
 import '../models/list_type.dart';
 import '../models/task.dart';
+import '../tasks/calendar_date_picker.dart';
 import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
@@ -18,10 +19,14 @@ import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
+import '../utils/selection_checkbox.dart';
+import '../utils/selection_controller.dart';
 import '../utils/selection_menu.dart';
+import '../utils/selection_toolbar.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
+import 'list_picker_sheet.dart';
 import 'move_to_sheet.dart';
 import 'section_name_sheet.dart';
 
@@ -48,6 +53,7 @@ class ListTaskView extends StatefulWidget {
 class _ListTaskViewState extends State<ListTaskView>
     with DropdownOverlayMixin {
   late AppList _currentList;
+  final _selection = SelectionController();
 
   @override
   void initState() {
@@ -61,6 +67,7 @@ class _ListTaskViewState extends State<ListTaskView>
   @override
   void dispose() {
     widget.activeListId.value = null;
+    _selection.dispose();
     super.dispose();
   }
 
@@ -68,6 +75,12 @@ class _ListTaskViewState extends State<ListTaskView>
     showDropdown(context, (dismiss) {
       return _ListOptionsDropdown(
         onDismiss: dismiss,
+        onSelect: _currentList.listType == ListType.birthdays
+            ? null
+            : () {
+                dismiss();
+                _selection.start();
+              },
         onEdit: () {
           dismiss();
           _openEditSheet();
@@ -103,6 +116,118 @@ class _ListTaskViewState extends State<ListTaskView>
         },
       );
     });
+  }
+
+  // ── Batch actions ────────────────────────────────────────────────────────
+
+  Future<void> _batchDelete() async {
+    final ids = _selection.selectedIds.toList();
+    if (ids.isEmpty) return;
+    for (final id in ids) {
+      await widget.taskController.deleteTask(id);
+    }
+    _selection.cancel();
+  }
+
+  Future<void> _batchToggleCompleted() async {
+    final ids = _selection.selectedIds.toList();
+    if (ids.isEmpty) return;
+    // If every selected task is already completed, uncomplete them all;
+    // otherwise complete the ones that aren't.
+    final tasks = ids
+        .map(widget.taskController.taskById)
+        .whereType<Task>()
+        .toList();
+    final allCompleted =
+        tasks.isNotEmpty && tasks.every((t) => t.isCompleted);
+    for (final t in tasks) {
+      if (allCompleted && !t.isCompleted) continue;
+      if (!allCompleted && t.isCompleted) continue;
+      await widget.taskController.toggleCompleted(t.id);
+    }
+    _selection.cancel();
+  }
+
+  Future<void> _batchSetDate() async {
+    final result = await showCalendarDatePicker(context);
+    if (result == null || !mounted) return;
+    final ids = _selection.selectedIds.toList();
+    for (final id in ids) {
+      final t = widget.taskController.taskById(id);
+      if (t == null) continue;
+      await widget.taskController.updateTask(t.copyWith(
+        dueDate: result.$1,
+        clearDueDate: result.$1 == null,
+        doTime: result.$2,
+        clearDoTime: result.$2 == null,
+      ));
+    }
+    _selection.cancel();
+  }
+
+  Future<void> _batchSetPriority() async {
+    final s = S.of(context);
+    final picked = await showSelectionMenu<int>(
+      context: context,
+      title: s.priority,
+      options: [
+        SelectionMenuOption(value: 0, label: s.priorityNone),
+        SelectionMenuOption(value: 1, label: s.priorityLow),
+        SelectionMenuOption(value: 2, label: s.priorityMed),
+        SelectionMenuOption(value: 3, label: s.priorityHigh),
+      ],
+    );
+    if (picked == null) return;
+    final ids = _selection.selectedIds.toList();
+    for (final id in ids) {
+      final t = widget.taskController.taskById(id);
+      if (t == null) continue;
+      await widget.taskController.updateTask(t.copyWith(priority: picked));
+    }
+    _selection.cancel();
+  }
+
+  Future<void> _batchMoveToList() async {
+    final picked = await showListPickerSheet(
+      context,
+      widget.folderController,
+      _currentList.id,
+    );
+    if (!mounted) return;
+    final ids = _selection.selectedIds.toList();
+    for (final id in ids) {
+      final t = widget.taskController.taskById(id);
+      if (t == null) continue;
+      await widget.taskController.updateTask(t.copyWith(
+        listId: picked,
+        clearListId: picked == null,
+        // Moving to a different list clears the section assignment.
+        clearSectionId: picked != _currentList.id,
+      ));
+    }
+    _selection.cancel();
+  }
+
+  Future<void> _batchDuplicate() async {
+    final ids = _selection.selectedIds.toList();
+    for (final id in ids) {
+      final t = widget.taskController.taskById(id);
+      if (t == null) continue;
+      await widget.taskController.addTask(Task(
+        title: t.title,
+        note: t.note,
+        dueDate: t.dueDate,
+        doTime: t.doTime,
+        duration: t.duration,
+        listId: t.listId,
+        priority: t.priority,
+        reminderOffsets: List.of(t.reminderOffsets),
+        tagIds: List.of(t.tagIds),
+        recurrence: t.recurrence,
+        sectionId: t.sectionId,
+      ));
+    }
+    _selection.cancel();
   }
 
   Future<void> _addSection() async {
@@ -173,29 +298,138 @@ class _ListTaskViewState extends State<ListTaskView>
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        border: null,
-        middle: Text(_currentList.name),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => _showDropdown(context),
-          child: const Icon(CupertinoIcons.ellipsis, size: 26),
-        ),
-      ),
-      child: SafeArea(
-        child: _currentList.listType == ListType.birthdays
-            ? ContactListView(
-                listId: _currentList.id,
-                controller: widget.contactController,
-              )
-            : _SectionedListBody(
-                list: _currentList,
-                taskController: widget.taskController,
-                folderController: widget.folderController,
-              ),
-      ),
+    return ListenableBuilder(
+      listenable: _selection,
+      builder: (context, _) {
+        final selecting = _selection.active;
+        final s = S.of(context);
+        return CupertinoPageScaffold(
+          navigationBar: CupertinoNavigationBar(
+            border: null,
+            leading: selecting
+                ? CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: _selection.cancel,
+                    child: Text(s.cancel),
+                  )
+                : null,
+            automaticallyImplyLeading: !selecting,
+            middle: Text(selecting
+                ? (_selection.count == 0
+                    ? s.selectItems
+                    : s.selectedCount(_selection.count))
+                : _currentList.name),
+            trailing: selecting
+                ? CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: _toggleSelectAll,
+                    child: Text(_areAllSelected()
+                        ? s.deselectAll
+                        : s.selectAll),
+                  )
+                : CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: () => _showDropdown(context),
+                    child: const Icon(CupertinoIcons.ellipsis, size: 26),
+                  ),
+          ),
+          child: SafeArea(
+            bottom: !selecting,
+            child: Column(
+              children: [
+                Expanded(
+                  child: _currentList.listType == ListType.birthdays
+                      ? ContactListView(
+                          listId: _currentList.id,
+                          controller: widget.contactController,
+                        )
+                      : _SectionedListBody(
+                          list: _currentList,
+                          taskController: widget.taskController,
+                          folderController: widget.folderController,
+                          selection: _selection,
+                        ),
+                ),
+                if (selecting)
+                  SelectionToolbar(
+                    bottomInset: MediaQuery.paddingOf(context).bottom,
+                    actions: _batchActions(s),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
+  }
+
+  List<SelectionAction> _batchActions(S s) {
+    final empty = _selection.isEmpty;
+    return [
+      SelectionAction(
+        label: s.done,
+        icon: CupertinoIcons.checkmark_circle,
+        onTap: empty ? () {} : _batchToggleCompleted,
+      ),
+      SelectionAction(
+        label: s.dateLabel,
+        icon: CupertinoIcons.calendar,
+        onTap: empty ? () {} : _batchSetDate,
+      ),
+      SelectionAction(
+        label: s.priority,
+        icon: CupertinoIcons.flag,
+        onTap: empty ? () {} : _batchSetPriority,
+      ),
+      SelectionAction(
+        label: s.moveTo,
+        icon: CupertinoIcons.tray,
+        onTap: empty ? () {} : _batchMoveToList,
+      ),
+      SelectionAction(
+        label: s.duplicate,
+        icon: CupertinoIcons.doc_on_doc,
+        onTap: empty ? () {} : _batchDuplicate,
+      ),
+      SelectionAction(
+        label: s.delete,
+        icon: CupertinoIcons.trash,
+        onTap: empty ? () {} : _batchDelete,
+        isDestructive: true,
+      ),
+    ];
+  }
+
+  /// Returns every (non-completed) task id in the active list — used by
+  /// the "Select All" button.
+  Iterable<String> _allTaskIds() sync* {
+    final sections =
+        widget.folderController.sectionsForList(_currentList.id);
+    for (final t in widget.taskController
+        .tasksForListSection(_currentList.id, null)) {
+      yield t.id;
+    }
+    for (final section in sections) {
+      for (final t in widget.taskController
+          .tasksForListSection(_currentList.id, section.id)) {
+        yield t.id;
+      }
+    }
+  }
+
+  bool _areAllSelected() {
+    final all = _allTaskIds().toSet();
+    if (all.isEmpty) return false;
+    return _selection.selectedIds.containsAll(all) &&
+        _selection.count >= all.length;
+  }
+
+  void _toggleSelectAll() {
+    if (_areAllSelected()) {
+      _selection.replaceAll(const [], SelectionItemKind.task);
+    } else {
+      _selection.replaceAll(_allTaskIds(), SelectionItemKind.task);
+    }
   }
 }
 
@@ -212,11 +446,13 @@ class _SectionedListBody extends StatefulWidget {
     required this.list,
     required this.taskController,
     required this.folderController,
+    required this.selection,
   });
 
   final AppList list;
   final TaskController taskController;
   final FolderController folderController;
+  final SelectionController selection;
 
   @override
   State<_SectionedListBody> createState() => _SectionedListBodyState();
@@ -228,8 +464,11 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable:
-          Listenable.merge([widget.taskController, widget.folderController]),
+      listenable: Listenable.merge([
+        widget.taskController,
+        widget.folderController,
+        widget.selection,
+      ]),
       builder: (context, _) {
         final sections =
             widget.folderController.sectionsForList(widget.list.id);
@@ -335,12 +574,17 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
   /// Wraps a task row so:
   ///   • Long-pressing starts a drag with the task id.
   ///   • Hovering another task triggers a reorder-insert-before drop target.
+  /// When the selection controller is active, drag/reorder is suppressed and
+  /// tapping the row toggles selection instead of opening the detail view.
   Widget _buildDraggableTask(
     BuildContext context,
     Task task, {
     required String? sectionId,
     required String beforeId,
   }) {
+    if (widget.selection.active) {
+      return _buildTaskRow(context, task);
+    }
     return LongPressDraggable<String>(
       data: task.id,
       delay: const Duration(milliseconds: 400),
@@ -424,6 +668,38 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
   }
 
   Widget _buildTaskRow(BuildContext context, Task task) {
+    if (widget.selection.active) {
+      final selected = widget.selection.isSelected(task.id);
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () =>
+            widget.selection.toggle(task.id, SelectionItemKind.task),
+        child: Container(
+          color: selected
+              ? AppColors.accent.withOpacity(0.10)
+              : null,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(
+            children: [
+              SelectionCheckbox(checked: selected),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  task.title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: task.isCompleted
+                        ? CupertinoColors.secondaryLabel
+                            .resolveFrom(context)
+                        : null,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Dismissible(
       key: ValueKey(task.id),
       direction: DismissDirection.endToStart,
@@ -636,6 +912,7 @@ class _ListOptionsDropdown extends StatelessWidget {
     required this.onInfo,
     required this.onDelete,
     this.onAddSection,
+    this.onSelect,
   });
 
   final VoidCallback onDismiss;
@@ -644,6 +921,7 @@ class _ListOptionsDropdown extends StatelessWidget {
   final VoidCallback onInfo;
   final VoidCallback onDelete;
   final VoidCallback? onAddSection;
+  final VoidCallback? onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -660,6 +938,11 @@ class _ListOptionsDropdown extends StatelessWidget {
           right: 8,
           child: _DropdownPanel(
             items: [
+              if (onSelect != null)
+                _DropdownItem(
+                    label: S.of(context).select,
+                    icon: CupertinoIcons.checkmark_circle,
+                    onTap: onSelect!),
               _DropdownItem(
                   label: S.of(context).editList,
                   icon: CupertinoIcons.pencil,
