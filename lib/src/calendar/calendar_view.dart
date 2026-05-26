@@ -148,6 +148,7 @@ class _CalendarViewState extends State<CalendarView>
       eventController: widget.eventController,
       folderController: widget.folderController,
       contactController: widget.contactController,
+      settingsController: widget.settingsController,
       googleCalendarController: widget.googleCalendarController,
     );
     if (!mounted) return;

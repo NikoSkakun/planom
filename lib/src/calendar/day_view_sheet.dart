@@ -10,6 +10,7 @@ import '../localization/strings.dart';
 import '../models/contact.dart';
 import '../models/event.dart';
 import '../models/task.dart';
+import '../settings/settings_controller.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../tasks/task_controller.dart';
 import '../tasks/task_creation_sheet.dart';
@@ -28,6 +29,7 @@ Future<void> showDayViewSheet(
   required EventController eventController,
   required FolderController folderController,
   required ContactController contactController,
+  SettingsController? settingsController,
   GoogleCalendarController? googleCalendarController,
 }) {
   return showModalBottomSheet<void>(
@@ -41,6 +43,7 @@ Future<void> showDayViewSheet(
       eventController: eventController,
       folderController: folderController,
       contactController: contactController,
+      settingsController: settingsController,
       googleCalendarController: googleCalendarController,
     ),
   );
@@ -54,6 +57,7 @@ class DayViewSheet extends StatefulWidget {
     required this.eventController,
     required this.folderController,
     required this.contactController,
+    this.settingsController,
     this.googleCalendarController,
   });
 
@@ -62,6 +66,7 @@ class DayViewSheet extends StatefulWidget {
   final EventController eventController;
   final FolderController folderController;
   final ContactController contactController;
+  final SettingsController? settingsController;
   final GoogleCalendarController? googleCalendarController;
 
   @override
@@ -106,6 +111,7 @@ class _DayViewSheetState extends State<DayViewSheet> {
                   widget.taskController,
                   widget.folderController,
                   initialDueDate: widget.date,
+                  settingsController: widget.settingsController,
                 );
               },
               onEvent: () {

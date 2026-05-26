@@ -189,6 +189,7 @@ class _HomeShellState extends State<HomeShell> {
           context,
           widget.taskController,
           widget.folderController,
+          settingsController: widget.settingsController,
         );
       case PlusDropSmartList.today:
         showTaskCreationSheet(
@@ -196,6 +197,7 @@ class _HomeShellState extends State<HomeShell> {
           widget.taskController,
           widget.folderController,
           initialDueDate: today(),
+          settingsController: widget.settingsController,
         );
       case PlusDropSmartList.tomorrow:
         showTaskCreationSheet(
@@ -203,6 +205,7 @@ class _HomeShellState extends State<HomeShell> {
           widget.taskController,
           widget.folderController,
           initialDueDate: tomorrow(),
+          settingsController: widget.settingsController,
         );
       case PlusDropSmartList.upcoming:
         showTaskCreationSheet(
@@ -210,6 +213,7 @@ class _HomeShellState extends State<HomeShell> {
           widget.taskController,
           widget.folderController,
           initialDueDate: upcomingDefault(),
+          settingsController: widget.settingsController,
         );
       case PlusDropSmartList.allTasks:
         // All Tasks is a read-only union — defaults to Inbox.
@@ -217,6 +221,7 @@ class _HomeShellState extends State<HomeShell> {
           context,
           widget.taskController,
           widget.folderController,
+          settingsController: widget.settingsController,
         );
     }
   }
@@ -236,6 +241,7 @@ class _HomeShellState extends State<HomeShell> {
       widget.taskController,
       widget.folderController,
       initialListId: listId,
+      settingsController: widget.settingsController,
     );
   }
 
@@ -247,6 +253,7 @@ class _HomeShellState extends State<HomeShell> {
       context,
       widget.taskController,
       widget.folderController,
+      settingsController: widget.settingsController,
     );
   }
 
@@ -265,6 +272,7 @@ class _HomeShellState extends State<HomeShell> {
       widget.folderController,
       initialListId: listId,
       initialSectionId: sectionId,
+      settingsController: widget.settingsController,
     );
   }
 
@@ -430,6 +438,7 @@ class _HomeShellState extends State<HomeShell> {
       widget.folderController,
       initialListId: _activeListId.value,
       initialDueDate: _activeDueDate.value,
+      settingsController: widget.settingsController,
     );
   }
 
@@ -450,6 +459,7 @@ class _HomeShellState extends State<HomeShell> {
         widget.taskController,
         widget.folderController,
         initialDueDate: date,
+        settingsController: widget.settingsController,
       );
     } else if (choice == 'event') {
       showEventCreationSheet(
