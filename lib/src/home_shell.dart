@@ -168,6 +168,57 @@ class _HomeShellState extends State<HomeShell> {
     _plusDragController.onDropOnDay = _handleDropOnDay;
     _plusDragController.onDropOnNoteFolder = _handleDropOnNoteFolder;
     _plusDragController.onDropOnNotesRoot = _handleDropOnNotesRoot;
+    _plusDragController.onDropOnSmartList = _handleDropOnSmartList;
+  }
+
+  void _handleDropOnSmartList(PlusDropSmartList kind) {
+    final now = DateTime.now();
+    DateTime today() => DateTime(now.year, now.month, now.day);
+    DateTime tomorrow() =>
+        DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    // For Upcoming there's no canonical date — fall back to today+2 so
+    // the task at least lands in the Upcoming bucket. The user can still
+    // edit it from the creation sheet.
+    DateTime upcomingDefault() =>
+        DateTime(now.year, now.month, now.day).add(const Duration(days: 2));
+
+    switch (kind) {
+      case PlusDropSmartList.inbox:
+        // Inbox = no list assigned, no date — explicit clear.
+        showTaskCreationSheet(
+          context,
+          widget.taskController,
+          widget.folderController,
+        );
+      case PlusDropSmartList.today:
+        showTaskCreationSheet(
+          context,
+          widget.taskController,
+          widget.folderController,
+          initialDueDate: today(),
+        );
+      case PlusDropSmartList.tomorrow:
+        showTaskCreationSheet(
+          context,
+          widget.taskController,
+          widget.folderController,
+          initialDueDate: tomorrow(),
+        );
+      case PlusDropSmartList.upcoming:
+        showTaskCreationSheet(
+          context,
+          widget.taskController,
+          widget.folderController,
+          initialDueDate: upcomingDefault(),
+        );
+      case PlusDropSmartList.allTasks:
+        // All Tasks is a read-only union — defaults to Inbox.
+        showTaskCreationSheet(
+          context,
+          widget.taskController,
+          widget.folderController,
+        );
+    }
   }
 
   void _handleDropOnList(String listId) {

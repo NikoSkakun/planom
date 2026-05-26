@@ -357,6 +357,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                             label: s.inbox,
                             count: widget
                                 .controller.inboxUncompletedCount,
+                            onAcceptPlus: () => PlusDragScope.of(context)
+                                ?.onDropOnSmartList
+                                ?.call(PlusDropSmartList.inbox),
                             onTap: () => Navigator.of(context).push(
                               FastRoute<void>(
                                 builder: (_) => InboxView(
@@ -373,6 +376,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               label: s.today,
                               count:
                                   todayCount > 0 ? todayCount : null,
+                              onAcceptPlus: () => PlusDragScope.of(context)
+                                  ?.onDropOnSmartList
+                                  ?.call(PlusDropSmartList.today),
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => TodayView(
@@ -396,6 +402,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               count: tomorrowCount > 0
                                   ? tomorrowCount
                                   : null,
+                              onAcceptPlus: () => PlusDragScope.of(context)
+                                  ?.onDropOnSmartList
+                                  ?.call(PlusDropSmartList.tomorrow),
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => TomorrowView(
@@ -414,6 +423,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               count: upcomingCount > 0
                                   ? upcomingCount
                                   : null,
+                              onAcceptPlus: () => PlusDragScope.of(context)
+                                  ?.onDropOnSmartList
+                                  ?.call(PlusDropSmartList.upcoming),
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => UpcomingView(
@@ -436,6 +448,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               count: allTasksCount > 0
                                   ? allTasksCount
                                   : null,
+                              onAcceptPlus: () => PlusDragScope.of(context)
+                                  ?.onDropOnSmartList
+                                  ?.call(PlusDropSmartList.allTasks),
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => AllTasksView(
