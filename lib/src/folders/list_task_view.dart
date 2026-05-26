@@ -18,6 +18,7 @@ import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
+import '../utils/selection_menu.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
@@ -459,34 +460,30 @@ class _SectionHeader extends StatelessWidget {
     );
   }
 
-  void _showSectionMenu(BuildContext context) {
+  Future<void> _showSectionMenu(BuildContext context) async {
     final s = S.of(context);
-    showCupertinoModalPopup<void>(
+    final choice = await showSelectionMenu<String>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              onRename();
-            },
-            child: Text(s.rename),
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              onDelete();
-            },
-            child: Text(s.delete),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(s.cancel),
+      title: section.name,
+      options: [
+        SelectionMenuOption(
+          value: 'rename',
+          label: s.rename,
+          icon: CupertinoIcons.pencil,
         ),
-      ),
+        SelectionMenuOption(
+          value: 'delete',
+          label: s.delete,
+          icon: CupertinoIcons.trash,
+          isDestructive: true,
+        ),
+      ],
     );
+    if (choice == 'rename') {
+      onRename();
+    } else if (choice == 'delete') {
+      onDelete();
+    }
   }
 }
 
