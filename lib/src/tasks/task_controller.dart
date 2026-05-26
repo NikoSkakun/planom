@@ -108,6 +108,27 @@ class TaskController with ChangeNotifier {
   List<Task> tasksForList(String listId) => List.unmodifiable(
       _completedLast(_applySort(_topLevel.where((t) => t.listId == listId))));
 
+  /// Active (non-completed) tasks in [listId] that live in [sectionId].
+  /// Pass null to scope to the implicit "Top" group (no section assigned).
+  List<Task> tasksForListSection(String listId, String? sectionId) {
+    final filtered = _topLevel.where((t) =>
+        t.listId == listId && !t.isCompleted && t.sectionId == sectionId);
+    final list = filtered.toList();
+    _sortByDefault(list);
+    return List.unmodifiable(list);
+  }
+
+  /// Completed tasks within [listId] — these always live in the implicit
+  /// "Completed" virtual section, regardless of which section they were in
+  /// before being checked off.
+  List<Task> completedTasksForList(String listId) {
+    final filtered =
+        _topLevel.where((t) => t.listId == listId && t.isCompleted);
+    final list = filtered.toList();
+    _sortByDefault(list);
+    return List.unmodifiable(list);
+  }
+
   int uncompletedCountForList(String listId) =>
       _topLevel.where((t) => t.listId == listId && !t.isCompleted).length;
 
@@ -397,6 +418,20 @@ class TaskController with ChangeNotifier {
     _trashedTasks = List.of(_trashedTasks)..removeAt(i);
     _tasks = [restored, ..._tasks];
     _updateBadge();
+    notifyListeners();
+  }
+
+  /// Updates a task's section assignment, persisting both the in-memory copy
+  /// and the row. Used when the user drags a task between section headers.
+  Future<void> moveTaskToSection(String taskId, String? sectionId) async {
+    final i = _tasks.indexWhere((t) => t.id == taskId);
+    if (i == -1) return;
+    final updated = _tasks[i].copyWith(
+      sectionId: sectionId,
+      clearSectionId: sectionId == null,
+    );
+    await _db.updateTask(updated);
+    _tasks = [..._tasks]..[i] = updated;
     notifyListeners();
   }
 

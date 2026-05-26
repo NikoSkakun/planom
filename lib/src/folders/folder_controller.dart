@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../database/database_service.dart';
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
+import '../models/list_section.dart';
 
 class FolderController with ChangeNotifier {
   FolderController(this._db);
@@ -12,6 +13,7 @@ class FolderController with ChangeNotifier {
   List<AppList> _lists = [];
   List<AppFolder> _trashedFolders = [];
   List<AppList> _trashedLists = [];
+  List<ListSection> _sections = [];
 
   List<AppFolder> get folders => List.unmodifiable(_folders);
   List<AppList> get lists => List.unmodifiable(_lists);
@@ -75,7 +77,77 @@ class FolderController with ChangeNotifier {
     _lists = await _db.getLists();
     _trashedFolders = await _db.getTrashedFolders();
     _trashedLists = await _db.getTrashedLists();
+    _sections = await _db.getListSections();
     notifyListeners();
+  }
+
+  // ── Sections ────────────────────────────────────────────────────────────
+
+  /// User-defined sections within [listId], in display order.
+  List<ListSection> sectionsForList(String listId) {
+    final scoped = _sections.where((s) => s.listId == listId).toList();
+    scoped.sort((a, b) {
+      if (a.sortOrder != b.sortOrder) {
+        return a.sortOrder.compareTo(b.sortOrder);
+      }
+      return a.creationDate.compareTo(b.creationDate);
+    });
+    return scoped;
+  }
+
+  ListSection? sectionById(String id) {
+    try {
+      return _sections.firstWhere((s) => s.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> addSection(ListSection section) async {
+    await _db.insertListSection(section);
+    _sections = [..._sections, section];
+    notifyListeners();
+  }
+
+  Future<void> updateSection(ListSection section) async {
+    await _db.updateListSection(section);
+    final idx = _sections.indexWhere((s) => s.id == section.id);
+    if (idx != -1) _sections[idx] = section;
+    notifyListeners();
+  }
+
+  Future<void> deleteSection(String id) async {
+    await _db.deleteListSection(id);
+    _sections = _sections.where((s) => s.id != id).toList();
+    notifyListeners();
+  }
+
+  Future<void> reorderSections(
+      String listId, int oldIndex, int newIndex) async {
+    final scope = sectionsForList(listId);
+    if (newIndex > oldIndex) newIndex--;
+    final item = scope.removeAt(oldIndex);
+    scope.insert(newIndex, item);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _sections.indexWhere((s) => s.id == updated.id);
+      if (idx != -1) _sections[idx] = updated;
+    }
+    notifyListeners();
+    await _db.updateListSectionSortOrders(scope);
+  }
+
+  Future<void> toggleSectionCollapsed(String id) async {
+    final idx = _sections.indexWhere((s) => s.id == id);
+    if (idx == -1) return;
+    final updated = _sections[idx]
+        .copyWith(isCollapsed: !_sections[idx].isCollapsed);
+    _sections[idx] = updated;
+    notifyListeners();
+    await _db.updateListSection(updated);
   }
 
   Future<void> addFolder(AppFolder folder) async {
