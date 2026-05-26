@@ -2,11 +2,8 @@ import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_controller.dart';
 import '../localization/strings.dart';
-import '../utils/fast_route.dart';
-import '../utils/undo_controller.dart';
+import 'selectable_task_list_shell.dart';
 import 'task_controller.dart';
-import 'task_detail_view.dart';
-import 'task_row.dart';
 
 class AllTasksView extends StatelessWidget {
   const AllTasksView({
@@ -20,83 +17,11 @@ class AllTasksView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = S.of(context);
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        border: null,
-        middle: Text(s.allTasks),
-      ),
-      child: SafeArea(
-        child: ListenableBuilder(
-          listenable: Listenable.merge([controller, folderController]),
-          builder: (context, _) {
-            final tasks = controller.allTasks;
-
-            if (tasks.isEmpty) {
-              return Center(
-                child: Text(
-                  s.noTasks,
-                  style:
-                      const TextStyle(color: CupertinoColors.secondaryLabel),
-                ),
-              );
-            }
-            return CustomScrollView(
-              slivers: [
-                SliverReorderableList(
-                  itemCount: tasks.length,
-                  onReorder: (_, __) {},
-                  proxyDecorator: taskProxyDecorator,
-                  itemBuilder: (context, i) {
-                    final task = tasks[i];
-                    final list = task.listId != null
-                        ? folderController.listById(task.listId!)
-                        : null;
-                    final listColor =
-                        list?.color != null ? Color(list!.color!) : null;
-                    return ReorderableDelayedDragStartListener(
-                      key: ValueKey('all_${task.id}'),
-                      index: i,
-                      enabled: false,
-                      child: Dismissible(
-                        key: ValueKey(task.id),
-                        direction: DismissDirection.endToStart,
-                        background: const TaskDeleteBackground(),
-                        onDismissed: (_) {
-                          final savedListId = task.listId;
-                          controller.deleteTask(task.id);
-                          UndoScope.maybeOf(context)?.show(
-                            label: S.of(context).taskTrashedToast,
-                            onUndo: () =>
-                                controller.restoreTask(task.id, savedListId),
-                          );
-                        },
-                        child: TaskRow(
-                          task: task,
-                          showList: task.listId != null,
-                          listColor: listColor,
-                          onToggle: () => controller.toggleCompleted(task.id),
-                          onTap: () => Navigator.of(context).push(
-                            FastRoute<void>(
-                              settings: const RouteSettings(
-                                  name: TaskDetailView.routeName),
-                              builder: (_) => TaskDetailView(
-                                task: task,
-                                controller: controller,
-                                folderController: folderController,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+    return SelectableTaskListShell(
+      title: S.of(context).allTasks,
+      taskController: controller,
+      folderController: folderController,
+      tasks: () => controller.allTasks,
     );
   }
 }

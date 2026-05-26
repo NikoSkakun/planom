@@ -6,6 +6,7 @@ import '../folders/folder_controller.dart';
 import '../home_shell.dart';
 import '../localization/strings.dart';
 import '../models/note.dart';
+import '../models/note_folder.dart';
 import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
@@ -18,6 +19,9 @@ import '../utils/fast_route.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
 import '../utils/reorder_drag.dart';
+import '../utils/selection_checkbox.dart';
+import '../utils/selection_controller.dart';
+import '../utils/selection_toolbar.dart';
 import '../utils/undo_controller.dart';
 import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
@@ -54,6 +58,7 @@ class NotesView extends StatefulWidget {
 
 class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
   final Set<String> _expandedIds = {};
+  final _selection = SelectionController();
 
   @override
   void initState() {
@@ -64,7 +69,145 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
   @override
   void dispose() {
     widget.collapseSignal.removeListener(_collapseAll);
+    _selection.dispose();
     super.dispose();
+  }
+
+  // ── Batch actions ────────────────────────────────────────────────────────
+
+  Future<void> _batchDeleteNotes() async {
+    for (final id in _selection.selectedIds.toList()) {
+      await widget.controller.deleteNote(id);
+    }
+    _selection.cancel();
+  }
+
+  Future<void> _batchDeleteFolders() async {
+    for (final id in _selection.selectedIds.toList()) {
+      await widget.controller.deleteFolderDeep(id);
+    }
+    _selection.cancel();
+  }
+
+  Future<void> _batchDuplicateNotes() async {
+    for (final id in _selection.selectedIds.toList()) {
+      final n = widget.controller.noteById(id);
+      if (n == null) continue;
+      await widget.controller.addNote(Note(
+        title: n.title,
+        content: n.content,
+        folderId: n.folderId,
+      ));
+    }
+    _selection.cancel();
+  }
+
+  Future<void> _batchMoveNotes() async {
+    final folders =
+        widget.controller.foldersIn(null).map((f) => f.id).toList();
+    // Build a flat list of selectable folder destinations.
+    String? picked;
+    bool cancelled = true;
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) {
+        final s = S.of(ctx);
+        return CupertinoActionSheet(
+          title: Text(s.moveTo),
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () {
+                cancelled = false;
+                picked = null;
+                Navigator.of(ctx).pop();
+              },
+              child: Text(s.inbox),
+            ),
+            for (final fid in folders)
+              CupertinoActionSheetAction(
+                onPressed: () {
+                  cancelled = false;
+                  picked = fid;
+                  Navigator.of(ctx).pop();
+                },
+                child: Text(widget.controller.folderById(fid)?.name ?? '—'),
+              ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.cancel),
+          ),
+        );
+      },
+    );
+    if (cancelled || !mounted) return;
+    for (final id in _selection.selectedIds.toList()) {
+      await widget.controller.moveNote(id, picked);
+    }
+    _selection.cancel();
+  }
+
+  /// Wraps a NoteRow in selection mode so taps toggle selection rather
+  /// than open the note. Returns [child] unchanged when not selecting.
+  Widget _wrapNoteForSelection(Note n, Widget child) {
+    if (!_selection.active) return child;
+    final selected = _selection.isSelected(n.id);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _selection.toggle(n.id, SelectionItemKind.note),
+      child: Container(
+        color: selected ? AppColors.accent.withOpacity(0.10) : null,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            SelectionCheckbox(checked: selected),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                n.title.isEmpty ? S.of(context).untitled : n.title,
+                style: const TextStyle(fontSize: 16),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Same as [_wrapNoteForSelection] but for folder rows.
+  Widget _wrapFolderForSelection(NoteFolder f, Widget child) {
+    if (!_selection.active) return child;
+    final selected = _selection.isSelected(f.id);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _selection.toggle(f.id, SelectionItemKind.folder),
+      child: Container(
+        color: selected ? AppColors.accent.withOpacity(0.10) : null,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            SelectionCheckbox(checked: selected),
+            const SizedBox(width: 12),
+            Icon(
+              CupertinoIcons.folder,
+              size: 22,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                f.name,
+                style: const TextStyle(fontSize: 16),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _collapseAll() {
@@ -226,6 +369,10 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
           dismiss();
           showCreateNoteFolderSheet(context, widget.controller);
         },
+        onSelect: () {
+          dismiss();
+          _selection.start();
+        },
         showSettings: settingsHidden,
         onSettings: settingsHidden
             ? () {
@@ -243,22 +390,136 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
     final sc = widget.settingsController;
     final showFloatingAddFolder =
         sc == null || sc.smartListPrefs.showNotesAddFolderButton;
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        border: null,
-        middle: Text(s.tabNotes),
-        trailing: Semantics(
-          label: s.settings,
-          button: true,
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => _showSettingsMenu(context),
-            child: const Icon(CupertinoIcons.ellipsis, size: 26),
+    return ListenableBuilder(
+      listenable: _selection,
+      builder: (context, _) {
+        final selecting = _selection.active;
+        final folders = widget.controller.foldersIn(null);
+        final notes = widget.controller.notesIn(null);
+        final hasMixed = folders.isNotEmpty && notes.isNotEmpty;
+        final selectKind = _selection.kind;
+        // "Select All" is only offered when the user has either started a
+        // selection (so we know whether they're picking notes or folders)
+        // or when the root holds a single homogeneous group. Mixed roots
+        // hide the action — picking a kind requires tapping one item first.
+        Iterable<String>? selectAllIds;
+        if (selectKind == SelectionItemKind.note) {
+          selectAllIds = notes.map((n) => n.id);
+        } else if (selectKind == SelectionItemKind.folder) {
+          selectAllIds = folders.map((f) => f.id);
+        } else if (!hasMixed) {
+          if (notes.isNotEmpty) {
+            selectAllIds = notes.map((n) => n.id);
+          } else if (folders.isNotEmpty) {
+            selectAllIds = folders.map((f) => f.id);
+          }
+        }
+        final allIds = selectAllIds?.toSet() ?? <String>{};
+        final allSelected = allIds.isNotEmpty &&
+            _selection.selectedIds.containsAll(allIds) &&
+            _selection.count >= allIds.length;
+        return CupertinoPageScaffold(
+          navigationBar: CupertinoNavigationBar(
+            border: null,
+            leading: selecting
+                ? CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: _selection.cancel,
+                    child: Text(s.cancel),
+                  )
+                : null,
+            automaticallyImplyLeading: !selecting,
+            middle: Text(selecting
+                ? (_selection.count == 0
+                    ? s.selectItems
+                    : s.selectedCount(_selection.count))
+                : s.tabNotes),
+            trailing: selecting
+                ? (selectAllIds != null
+                    ? CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          if (allSelected) {
+                            _selection.replaceAll(
+                                const [], selectKind ?? SelectionItemKind.note);
+                          } else {
+                            _selection.replaceAll(
+                                allIds,
+                                selectKind ??
+                                    (notes.isNotEmpty
+                                        ? SelectionItemKind.note
+                                        : SelectionItemKind.folder));
+                          }
+                        },
+                        child: Text(
+                            allSelected ? s.deselectAll : s.selectAll),
+                      )
+                    : null)
+                : Semantics(
+                    label: s.settings,
+                    button: true,
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _showSettingsMenu(context),
+                      child:
+                          const Icon(CupertinoIcons.ellipsis, size: 26),
+                    ),
+                  ),
           ),
+          child: SafeArea(
+            bottom: !selecting,
+            child: Column(
+              children: [
+                Expanded(child: _buildBody(context, showFloatingAddFolder)),
+                if (selecting)
+                  SelectionToolbar(
+                    bottomInset: MediaQuery.paddingOf(context).bottom,
+                    actions: _buildBatchActions(s),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<SelectionAction> _buildBatchActions(S s) {
+    final empty = _selection.isEmpty;
+    final kind = _selection.kind;
+    if (kind == SelectionItemKind.folder) {
+      return [
+        SelectionAction(
+          label: s.delete,
+          icon: CupertinoIcons.trash,
+          onTap: empty ? () {} : _batchDeleteFolders,
+          isDestructive: true,
         ),
+      ];
+    }
+    return [
+      SelectionAction(
+        label: s.moveTo,
+        icon: CupertinoIcons.folder,
+        onTap: empty ? () {} : _batchMoveNotes,
       ),
-      child: SafeArea(
-        child: Stack(
+      SelectionAction(
+        label: s.duplicate,
+        icon: CupertinoIcons.doc_on_doc,
+        onTap: empty ? () {} : _batchDuplicateNotes,
+      ),
+      SelectionAction(
+        label: s.delete,
+        icon: CupertinoIcons.trash,
+        onTap: empty ? () {} : _batchDeleteNotes,
+        isDestructive: true,
+      ),
+    ];
+  }
+
+  Widget _buildBody(BuildContext context, bool showFloatingAddFolder) {
+    final s = S.of(context);
+    return Stack(
           children: [
             _maybeWrapWithSearchPull(
               child: ListenableBuilder(
@@ -363,28 +624,32 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                                                             .circular(8),
                                                   )
                                                 : null,
-                                            child: NoteFolderRow(
-                                              folder: f,
-                                              noteCount: widget.controller
-                                                  .notesIn(f.id)
-                                                  .length,
-                                              onTap: () =>
-                                                  Navigator.of(context)
-                                                      .push(
-                                                FastRoute<void>(
-                                                  builder: (_) =>
-                                                      NoteFolderView(
-                                                    folder: f,
-                                                    controller:
-                                                        widget.controller,
-                                                    settingsController: widget
-                                                        .settingsController,
+                                            child: _wrapFolderForSelection(
+                                              f,
+                                              NoteFolderRow(
+                                                folder: f,
+                                                noteCount: widget.controller
+                                                    .notesIn(f.id)
+                                                    .length,
+                                                onTap: () =>
+                                                    Navigator.of(context)
+                                                        .push(
+                                                  FastRoute<void>(
+                                                    builder: (_) =>
+                                                        NoteFolderView(
+                                                      folder: f,
+                                                      controller:
+                                                          widget.controller,
+                                                      settingsController: widget
+                                                          .settingsController,
+                                                    ),
                                                   ),
                                                 ),
+                                                onExpand: () =>
+                                                    _toggle(f.id),
+                                                isExpanded: _expandedIds
+                                                    .contains(f.id),
                                               ),
-                                              onExpand: () => _toggle(f.id),
-                                              isExpanded: _expandedIds
-                                                  .contains(f.id),
                                             ),
                                           );
                                         },
@@ -467,17 +732,22 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                                                   n.id, savedFolderId),
                                         );
                                       },
-                                      child: NoteRow(
-                                        note: n,
-                                        onTap: () =>
-                                            Navigator.of(context).push(
-                                          FastRoute<void>(
-                                            settings: const RouteSettings(
-                                                name: NoteDetailView
-                                                    .routeName),
-                                            builder: (_) => NoteDetailView(
-                                              note: n,
-                                              controller: widget.controller,
+                                      child: _wrapNoteForSelection(
+                                        n,
+                                        NoteRow(
+                                          note: n,
+                                          onTap: () =>
+                                              Navigator.of(context).push(
+                                            FastRoute<void>(
+                                              settings: const RouteSettings(
+                                                  name: NoteDetailView
+                                                      .routeName),
+                                              builder: (_) =>
+                                                  NoteDetailView(
+                                                note: n,
+                                                controller:
+                                                    widget.controller,
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -594,9 +864,7 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
               ),
             ),
           ],
-        ),
-      ),
-    );
+        );
   }
 }
 
@@ -605,6 +873,7 @@ class _NotesOptionsDropdown extends StatelessWidget {
     required this.onDismiss,
     required this.onAddNote,
     required this.onAddFolder,
+    required this.onSelect,
     this.showSettings = false,
     this.onSettings,
   });
@@ -612,6 +881,7 @@ class _NotesOptionsDropdown extends StatelessWidget {
   final VoidCallback onDismiss;
   final VoidCallback onAddNote;
   final VoidCallback onAddFolder;
+  final VoidCallback onSelect;
   final bool showSettings;
   final VoidCallback? onSettings;
 
@@ -624,6 +894,12 @@ class _NotesOptionsDropdown extends StatelessWidget {
       color: CupertinoColors.separator.resolveFrom(context),
     );
     final items = <Widget>[
+      DropdownRow(
+        label: s.select,
+        icon: CupertinoIcons.checkmark_circle,
+        onTap: onSelect,
+      ),
+      separator,
       DropdownRow(
         label: s.addNote,
         icon: CupertinoIcons.add_circled,
