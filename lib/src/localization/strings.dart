@@ -225,6 +225,9 @@ class S {
   String get defaultListIcon => t('defaultListIcon');
   String get defaultFolderIcon => t('defaultFolderIcon');
   String get defaultNoteFolderIcon => t('defaultNoteFolderIcon');
+  String get textSize => t('textSize');
+  String get useSystemTextSize => t('useSystemTextSize');
+  String get textSizeHint => t('textSizeHint');
   String get showListCount => t('showListCount');
   String get revert => t('revert');
   String get taskTrashedToast => t('taskTrashedToast');
@@ -745,6 +748,9 @@ const Map<String, String> _en = {
   'defaultListIcon': 'Default list icon',
   'defaultFolderIcon': 'Default folder icon',
   'defaultNoteFolderIcon': 'Default folder icon',
+  'textSize': 'Text size',
+  'useSystemTextSize': 'Use system text size',
+  'textSizeHint': 'Scales all text in the app. UI elements next to text grow with the chosen size.',
   'showListCount': 'List counter',
   'revert': 'Undo',
   'taskTrashedToast': 'Task moved to Trash',

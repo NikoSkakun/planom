@@ -77,21 +77,37 @@ class MyApp extends StatelessWidget {
             // instead of the whole CupertinoApp above.
             builder: (context) => ValueListenableBuilder<int>(
               valueListenable: settingsController.colorRevision,
-              builder: (context, _, __) => _SecurityGate(
-                securityService: securityService,
-                child: HomeShell(
-                  settingsController: settingsController,
-                  taskController: taskController,
-                  folderController: folderController,
-                  noteController: noteController,
-                  routineController: routineController,
-                  eventController: eventController,
-                  contactController: contactController,
-                  backupService: backupService,
-                  securityService: securityService,
-                  googleCalendarController: googleCalendarController,
-                ),
-              ),
+              builder: (context, _, __) {
+                // Apply the user-selected text scale to the whole content
+                // subtree. When useSystemTextScale is true we honour the OS
+                // value (TextScaler.noScaling falls through to whatever the
+                // platform passed in via MediaQuery).
+                final base = MediaQuery.of(context);
+                final mq = settingsController.useSystemTextScale
+                    ? base
+                    : base.copyWith(
+                        textScaler:
+                            TextScaler.linear(settingsController.textScale),
+                      );
+                return MediaQuery(
+                  data: mq,
+                  child: _SecurityGate(
+                    securityService: securityService,
+                    child: HomeShell(
+                      settingsController: settingsController,
+                      taskController: taskController,
+                      folderController: folderController,
+                      noteController: noteController,
+                      routineController: routineController,
+                      eventController: eventController,
+                      contactController: contactController,
+                      backupService: backupService,
+                      securityService: securityService,
+                      googleCalendarController: googleCalendarController,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         );

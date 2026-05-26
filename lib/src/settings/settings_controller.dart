@@ -67,6 +67,22 @@ class SettingsController with ChangeNotifier {
   BadgeMode _badgeMode = BadgeMode.todayTasks;
   BadgeMode get badgeMode => _badgeMode;
 
+  // App-wide font/UI scale.
+  //
+  // [textScale] is the multiplier applied to text via MediaQuery's
+  // `textScaler` AND mirrored to [AppScale.factor] for UI widgets that want
+  // to grow alongside their attached text (checkbox, row icons). The default
+  // 1.0 matches today's behavior.
+  //
+  // When [useSystemTextScale] is true, the app respects the OS-level text
+  // scale (Dynamic Type on iOS; Display & Text Size on Android) and the
+  // [textScale] value is ignored for text — but still applied to UI widgets
+  // through [AppScale.factor] so the two stay roughly in sync visually.
+  double _textScale = 1.0;
+  double get textScale => _textScale;
+  bool _useSystemTextScale = false;
+  bool get useSystemTextScale => _useSystemTextScale;
+
   // Default icons applied when the user creates a new task/list/folder/note
   // folder without picking one. Strings match the existing iconId scheme:
   // - Tasks: 'inbox' is the historical default; other values are presets.
@@ -186,6 +202,11 @@ class SettingsController with ChangeNotifier {
         _defaultFolderIcon = value.isEmpty ? null : value;
       } else if (key == 'default_note_folder_icon') {
         _defaultNoteFolderIcon = value.isEmpty ? null : value;
+      } else if (key == 'text_scale') {
+        final v = double.tryParse(value);
+        if (v != null && v >= 0.5 && v <= 2.5) _textScale = v;
+      } else if (key == 'use_system_text_scale') {
+        _useSystemTextScale = value == 'true';
       } else if (key == TaskFieldPrefs.storageKey) {
         _taskFieldPrefs = TaskFieldPrefs.fromJson(value);
       }
@@ -199,6 +220,7 @@ class SettingsController with ChangeNotifier {
     AppDefaults.listIcon = _defaultListIcon;
     AppDefaults.folderIcon = _defaultFolderIcon;
     AppDefaults.noteFolderIcon = _defaultNoteFolderIcon;
+    AppScale.factor = _textScale;
 
     notifyListeners();
   }
@@ -284,6 +306,22 @@ class SettingsController with ChangeNotifier {
     AppDefaults.noteFolderIcon = iconId;
     notifyListeners();
     await _db.setAppSetting('default_note_folder_icon', iconId ?? '');
+  }
+
+  Future<void> updateTextScale(double scale) async {
+    final clamped = scale.clamp(0.5, 2.5).toDouble();
+    if (clamped == _textScale) return;
+    _textScale = clamped;
+    AppScale.factor = clamped;
+    notifyListeners();
+    await _db.setAppSetting('text_scale', clamped.toStringAsFixed(2));
+  }
+
+  Future<void> updateUseSystemTextScale(bool value) async {
+    if (value == _useSystemTextScale) return;
+    _useSystemTextScale = value;
+    notifyListeners();
+    await _db.setAppSetting('use_system_text_scale', value.toString());
   }
 
   static String _encodeBadgeMode(BadgeMode m) {

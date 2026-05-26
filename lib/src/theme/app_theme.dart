@@ -45,3 +45,15 @@ class AppDefaults {
   /// Default `iconId` for a note folder. null = render the default PNG asset.
   static String? noteFolderIcon;
 }
+
+/// UI scale factor mirrored from SettingsController. CupertinoApp wraps the
+/// content in a MediaQuery whose `textScaler` is `TextScaler.linear(factor)`
+/// when system scaling is disabled, so text widgets scale automatically.
+/// Widgets that need to scale alongside their attached text (e.g. checkboxes,
+/// row icons) multiply their hardcoded size by [AppScale.factor].
+class AppScale {
+  AppScale._();
+
+  /// Current effective UI scale (1.0 = default). Updated on settings load.
+  static double factor = 1.0;
+}

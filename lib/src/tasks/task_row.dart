@@ -224,13 +224,15 @@ class RoundedCheckbox extends StatelessWidget {
         );
     }
 
+    final size = 20 * AppScale.factor;
     return Container(
-      width: 20,
-      height: 20,
+      width: size,
+      height: size,
       decoration: deco,
       child: checked
-          ? const Icon(CupertinoIcons.checkmark,
-              size: 11, color: CupertinoColors.white)
+          ? Icon(CupertinoIcons.checkmark,
+              size: 11 * AppScale.factor,
+              color: CupertinoColors.white)
           : null,
     );
   }

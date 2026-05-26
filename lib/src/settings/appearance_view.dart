@@ -125,6 +125,35 @@ class AppearanceView extends StatelessWidget {
                   onSelect: controller.updateCompletionColor,
                 ),
 
+                // ── Text size ────────────────────────────────────────────
+                const SizedBox(height: 32),
+                Text(
+                  s.textSize,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: labelColor,
+                    letterSpacing: -0.08,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SettingsToggleRow(
+                  label: s.useSystemTextSize,
+                  value: controller.useSystemTextScale,
+                  onChanged: controller.updateUseSystemTextScale,
+                ),
+                if (!controller.useSystemTextScale) ...[
+                  const SizedBox(height: 8),
+                  _TextScaleRow(controller: controller),
+                ],
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    s.textSizeHint,
+                    style: TextStyle(fontSize: 13, color: labelColor),
+                  ),
+                ),
+
                 // ── Calendar ─────────────────────────────────────────────
                 const SizedBox(height: 32),
                 Text(
@@ -168,6 +197,76 @@ class AppearanceView extends StatelessWidget {
       ],
     );
     if (selected != null) await controller.updateFirstDayOfWeek(selected);
+  }
+}
+
+// ── Text scale ────────────────────────────────────────────────────────────────
+
+class _TextScaleRow extends StatelessWidget {
+  const _TextScaleRow({required this.controller});
+
+  final SettingsController controller;
+
+  static const _presets = <double>[0.85, 1.0, 1.15, 1.3, 1.5];
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = CupertinoDynamicColor.resolve(
+      CupertinoColors.tertiarySystemBackground,
+      context,
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('A', style: TextStyle(fontSize: 13)),
+              Text('A', style: TextStyle(fontSize: 22)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // CupertinoSlider with discrete preset stops. We compute the nearest
+          // preset on commit so the value snaps to a clean number.
+          CupertinoSlider(
+            value: controller.textScale,
+            min: _presets.first,
+            max: _presets.last,
+            divisions: _presets.length - 1,
+            onChanged: (v) {
+              final nearest = _presets.reduce((a, b) =>
+                  (a - v).abs() < (b - v).abs() ? a : b);
+              if (nearest != controller.textScale) {
+                controller.updateTextScale(nearest);
+              }
+            },
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (final p in _presets)
+                Text(
+                  '${(p * 100).round()}%',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: p == controller.textScale
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    color: p == controller.textScale
+                        ? CupertinoColors.label.resolveFrom(context)
+                        : CupertinoColors.tertiaryLabel.resolveFrom(context),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

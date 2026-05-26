@@ -941,13 +941,15 @@ class _RoundedCheckbox extends StatelessWidget {
           border: checked ? null : Border.all(color: borderColor, width: 1.5),
         );
     }
+    final size = 22 * AppScale.factor;
     return Container(
-      width: 22,
-      height: 22,
+      width: size,
+      height: size,
       decoration: deco,
       child: checked
-          ? const Icon(CupertinoIcons.checkmark,
-              size: 13, color: CupertinoColors.white)
+          ? Icon(CupertinoIcons.checkmark,
+              size: 13 * AppScale.factor,
+              color: CupertinoColors.white)
           : null,
     );
   }
