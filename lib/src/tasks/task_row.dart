@@ -66,7 +66,9 @@ class TaskRow extends StatelessWidget {
         : CupertinoColors.secondaryLabel.resolveFrom(context);
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      // Top-align so the checkbox lines up with the first line of the
+      // title when the title wraps to multiple lines.
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Checkbox zone — includes the vertical padding so the full item height is tappable
         MergeSemantics(
