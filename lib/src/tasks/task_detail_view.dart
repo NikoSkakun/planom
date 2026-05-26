@@ -432,14 +432,29 @@ class _TaskDetailViewState extends State<TaskDetailView>
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: GestureDetector(
-                          onTap: () =>
-                              setState(() => _isCompleted = !_isCompleted),
-                          child: _RoundedCheckbox(checked: _isCompleted),
+                      if (widget.task.isBirthday && !widget.task.isCompletable)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF2D55).withOpacity(0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(CupertinoIcons.gift_fill,
+                                size: 14, color: Color(0xFFFF2D55)),
+                          ),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: GestureDetector(
+                            onTap: () =>
+                                setState(() => _isCompleted = !_isCompleted),
+                            child: _RoundedCheckbox(checked: _isCompleted),
+                          ),
                         ),
-                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: CupertinoTextField(
@@ -454,6 +469,19 @@ class _TaskDetailViewState extends State<TaskDetailView>
                       ),
                     ],
                   ),
+                  if (widget.task.isBirthday) ...[
+                    const SizedBox(height: 12),
+                    _BirthdayInfoRow(
+                      task: widget.task,
+                      isCompletable: widget.task.isCompletable,
+                      onToggleCompletable: (v) {
+                        final updated =
+                            widget.task.copyWith(isCompletable: v);
+                        widget.controller.updateTask(updated);
+                        setState(() {});
+                      },
+                    ),
+                  ],
                   // Compact options strip — one row of icons (and short
                   // value chips for date/priority) sitting right below the
                   // title, replacing seven full-width cards.
@@ -920,6 +948,87 @@ class _RoundedCheckbox extends StatelessWidget {
           ? const Icon(CupertinoIcons.checkmark,
               size: 13, color: CupertinoColors.white)
           : null,
+    );
+  }
+}
+
+class _BirthdayInfoRow extends StatelessWidget {
+  const _BirthdayInfoRow({
+    required this.task,
+    required this.isCompletable,
+    required this.onToggleCompletable,
+  });
+
+  final Task task;
+  final bool isCompletable;
+  final ValueChanged<bool> onToggleCompletable;
+
+  static String _fmt(int month, int day, int? year) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final base = '${months[month - 1]} $day';
+    return year != null ? '$base, $year' : base;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final bg = CupertinoColors.tertiarySystemFill.resolveFrom(context);
+    return Padding(
+      padding: const EdgeInsets.only(left: 34),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(CupertinoIcons.gift, size: 18,
+                    color: Color(0xFFFF2D55)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(s.birthDate,
+                      style: const TextStyle(fontSize: 15)),
+                ),
+                Text(
+                  _fmt(task.birthMonth!, task.birthDay!, task.birthYear),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(s.completable,
+                      style: const TextStyle(fontSize: 15)),
+                ),
+                CupertinoSwitch(
+                  value: isCompletable,
+                  activeColor: AppColors.accent,
+                  onChanged: onToggleCompletable,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

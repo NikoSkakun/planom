@@ -95,6 +95,16 @@ class TaskController with ChangeNotifier {
           t.dueDate!.day == date.day)
       .toList();
 
+  /// Birthday-typed tasks whose month/day match [date] in any year — used by
+  /// the calendar to render the recurring anniversary even though only one
+  /// dueDate is stored on the task itself.
+  List<Task> birthdaysForDate(DateTime date) => _topLevel
+      .where((t) =>
+          t.isBirthday &&
+          t.birthMonth == date.month &&
+          t.birthDay == date.day)
+      .toList();
+
   List<Task> tasksForList(String listId) => List.unmodifiable(
       _completedLast(_applySort(_topLevel.where((t) => t.listId == listId))));
 

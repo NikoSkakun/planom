@@ -6,6 +6,7 @@ import 'calendar/event_controller.dart';
 import 'calendar/event_creation_sheet.dart';
 import 'folders/folder_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
+import 'models/list_type.dart';
 import 'notes/note_controller.dart';
 import 'notes/notes_view.dart';
 import 'spaces/space_manager.dart';
@@ -16,6 +17,7 @@ import 'security/security_service.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
+import 'tasks/birthday_creation_sheet.dart';
 import 'tasks/task_controller.dart';
 import 'tasks/task_creation_sheet.dart';
 import 'tasks/tasks_view.dart';
@@ -255,6 +257,21 @@ class _HomeShellState extends State<HomeShell> {
     if (_lastTabIndex == 2 && _activeDueDate.value != null) {
       _showCalendarItemPicker(_activeDueDate.value!);
       return;
+    }
+
+    // When the active list is a Birthdays list, open the birthday creator
+    // instead of the standard task sheet.
+    final listId = _activeListId.value;
+    if (listId != null) {
+      final list = widget.folderController.listById(listId);
+      if (list?.listType == ListType.birthdays) {
+        showBirthdayCreationSheet(
+          context,
+          widget.taskController,
+          listId: listId,
+        );
+        return;
+      }
     }
 
     showTaskCreationSheet(

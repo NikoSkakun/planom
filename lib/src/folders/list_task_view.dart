@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
 import '../models/app_list.dart';
+import '../models/list_type.dart';
+import '../tasks/birthday_list_view.dart';
 import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
@@ -149,7 +151,13 @@ class _ListTaskViewState extends State<ListTaskView>
         ),
       ),
       child: SafeArea(
-        child: ListenableBuilder(
+        child: _currentList.listType == ListType.birthdays
+            ? BirthdayListView(
+                listId: _currentList.id,
+                taskController: widget.taskController,
+                folderController: widget.folderController,
+              )
+            : ListenableBuilder(
           listenable: widget.taskController,
           builder: (context, _) {
             final tasks =
