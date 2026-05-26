@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show Material;
 
 import '../theme/app_theme.dart';
 
@@ -165,14 +166,17 @@ class NoteRow extends StatelessWidget {
     required this.note,
     required this.onTap,
     this.indent = 0,
+    this.draggable = true,
   });
 
   final Note note;
   final VoidCallback onTap;
   final double indent;
+  // When true (default), wraps the row in a LongPressDraggable<NoteDragData>
+  // so the user can drop it on a NoteFolderRow to re-parent the note.
+  final bool draggable;
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _content(BuildContext context) {
     final hasBody = note.content.isNotEmpty;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -225,6 +229,49 @@ class NoteRow extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!draggable) return _content(context);
+    return LongPressDraggable<NoteDragData>(
+      data: NoteDragData(note.id),
+      delay: const Duration(milliseconds: 400),
+      feedback: Material(
+        color: const Color(0x00000000),
+        child: Container(
+          width: MediaQuery.sizeOf(context).width - 32,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemBackground.resolveFrom(context),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1A000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Text(
+            note.title.isEmpty ? S.of(context).untitled : note.title,
+            style: const TextStyle(fontSize: 16),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.3, child: _content(context)),
+      child: _content(context),
+    );
+  }
+}
+
+/// Payload dragged when the user long-presses a note. Distinct from
+/// the generic string used by tasks so DragTargets can route notes and
+/// tasks differently.
+class NoteDragData {
+  const NoteDragData(this.noteId);
+  final String noteId;
 }
 
 class NoteFolderCircleButton extends StatelessWidget {

@@ -100,11 +100,19 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                 onUndo: () => widget.controller.restoreAt(ts),
               );
             },
-            child: DragTarget<PlusDragPayload>(
-              onWillAcceptWithDetails: (_) => true,
-              onAcceptWithDetails: (_) => PlusDragScope.of(context)
-                  ?.onDropOnNoteFolder
-                  ?.call(f.id),
+            child: DragTarget<Object>(
+              onWillAcceptWithDetails: (d) =>
+                  d.data is PlusDragPayload || d.data is NoteDragData,
+              onAcceptWithDetails: (d) {
+                if (d.data is PlusDragPayload) {
+                  PlusDragScope.of(context)
+                      ?.onDropOnNoteFolder
+                      ?.call(f.id);
+                } else if (d.data is NoteDragData) {
+                  widget.controller.moveNote(
+                    (d.data as NoteDragData).noteId, f.id);
+                }
+              },
               builder: (ctx, cand, __) {
                 final hl = cand.isNotEmpty;
                 return Container(
@@ -319,12 +327,22 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                                           widget.controller.restoreAt(ts),
                                     );
                                   },
-                                  child: DragTarget<PlusDragPayload>(
-                                    onWillAcceptWithDetails: (_) => true,
-                                    onAcceptWithDetails: (_) =>
+                                  child: DragTarget<Object>(
+                                    onWillAcceptWithDetails: (d) =>
+                                        d.data is PlusDragPayload ||
+                                        d.data is NoteDragData,
+                                    onAcceptWithDetails: (d) {
+                                      if (d.data is PlusDragPayload) {
                                         PlusDragScope.of(context)
                                             ?.onDropOnNoteFolder
-                                            ?.call(f.id),
+                                            ?.call(f.id);
+                                      } else if (d.data is NoteDragData) {
+                                        widget.controller.moveNote(
+                                            (d.data as NoteDragData)
+                                                .noteId,
+                                            f.id);
+                                      }
+                                    },
                                     builder: (ctx, cand, __) {
                                       final hl = cand.isNotEmpty;
                                       return Container(

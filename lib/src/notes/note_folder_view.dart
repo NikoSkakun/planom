@@ -74,21 +74,37 @@ class _NoteFolderViewState extends State<NoteFolderView>
                 onUndo: () => widget.controller.restoreAt(ts),
               );
             },
-            child: NoteFolderRow(
-              folder: f,
-              noteCount: widget.controller.notesIn(f.id).length,
-              indent: indent,
-              onTap: () => Navigator.of(context).push(
-                FastRoute<void>(
-                  builder: (_) => NoteFolderView(
+            child: DragTarget<NoteDragData>(
+              onWillAcceptWithDetails: (_) => true,
+              onAcceptWithDetails: (d) =>
+                  widget.controller.moveNote(d.data.noteId, f.id),
+              builder: (ctx, cand, __) {
+                final hl = cand.isNotEmpty;
+                return Container(
+                  decoration: hl
+                      ? BoxDecoration(
+                          color: AppColors.accent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        )
+                      : null,
+                  child: NoteFolderRow(
                     folder: f,
-                    controller: widget.controller,
-                    settingsController: widget.settingsController,
+                    noteCount: widget.controller.notesIn(f.id).length,
+                    indent: indent,
+                    onTap: () => Navigator.of(context).push(
+                      FastRoute<void>(
+                        builder: (_) => NoteFolderView(
+                          folder: f,
+                          controller: widget.controller,
+                          settingsController: widget.settingsController,
+                        ),
+                      ),
+                    ),
+                    onExpand: () => _toggle(f.id),
+                    isExpanded: _expandedIds.contains(f.id),
                   ),
-                ),
-              ),
-              onExpand: () => _toggle(f.id),
-              isExpanded: _expandedIds.contains(f.id),
+                );
+              },
             ),
           ),
           if (_expandedIds.contains(f.id))
@@ -297,23 +313,44 @@ class _NoteFolderViewState extends State<NoteFolderView>
                                           widget.controller.restoreAt(ts),
                                     );
                                   },
-                                  child: NoteFolderRow(
-                                    folder: f,
-                                    noteCount: widget.controller
-                                        .notesIn(f.id)
-                                        .length,
-                                    onTap: () => Navigator.of(context).push(
-                                      FastRoute<void>(
-                                        builder: (_) => NoteFolderView(
+                                  child: DragTarget<NoteDragData>(
+                                    onWillAcceptWithDetails: (_) => true,
+                                    onAcceptWithDetails: (d) => widget
+                                        .controller
+                                        .moveNote(d.data.noteId, f.id),
+                                    builder: (ctx, cand, __) {
+                                      final hl = cand.isNotEmpty;
+                                      return Container(
+                                        decoration: hl
+                                            ? BoxDecoration(
+                                                color: AppColors.accent
+                                                    .withOpacity(0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              )
+                                            : null,
+                                        child: NoteFolderRow(
                                           folder: f,
-                                          controller: widget.controller,
-                                          settingsController:
-                                              widget.settingsController,
+                                          noteCount: widget.controller
+                                              .notesIn(f.id)
+                                              .length,
+                                          onTap: () =>
+                                              Navigator.of(context).push(
+                                            FastRoute<void>(
+                                              builder: (_) => NoteFolderView(
+                                                folder: f,
+                                                controller: widget.controller,
+                                                settingsController:
+                                                    widget.settingsController,
+                                              ),
+                                            ),
+                                          ),
+                                          onExpand: () => _toggle(f.id),
+                                          isExpanded:
+                                              _expandedIds.contains(f.id),
                                         ),
-                                      ),
-                                    ),
-                                    onExpand: () => _toggle(f.id),
-                                    isExpanded: _expandedIds.contains(f.id),
+                                      );
+                                    },
                                   ),
                                 ),
                                 if (_expandedIds.contains(f.id))

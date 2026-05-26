@@ -68,6 +68,24 @@ class NoteController with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Moves a note to [targetFolderId] (or to the root when null). Preserves
+  /// the modified-date stamp so re-parenting doesn't bump the note to the
+  /// top of recently-edited lists.
+  Future<void> moveNote(String noteId, String? targetFolderId) async {
+    final i = _notes.indexWhere((n) => n.id == noteId);
+    if (i == -1) return;
+    final orig = _notes[i];
+    if (orig.folderId == targetFolderId) return;
+    final updated = orig.copyWith(
+      folderId: targetFolderId,
+      clearFolderId: targetFolderId == null,
+      preserveModifiedDate: true,
+    );
+    await _db.updateNote(updated);
+    _notes = [..._notes]..[i] = updated;
+    notifyListeners();
+  }
+
   Future<void> deleteNote(String id) async {
     final now = DateTime.now();
     await _db.softDeleteNote(id, now);
