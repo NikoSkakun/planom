@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 
 import '../localization/strings.dart';
-import '../theme/app_theme.dart';
+import '../utils/color_picker.dart';
 import '../utils/selection_menu.dart';
 import 'settings_controller.dart';
 import 'settings_widgets.dart';
@@ -184,12 +184,23 @@ class _ColorSwatchRow extends StatelessWidget {
   final Color selected;
   final ValueChanged<Color> onSelect;
 
+  Future<void> _showCustomPicker(BuildContext context) async {
+    final picked = await showCustomColorPicker(
+      context,
+      initialColor: selected,
+      title: S.of(context).customColor,
+    );
+    if (picked != null) onSelect(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     final bg = CupertinoDynamicColor.resolve(
       CupertinoColors.tertiarySystemBackground,
       context,
     );
+    final isPresetSelected =
+        options.any((c) => c.value == selected.value);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -199,14 +210,76 @@ class _ColorSwatchRow extends StatelessWidget {
       child: Wrap(
         spacing: 10,
         runSpacing: 10,
-        children: options
-            .map((c) => _Swatch(
-                  color: c,
-                  isSelected: c.value == selected.value,
-                  onTap: () => onSelect(c),
-                  context: context,
-                ))
-            .toList(),
+        children: [
+          ...options.map((c) => _Swatch(
+                color: c,
+                isSelected: c.value == selected.value,
+                onTap: () => onSelect(c),
+                context: context,
+              )),
+          _CustomSwatch(
+            // When the active color isn't one of the presets, the user already
+            // has a custom one — show the live color inside the rainbow ring.
+            currentColor: isPresetSelected ? null : selected,
+            onTap: () => _showCustomPicker(context),
+            context: context,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Rainbow-bordered swatch that opens the HSV color picker. If the current
+/// theme color isn't one of the presets, the centre fills with that color
+/// (and shows a checkmark) so the user can see their custom choice.
+class _CustomSwatch extends StatelessWidget {
+  const _CustomSwatch({
+    required this.currentColor,
+    required this.onTap,
+    required this.context,
+  });
+
+  final Color? currentColor;
+  final VoidCallback onTap;
+  final BuildContext context;
+
+  @override
+  Widget build(BuildContext _) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const SweepGradient(
+            colors: [
+              Color(0xFFFF0000),
+              Color(0xFFFFFF00),
+              Color(0xFF00FF00),
+              Color(0xFF00FFFF),
+              Color(0xFF0000FF),
+              Color(0xFFFF00FF),
+              Color(0xFFFF0000),
+            ],
+          ),
+        ),
+        padding: const EdgeInsets.all(3),
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: currentColor ??
+                CupertinoColors.systemBackground.resolveFrom(context),
+          ),
+          child: currentColor != null
+              ? const Icon(
+                  CupertinoIcons.checkmark,
+                  size: 16,
+                  color: CupertinoColors.white,
+                )
+              : null,
+        ),
       ),
     );
   }
