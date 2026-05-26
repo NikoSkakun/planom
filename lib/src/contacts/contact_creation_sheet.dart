@@ -2,17 +2,17 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
 import '../localization/strings.dart';
-import '../models/task.dart';
+import '../models/contact.dart';
 import '../theme/app_theme.dart';
-import 'task_controller.dart';
+import 'contact_controller.dart';
 
-/// Modal sheet for adding a "birthday contact" to a Birthdays-typed list.
-/// Captures the contact's name + birth date; the day & month are required,
-/// the year is optional (toggle "Include year"). Reminders / notes can be
-/// added later from the birthday detail view.
-void showBirthdayCreationSheet(
+/// Modal sheet for adding a Contact (birthday entry) to a Birthdays-typed
+/// list. Captures the name + birth date; day & month are required, year is
+/// optional (toggle "Include year"). Reminders / notes can be added later
+/// from the contact detail view.
+void showContactCreationSheet(
   BuildContext context,
-  TaskController controller, {
+  ContactController controller, {
   required String listId,
 }) {
   showModalBottomSheet<void>(
@@ -20,27 +20,27 @@ void showBirthdayCreationSheet(
     useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: const Color(0x00000000),
-    builder: (_) => _BirthdayCreationSheet(
+    builder: (_) => _ContactCreationSheet(
       controller: controller,
       listId: listId,
     ),
   );
 }
 
-class _BirthdayCreationSheet extends StatefulWidget {
-  const _BirthdayCreationSheet({
+class _ContactCreationSheet extends StatefulWidget {
+  const _ContactCreationSheet({
     required this.controller,
     required this.listId,
   });
 
-  final TaskController controller;
+  final ContactController controller;
   final String listId;
 
   @override
-  State<_BirthdayCreationSheet> createState() => _BirthdayCreationSheetState();
+  State<_ContactCreationSheet> createState() => _ContactCreationSheetState();
 }
 
-class _BirthdayCreationSheetState extends State<_BirthdayCreationSheet> {
+class _ContactCreationSheetState extends State<_ContactCreationSheet> {
   final _nameCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   bool _includeYear = false;
@@ -110,8 +110,8 @@ class _BirthdayCreationSheetState extends State<_BirthdayCreationSheet> {
   Future<void> _submit() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
-    await widget.controller.addTask(Task(
-      title: name,
+    await widget.controller.addContact(Contact(
+      name: name,
       note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
       listId: widget.listId,
       birthMonth: _picked.month,

@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../calendar/event_controller.dart';
+import '../contacts/contact_controller.dart';
 import '../database/database_service.dart';
 import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
@@ -28,6 +29,7 @@ class BackupService {
     required this.noteController,
     required this.routineController,
     required this.eventController,
+    required this.contactController,
     required this.settingsController,
   });
 
@@ -37,6 +39,7 @@ class BackupService {
   final NoteController noteController;
   final RoutineController routineController;
   final EventController eventController;
+  final ContactController contactController;
   final SettingsController settingsController;
 
   /// Builds the active space's backup payload as a plain JSON string. Used
@@ -69,6 +72,7 @@ class BackupService {
       'routine_entries': await db.exportRoutineEntries(),
       'events': await db.exportEvents(),
       'list_sections': await db.exportListSections(),
+      'contacts': await db.exportContacts(),
       'app_settings': (await db.exportAppSettings())
           .where((r) =>
               !SecurityService.authSettingKeys.contains(r['key']) &&
@@ -223,6 +227,7 @@ class BackupService {
         'routine_entries': asMaps(data['routine_entries']),
         'events': asMaps(data['events']),
         'list_sections': asMaps(data['list_sections']),
+        'contacts': asMaps(data['contacts']),
         'app_settings': [
           ...asMaps(data['app_settings']).where((r) =>
               !SecurityService.authSettingKeys.contains(r['key']) &&
@@ -261,6 +266,7 @@ class BackupService {
     await noteController.load();
     await routineController.load();
     await eventController.load();
+    await contactController.load();
     await settingsController.loadSettings();
 
     return true;
@@ -273,6 +279,7 @@ class BackupService {
     await noteController.load();
     await routineController.load();
     await eventController.load();
+    await contactController.load();
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────

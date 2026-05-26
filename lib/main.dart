@@ -79,6 +79,7 @@ void main() async {
           noteController: spaceManager.noteController,
           routineController: spaceManager.routineController,
           eventController: spaceManager.eventController,
+          contactController: spaceManager.contactController,
           backupService: spaceManager.backupService,
           securityService: securityService,
           googleCalendarController: googleCalendarController,

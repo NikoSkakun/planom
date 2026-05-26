@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_theme.dart';
 
 import '../localization/strings.dart';
+import '../contacts/contact_controller.dart';
 import '../folders/create_folder_list_sheet.dart';
 import '../calendar/event_controller.dart';
 import '../database/database_service.dart';
@@ -22,6 +23,7 @@ import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
+import '../utils/reorder_drag.dart';
 import '../utils/undo_controller.dart';
 import 'all_tasks_view.dart';
 import 'completed_view.dart';
@@ -38,6 +40,7 @@ class TasksView extends StatefulWidget {
     super.key,
     required this.controller,
     required this.folderController,
+    required this.contactController,
     required this.settingsController,
     required this.activeListId,
     required this.activeDueDate,
@@ -50,6 +53,7 @@ class TasksView extends StatefulWidget {
 
   final TaskController controller;
   final FolderController folderController;
+  final ContactController contactController;
   final SettingsController settingsController;
   final ValueNotifier<String?> activeListId;
   final ValueNotifier<DateTime?> activeDueDate;
@@ -196,14 +200,19 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
               label: f.name,
               indent: indent,
               count: _folderCount(f.id),
-              onAcceptPlus: () =>
-                  PlusDragScope.of(context)?.onDropOnFolder?.call(f.id),
+              // Folder rows can't accept a Plus drop directly — tasks live
+              // in lists inside, not in folders. Auto-expand after 1.5s so
+              // the user can keep dragging into a nested list.
+              onHoverAutoExpand: () {
+                if (!_expandedIds.contains(f.id)) _toggle(f.id);
+              },
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => FolderView(
                     folder: f,
                     folderController: widget.folderController,
                     taskController: widget.controller,
+                    contactController: widget.contactController,
                     activeListId: widget.activeListId,
                     settingsController: widget.settingsController,
                   ),
@@ -254,6 +263,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     list: l,
                     taskController: widget.controller,
                     folderController: widget.folderController,
+                    contactController: widget.contactController,
                     activeListId: widget.activeListId,
                   ),
                 ),
@@ -352,6 +362,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                             label: s.inbox,
                             count: widget
                                 .controller.inboxUncompletedCount,
+                            onAcceptPlus: () => PlusDragScope.of(context)
+                                ?.onDropOnSmartList
+                                ?.call(PlusDropSmartList.inbox),
                             onTap: () => Navigator.of(context).push(
                               FastRoute<void>(
                                 builder: (_) => InboxView(
@@ -368,6 +381,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               label: s.today,
                               count:
                                   todayCount > 0 ? todayCount : null,
+                              onAcceptPlus: () => PlusDragScope.of(context)
+                                  ?.onDropOnSmartList
+                                  ?.call(PlusDropSmartList.today),
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => TodayView(
@@ -391,6 +407,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               count: tomorrowCount > 0
                                   ? tomorrowCount
                                   : null,
+                              onAcceptPlus: () => PlusDragScope.of(context)
+                                  ?.onDropOnSmartList
+                                  ?.call(PlusDropSmartList.tomorrow),
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => TomorrowView(
@@ -409,6 +428,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               count: upcomingCount > 0
                                   ? upcomingCount
                                   : null,
+                              onAcceptPlus: () => PlusDragScope.of(context)
+                                  ?.onDropOnSmartList
+                                  ?.call(PlusDropSmartList.upcoming),
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => UpcomingView(
@@ -431,6 +453,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                               count: allTasksCount > 0
                                   ? allTasksCount
                                   : null,
+                              onAcceptPlus: () => PlusDragScope.of(context)
+                                  ?.onDropOnSmartList
+                                  ?.call(PlusDropSmartList.allTasks),
                               onTap: () => Navigator.of(context).push(
                                 FastRoute<void>(
                                   builder: (_) => AllTasksView(
@@ -455,146 +480,208 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                       ),
                     ),
 
-                    // Reorderable folders
+                    // Reorderable folders — long-press to drag, drop on
+                    // another folder to insert before, drop on the trailing
+                    // slot to push to the end.
                     if (rootFolders.isNotEmpty)
-                      SliverReorderableList(
-                        itemCount: rootFolders.length,
-                        onReorder: (oldIndex, newIndex) =>
-                            widget.folderController.reorderFolders(
-                                null, oldIndex, newIndex),
-                        proxyDecorator: _proxyDecorator,
-                        itemBuilder: (context, index) {
-                          final f = rootFolders[index];
-                          return ReorderableDelayedDragStartListener(
-                            key: ValueKey('folder_${f.id}'),
-                            index: index,
-                            child: Column(
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final f = rootFolders[index];
+                            return Column(
+                              key: ValueKey('folder_${f.id}'),
                               children: [
-                                Dismissible(
-                                  key: ValueKey(f.id),
+                                ReorderableDropZone(
+                                  kind: ReorderKind.folder,
+                                  beforeId: f.id,
+                                  onReorder: (movedId, beforeId) =>
+                                      widget.folderController
+                                          .reorderFolderBefore(
+                                    movedId: movedId,
+                                    beforeId: beforeId,
+                                    parentFolderId: null,
+                                  ),
+                                  child: ReorderableRow(
+                                    id: f.id,
+                                    kind: ReorderKind.folder,
+                                    label: f.name,
+                                    child: Dismissible(
+                                      key: ValueKey(f.id),
+                                      direction: DismissDirection.endToStart,
+                                      background: _DeleteBackground(),
+                                      confirmDismiss: (_) => _confirmDelete(
+                                          context, f.name,
+                                          isFolder: true),
+                                      onDismissed: (_) async {
+                                        final undo =
+                                            UndoScope.maybeOf(context);
+                                        final ts = await widget
+                                            .folderController
+                                            .deleteFolderDeep(
+                                          f.id,
+                                          widget.controller
+                                              .deleteTasksForList,
+                                        );
+                                        undo?.show(
+                                          label: s.folderTrashedToast,
+                                          onUndo: () async {
+                                            await widget.folderController
+                                                .restoreAt(ts);
+                                            await widget.controller
+                                                .restoreAt(ts);
+                                          },
+                                        );
+                                      },
+                                      child: _ListItem(
+                                        iconAsset: 'assets/icons/folder.png',
+                                        iconId: f.iconId,
+                                        iconColor: f.iconColor,
+                                        isFolder: true,
+                                        label: f.name,
+                                        count: _folderCount(f.id),
+                                        onHoverAutoExpand: () {
+                                          if (!_expandedIds
+                                              .contains(f.id)) {
+                                            _toggle(f.id);
+                                          }
+                                        },
+                                        onTap: () => Navigator.of(context)
+                                            .push(
+                                          FastRoute<void>(
+                                            builder: (_) => FolderView(
+                                              folder: f,
+                                              folderController:
+                                                  widget.folderController,
+                                              taskController:
+                                                  widget.controller,
+                                              contactController:
+                                                  widget.contactController,
+                                              activeListId:
+                                                  widget.activeListId,
+                                              settingsController:
+                                                  widget.settingsController,
+                                            ),
+                                          ),
+                                        ),
+                                        onExpand: () => _toggle(f.id),
+                                        isExpanded:
+                                            _expandedIds.contains(f.id),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (_expandedIds.contains(f.id))
+                                  _buildFolderChildren(context, f.id, 24),
+                              ],
+                            );
+                          },
+                          childCount: rootFolders.length,
+                        ),
+                      ),
+                    if (rootFolders.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: ReorderableTrailingSlot(
+                          kind: ReorderKind.folder,
+                          onReorder: (movedId) => widget.folderController
+                              .reorderFolderBefore(
+                            movedId: movedId,
+                            beforeId: null,
+                            parentFolderId: null,
+                          ),
+                        ),
+                      ),
+
+                    // Reorderable lists
+                    if (rootLists.isNotEmpty)
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final l = rootLists[index];
+                            return ReorderableDropZone(
+                              key: ValueKey('list_${l.id}'),
+                              kind: ReorderKind.list,
+                              beforeId: l.id,
+                              onReorder: (movedId, beforeId) => widget
+                                  .folderController
+                                  .reorderListBefore(
+                                movedId: movedId,
+                                beforeId: beforeId,
+                                folderId: null,
+                              ),
+                              child: ReorderableRow(
+                                id: l.id,
+                                kind: ReorderKind.list,
+                                label: l.name,
+                                child: Dismissible(
+                                  key: ValueKey(l.id),
                                   direction: DismissDirection.endToStart,
                                   background: _DeleteBackground(),
                                   confirmDismiss: (_) => _confirmDelete(
-                                      context, f.name,
-                                      isFolder: true),
+                                      context, l.name,
+                                      isFolder: false),
                                   onDismissed: (_) async {
                                     final undo =
                                         UndoScope.maybeOf(context);
-                                    final ts = await widget.folderController
-                                        .deleteFolderDeep(
-                                      f.id,
-                                      widget.controller.deleteTasksForList,
-                                    );
+                                    final ts = DateTime.now();
+                                    final savedFolderId = l.folderId;
+                                    await widget.controller
+                                        .deleteTasksForList(l.id, ts);
+                                    await widget.folderController
+                                        .deleteList(l.id);
                                     undo?.show(
-                                      label: s.folderTrashedToast,
+                                      label: s.listTrashedToast,
                                       onUndo: () async {
                                         await widget.folderController
-                                            .restoreAt(ts);
+                                            .restoreList(
+                                                l.id, savedFolderId);
                                         await widget.controller
                                             .restoreAt(ts);
                                       },
                                     );
                                   },
                                   child: _ListItem(
-                                    iconAsset: 'assets/icons/folder.png',
-                                    iconId: f.iconId,
-                                    iconColor: f.iconColor,
-                                    isFolder: true,
-                                    label: f.name,
-                                    count: _folderCount(f.id),
-                                    onAcceptPlus: () => PlusDragScope.of(
-                                            context)
-                                        ?.onDropOnFolder
-                                        ?.call(f.id),
-                                    onTap: () =>
-                                        Navigator.of(context).push(
+                                    iconAsset: 'assets/icons/list.png',
+                                    iconId: l.iconId,
+                                    iconColor: l.iconColor,
+                                    isFolder: false,
+                                    label: l.name,
+                                    count: _listCount(l.id),
+                                    onAcceptPlus: () =>
+                                        PlusDragScope.of(context)
+                                            ?.onDropOnList
+                                            ?.call(l.id),
+                                    onTap: () => Navigator.of(context).push(
                                       FastRoute<void>(
-                                        builder: (_) => FolderView(
-                                          folder: f,
+                                        builder: (_) => ListTaskView(
+                                          list: l,
+                                          taskController: widget.controller,
                                           folderController:
                                               widget.folderController,
-                                          taskController: widget.controller,
+                                          contactController:
+                                              widget.contactController,
                                           activeListId: widget.activeListId,
-                                          settingsController:
-                                              widget.settingsController,
                                         ),
                                       ),
-                                    ),
-                                    onExpand: () => _toggle(f.id),
-                                    isExpanded:
-                                        _expandedIds.contains(f.id),
-                                  ),
-                                ),
-                                if (_expandedIds.contains(f.id))
-                                  _buildFolderChildren(context, f.id, 24),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-
-                    // Reorderable lists
-                    if (rootLists.isNotEmpty)
-                      SliverReorderableList(
-                        itemCount: rootLists.length,
-                        onReorder: (oldIndex, newIndex) =>
-                            widget.folderController.reorderLists(
-                                null, oldIndex, newIndex),
-                        proxyDecorator: _proxyDecorator,
-                        itemBuilder: (context, index) {
-                          final l = rootLists[index];
-                          return ReorderableDelayedDragStartListener(
-                            key: ValueKey('list_${l.id}'),
-                            index: index,
-                            child: Dismissible(
-                              key: ValueKey(l.id),
-                              direction: DismissDirection.endToStart,
-                              background: _DeleteBackground(),
-                              confirmDismiss: (_) => _confirmDelete(
-                                  context, l.name,
-                                  isFolder: false),
-                              onDismissed: (_) async {
-                                final undo = UndoScope.maybeOf(context);
-                                final ts = DateTime.now();
-                                final savedFolderId = l.folderId;
-                                await widget.controller
-                                    .deleteTasksForList(l.id, ts);
-                                await widget.folderController
-                                    .deleteList(l.id);
-                                undo?.show(
-                                  label: s.listTrashedToast,
-                                  onUndo: () async {
-                                    await widget.folderController
-                                        .restoreList(l.id, savedFolderId);
-                                    await widget.controller.restoreAt(ts);
-                                  },
-                                );
-                              },
-                              child: _ListItem(
-                                iconAsset: 'assets/icons/list.png',
-                                iconId: l.iconId,
-                                iconColor: l.iconColor,
-                                isFolder: false,
-                                label: l.name,
-                                count: _listCount(l.id),
-                                onAcceptPlus: () => PlusDragScope.of(context)
-                                    ?.onDropOnList
-                                    ?.call(l.id),
-                                onTap: () => Navigator.of(context).push(
-                                  FastRoute<void>(
-                                    builder: (_) => ListTaskView(
-                                      list: l,
-                                      taskController: widget.controller,
-                                      folderController:
-                                          widget.folderController,
-                                      activeListId: widget.activeListId,
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                          childCount: rootLists.length,
+                        ),
+                      ),
+                    if (rootLists.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: ReorderableTrailingSlot(
+                          kind: ReorderKind.list,
+                          onReorder: (movedId) => widget.folderController
+                              .reorderListBefore(
+                            movedId: movedId,
+                            beforeId: null,
+                            folderId: null,
+                          ),
+                        ),
                       ),
 
                     // Bottom section: Completed + Trash smart lists
@@ -666,6 +753,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                 child: _CircleAddButton(
                   onPressed: () => showCreateFolderListSheet(
                       context, widget.folderController),
+                  onAcceptPlus: () => PlusDragScope.of(context)
+                      ?.onDropOnAddFolderButton
+                      ?.call(),
                 ),
               ),
           ],
@@ -689,21 +779,6 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
     );
   }
 
-  Widget _proxyDecorator(
-      Widget child, int index, Animation<double> animation) {
-    return Container(
-      decoration: const BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x18000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
 }
 
 class _DeleteBackground extends StatelessWidget {
@@ -732,6 +807,7 @@ class _ListItem extends StatelessWidget {
     this.isExpanded = false,
     this.indent = 0,
     this.onAcceptPlus,
+    this.onHoverAutoExpand,
   });
 
   final String? iconAsset;
@@ -746,6 +822,11 @@ class _ListItem extends StatelessWidget {
   final bool isExpanded;
   final double indent;
   final VoidCallback? onAcceptPlus;
+  // Folders only — invoked when the Plus button has hovered over this row
+  // for 1.5s so the user can drill into a nested list. When set, the row
+  // shows a gray highlight (not the accent drop target) and a 1.5s ring
+  // progress indicator.
+  final VoidCallback? onHoverAutoExpand;
 
   @override
   Widget build(BuildContext context) {
@@ -829,6 +910,12 @@ class _ListItem extends StatelessWidget {
       ),
     );
 
+    if (onHoverAutoExpand != null) {
+      return _FolderHoverDropTarget(
+        onAutoExpand: onHoverAutoExpand!,
+        child: row,
+      );
+    }
     if (onAcceptPlus == null) return row;
     return DragTarget<PlusDragPayload>(
       onWillAcceptWithDetails: (_) => true,
@@ -842,6 +929,114 @@ class _ListItem extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
           child: row,
+        );
+      },
+    );
+  }
+}
+
+/// Drop target wrapper for **folder** rows. Plus-button drops on folders
+/// don't create anything — the user must drill into one of the folder's
+/// lists — so this widget instead waits 1.5s while the button hovers,
+/// then auto-expands the folder. While hovering it tints the row light
+/// gray (not accent-orange) and draws a thin progress bar across the
+/// bottom edge that fills as the timer runs.
+class _FolderHoverDropTarget extends StatefulWidget {
+  const _FolderHoverDropTarget({
+    required this.onAutoExpand,
+    required this.child,
+  });
+
+  final VoidCallback onAutoExpand;
+  final Widget child;
+
+  static const Duration hoverDuration = Duration(milliseconds: 1500);
+
+  @override
+  State<_FolderHoverDropTarget> createState() => _FolderHoverDropTargetState();
+}
+
+class _FolderHoverDropTargetState extends State<_FolderHoverDropTarget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: _FolderHoverDropTarget.hoverDuration,
+    );
+    _ctrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.onAutoExpand();
+        // Reset so the user can re-trigger if they hover again without
+        // dropping (e.g. the folder is still empty after expanding).
+        _ctrl.value = 0;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) {
+        _ctrl.forward(from: 0);
+        return true;
+      },
+      onLeave: (_) {
+        _ctrl.stop();
+        _ctrl.value = 0;
+      },
+      // No onAcceptWithDetails — dropping on a folder isn't a creation
+      // action; the user is expected to drop on one of its lists.
+      builder: (context, candidates, _) {
+        final hovering = candidates.isNotEmpty;
+        return Stack(
+          children: [
+            Container(
+              decoration: hovering
+                  ? BoxDecoration(
+                      color: CupertinoColors.systemGrey4
+                          .resolveFrom(context)
+                          .withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    )
+                  : null,
+              child: widget.child,
+            ),
+            if (hovering)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 0,
+                child: AnimatedBuilder(
+                  animation: _ctrl,
+                  builder: (context, _) => SizedBox(
+                    height: 2,
+                    child: Stack(
+                      children: [
+                        Container(
+                          color: CupertinoColors.separator
+                              .resolveFrom(context),
+                        ),
+                        FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: _ctrl.value,
+                          child: Container(color: AppColors.accent),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -928,11 +1123,14 @@ class _TasksOptionsDropdown extends StatelessWidget {
 }
 
 class _CircleAddButton extends StatelessWidget {
-  const _CircleAddButton({required this.onPressed});
+  const _CircleAddButton({required this.onPressed, this.onAcceptPlus});
   final VoidCallback onPressed;
+  // When set, the button doubles as a drop target for the global Plus
+  // drag — releasing the Plus button here opens the create-list/folder
+  // sheet instead of the standard task creation flow.
+  final VoidCallback? onAcceptPlus;
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _button(BuildContext context) {
     return CupertinoButton(
       padding: EdgeInsets.zero,
       onPressed: onPressed,
@@ -950,6 +1148,34 @@ class _CircleAddButton extends StatelessWidget {
           color: CupertinoColors.label.resolveFrom(context),
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (onAcceptPlus == null) return _button(context);
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (_) => onAcceptPlus!(),
+      builder: (context, candidates, _) {
+        final hovering = candidates.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: hovering
+                ? [
+                    BoxShadow(
+                      color: AppColors.accent.withOpacity(0.4),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : null,
+          ),
+          child: _button(context),
+        );
+      },
     );
   }
 }

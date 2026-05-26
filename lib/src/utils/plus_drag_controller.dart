@@ -2,6 +2,12 @@ import 'package:flutter/widgets.dart';
 
 import 'plus_drag_payload.dart';
 
+/// Smart-list identifiers used when the Plus button is dropped on a
+/// smart-list row. The drop handler inspects the kind and stamps the
+/// matching defaults on the new task (Today/Tomorrow set a dueDate,
+/// All Tasks falls back to Inbox, etc.).
+enum PlusDropSmartList { inbox, today, tomorrow, upcoming, allTasks }
+
 /// Optional handlers a tab's content can register so that dropping the
 /// global Plus button on a list/folder/day/section opens the right
 /// creation flow scoped to that target.
@@ -34,6 +40,19 @@ class PlusDragController {
   /// Called when the user drops on the notes-root area (no folder).
   /// The receiver should create a new root-level note.
   void Function()? onDropOnNotesRoot;
+
+  /// Called when the user drops on a smart-list row (Inbox, Today,
+  /// Tomorrow, Upcoming, All Tasks). The receiver should open the
+  /// task creation sheet with the smart-list-specific defaults applied.
+  void Function(PlusDropSmartList kind)? onDropOnSmartList;
+
+  /// Called when the user drops on the Notes-tab add-folder button.
+  /// Mirrors `onDropOnAddFolderButton` for the Tasks tab.
+  void Function()? onDropOnNotesAddFolderButton;
+
+  /// Called when the user drops on the Tasks-tab add-folder button.
+  /// The receiver should open the create-folder/list sheet.
+  void Function()? onDropOnAddFolderButton;
 }
 
 class PlusDragScope extends InheritedWidget {

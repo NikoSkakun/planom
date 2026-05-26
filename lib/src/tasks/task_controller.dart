@@ -95,16 +95,6 @@ class TaskController with ChangeNotifier {
           t.dueDate!.day == date.day)
       .toList();
 
-  /// Birthday-typed tasks whose month/day match [date] in any year — used by
-  /// the calendar to render the recurring anniversary even though only one
-  /// dueDate is stored on the task itself.
-  List<Task> birthdaysForDate(DateTime date) => _topLevel
-      .where((t) =>
-          t.isBirthday &&
-          t.birthMonth == date.month &&
-          t.birthDay == date.day)
-      .toList();
-
   List<Task> tasksForList(String listId) => List.unmodifiable(
       _completedLast(_applySort(_topLevel.where((t) => t.listId == listId))));
 
@@ -463,6 +453,66 @@ class TaskController with ChangeNotifier {
     // its original slot until the write completes.
     notifyListeners();
     await _db.updateTaskSortOrders(displayed);
+  }
+
+  /// Moves the task with [movedTaskId] to come right before [beforeTaskId],
+  /// both within the same list+section. If [beforeTaskId] is null the moved
+  /// task lands at the end of the section. Renumbers sortOrder across the
+  /// whole section so the new arrangement persists.
+  Future<void> reorderTaskBefore({
+    required String movedTaskId,
+    String? beforeTaskId,
+    required String? listId,
+    required String? sectionId,
+  }) async {
+    final moved = _tasks.firstWhere((t) => t.id == movedTaskId,
+        orElse: () => Task(title: ''));
+    if (moved.id.isEmpty) return;
+
+    // Build the in-section task list in current display order. Excludes the
+    // moved task itself so we can insert it cleanly at the new position.
+    final scope = _tasks
+        .where((t) =>
+            t.listId == listId &&
+            t.sectionId == sectionId &&
+            !t.isCompleted &&
+            t.parentTaskId == null &&
+            t.id != movedTaskId)
+        .toList();
+    _sortByDefault(scope);
+
+    int insertAt;
+    if (beforeTaskId == null) {
+      insertAt = scope.length;
+    } else {
+      insertAt = scope.indexWhere((t) => t.id == beforeTaskId);
+      if (insertAt == -1) insertAt = scope.length;
+    }
+
+    // The moved task may have been in a different section; if so, update
+    // its sectionId at the same time. Use copyWith with clearSectionId so
+    // null-section assignments persist.
+    final movedUpdated = moved.copyWith(
+      sectionId: sectionId,
+      clearSectionId: sectionId == null,
+      listId: listId,
+      clearListId: listId == null,
+    );
+    scope.insert(insertAt, movedUpdated);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    // Persist movedUpdated separately (it may have a new sectionId).
+    final movedInList = scope.firstWhere((t) => t.id == movedTaskId);
+    await _db.updateTask(movedInList);
+    await _db.updateTaskSortOrders(scope);
+
+    for (final t in scope) {
+      final idx = _tasks.indexWhere((x) => x.id == t.id);
+      if (idx != -1) _tasks[idx] = t;
+    }
+    notifyListeners();
   }
 
   // ── Sorting helpers ──────────────────────────────────────────────────────

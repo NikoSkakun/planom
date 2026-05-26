@@ -1,12 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Material;
 
+import '../contacts/contact_controller.dart';
+import '../contacts/contact_list_view.dart';
 import '../localization/strings.dart';
 import '../models/app_list.dart';
 import '../models/list_section.dart';
 import '../models/list_type.dart';
 import '../models/task.dart';
-import '../tasks/birthday_list_view.dart';
 import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
@@ -17,6 +18,7 @@ import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
+import '../utils/selection_menu.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
@@ -29,12 +31,14 @@ class ListTaskView extends StatefulWidget {
     required this.list,
     required this.taskController,
     required this.folderController,
+    required this.contactController,
     required this.activeListId,
   });
 
   final AppList list;
   final TaskController taskController;
   final FolderController folderController;
+  final ContactController contactController;
   final ValueNotifier<String?> activeListId;
 
   @override
@@ -152,6 +156,8 @@ class _ListTaskViewState extends State<ListTaskView>
     final ts = DateTime.now();
     final undo = UndoScope.maybeOf(context);
     await widget.taskController.deleteTasksForList(_currentList.id, ts);
+    await widget.contactController
+        .deleteContactsForList(_currentList.id, ts);
     await widget.folderController.deleteList(_currentList.id);
     undo?.show(
       label: s.listTrashedToast,
@@ -159,6 +165,7 @@ class _ListTaskViewState extends State<ListTaskView>
         await widget.folderController
             .restoreList(_currentList.id, _currentList.folderId);
         await widget.taskController.restoreAt(ts);
+        await widget.contactController.restoreAt(ts);
       },
     );
     if (mounted) Navigator.of(context).pop();
@@ -178,10 +185,9 @@ class _ListTaskViewState extends State<ListTaskView>
       ),
       child: SafeArea(
         child: _currentList.listType == ListType.birthdays
-            ? BirthdayListView(
+            ? ContactListView(
                 listId: _currentList.id,
-                taskController: widget.taskController,
-                folderController: widget.folderController,
+                controller: widget.contactController,
               )
             : _SectionedListBody(
                 list: _currentList,
@@ -247,9 +253,18 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
         final children = <Widget>[];
 
         // Top "no section" group — no header; tasks render directly.
+        // Each task is wrapped in a DragTarget that, on drop, inserts the
+        // dragged task immediately before it (within the same list+section).
         for (final t in topTasks) {
-          children.add(_buildDraggableTask(context, t, sectionId: null));
+          children.add(_buildDraggableTask(
+            context,
+            t,
+            sectionId: null,
+            beforeId: t.id,
+          ));
         }
+        // Trailing slot to drop at the end of the top group.
+        children.add(_buildTaskDropSlot(context, null, null));
 
         for (final section in sections) {
           final secTasks = widget.taskController
@@ -281,9 +296,15 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
           ));
           if (!section.isCollapsed) {
             for (final t in secTasks) {
-              children
-                  .add(_buildDraggableTask(context, t, sectionId: section.id));
+              children.add(_buildDraggableTask(
+                context,
+                t,
+                sectionId: section.id,
+                beforeId: t.id,
+              ));
             }
+            // Trailing slot inside this section.
+            children.add(_buildTaskDropSlot(context, null, section.id));
           }
         }
 
@@ -311,10 +332,18 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
     );
   }
 
-  Widget _buildDraggableTask(BuildContext context, Task task,
-      {required String? sectionId}) {
+  /// Wraps a task row so:
+  ///   • Long-pressing starts a drag with the task id.
+  ///   • Hovering another task triggers a reorder-insert-before drop target.
+  Widget _buildDraggableTask(
+    BuildContext context,
+    Task task, {
+    required String? sectionId,
+    required String beforeId,
+  }) {
     return LongPressDraggable<String>(
       data: task.id,
+      delay: const Duration(milliseconds: 400),
       feedback: Material(
         color: const Color(0x00000000),
         child: Container(
@@ -341,7 +370,56 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
         opacity: 0.3,
         child: _buildTaskRow(context, task),
       ),
-      child: _buildTaskRow(context, task),
+      child: DragTarget<String>(
+        onWillAcceptWithDetails: (d) => d.data != task.id,
+        onAcceptWithDetails: (d) => widget.taskController.reorderTaskBefore(
+          movedTaskId: d.data,
+          beforeTaskId: beforeId,
+          listId: widget.list.id,
+          sectionId: sectionId,
+        ),
+        builder: (context, candidates, _) {
+          final highlighted = candidates.isNotEmpty;
+          return Stack(
+            children: [
+              _buildTaskRow(context, task),
+              if (highlighted)
+                const Positioned(
+                  top: 0,
+                  left: 16,
+                  right: 16,
+                  child: _DropInsertLine(),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Trailing drop zone after the last task in a section so the user can
+  /// drop a task at the very end of that section.
+  Widget _buildTaskDropSlot(
+      BuildContext context, String? beforeId, String? sectionId) {
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (d) => widget.taskController.reorderTaskBefore(
+        movedTaskId: d.data,
+        beforeTaskId: beforeId,
+        listId: widget.list.id,
+        sectionId: sectionId,
+      ),
+      builder: (context, candidates, _) {
+        return SizedBox(
+          height: 12,
+          child: candidates.isEmpty
+              ? null
+              : const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: _DropInsertLine(),
+                ),
+        );
+      },
     );
   }
 
@@ -372,6 +450,24 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Thin accent-coloured horizontal bar shown across a row while a drag is
+/// hovering over it — visualises the insert-before position for the
+/// long-press reorder.
+class _DropInsertLine extends StatelessWidget {
+  const _DropInsertLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 2,
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(1),
       ),
     );
   }
@@ -454,34 +550,30 @@ class _SectionHeader extends StatelessWidget {
     );
   }
 
-  void _showSectionMenu(BuildContext context) {
+  Future<void> _showSectionMenu(BuildContext context) async {
     final s = S.of(context);
-    showCupertinoModalPopup<void>(
+    final choice = await showSelectionMenu<String>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              onRename();
-            },
-            child: Text(s.rename),
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              onDelete();
-            },
-            child: Text(s.delete),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(s.cancel),
+      title: section.name,
+      options: [
+        SelectionMenuOption(
+          value: 'rename',
+          label: s.rename,
+          icon: CupertinoIcons.pencil,
         ),
-      ),
+        SelectionMenuOption(
+          value: 'delete',
+          label: s.delete,
+          icon: CupertinoIcons.trash,
+          isDestructive: true,
+        ),
+      ],
     );
+    if (choice == 'rename') {
+      onRename();
+    } else if (choice == 'delete') {
+      onDelete();
+    }
   }
 }
 

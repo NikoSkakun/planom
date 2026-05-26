@@ -1,12 +1,16 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../contacts/contact_controller.dart';
+import '../contacts/contact_detail_view.dart';
 import '../folders/folder_controller.dart';
 import '../integrations/google/google_calendar_controller.dart';
 import '../integrations/google/remote_event.dart';
 import '../localization/strings.dart';
+import '../models/contact.dart';
 import '../models/event.dart';
 import '../models/task.dart';
+import '../settings/settings_controller.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../tasks/task_controller.dart';
 import '../tasks/task_creation_sheet.dart';
@@ -24,6 +28,8 @@ Future<void> showDayViewSheet(
   required TaskController taskController,
   required EventController eventController,
   required FolderController folderController,
+  required ContactController contactController,
+  SettingsController? settingsController,
   GoogleCalendarController? googleCalendarController,
 }) {
   return showModalBottomSheet<void>(
@@ -36,6 +42,8 @@ Future<void> showDayViewSheet(
       taskController: taskController,
       eventController: eventController,
       folderController: folderController,
+      contactController: contactController,
+      settingsController: settingsController,
       googleCalendarController: googleCalendarController,
     ),
   );
@@ -48,6 +56,8 @@ class DayViewSheet extends StatefulWidget {
     required this.taskController,
     required this.eventController,
     required this.folderController,
+    required this.contactController,
+    this.settingsController,
     this.googleCalendarController,
   });
 
@@ -55,6 +65,8 @@ class DayViewSheet extends StatefulWidget {
   final TaskController taskController;
   final EventController eventController;
   final FolderController folderController;
+  final ContactController contactController;
+  final SettingsController? settingsController;
   final GoogleCalendarController? googleCalendarController;
 
   @override
@@ -99,6 +111,7 @@ class _DayViewSheetState extends State<DayViewSheet> {
                   widget.taskController,
                   widget.folderController,
                   initialDueDate: widget.date,
+                  settingsController: widget.settingsController,
                 );
               },
               onEvent: () {
@@ -127,6 +140,18 @@ class _DayViewSheetState extends State<DayViewSheet> {
           task: task,
           controller: widget.taskController,
           folderController: widget.folderController,
+        ),
+      ),
+    );
+  }
+
+  void _openContact(Contact contact) {
+    Navigator.of(context).push(
+      FastRoute<void>(
+        settings: const RouteSettings(name: ContactDetailView.routeName),
+        builder: (_) => ContactDetailView(
+          contact: contact,
+          controller: widget.contactController,
         ),
       ),
     );
@@ -263,11 +288,9 @@ class _DayViewSheetState extends State<DayViewSheet> {
   }
 
   Widget _buildList(BuildContext context) {
-    final allTasks = widget.taskController.tasksForDate(widget.date);
-    final nonBirthdayTasks =
-        allTasks.where((t) => !t.isBirthday).toList();
+    final tasks = widget.taskController.tasksForDate(widget.date);
     final birthdays =
-        widget.taskController.birthdaysForDate(widget.date);
+        widget.contactController.contactsForDate(widget.date);
     final events = widget.eventController.eventsForDate(widget.date);
     final remoteEvents = widget.googleCalendarController
             ?.eventsForDate(widget.date) ??
@@ -275,12 +298,12 @@ class _DayViewSheetState extends State<DayViewSheet> {
 
     // Untimed first (tasks then events), then timed sorted by doTime.
     final untimedTasks =
-        nonBirthdayTasks.where((t) => t.doTime == null).toList();
+        tasks.where((t) => t.doTime == null).toList();
     final untimedEvents = events.where((e) => e.doTime == null).toList();
     final untimedRemote =
         remoteEvents.where((e) => e.doTime == null).toList();
     final timedItems = <_TimedItem>[
-      for (final t in nonBirthdayTasks.where((t) => t.doTime != null))
+      for (final t in tasks.where((t) => t.doTime != null))
         _TimedItem.task(t),
       for (final e in events.where((e) => e.doTime != null))
         _TimedItem.event(e),
@@ -311,9 +334,9 @@ class _DayViewSheetState extends State<DayViewSheet> {
       children: [
         for (final b in birthdays) ...[
           _BirthdayCard(
-            task: b,
+            contact: b,
             celebrationDate: widget.date,
-            onTap: () => _openTask(b),
+            onTap: () => _openContact(b),
           ),
           const SizedBox(height: 8),
         ],
@@ -648,12 +671,12 @@ class _EventCard extends StatelessWidget {
 
 class _BirthdayCard extends StatelessWidget {
   const _BirthdayCard({
-    required this.task,
+    required this.contact,
     required this.celebrationDate,
     required this.onTap,
   });
 
-  final Task task;
+  final Contact contact;
   final DateTime celebrationDate;
   final VoidCallback onTap;
 
@@ -661,8 +684,8 @@ class _BirthdayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final age = task.birthYear != null
-        ? celebrationDate.year - task.birthYear!
+    final age = contact.birthYear != null
+        ? celebrationDate.year - contact.birthYear!
         : null;
     final s = S.of(context);
     return GestureDetector(
@@ -684,7 +707,7 @@ class _BirthdayCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    task.title,
+                    contact.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

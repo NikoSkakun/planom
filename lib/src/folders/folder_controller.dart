@@ -343,6 +343,74 @@ class FolderController with ChangeNotifier {
     await _db.updateListSortOrders(scope);
   }
 
+  /// Moves the folder with [movedId] to come right before [beforeId] inside
+  /// [parentFolderId]. When [beforeId] is null it lands at the end. Drives
+  /// the long-press-drag reorder.
+  Future<void> reorderFolderBefore({
+    required String movedId,
+    String? beforeId,
+    required String? parentFolderId,
+  }) async {
+    final scope = _folders
+        .where((f) =>
+            f.parentFolderId == parentFolderId && f.id != movedId)
+        .toList();
+    _sortByDefault(scope);
+
+    final moved = _folders.firstWhere((f) => f.id == movedId,
+        orElse: () => AppFolder(id: movedId, name: ''));
+    if (moved.name.isEmpty && _folders.indexWhere((f) => f.id == movedId) == -1) {
+      return;
+    }
+    int insertAt =
+        beforeId == null ? scope.length : scope.indexWhere((f) => f.id == beforeId);
+    if (insertAt < 0) insertAt = scope.length;
+    scope.insert(insertAt, moved);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _folders.indexWhere((f) => f.id == updated.id);
+      if (idx != -1) _folders[idx] = updated;
+    }
+    notifyListeners();
+    await _db.updateFolderSortOrders(scope);
+  }
+
+  /// Moves the list with [movedId] to come right before [beforeId] inside
+  /// [folderId]. When [beforeId] is null it lands at the end.
+  Future<void> reorderListBefore({
+    required String movedId,
+    String? beforeId,
+    required String? folderId,
+  }) async {
+    final scope = _lists
+        .where((l) => l.folderId == folderId && l.id != movedId)
+        .toList();
+    _sortListsByDefault(scope);
+
+    final moved = _lists.firstWhere((l) => l.id == movedId,
+        orElse: () => AppList(id: movedId, name: ''));
+    if (moved.name.isEmpty && _lists.indexWhere((l) => l.id == movedId) == -1) {
+      return;
+    }
+    int insertAt =
+        beforeId == null ? scope.length : scope.indexWhere((l) => l.id == beforeId);
+    if (insertAt < 0) insertAt = scope.length;
+    scope.insert(insertAt, moved);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _lists.indexWhere((l) => l.id == updated.id);
+      if (idx != -1) _lists[idx] = updated;
+    }
+    notifyListeners();
+    await _db.updateListSortOrders(scope);
+  }
+
   /// Recursively soft-deletes a folder, all nested subfolders, all lists inside
   /// them, and calls [onDeleteList] for each deleted list so the caller can
   /// soft-delete associated tasks. Returns the shared `deletedDate` so a

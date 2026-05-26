@@ -4,9 +4,13 @@ import 'calendar/calendar_view.dart';
 import 'localization/strings.dart';
 import 'calendar/event_controller.dart';
 import 'calendar/event_creation_sheet.dart';
+import 'contacts/contact_controller.dart';
+import 'contacts/contact_creation_sheet.dart';
+import 'folders/create_folder_list_sheet.dart';
 import 'folders/folder_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
 import 'models/list_type.dart';
+import 'notes/create_note_folder_sheet.dart';
 import 'notes/note_controller.dart';
 import 'notes/notes_view.dart';
 import 'spaces/space_manager.dart';
@@ -17,7 +21,6 @@ import 'security/security_service.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
-import 'tasks/birthday_creation_sheet.dart';
 import 'tasks/task_controller.dart';
 import 'tasks/task_creation_sheet.dart';
 import 'tasks/tasks_view.dart';
@@ -40,6 +43,7 @@ class HomeShell extends StatefulWidget {
     required this.noteController,
     required this.routineController,
     required this.eventController,
+    required this.contactController,
     required this.backupService,
     this.securityService,
     required this.googleCalendarController,
@@ -62,6 +66,7 @@ class HomeShell extends StatefulWidget {
   final NoteController noteController;
   final RoutineController routineController;
   final EventController eventController;
+  final ContactController contactController;
   final BackupService backupService;
   final SecurityService? securityService;
   final GoogleCalendarController googleCalendarController;
@@ -165,14 +170,82 @@ class _HomeShellState extends State<HomeShell> {
     _plusDragController.onDropOnDay = _handleDropOnDay;
     _plusDragController.onDropOnNoteFolder = _handleDropOnNoteFolder;
     _plusDragController.onDropOnNotesRoot = _handleDropOnNotesRoot;
+    _plusDragController.onDropOnSmartList = _handleDropOnSmartList;
+    _plusDragController.onDropOnAddFolderButton =
+        _handleDropOnAddFolderButton;
+    _plusDragController.onDropOnNotesAddFolderButton =
+        _handleDropOnNotesAddFolderButton;
+  }
+
+  void _handleDropOnAddFolderButton() {
+    showCreateFolderListSheet(context, widget.folderController);
+  }
+
+  void _handleDropOnNotesAddFolderButton() {
+    showCreateNoteFolderSheet(context, widget.noteController);
+  }
+
+  void _handleDropOnSmartList(PlusDropSmartList kind) {
+    final now = DateTime.now();
+    DateTime today() => DateTime(now.year, now.month, now.day);
+    DateTime tomorrow() =>
+        DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    // For Upcoming there's no canonical date — fall back to today+2 so
+    // the task at least lands in the Upcoming bucket. The user can still
+    // edit it from the creation sheet.
+    DateTime upcomingDefault() =>
+        DateTime(now.year, now.month, now.day).add(const Duration(days: 2));
+
+    switch (kind) {
+      case PlusDropSmartList.inbox:
+        // Inbox = no list assigned, no date — explicit clear.
+        showTaskCreationSheet(
+          context,
+          widget.taskController,
+          widget.folderController,
+          settingsController: widget.settingsController,
+        );
+      case PlusDropSmartList.today:
+        showTaskCreationSheet(
+          context,
+          widget.taskController,
+          widget.folderController,
+          initialDueDate: today(),
+          settingsController: widget.settingsController,
+        );
+      case PlusDropSmartList.tomorrow:
+        showTaskCreationSheet(
+          context,
+          widget.taskController,
+          widget.folderController,
+          initialDueDate: tomorrow(),
+          settingsController: widget.settingsController,
+        );
+      case PlusDropSmartList.upcoming:
+        showTaskCreationSheet(
+          context,
+          widget.taskController,
+          widget.folderController,
+          initialDueDate: upcomingDefault(),
+          settingsController: widget.settingsController,
+        );
+      case PlusDropSmartList.allTasks:
+        // All Tasks is a read-only union — defaults to Inbox.
+        showTaskCreationSheet(
+          context,
+          widget.taskController,
+          widget.folderController,
+          settingsController: widget.settingsController,
+        );
+    }
   }
 
   void _handleDropOnList(String listId) {
     final list = widget.folderController.listById(listId);
     if (list?.listType == ListType.birthdays) {
-      showBirthdayCreationSheet(
+      showContactCreationSheet(
         context,
-        widget.taskController,
+        widget.contactController,
         listId: listId,
       );
       return;
@@ -182,6 +255,7 @@ class _HomeShellState extends State<HomeShell> {
       widget.taskController,
       widget.folderController,
       initialListId: listId,
+      settingsController: widget.settingsController,
     );
   }
 
@@ -193,6 +267,7 @@ class _HomeShellState extends State<HomeShell> {
       context,
       widget.taskController,
       widget.folderController,
+      settingsController: widget.settingsController,
     );
   }
 
@@ -211,11 +286,15 @@ class _HomeShellState extends State<HomeShell> {
       widget.folderController,
       initialListId: listId,
       initialSectionId: sectionId,
+      settingsController: widget.settingsController,
     );
   }
 
   void _handleDropOnDay(DateTime date) {
-    _activeDueDate.value = date;
+    // Don't write to _activeDueDate here — that's intended for tab-state
+    // (selected day in calendar) and persists until the calendar sheet
+    // closes. Just route the chosen date directly into the picker so
+    // subsequent +-button taps don't keep re-using this date.
     _showCalendarItemPicker(date);
   }
 
@@ -352,15 +431,15 @@ class _HomeShellState extends State<HomeShell> {
       return;
     }
 
-    // When the active list is a Birthdays list, open the birthday creator
+    // When the active list is a Birthdays list, open the contact creator
     // instead of the standard task sheet.
     final listId = _activeListId.value;
     if (listId != null) {
       final list = widget.folderController.listById(listId);
       if (list?.listType == ListType.birthdays) {
-        showBirthdayCreationSheet(
+        showContactCreationSheet(
           context,
-          widget.taskController,
+          widget.contactController,
           listId: listId,
         );
         return;
@@ -373,6 +452,7 @@ class _HomeShellState extends State<HomeShell> {
       widget.folderController,
       initialListId: _activeListId.value,
       initialDueDate: _activeDueDate.value,
+      settingsController: widget.settingsController,
     );
   }
 
@@ -393,6 +473,7 @@ class _HomeShellState extends State<HomeShell> {
         widget.taskController,
         widget.folderController,
         initialDueDate: date,
+        settingsController: widget.settingsController,
       );
     } else if (choice == 'event') {
       showEventCreationSheet(
@@ -510,6 +591,7 @@ class _HomeShellState extends State<HomeShell> {
       0 => TasksView(
           controller: widget.taskController,
           folderController: widget.folderController,
+          contactController: widget.contactController,
           settingsController: widget.settingsController,
           activeListId: _activeListId,
           activeDueDate: _activeDueDate,
@@ -533,6 +615,7 @@ class _HomeShellState extends State<HomeShell> {
           controller: widget.taskController,
           folderController: widget.folderController,
           eventController: widget.eventController,
+          contactController: widget.contactController,
           resetSignal: _calendarResetSignal,
           settingsController: widget.settingsController,
           backupService: widget.backupService,

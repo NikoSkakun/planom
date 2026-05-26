@@ -16,6 +16,7 @@ import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
+import '../utils/reorder_drag.dart';
 import '../utils/undo_controller.dart';
 import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
@@ -100,11 +101,19 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                 onUndo: () => widget.controller.restoreAt(ts),
               );
             },
-            child: DragTarget<PlusDragPayload>(
-              onWillAcceptWithDetails: (_) => true,
-              onAcceptWithDetails: (_) => PlusDragScope.of(context)
-                  ?.onDropOnNoteFolder
-                  ?.call(f.id),
+            child: DragTarget<Object>(
+              onWillAcceptWithDetails: (d) =>
+                  d.data is PlusDragPayload || d.data is NoteDragData,
+              onAcceptWithDetails: (d) {
+                if (d.data is PlusDragPayload) {
+                  PlusDragScope.of(context)
+                      ?.onDropOnNoteFolder
+                      ?.call(f.id);
+                } else if (d.data is NoteDragData) {
+                  widget.controller.moveNote(
+                    (d.data as NoteDragData).noteId, f.id);
+                }
+              },
               builder: (ctx, cand, __) {
                 final hl = cand.isNotEmpty;
                 return Container(
@@ -187,21 +196,6 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
     );
   }
 
-  Widget _proxyDecorator(
-      Widget child, int index, Animation<double> animation) {
-    return Container(
-      decoration: const BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x18000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
 
   void _openSettings(BuildContext context) {
     HomeShell.openGlobalSettings(context);
@@ -287,129 +281,216 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                   slivers: [
                     const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-                    // Reorderable note folders
                     if (folders.isNotEmpty)
-                      SliverReorderableList(
-                        itemCount: folders.length,
-                        onReorder: (old, neo) =>
-                            widget.controller.reorderNoteFolders(
-                                null, old, neo),
-                        proxyDecorator: _proxyDecorator,
-                        itemBuilder: (context, index) {
-                          final f = folders[index];
-                          return ReorderableDelayedDragStartListener(
-                            key: ValueKey('nf_${f.id}'),
-                            index: index,
-                            child: Column(
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final f = folders[index];
+                            return Column(
+                              key: ValueKey('nf_${f.id}'),
                               children: [
-                                Dismissible(
-                                  key: ValueKey(f.id),
-                                  direction: DismissDirection.endToStart,
-                                  background: const NoteDeleteBackground(),
-                                  onDismissed: (_) async {
-                                    final undo =
-                                        UndoScope.maybeOf(context);
-                                    final ts = await widget.controller
-                                        .deleteFolderDeep(f.id);
-                                    undo?.show(
-                                      label: S
-                                          .of(context)
-                                          .noteFolderTrashedToast,
-                                      onUndo: () =>
-                                          widget.controller.restoreAt(ts),
-                                    );
-                                  },
-                                  child: DragTarget<PlusDragPayload>(
-                                    onWillAcceptWithDetails: (_) => true,
-                                    onAcceptWithDetails: (_) =>
-                                        PlusDragScope.of(context)
-                                            ?.onDropOnNoteFolder
-                                            ?.call(f.id),
-                                    builder: (ctx, cand, __) {
-                                      final hl = cand.isNotEmpty;
-                                      return Container(
-                                        decoration: hl
-                                            ? BoxDecoration(
-                                                color: AppColors.accent
-                                                    .withOpacity(0.15),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              )
-                                            : null,
-                                        child: NoteFolderRow(
-                                          folder: f,
-                                          noteCount: widget.controller
-                                              .notesIn(f.id)
-                                              .length,
-                                          onTap: () =>
-                                              Navigator.of(context).push(
-                                            FastRoute<void>(
-                                              builder: (_) => NoteFolderView(
-                                                folder: f,
-                                                controller: widget.controller,
-                                                settingsController:
-                                                    widget.settingsController,
+                                ReorderableDropZone(
+                                  kind: ReorderKind.noteFolder,
+                                  beforeId: f.id,
+                                  onReorder: (movedId, beforeId) =>
+                                      widget.controller
+                                          .reorderNoteFolderBefore(
+                                    movedId: movedId,
+                                    beforeId: beforeId,
+                                    parentFolderId: null,
+                                  ),
+                                  child: ReorderableRow(
+                                    id: f.id,
+                                    kind: ReorderKind.noteFolder,
+                                    label: f.name,
+                                    child: Dismissible(
+                                      key: ValueKey(f.id),
+                                      direction: DismissDirection.endToStart,
+                                      background:
+                                          const NoteDeleteBackground(),
+                                      onDismissed: (_) async {
+                                        final undo =
+                                            UndoScope.maybeOf(context);
+                                        final ts = await widget.controller
+                                            .deleteFolderDeep(f.id);
+                                        undo?.show(
+                                          label: S
+                                              .of(context)
+                                              .noteFolderTrashedToast,
+                                          onUndo: () => widget.controller
+                                              .restoreAt(ts),
+                                        );
+                                      },
+                                      child: DragTarget<Object>(
+                                        onWillAcceptWithDetails: (d) =>
+                                            d.data is PlusDragPayload ||
+                                            d.data is NoteDragData,
+                                        onAcceptWithDetails: (d) {
+                                          if (d.data is PlusDragPayload) {
+                                            PlusDragScope.of(context)
+                                                ?.onDropOnNoteFolder
+                                                ?.call(f.id);
+                                          } else if (d.data
+                                              is NoteDragData) {
+                                            widget.controller.moveNote(
+                                                (d.data as NoteDragData)
+                                                    .noteId,
+                                                f.id);
+                                          }
+                                        },
+                                        builder: (ctx, cand, __) {
+                                          final hl = cand.isNotEmpty;
+                                          return Container(
+                                            decoration: hl
+                                                ? BoxDecoration(
+                                                    color: AppColors.accent
+                                                        .withOpacity(0.15),
+                                                    borderRadius:
+                                                        BorderRadius
+                                                            .circular(8),
+                                                  )
+                                                : null,
+                                            child: NoteFolderRow(
+                                              folder: f,
+                                              noteCount: widget.controller
+                                                  .notesIn(f.id)
+                                                  .length,
+                                              onTap: () =>
+                                                  Navigator.of(context)
+                                                      .push(
+                                                FastRoute<void>(
+                                                  builder: (_) =>
+                                                      NoteFolderView(
+                                                    folder: f,
+                                                    controller:
+                                                        widget.controller,
+                                                    settingsController: widget
+                                                        .settingsController,
+                                                  ),
+                                                ),
                                               ),
+                                              onExpand: () => _toggle(f.id),
+                                              isExpanded: _expandedIds
+                                                  .contains(f.id),
                                             ),
-                                          ),
-                                          onExpand: () => _toggle(f.id),
-                                          isExpanded:
-                                              _expandedIds.contains(f.id),
-                                        ),
-                                      );
-                                    },
+                                          );
+                                        },
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 if (_expandedIds.contains(f.id))
                                   _buildFolderChildren(context, f.id, 24),
                               ],
-                            ),
-                          );
-                        },
+                            );
+                          },
+                          childCount: folders.length,
+                        ),
+                      ),
+                    if (folders.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: ReorderableTrailingSlot(
+                          kind: ReorderKind.noteFolder,
+                          onReorder: (movedId) => widget.controller
+                              .reorderNoteFolderBefore(
+                            movedId: movedId,
+                            beforeId: null,
+                            parentFolderId: null,
+                          ),
+                        ),
                       ),
 
-                    // Reorderable notes
+                    // Notes — long-press uses the existing NoteDragData
+                    // drag (so it works as both folder-move and reorder).
+                    // Each row is wrapped in a DragTarget<NoteDragData>
+                    // that, on drop, inserts the moved note before this
+                    // row inside the same folder (when same), or moves
+                    // between folders (when different).
                     if (notes.isNotEmpty)
-                      SliverReorderableList(
-                        itemCount: notes.length,
-                        onReorder: (old, neo) =>
-                            widget.controller.reorderNotes(null, old, neo),
-                        proxyDecorator: _proxyDecorator,
-                        itemBuilder: (context, index) {
-                          final n = notes[index];
-                          return ReorderableDelayedDragStartListener(
-                            key: ValueKey('note_${n.id}'),
-                            index: index,
-                            child: Dismissible(
-                              key: ValueKey(n.id),
-                              direction: DismissDirection.endToStart,
-                              background: const NoteDeleteBackground(),
-                              onDismissed: (_) {
-                                final savedFolderId = n.folderId;
-                                widget.controller.deleteNote(n.id);
-                                UndoScope.maybeOf(context)?.show(
-                                  label: S.of(context).noteTrashedToast,
-                                  onUndo: () => widget.controller
-                                      .restoreNote(n.id, savedFolderId),
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final n = notes[index];
+                            return DragTarget<NoteDragData>(
+                              key: ValueKey('note_${n.id}'),
+                              onWillAcceptWithDetails: (d) =>
+                                  d.data.noteId != n.id,
+                              onAcceptWithDetails: (d) {
+                                final moved = widget.controller
+                                    .allNotes
+                                    .where((x) => x.id == d.data.noteId)
+                                    .firstOrNull;
+                                if (moved == null) return;
+                                if (moved.folderId == n.folderId) {
+                                  widget.controller.reorderNoteBefore(
+                                    movedId: d.data.noteId,
+                                    beforeId: n.id,
+                                    folderId: n.folderId,
+                                  );
+                                } else {
+                                  widget.controller
+                                      .moveNote(d.data.noteId, n.folderId);
+                                }
+                              },
+                              builder: (context, candidates, _) {
+                                final hovering = candidates.isNotEmpty;
+                                return Stack(
+                                  children: [
+                                    Dismissible(
+                                      key: ValueKey(n.id),
+                                      direction:
+                                          DismissDirection.endToStart,
+                                      background:
+                                          const NoteDeleteBackground(),
+                                      onDismissed: (_) {
+                                        final savedFolderId = n.folderId;
+                                        widget.controller.deleteNote(n.id);
+                                        UndoScope.maybeOf(context)?.show(
+                                          label: S
+                                              .of(context)
+                                              .noteTrashedToast,
+                                          onUndo: () => widget.controller
+                                              .restoreNote(
+                                                  n.id, savedFolderId),
+                                        );
+                                      },
+                                      child: NoteRow(
+                                        note: n,
+                                        onTap: () =>
+                                            Navigator.of(context).push(
+                                          FastRoute<void>(
+                                            settings: const RouteSettings(
+                                                name: NoteDetailView
+                                                    .routeName),
+                                            builder: (_) => NoteDetailView(
+                                              note: n,
+                                              controller: widget.controller,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (hovering)
+                                      Positioned(
+                                        top: 0,
+                                        left: 16,
+                                        right: 16,
+                                        child: Container(
+                                          height: 2,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.accent,
+                                            borderRadius:
+                                                BorderRadius.circular(1),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 );
                               },
-                              child: NoteRow(
-                                note: n,
-                                onTap: () =>
-                                    Navigator.of(context).push(
-                                  FastRoute<void>(
-                                    settings: const RouteSettings(
-                                        name: NoteDetailView.routeName),
-                                    builder: (_) => NoteDetailView(
-                                      note: n,
-                                      controller: widget.controller,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                          childCount: notes.length,
+                        ),
                       ),
 
                     if (hasTrash)
@@ -477,6 +558,9 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                 child: NoteFolderCircleButton(
                   onPressed: () =>
                       showCreateNoteFolderSheet(context, widget.controller),
+                  onAcceptPlus: () => PlusDragScope.of(context)
+                      ?.onDropOnNotesAddFolderButton
+                      ?.call(),
                 ),
               ),
             Positioned(

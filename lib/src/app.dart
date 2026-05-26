@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'calendar/event_controller.dart';
+import 'contacts/contact_controller.dart';
 import 'folders/folder_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
 import 'localization/app_localizations.dart';
@@ -26,6 +27,7 @@ class MyApp extends StatelessWidget {
     required this.noteController,
     required this.routineController,
     required this.eventController,
+    required this.contactController,
     required this.backupService,
     this.securityService,
     required this.googleCalendarController,
@@ -37,6 +39,7 @@ class MyApp extends StatelessWidget {
   final NoteController noteController;
   final RoutineController routineController;
   final EventController eventController;
+  final ContactController contactController;
   final BackupService backupService;
   final SecurityService? securityService;
   final GoogleCalendarController googleCalendarController;
@@ -83,6 +86,7 @@ class MyApp extends StatelessWidget {
                   noteController: noteController,
                   routineController: routineController,
                   eventController: eventController,
+                  contactController: contactController,
                   backupService: backupService,
                   securityService: securityService,
                   googleCalendarController: googleCalendarController,

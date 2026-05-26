@@ -5,10 +5,12 @@ import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../localization/strings.dart';
 import '../models/task.dart';
+import '../settings/settings_controller.dart';
 import '../theme/app_theme.dart';
 import '../utils/duration_picker.dart';
 import 'calendar_date_picker.dart';
 import 'task_controller.dart';
+import 'task_field_prefs.dart';
 
 void showTaskCreationSheet(
   BuildContext context,
@@ -17,6 +19,7 @@ void showTaskCreationSheet(
   String? initialListId,
   DateTime? initialDueDate,
   String? initialSectionId,
+  SettingsController? settingsController,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -29,6 +32,7 @@ void showTaskCreationSheet(
       initialListId: initialListId,
       initialDueDate: initialDueDate,
       initialSectionId: initialSectionId,
+      settingsController: settingsController,
     ),
   );
 }
@@ -41,6 +45,7 @@ class TaskCreationSheet extends StatefulWidget {
     this.initialListId,
     this.initialDueDate,
     this.initialSectionId,
+    this.settingsController,
   });
 
   final TaskController controller;
@@ -48,6 +53,7 @@ class TaskCreationSheet extends StatefulWidget {
   final String? initialListId;
   final DateTime? initialDueDate;
   final String? initialSectionId;
+  final SettingsController? settingsController;
 
   @override
   State<TaskCreationSheet> createState() => _TaskCreationSheetState();
@@ -199,6 +205,12 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     final s = S.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
+    final prefs =
+        widget.settingsController?.taskFieldPrefs ?? TaskFieldPrefs();
+    final showDate = prefs.showDate;
+    final showPriority = prefs.showPriority;
+    final showDuration = prefs.showDuration;
+    final showList = prefs.showList;
 
     return Container(
       decoration: BoxDecoration(
@@ -259,116 +271,119 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
             children: [
               Row(
                 children: [
-                  // List picker
-                  GestureDetector(
-                    onTap: _pickList,
-                    child: Row(
-                      children: [
-                        ImageIcon(
-                          AssetImage(_listIcon),
-                          size: 18,
-                          color: CupertinoColors.secondaryLabel
-                              .resolveFrom(context),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _listLabel(context),
-                          style: TextStyle(
-                            fontSize: 14,
+                  if (showList) ...[
+                    GestureDetector(
+                      onTap: _pickList,
+                      child: Row(
+                        children: [
+                          ImageIcon(
+                            AssetImage(_listIcon),
+                            size: 18,
                             color: CupertinoColors.secondaryLabel
                                 .resolveFrom(context),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  // Date picker
-                  GestureDetector(
-                    onTap: _pickDate,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.calendar,
-                          size: 16,
-                          color: _dueDate != null
-                              ? AppColors.accent
-                              : CupertinoColors.secondaryLabel
+                          const SizedBox(width: 6),
+                          Text(
+                            _listLabel(context),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: CupertinoColors.secondaryLabel
                                   .resolveFrom(context),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _dueDate != null
-                              ? formatTaskDate(context, _dueDate!,
-                                  doTime: _doTime)
-                              : s.dateLabel,
-                          style: TextStyle(
-                            fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                  ],
+                  if (showDate) ...[
+                    GestureDetector(
+                      onTap: _pickDate,
+                      child: Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.calendar,
+                            size: 16,
                             color: _dueDate != null
                                 ? AppColors.accent
                                 : CupertinoColors.secondaryLabel
                                     .resolveFrom(context),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  // Priority toggle
-                  GestureDetector(
-                    onTap: _cyclePriority,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.flag_fill,
-                          size: 15,
-                          color: _priority == 0
-                              ? CupertinoColors.secondaryLabel
-                                  .resolveFrom(context)
-                              : _priorityColors[_priority],
-                        ),
-                        if (_priority > 0) ...[
                           const SizedBox(width: 4),
                           Text(
-                            _priorityLabels(context)[_priority],
+                            _dueDate != null
+                                ? formatTaskDate(context, _dueDate!,
+                                    doTime: _doTime)
+                                : s.dateLabel,
                             style: TextStyle(
-                              fontSize: 13,
-                              color: _priorityColors[_priority],
-                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                              color: _dueDate != null
+                                  ? AppColors.accent
+                                  : CupertinoColors.secondaryLabel
+                                      .resolveFrom(context),
                             ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  // Duration picker
-                  GestureDetector(
-                    onTap: _pickDuration,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.timer,
-                          size: 16,
-                          color: _duration != null
-                              ? AppColors.accent
-                              : CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
-                        ),
-                        if (_duration != null) ...[
-                          const SizedBox(width: 4),
-                          Text(
-                            formatDuration(_duration!),
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.w500,
-                            ),
+                    const SizedBox(width: 14),
+                  ],
+                  if (showPriority) ...[
+                    GestureDetector(
+                      onTap: _cyclePriority,
+                      child: Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.flag_fill,
+                            size: 15,
+                            color: _priority == 0
+                                ? CupertinoColors.secondaryLabel
+                                    .resolveFrom(context)
+                                : _priorityColors[_priority],
                           ),
+                          if (_priority > 0) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              _priorityLabels(context)[_priority],
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _priorityColors[_priority],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 14),
+                  ],
+                  if (showDuration)
+                    GestureDetector(
+                      onTap: _pickDuration,
+                      child: Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.timer,
+                            size: 16,
+                            color: _duration != null
+                                ? AppColors.accent
+                                : CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                          ),
+                          if (_duration != null) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              formatDuration(_duration!),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                 ],
               ),
               CupertinoButton(
