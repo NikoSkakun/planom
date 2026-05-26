@@ -6,6 +6,7 @@ import 'calendar/event_controller.dart';
 import 'calendar/event_creation_sheet.dart';
 import 'folders/folder_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
+import 'models/list_type.dart';
 import 'notes/note_controller.dart';
 import 'notes/notes_view.dart';
 import 'spaces/space_manager.dart';
@@ -16,13 +17,18 @@ import 'security/security_service.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
+import 'tasks/birthday_creation_sheet.dart';
 import 'tasks/task_controller.dart';
 import 'tasks/task_creation_sheet.dart';
 import 'tasks/tasks_view.dart';
 import 'theme/app_theme.dart';
 import 'utils/fast_route.dart';
 import 'utils/platform_capabilities.dart';
+import 'utils/plus_drag_controller.dart';
+import 'utils/plus_drag_payload.dart';
 import 'utils/selection_menu.dart';
+import 'notes/note_detail_view.dart';
+import 'models/note.dart';
 import 'utils/undo_controller.dart';
 
 class HomeShell extends StatefulWidget {
@@ -75,6 +81,7 @@ class _HomeShellState extends State<HomeShell> {
   final _calendarResetSignal = ValueNotifier<int>(0);
   final _showPlusButton = ValueNotifier<bool>(true);
   final _undoController = UndoController();
+  final _plusDragController = PlusDragController();
   // True while the user is viewing Settings via the global overlay (i.e. the
   // Settings tab is hidden but they opened Settings from another tab's ⋯
   // menu). The tab bar repaints all tabs as inactive while this is true.
@@ -148,6 +155,94 @@ class _HomeShellState extends State<HomeShell> {
     ];
     // Notes (1) and Settings (4) never show the global +.
     _showPlusButton.value = _lastTabIndex != 1 && _lastTabIndex != 4;
+
+    // Wire up Plus-button drag drop callbacks. These run regardless of which
+    // tab is currently active because a Draggable receives drops anywhere on
+    // screen; the target widgets live inside per-tab views.
+    _plusDragController.onDropOnList = _handleDropOnList;
+    _plusDragController.onDropOnFolder = _handleDropOnFolder;
+    _plusDragController.onDropOnSection = _handleDropOnSection;
+    _plusDragController.onDropOnDay = _handleDropOnDay;
+    _plusDragController.onDropOnNoteFolder = _handleDropOnNoteFolder;
+    _plusDragController.onDropOnNotesRoot = _handleDropOnNotesRoot;
+  }
+
+  void _handleDropOnList(String listId) {
+    final list = widget.folderController.listById(listId);
+    if (list?.listType == ListType.birthdays) {
+      showBirthdayCreationSheet(
+        context,
+        widget.taskController,
+        listId: listId,
+      );
+      return;
+    }
+    showTaskCreationSheet(
+      context,
+      widget.taskController,
+      widget.folderController,
+      initialListId: listId,
+    );
+  }
+
+  void _handleDropOnFolder(String folderId) {
+    // Dropping on a folder opens the standard task-creation sheet with no
+    // list pre-filled — the user can still pick a list inside that folder
+    // from the sheet's list picker if they want.
+    showTaskCreationSheet(
+      context,
+      widget.taskController,
+      widget.folderController,
+    );
+  }
+
+  void _handleDropOnSection(String listId, String sectionId) {
+    final list = widget.folderController.listById(listId);
+    if (list?.listType == ListType.birthdays) return;
+    // Show the standard task sheet but stamp the section id on the new task
+    // by intercepting via the controller before/after creation. Simpler:
+    // open the sheet and apply the section assignment afterwards. We do it
+    // by routing through addTask directly with a minimal sheet — but to
+    // keep the UX consistent, we use the sheet and patch the resulting
+    // task's section via a follow-up moveTaskToSection call once it appears.
+    showTaskCreationSheet(
+      context,
+      widget.taskController,
+      widget.folderController,
+      initialListId: listId,
+      initialSectionId: sectionId,
+    );
+  }
+
+  void _handleDropOnDay(DateTime date) {
+    _activeDueDate.value = date;
+    _showCalendarItemPicker(date);
+  }
+
+  void _handleDropOnNoteFolder(String folderId) {
+    _navigatorKeys[1].currentState?.push(
+      FastRoute<void>(
+        settings: const RouteSettings(name: NoteDetailView.routeName),
+        builder: (_) => NoteDetailView(
+          note: Note(title: '', content: '', folderId: folderId),
+          controller: widget.noteController,
+          isNew: true,
+        ),
+      ),
+    );
+  }
+
+  void _handleDropOnNotesRoot() {
+    _navigatorKeys[1].currentState?.push(
+      FastRoute<void>(
+        settings: const RouteSettings(name: NoteDetailView.routeName),
+        builder: (_) => NoteDetailView(
+          note: Note(title: '', content: ''),
+          controller: widget.noteController,
+          isNew: true,
+        ),
+      ),
+    );
   }
 
   @override
@@ -255,6 +350,21 @@ class _HomeShellState extends State<HomeShell> {
     if (_lastTabIndex == 2 && _activeDueDate.value != null) {
       _showCalendarItemPicker(_activeDueDate.value!);
       return;
+    }
+
+    // When the active list is a Birthdays list, open the birthday creator
+    // instead of the standard task sheet.
+    final listId = _activeListId.value;
+    if (listId != null) {
+      final list = widget.folderController.listById(listId);
+      if (list?.listType == ListType.birthdays) {
+        showBirthdayCreationSheet(
+          context,
+          widget.taskController,
+          listId: listId,
+        );
+        return;
+      }
     }
 
     showTaskCreationSheet(
@@ -454,7 +564,10 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     return UndoScope(
       controller: _undoController,
-      child: _buildShell(context),
+      child: PlusDragScope(
+        controller: _plusDragController,
+        child: _buildShell(context),
+      ),
     );
   }
 
@@ -762,31 +875,37 @@ class _PlusButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visual = Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        shape: BoxShape.circle,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: const Icon(
+        CupertinoIcons.plus,
+        color: CupertinoColors.white,
+        size: 24,
+      ),
+    );
     return Semantics(
       label: S.of(context).add,
       button: true,
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: onPressed,
-        child: Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: AppColors.accent,
-            shape: BoxShape.circle,
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 8,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            CupertinoIcons.plus,
-            color: CupertinoColors.white,
-            size: 24,
-          ),
+      child: Draggable<PlusDragPayload>(
+        data: const PlusDragPayload(),
+        feedback: visual,
+        childWhenDragging: Opacity(opacity: 0.3, child: visual),
+        child: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: onPressed,
+          child: visual,
         ),
       ),
     );

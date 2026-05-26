@@ -10,6 +10,8 @@ import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/plus_drag_controller.dart';
+import '../utils/plus_drag_payload.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart'
     show
@@ -115,6 +117,8 @@ class _FolderViewState extends State<FolderView>
               isFolder: true,
               indent: indent,
               count: _folderCount(f.id),
+              onAcceptPlus: () =>
+                  PlusDragScope.of(context)?.onDropOnFolder?.call(f.id),
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => FolderView(
@@ -161,6 +165,8 @@ class _FolderViewState extends State<FolderView>
               label: l.name,
               indent: indent,
               count: _listCount(l.id),
+              onAcceptPlus: () =>
+                  PlusDragScope.of(context)?.onDropOnList?.call(l.id),
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => ListTaskView(
@@ -394,6 +400,10 @@ class _FolderViewState extends State<FolderView>
                                     label: f.name,
                                     isFolder: true,
                                     count: _folderCount(f.id),
+                                    onAcceptPlus: () => PlusDragScope.of(
+                                            context)
+                                        ?.onDropOnFolder
+                                        ?.call(f.id),
                                     onTap: () =>
                                         Navigator.of(context).push(
                                       FastRoute<void>(
@@ -464,6 +474,9 @@ class _FolderViewState extends State<FolderView>
                                 ),
                                 label: l.name,
                                 count: _listCount(l.id),
+                                onAcceptPlus: () => PlusDragScope.of(context)
+                                    ?.onDropOnList
+                                    ?.call(l.id),
                                 onTap: () =>
                                     Navigator.of(context).push(
                                   FastRoute<void>(
@@ -670,6 +683,7 @@ class _FolderListItem extends StatelessWidget {
     this.onExpand,
     this.isExpanded = false,
     this.indent = 0,
+    this.onAcceptPlus,
   });
 
   final Widget icon;
@@ -680,10 +694,11 @@ class _FolderListItem extends StatelessWidget {
   final VoidCallback? onExpand;
   final bool isExpanded;
   final double indent;
+  final VoidCallback? onAcceptPlus;
 
   @override
   Widget build(BuildContext context) {
-    return IntrinsicHeight(
+    final row = IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -746,6 +761,23 @@ class _FolderListItem extends StatelessWidget {
             ),
         ],
       ),
+    );
+
+    if (onAcceptPlus == null) return row;
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (_) => onAcceptPlus!(),
+      builder: (context, candidates, _) {
+        return Container(
+          decoration: candidates.isEmpty
+              ? null
+              : BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+          child: row,
+        );
+      },
     );
   }
 }

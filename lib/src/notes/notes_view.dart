@@ -14,6 +14,8 @@ import '../theme/app_theme.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
+import '../utils/plus_drag_controller.dart';
+import '../utils/plus_drag_payload.dart';
 import '../utils/undo_controller.dart';
 import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
@@ -98,21 +100,38 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                 onUndo: () => widget.controller.restoreAt(ts),
               );
             },
-            child: NoteFolderRow(
-              folder: f,
-              noteCount: widget.controller.notesIn(f.id).length,
-              indent: indent,
-              onTap: () => Navigator.of(context).push(
-                FastRoute<void>(
-                  builder: (_) => NoteFolderView(
+            child: DragTarget<PlusDragPayload>(
+              onWillAcceptWithDetails: (_) => true,
+              onAcceptWithDetails: (_) => PlusDragScope.of(context)
+                  ?.onDropOnNoteFolder
+                  ?.call(f.id),
+              builder: (ctx, cand, __) {
+                final hl = cand.isNotEmpty;
+                return Container(
+                  decoration: hl
+                      ? BoxDecoration(
+                          color: AppColors.accent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        )
+                      : null,
+                  child: NoteFolderRow(
                     folder: f,
-                    controller: widget.controller,
-                    settingsController: widget.settingsController,
+                    noteCount: widget.controller.notesIn(f.id).length,
+                    indent: indent,
+                    onTap: () => Navigator.of(context).push(
+                      FastRoute<void>(
+                        builder: (_) => NoteFolderView(
+                          folder: f,
+                          controller: widget.controller,
+                          settingsController: widget.settingsController,
+                        ),
+                      ),
+                    ),
+                    onExpand: () => _toggle(f.id),
+                    isExpanded: _expandedIds.contains(f.id),
                   ),
-                ),
-              ),
-              onExpand: () => _toggle(f.id),
-              isExpanded: _expandedIds.contains(f.id),
+                );
+              },
             ),
           ),
           if (_expandedIds.contains(f.id))
@@ -300,24 +319,45 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                                           widget.controller.restoreAt(ts),
                                     );
                                   },
-                                  child: NoteFolderRow(
-                                    folder: f,
-                                    noteCount: widget.controller
-                                        .notesIn(f.id)
-                                        .length,
-                                    onTap: () =>
-                                        Navigator.of(context).push(
-                                      FastRoute<void>(
-                                        builder: (_) => NoteFolderView(
+                                  child: DragTarget<PlusDragPayload>(
+                                    onWillAcceptWithDetails: (_) => true,
+                                    onAcceptWithDetails: (_) =>
+                                        PlusDragScope.of(context)
+                                            ?.onDropOnNoteFolder
+                                            ?.call(f.id),
+                                    builder: (ctx, cand, __) {
+                                      final hl = cand.isNotEmpty;
+                                      return Container(
+                                        decoration: hl
+                                            ? BoxDecoration(
+                                                color: AppColors.accent
+                                                    .withOpacity(0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              )
+                                            : null,
+                                        child: NoteFolderRow(
                                           folder: f,
-                                          controller: widget.controller,
-                                          settingsController:
-                                              widget.settingsController,
+                                          noteCount: widget.controller
+                                              .notesIn(f.id)
+                                              .length,
+                                          onTap: () =>
+                                              Navigator.of(context).push(
+                                            FastRoute<void>(
+                                              builder: (_) => NoteFolderView(
+                                                folder: f,
+                                                controller: widget.controller,
+                                                settingsController:
+                                                    widget.settingsController,
+                                              ),
+                                            ),
+                                          ),
+                                          onExpand: () => _toggle(f.id),
+                                          isExpanded:
+                                              _expandedIds.contains(f.id),
                                         ),
-                                      ),
-                                    ),
-                                    onExpand: () => _toggle(f.id),
-                                    isExpanded: _expandedIds.contains(f.id),
+                                      );
+                                    },
                                   ),
                                 ),
                                 if (_expandedIds.contains(f.id))

@@ -17,6 +17,8 @@ import '../settings/settings_controller.dart';
 import '../settings/settings_menu.dart';
 import '../tasks/task_controller.dart';
 import '../utils/dropdown_overlay.dart';
+import '../utils/plus_drag_controller.dart';
+import '../utils/plus_drag_payload.dart';
 import 'day_view_sheet.dart';
 import 'event_controller.dart';
 
@@ -436,28 +438,42 @@ class _DayCell extends StatelessWidget {
     }
 
     final allTasks = controller.tasksForDate(date!);
-    final uncompleted = allTasks.where((t) => !t.isCompleted).toList();
-    final completed = allTasks.where((t) => t.isCompleted).toList();
+    final birthdays = controller.birthdaysForDate(date!);
+    // Filter out birthday tasks already surfaced via dueDate — we'd otherwise
+    // double-count the year where birthDay==dueDate.
+    final nonBirthdayTasks = allTasks.where((t) => !t.isBirthday).toList();
+    final uncompleted =
+        nonBirthdayTasks.where((t) => !t.isCompleted).toList();
+    final completed =
+        nonBirthdayTasks.where((t) => t.isCompleted).toList();
     final events = eventController.eventsForDate(date!);
     final remoteEvents =
         googleCalendarController?.eventsForDate(date!) ?? const <RemoteEvent>[];
 
-    // Order: events first (local + Google), then incomplete tasks, then
-    // completed tasks. Remote events are rendered with their calendar color
-    // so different Google calendars stay visually distinct.
+    // Order: events first (local + Google), then birthdays, then incomplete
+    // tasks, then completed tasks. Remote events render with their calendar
+    // color so different Google calendars stay visually distinct.
     final chips = <_ChipData>[
       for (final e in events) _ChipData.event(e),
       for (final e in remoteEvents) _ChipData.remoteEvent(e),
+      for (final b in birthdays) _ChipData.birthday(b),
       for (final t in uncompleted) _ChipData.task(t, false),
       for (final t in completed) _ChipData.task(t, true),
     ];
 
-    return GestureDetector(
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (_) =>
+          PlusDragScope.of(context)?.onDropOnDay?.call(date!),
+      builder: (context, candidates, _) {
+        final highlighted = candidates.isNotEmpty;
+        return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
         constraints: const BoxConstraints(minHeight: 88),
         decoration: BoxDecoration(
+          color: highlighted ? AppColors.accent.withOpacity(0.15) : null,
           border: Border(
             top: BorderSide(
               color: CupertinoColors.separator.resolveFrom(context),
@@ -507,6 +523,9 @@ class _DayCell extends StatelessWidget {
                   isPast: _remoteEventIsPast(c.remoteEvent!),
                 );
               }
+              if (c.isBirthday) {
+                return _BirthdayChip(title: c.birthday!.title);
+              }
               final listColor = c.task!.listId != null
                   ? folderController.listById(c.task!.listId!)?.color
                   : null;
@@ -532,6 +551,8 @@ class _DayCell extends StatelessWidget {
         ),
       ),
     );
+      },
+    );
   }
 }
 
@@ -540,25 +561,36 @@ class _ChipData {
       : task = t,
         event = null,
         remoteEvent = null,
+        birthday = null,
         completed = c;
   _ChipData.event(Event e)
       : task = null,
         event = e,
         remoteEvent = null,
+        birthday = null,
         completed = false;
   _ChipData.remoteEvent(RemoteEvent e)
       : task = null,
         event = null,
         remoteEvent = e,
+        birthday = null,
+        completed = false;
+  _ChipData.birthday(Task b)
+      : task = null,
+        event = null,
+        remoteEvent = null,
+        birthday = b,
         completed = false;
 
   final Task? task;
   final Event? event;
   final RemoteEvent? remoteEvent;
+  final Task? birthday;
   final bool completed;
 
   bool get isEvent => event != null;
   bool get isRemoteEvent => remoteEvent != null;
+  bool get isBirthday => birthday != null;
 }
 
 // ─── Task chip ────────────────────────────────────────────────────────────────
@@ -597,6 +629,42 @@ class _TaskChip extends StatelessWidget {
               ? CupertinoColors.secondaryLabel.resolveFrom(context)
               : CupertinoColors.white,
         ),
+      ),
+    );
+  }
+}
+
+class _BirthdayChip extends StatelessWidget {
+  const _BirthdayChip({required this.title});
+  final String title;
+
+  static const _color = Color(0xFFFF2D55); // birthday pink
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      decoration: BoxDecoration(
+        color: _color,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(CupertinoIcons.gift_fill,
+              size: 8, color: CupertinoColors.white),
+          const SizedBox(width: 2),
+          Flexible(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 9, color: CupertinoColors.white),
+            ),
+          ),
+        ],
       ),
     );
   }

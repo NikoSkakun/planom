@@ -263,19 +263,24 @@ class _DayViewSheetState extends State<DayViewSheet> {
   }
 
   Widget _buildList(BuildContext context) {
-    final tasks = widget.taskController.tasksForDate(widget.date);
+    final allTasks = widget.taskController.tasksForDate(widget.date);
+    final nonBirthdayTasks =
+        allTasks.where((t) => !t.isBirthday).toList();
+    final birthdays =
+        widget.taskController.birthdaysForDate(widget.date);
     final events = widget.eventController.eventsForDate(widget.date);
     final remoteEvents = widget.googleCalendarController
             ?.eventsForDate(widget.date) ??
         const <RemoteEvent>[];
 
     // Untimed first (tasks then events), then timed sorted by doTime.
-    final untimedTasks = tasks.where((t) => t.doTime == null).toList();
+    final untimedTasks =
+        nonBirthdayTasks.where((t) => t.doTime == null).toList();
     final untimedEvents = events.where((e) => e.doTime == null).toList();
     final untimedRemote =
         remoteEvents.where((e) => e.doTime == null).toList();
     final timedItems = <_TimedItem>[
-      for (final t in tasks.where((t) => t.doTime != null))
+      for (final t in nonBirthdayTasks.where((t) => t.doTime != null))
         _TimedItem.task(t),
       for (final e in events.where((e) => e.doTime != null))
         _TimedItem.event(e),
@@ -286,7 +291,8 @@ class _DayViewSheetState extends State<DayViewSheet> {
     final isEmpty = untimedTasks.isEmpty &&
         untimedEvents.isEmpty &&
         untimedRemote.isEmpty &&
-        timedItems.isEmpty;
+        timedItems.isEmpty &&
+        birthdays.isEmpty;
 
     if (isEmpty) {
       return Center(
@@ -303,6 +309,14 @@ class _DayViewSheetState extends State<DayViewSheet> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       children: [
+        for (final b in birthdays) ...[
+          _BirthdayCard(
+            task: b,
+            celebrationDate: widget.date,
+            onTap: () => _openTask(b),
+          ),
+          const SizedBox(height: 8),
+        ],
         for (final t in untimedTasks) ...[
           _TaskCard(
             task: t,
@@ -623,6 +637,73 @@ class _EventCard extends StatelessWidget {
                   color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Birthday card ──────────────────────────────────────────────────────────
+
+class _BirthdayCard extends StatelessWidget {
+  const _BirthdayCard({
+    required this.task,
+    required this.celebrationDate,
+    required this.onTap,
+  });
+
+  final Task task;
+  final DateTime celebrationDate;
+  final VoidCallback onTap;
+
+  static const _accent = Color(0xFFFF2D55);
+
+  @override
+  Widget build(BuildContext context) {
+    final age = task.birthYear != null
+        ? celebrationDate.year - task.birthYear!
+        : null;
+    final s = S.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: _accent.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: const Border(left: BorderSide(color: _accent, width: 3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(CupertinoIcons.gift_fill, size: 16, color: _accent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    task.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (age != null)
+                    Text(
+                      '${s.turns} $age',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

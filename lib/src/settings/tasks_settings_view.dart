@@ -139,6 +139,18 @@ class TasksSettingsView extends StatelessWidget {
                 const SizedBox(height: 1),
                 _SmartListRow(
                   icon: Icon(
+                    CupertinoIcons.tray_full,
+                    size: 22,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(ctx),
+                  ),
+                  label: s.allTasks,
+                  visibility: prefs.allTasks,
+                  onTap: () =>
+                      _showVisibilityPicker(ctx, 'allTasks', prefs.allTasks),
+                ),
+                const SizedBox(height: 1),
+                _SmartListRow(
+                  icon: Icon(
                     CupertinoIcons.checkmark_circle_fill,
                     size: 22,
                     color: AppColors.systemGreen,

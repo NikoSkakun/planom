@@ -5,7 +5,9 @@ import 'package:flutter/material.dart' show showModalBottomSheet;
 import '../localization/strings.dart';
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
+import '../models/list_type.dart';
 import '../theme/app_theme.dart';
+import '../utils/selection_menu.dart';
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
 import 'list_color_picker.dart';
@@ -212,6 +214,7 @@ class _CreateSheetState extends State<_CreateSheet> {
   int? _selectedColor;
   String? _selectedIconId;
   int? _selectedIconColor;
+  ListType _listType = ListType.tasks;
 
   @override
   void dispose() {
@@ -236,9 +239,39 @@ class _CreateSheetState extends State<_CreateSheet> {
         color: _selectedColor,
         iconId: _selectedIconId,
         iconColor: _selectedIconColor,
+        listType: _listType,
       ));
     }
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
+  }
+
+  Future<void> _pickListType() async {
+    final s = S.of(context);
+    final picked = await showSelectionMenu<ListType>(
+      context: context,
+      title: s.listType,
+      current: _listType,
+      options: [
+        SelectionMenuOption(value: ListType.tasks, label: s.listTypeTasks),
+        SelectionMenuOption(
+            value: ListType.birthdays, label: s.listTypeBirthdays),
+        SelectionMenuOption(value: ListType.shopping, label: s.listTypeShopping),
+      ],
+    );
+    if (picked != null && mounted) {
+      setState(() => _listType = picked);
+    }
+  }
+
+  String _listTypeLabel(S s, ListType t) {
+    switch (t) {
+      case ListType.tasks:
+        return s.listTypeTasks;
+      case ListType.birthdays:
+        return s.listTypeBirthdays;
+      case ListType.shopping:
+        return s.listTypeShopping;
+    }
   }
 
   void _openIconPicker() {
@@ -360,6 +393,11 @@ class _CreateSheetState extends State<_CreateSheet> {
             ],
           ),
           if (_type == _CreateType.list) ...[
+            const SizedBox(height: 16),
+            _ListTypeButton(
+              label: _listTypeLabel(S.of(context), _listType),
+              onTap: _pickListType,
+            ),
             const SizedBox(height: 16),
             _ColorPickerButton(
               selectedColor: _selectedColor,
@@ -555,6 +593,50 @@ class _EditItemSheetState extends State<_EditItemSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ListTypeButton extends StatelessWidget {
+  const _ListTypeButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                S.of(context).listType,
+                style: const TextStyle(fontSize: 17),
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              CupertinoIcons.chevron_right,
+              size: 14,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ],
+        ),
       ),
     );
   }

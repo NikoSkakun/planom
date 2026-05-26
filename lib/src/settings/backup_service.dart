@@ -68,6 +68,7 @@ class BackupService {
       'routines': await db.exportRoutines(),
       'routine_entries': await db.exportRoutineEntries(),
       'events': await db.exportEvents(),
+      'list_sections': await db.exportListSections(),
       'app_settings': (await db.exportAppSettings())
           .where((r) =>
               !SecurityService.authSettingKeys.contains(r['key']) &&
@@ -221,6 +222,7 @@ class BackupService {
         'routines': asMaps(data['routines']),
         'routine_entries': asMaps(data['routine_entries']),
         'events': asMaps(data['events']),
+        'list_sections': asMaps(data['list_sections']),
         'app_settings': [
           ...asMaps(data['app_settings']).where((r) =>
               !SecurityService.authSettingKeys.contains(r['key']) &&

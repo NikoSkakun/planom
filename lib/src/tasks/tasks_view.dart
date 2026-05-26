@@ -20,7 +20,10 @@ import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
+import '../utils/plus_drag_controller.dart';
+import '../utils/plus_drag_payload.dart';
 import '../utils/undo_controller.dart';
+import 'all_tasks_view.dart';
 import 'completed_view.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
@@ -193,6 +196,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
               label: f.name,
               indent: indent,
               count: _folderCount(f.id),
+              onAcceptPlus: () =>
+                  PlusDragScope.of(context)?.onDropOnFolder?.call(f.id),
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => FolderView(
@@ -241,6 +246,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
               label: l.name,
               indent: indent,
               count: _listCount(l.id),
+              onAcceptPlus: () =>
+                  PlusDragScope.of(context)?.onDropOnList?.call(l.id),
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => ListTaskView(
@@ -309,6 +316,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     widget.controller.tomorrowUncompletedCount;
                 final upcomingCount =
                     widget.controller.upcomingUncompletedCount;
+                final allTasksCount =
+                    widget.controller.allTasksUncompletedCount;
                 final completedCount =
                     widget.controller.completedTasksCount;
                 final hasTrashContent =
@@ -324,6 +333,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     _isVisible(prefs.tomorrow, tomorrowCount > 0);
                 final showUpcoming =
                     _isVisible(prefs.upcoming, upcomingCount > 0);
+                final showAllTasks =
+                    _isVisible(prefs.allTasks, allTasksCount > 0);
                 final showCompleted =
                     _isVisible(prefs.completed, completedCount > 0);
                 final showTrash =
@@ -408,6 +419,28 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                 ),
                               ),
                             ),
+                          if (showAllTasks)
+                            _ListItem(
+                              iconWidget: Icon(
+                                CupertinoIcons.tray_full,
+                                size: 22,
+                                color: CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                              ),
+                              label: s.allTasks,
+                              count: allTasksCount > 0
+                                  ? allTasksCount
+                                  : null,
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => AllTasksView(
+                                    controller: widget.controller,
+                                    folderController:
+                                        widget.folderController,
+                                  ),
+                                ),
+                              ),
+                            ),
                           // Separator between smart lists and user folders/lists
                           Padding(
                             padding: const EdgeInsets.symmetric(
@@ -469,6 +502,10 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                     isFolder: true,
                                     label: f.name,
                                     count: _folderCount(f.id),
+                                    onAcceptPlus: () => PlusDragScope.of(
+                                            context)
+                                        ?.onDropOnFolder
+                                        ?.call(f.id),
                                     onTap: () =>
                                         Navigator.of(context).push(
                                       FastRoute<void>(
@@ -540,6 +577,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                 isFolder: false,
                                 label: l.name,
                                 count: _listCount(l.id),
+                                onAcceptPlus: () => PlusDragScope.of(context)
+                                    ?.onDropOnList
+                                    ?.call(l.id),
                                 onTap: () => Navigator.of(context).push(
                                   FastRoute<void>(
                                     builder: (_) => ListTaskView(
@@ -691,6 +731,7 @@ class _ListItem extends StatelessWidget {
     this.onExpand,
     this.isExpanded = false,
     this.indent = 0,
+    this.onAcceptPlus,
   });
 
   final String? iconAsset;
@@ -704,6 +745,7 @@ class _ListItem extends StatelessWidget {
   final VoidCallback? onExpand;
   final bool isExpanded;
   final double indent;
+  final VoidCallback? onAcceptPlus;
 
   @override
   Widget build(BuildContext context) {
@@ -717,7 +759,7 @@ class _ListItem extends StatelessWidget {
       icon = Image.asset(iconAsset!, width: 22, height: 22);
     }
 
-    return IntrinsicHeight(
+    final row = IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -785,6 +827,23 @@ class _ListItem extends StatelessWidget {
             ),
         ],
       ),
+    );
+
+    if (onAcceptPlus == null) return row;
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (_) => onAcceptPlus!(),
+      builder: (context, candidates, _) {
+        return Container(
+          decoration: candidates.isEmpty
+              ? null
+              : BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+          child: row,
+        );
+      },
     );
   }
 }

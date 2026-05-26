@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import '../models/event.dart';
+import '../models/list_section.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 import '../models/routine.dart';
@@ -14,7 +15,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 22;
+  static const _dbVersion = 24;
 
   Database? _db;
 
@@ -46,7 +47,12 @@ class DatabaseService {
             reminderOffsets TEXT,
             parentTaskId TEXT,
             tagIds TEXT,
-            recurrence TEXT
+            recurrence TEXT,
+            birthMonth INTEGER,
+            birthDay INTEGER,
+            birthYear INTEGER,
+            isCompletable INTEGER NOT NULL DEFAULT 1,
+            sectionId TEXT
           )
         ''');
         await db.execute('''
@@ -81,7 +87,8 @@ class DatabaseService {
             iconId TEXT,
             iconColor INTEGER,
             isDeleted INTEGER NOT NULL DEFAULT 0,
-            deletedDate INTEGER
+            deletedDate INTEGER,
+            listType TEXT NOT NULL DEFAULT 'tasks'
           )
         ''');
         await db.execute('''
@@ -153,6 +160,16 @@ class DatabaseService {
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
             reminderOffsets TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE list_sections (
+            id TEXT PRIMARY KEY,
+            listId TEXT NOT NULL,
+            name TEXT NOT NULL,
+            sortOrder INTEGER NOT NULL DEFAULT 0,
+            isCollapsed INTEGER NOT NULL DEFAULT 0,
+            creationDate INTEGER NOT NULL
           )
         ''');
         await _createFtsTables(db);
@@ -342,6 +359,28 @@ class DatabaseService {
         if (oldVersion < 22) {
           await db.execute('ALTER TABLE folders ADD COLUMN iconColor INTEGER');
           await db.execute('ALTER TABLE app_lists ADD COLUMN iconColor INTEGER');
+        }
+        if (oldVersion < 23) {
+          await db.execute(
+              "ALTER TABLE app_lists ADD COLUMN listType TEXT NOT NULL DEFAULT 'tasks'");
+        }
+        if (oldVersion < 24) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN birthMonth INTEGER');
+          await db.execute('ALTER TABLE tasks ADD COLUMN birthDay INTEGER');
+          await db.execute('ALTER TABLE tasks ADD COLUMN birthYear INTEGER');
+          await db.execute(
+              'ALTER TABLE tasks ADD COLUMN isCompletable INTEGER NOT NULL DEFAULT 1');
+          await db.execute('ALTER TABLE tasks ADD COLUMN sectionId TEXT');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS list_sections (
+              id TEXT PRIMARY KEY,
+              listId TEXT NOT NULL,
+              name TEXT NOT NULL,
+              sortOrder INTEGER NOT NULL DEFAULT 0,
+              isCollapsed INTEGER NOT NULL DEFAULT 0,
+              creationDate INTEGER NOT NULL
+            )
+          ''');
         }
       },
     );
@@ -784,6 +823,53 @@ class DatabaseService {
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
+  // List sections — user-defined groups of tasks within a list
+  Future<List<ListSection>> getListSections() async {
+    final db = await _database;
+    final rows =
+        await db.query('list_sections', orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(ListSection.fromMap).toList();
+  }
+
+  Future<void> insertListSection(ListSection section) async {
+    final db = await _database;
+    await db.insert('list_sections', section.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateListSection(ListSection section) async {
+    final db = await _database;
+    await db.update('list_sections', section.toMap(),
+        where: 'id = ?', whereArgs: [section.id]);
+  }
+
+  Future<void> deleteListSection(String id) async {
+    final db = await _database;
+    await db.delete('list_sections', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteSectionsForList(String listId) async {
+    final db = await _database;
+    await db.delete('list_sections',
+        where: 'listId = ?', whereArgs: [listId]);
+  }
+
+  Future<void> updateListSectionSortOrders(List<ListSection> sections) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final s in sections) {
+      batch.update('list_sections', {'sortOrder': s.sortOrder},
+          where: 'id = ?', whereArgs: [s.id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<Map<String, dynamic>>> exportListSections() async {
+    final db = await _database;
+    final rows = await db.query('list_sections');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
 
   Future<void> clearTrashedTasks() async {
     final db = await _database;
@@ -896,6 +982,7 @@ class DatabaseService {
 
   static const _allTables = [
     'events',
+    'list_sections',
     'app_settings',
     'routine_entries',
     'routines',
@@ -933,6 +1020,7 @@ class DatabaseService {
   Future<void> resetUserData() async {
     final db = await _database;
     await db.delete('events');
+    await db.delete('list_sections');
     await db.delete('routine_entries');
     await db.delete('routines');
     await db.delete('notes');
