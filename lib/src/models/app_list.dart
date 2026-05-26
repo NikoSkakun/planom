@@ -1,5 +1,7 @@
 import 'package:uuid/uuid.dart';
 
+import 'list_type.dart';
+
 class AppList {
   final String id;
   final String name;
@@ -11,6 +13,7 @@ class AppList {
   final int? iconColor; // ARGB override for SF-symbol icon; null=use accent
   final bool isDeleted;
   final DateTime? deletedDate;
+  final ListType listType;
 
   AppList({
     String? id,
@@ -23,6 +26,7 @@ class AppList {
     this.iconColor,
     this.isDeleted = false,
     this.deletedDate,
+    this.listType = ListType.tasks,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate ?? DateTime.now();
 
@@ -40,6 +44,7 @@ class AppList {
     bool? isDeleted,
     DateTime? deletedDate,
     bool clearDeletedDate = false,
+    ListType? listType,
   }) =>
       AppList(
         id: id,
@@ -52,6 +57,7 @@ class AppList {
         iconColor: clearIconColor ? null : (iconColor ?? this.iconColor),
         isDeleted: isDeleted ?? this.isDeleted,
         deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
+        listType: listType ?? this.listType,
       );
 
   Map<String, dynamic> toMap() => {
@@ -65,6 +71,7 @@ class AppList {
         'iconColor': iconColor,
         'isDeleted': isDeleted ? 1 : 0,
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
+        'listType': listType.value,
       };
 
   factory AppList.fromMap(Map<String, dynamic> map) => AppList(
@@ -81,5 +88,6 @@ class AppList {
         deletedDate: map['deletedDate'] != null
             ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)
             : null,
+        listType: ListType.fromString(map['listType'] as String?),
       );
 }

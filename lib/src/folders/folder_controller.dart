@@ -192,6 +192,7 @@ class FolderController with ChangeNotifier {
       color: orig.color,
       iconId: orig.iconId,
       iconColor: orig.iconColor,
+      listType: orig.listType,
     );
     await _db.restoreList(id);
     if (targetFolderId != orig.folderId) {

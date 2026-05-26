@@ -14,7 +14,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 22;
+  static const _dbVersion = 23;
 
   Database? _db;
 
@@ -81,7 +81,8 @@ class DatabaseService {
             iconId TEXT,
             iconColor INTEGER,
             isDeleted INTEGER NOT NULL DEFAULT 0,
-            deletedDate INTEGER
+            deletedDate INTEGER,
+            listType TEXT NOT NULL DEFAULT 'tasks'
           )
         ''');
         await db.execute('''
@@ -342,6 +343,10 @@ class DatabaseService {
         if (oldVersion < 22) {
           await db.execute('ALTER TABLE folders ADD COLUMN iconColor INTEGER');
           await db.execute('ALTER TABLE app_lists ADD COLUMN iconColor INTEGER');
+        }
+        if (oldVersion < 23) {
+          await db.execute(
+              "ALTER TABLE app_lists ADD COLUMN listType TEXT NOT NULL DEFAULT 'tasks'");
         }
       },
     );
