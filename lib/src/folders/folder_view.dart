@@ -120,8 +120,9 @@ class _FolderViewState extends State<FolderView>
               isFolder: true,
               indent: indent,
               count: _folderCount(f.id),
-              onAcceptPlus: () =>
-                  PlusDragScope.of(context)?.onDropOnFolder?.call(f.id),
+              onHoverAutoExpand: () {
+                if (!_expandedIds.contains(f.id)) _toggle(f.id);
+              },
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => FolderView(
@@ -405,10 +406,11 @@ class _FolderViewState extends State<FolderView>
                                     label: f.name,
                                     isFolder: true,
                                     count: _folderCount(f.id),
-                                    onAcceptPlus: () => PlusDragScope.of(
-                                            context)
-                                        ?.onDropOnFolder
-                                        ?.call(f.id),
+                                    onHoverAutoExpand: () {
+                                      if (!_expandedIds.contains(f.id)) {
+                                        _toggle(f.id);
+                                      }
+                                    },
                                     onTap: () =>
                                         Navigator.of(context).push(
                                       FastRoute<void>(
@@ -693,6 +695,7 @@ class _FolderListItem extends StatelessWidget {
     this.isExpanded = false,
     this.indent = 0,
     this.onAcceptPlus,
+    this.onHoverAutoExpand,
   });
 
   final Widget icon;
@@ -704,6 +707,9 @@ class _FolderListItem extends StatelessWidget {
   final bool isExpanded;
   final double indent;
   final VoidCallback? onAcceptPlus;
+  // Folders only — invoked when the Plus button hovers for 1.5s so the
+  // user can drill into a nested list.
+  final VoidCallback? onHoverAutoExpand;
 
   @override
   Widget build(BuildContext context) {
@@ -772,6 +778,12 @@ class _FolderListItem extends StatelessWidget {
       ),
     );
 
+    if (onHoverAutoExpand != null) {
+      return _FolderHoverDropTarget(
+        onAutoExpand: onHoverAutoExpand!,
+        child: row,
+      );
+    }
     if (onAcceptPlus == null) return row;
     return DragTarget<PlusDragPayload>(
       onWillAcceptWithDetails: (_) => true,
@@ -785,6 +797,107 @@ class _FolderListItem extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
           child: row,
+        );
+      },
+    );
+  }
+}
+
+/// Drop target wrapper for **folder** rows inside FolderView. Mirrors the
+/// `_FolderHoverDropTarget` in tasks_view.dart — see comment there for
+/// behaviour.
+class _FolderHoverDropTarget extends StatefulWidget {
+  const _FolderHoverDropTarget({
+    required this.onAutoExpand,
+    required this.child,
+  });
+
+  final VoidCallback onAutoExpand;
+  final Widget child;
+
+  static const Duration hoverDuration = Duration(milliseconds: 1500);
+
+  @override
+  State<_FolderHoverDropTarget> createState() => _FolderHoverDropTargetState();
+}
+
+class _FolderHoverDropTargetState extends State<_FolderHoverDropTarget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: _FolderHoverDropTarget.hoverDuration,
+    );
+    _ctrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.onAutoExpand();
+        _ctrl.value = 0;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) {
+        _ctrl.forward(from: 0);
+        return true;
+      },
+      onLeave: (_) {
+        _ctrl.stop();
+        _ctrl.value = 0;
+      },
+      builder: (context, candidates, _) {
+        final hovering = candidates.isNotEmpty;
+        return Stack(
+          children: [
+            Container(
+              decoration: hovering
+                  ? BoxDecoration(
+                      color: CupertinoColors.systemGrey4
+                          .resolveFrom(context)
+                          .withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    )
+                  : null,
+              child: widget.child,
+            ),
+            if (hovering)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 0,
+                child: AnimatedBuilder(
+                  animation: _ctrl,
+                  builder: (context, _) => SizedBox(
+                    height: 2,
+                    child: Stack(
+                      children: [
+                        Container(
+                          color: CupertinoColors.separator
+                              .resolveFrom(context),
+                        ),
+                        FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: _ctrl.value,
+                          child: Container(color: AppColors.accent),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );

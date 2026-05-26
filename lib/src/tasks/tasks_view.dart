@@ -199,8 +199,12 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
               label: f.name,
               indent: indent,
               count: _folderCount(f.id),
-              onAcceptPlus: () =>
-                  PlusDragScope.of(context)?.onDropOnFolder?.call(f.id),
+              // Folder rows can't accept a Plus drop directly — tasks live
+              // in lists inside, not in folders. Auto-expand after 1.5s so
+              // the user can keep dragging into a nested list.
+              onHoverAutoExpand: () {
+                if (!_expandedIds.contains(f.id)) _toggle(f.id);
+              },
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => FolderView(
@@ -522,10 +526,11 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                     isFolder: true,
                                     label: f.name,
                                     count: _folderCount(f.id),
-                                    onAcceptPlus: () => PlusDragScope.of(
-                                            context)
-                                        ?.onDropOnFolder
-                                        ?.call(f.id),
+                                    onHoverAutoExpand: () {
+                                      if (!_expandedIds.contains(f.id)) {
+                                        _toggle(f.id);
+                                      }
+                                    },
                                     onTap: () =>
                                         Navigator.of(context).push(
                                       FastRoute<void>(
@@ -756,6 +761,7 @@ class _ListItem extends StatelessWidget {
     this.isExpanded = false,
     this.indent = 0,
     this.onAcceptPlus,
+    this.onHoverAutoExpand,
   });
 
   final String? iconAsset;
@@ -770,6 +776,11 @@ class _ListItem extends StatelessWidget {
   final bool isExpanded;
   final double indent;
   final VoidCallback? onAcceptPlus;
+  // Folders only — invoked when the Plus button has hovered over this row
+  // for 1.5s so the user can drill into a nested list. When set, the row
+  // shows a gray highlight (not the accent drop target) and a 1.5s ring
+  // progress indicator.
+  final VoidCallback? onHoverAutoExpand;
 
   @override
   Widget build(BuildContext context) {
@@ -853,6 +864,12 @@ class _ListItem extends StatelessWidget {
       ),
     );
 
+    if (onHoverAutoExpand != null) {
+      return _FolderHoverDropTarget(
+        onAutoExpand: onHoverAutoExpand!,
+        child: row,
+      );
+    }
     if (onAcceptPlus == null) return row;
     return DragTarget<PlusDragPayload>(
       onWillAcceptWithDetails: (_) => true,
@@ -866,6 +883,114 @@ class _ListItem extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
           child: row,
+        );
+      },
+    );
+  }
+}
+
+/// Drop target wrapper for **folder** rows. Plus-button drops on folders
+/// don't create anything — the user must drill into one of the folder's
+/// lists — so this widget instead waits 1.5s while the button hovers,
+/// then auto-expands the folder. While hovering it tints the row light
+/// gray (not accent-orange) and draws a thin progress bar across the
+/// bottom edge that fills as the timer runs.
+class _FolderHoverDropTarget extends StatefulWidget {
+  const _FolderHoverDropTarget({
+    required this.onAutoExpand,
+    required this.child,
+  });
+
+  final VoidCallback onAutoExpand;
+  final Widget child;
+
+  static const Duration hoverDuration = Duration(milliseconds: 1500);
+
+  @override
+  State<_FolderHoverDropTarget> createState() => _FolderHoverDropTargetState();
+}
+
+class _FolderHoverDropTargetState extends State<_FolderHoverDropTarget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: _FolderHoverDropTarget.hoverDuration,
+    );
+    _ctrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.onAutoExpand();
+        // Reset so the user can re-trigger if they hover again without
+        // dropping (e.g. the folder is still empty after expanding).
+        _ctrl.value = 0;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) {
+        _ctrl.forward(from: 0);
+        return true;
+      },
+      onLeave: (_) {
+        _ctrl.stop();
+        _ctrl.value = 0;
+      },
+      // No onAcceptWithDetails — dropping on a folder isn't a creation
+      // action; the user is expected to drop on one of its lists.
+      builder: (context, candidates, _) {
+        final hovering = candidates.isNotEmpty;
+        return Stack(
+          children: [
+            Container(
+              decoration: hovering
+                  ? BoxDecoration(
+                      color: CupertinoColors.systemGrey4
+                          .resolveFrom(context)
+                          .withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    )
+                  : null,
+              child: widget.child,
+            ),
+            if (hovering)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 0,
+                child: AnimatedBuilder(
+                  animation: _ctrl,
+                  builder: (context, _) => SizedBox(
+                    height: 2,
+                    child: Stack(
+                      children: [
+                        Container(
+                          color: CupertinoColors.separator
+                              .resolveFrom(context),
+                        ),
+                        FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: _ctrl.value,
+                          child: Container(color: AppColors.accent),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
