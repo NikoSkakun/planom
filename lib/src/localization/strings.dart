@@ -173,6 +173,26 @@ class S {
   String get sectionBody => t('sectionBody');
   String get useMarkdown => t('useMarkdown');
   String get useMarkdownHint => t('useMarkdownHint');
+  String get storage => t('storage');
+  String get storageSublabel => t('storageSublabel');
+  String get storageAppCaches => t('storageAppCaches');
+  String get storageCustomIcons => t('storageCustomIcons');
+  String get storageFontsCache => t('storageFontsCache');
+  String get storageTempCache => t('storageTempCache');
+  String get storageClearOrphans => t('storageClearOrphans');
+  String get storageFoldersLists => t('storageFoldersLists');
+  String get storageTotal => t('storageTotal');
+  String get storageItemsSuffix => t('storageItemsSuffix');
+  String get storageFilesSuffix => t('storageFilesSuffix');
+  String storageDataIn(String space) =>
+      t('storageDataIn').replaceFirst('{space}', space);
+  String get space => t('space');
+  String get clearFontsCacheQ => t('clearFontsCacheQ');
+  String get clearFontsCacheBody => t('clearFontsCacheBody');
+  String get clearTempCacheQ => t('clearTempCacheQ');
+  String get clearTempCacheBody => t('clearTempCacheBody');
+  String get clearOrphanIconsQ => t('clearOrphanIconsQ');
+  String get clearOrphanIconsBody => t('clearOrphanIconsBody');
   String get showHidePriority => t('showHidePriority');
   String get showHideDate => t('showHideDate');
   String get showHideRepeat => t('showHideRepeat');
@@ -638,6 +658,28 @@ const Map<String, String> _en = {
   'taskFieldsHint': 'Hidden fields are not shown when editing a task.',
   'sectionBody': 'BODY', 'useMarkdown': 'Format with Markdown',
   'useMarkdownHint': 'When off, the body is shown and edited as plain text and the formatting toolbar is hidden.',
+  'storage': 'Storage',
+  'storageSublabel': "Disk usage by category · clear caches",
+  'storageAppCaches': 'APP CACHES',
+  'storageCustomIcons': 'Custom icons',
+  'storageFontsCache': 'Fonts cache',
+  'storageTempCache': 'Temporary files',
+  'storageClearOrphans': 'Clear orphans',
+  'storageFoldersLists': 'Folders & lists',
+  'storageTotal': 'Total',
+  'storageItemsSuffix': 'items',
+  'storageFilesSuffix': 'files',
+  'storageDataIn': 'DATA IN {space}',
+  'space': 'Space',
+  'clearFontsCacheQ': 'Clear fonts cache?',
+  'clearFontsCacheBody':
+      'Removes cached Google Fonts files. They will be re-downloaded when needed.',
+  'clearTempCacheQ': 'Clear temporary files?',
+  'clearTempCacheBody':
+      'Removes the OS temporary directory. Doesn\'t affect saved data.',
+  'clearOrphanIconsQ': 'Clear orphan icons?',
+  'clearOrphanIconsBody':
+      'Removes custom icon files that are no longer referenced by any folder or list across every space.',
   'showHidePriority': 'Priority', 'showHideDate': 'Date',
   'showHideRepeat': 'Repeat', 'showHideList': 'List',
   'showHideDuration': 'Duration', 'showHideTags': 'Tags',

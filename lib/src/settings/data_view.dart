@@ -2,17 +2,22 @@ import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
 import '../security/security_service.dart';
+import '../spaces/space_manager.dart';
 import '../theme/app_theme.dart';
+import '../utils/fast_route.dart';
 import 'backup_service.dart';
+import 'storage_view.dart';
 
 class DataView extends StatefulWidget {
   const DataView({
     super.key,
     required this.backupService,
+    this.spaceManager,
     this.securityService,
   });
 
   final BackupService backupService;
+  final SpaceManager? spaceManager;
   final SecurityService? securityService;
 
   @override
@@ -324,6 +329,21 @@ class _DataViewState extends State<DataView> {
               loading: _importing,
               onTap: _exporting || _importing || _resetting ? null : _import,
             ),
+
+            if (widget.spaceManager != null) ...[
+              const SizedBox(height: 1),
+              _DataRow(
+                label: s.storage,
+                sublabel: s.storageSublabel,
+                loading: false,
+                onTap: () => Navigator.of(context).push(
+                  FastRoute<void>(
+                    builder: (_) =>
+                        StorageView(spaceManager: widget.spaceManager!),
+                  ),
+                ),
+              ),
+            ],
 
             // ── Danger zone ─────────────────────────────────────────────
             const SizedBox(height: 32),

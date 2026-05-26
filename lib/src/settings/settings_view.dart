@@ -410,6 +410,7 @@ class _SettingsViewState extends State<SettingsView> {
                   FastRoute<void>(
                     builder: (_) => DataView(
                       backupService: widget.backupService!,
+                      spaceManager: SpaceManagerProvider.of(context),
                       securityService: widget.securityService,
                     ),
                   ),

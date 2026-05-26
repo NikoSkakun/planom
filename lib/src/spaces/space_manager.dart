@@ -95,6 +95,12 @@ class SpaceManager with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Returns the on-disk filename for [spaceId]. The default space lives in
+  /// `planom.db`; all others live in `planom_<id>.db`. Used by storage
+  /// analysis to size every space, not just the active one.
+  String dbNameFor(String spaceId) =>
+      spaceId == 'default' ? 'planom.db' : 'planom_$spaceId.db';
+
   /// Permanently deletes a space and its database file. The default space can
   /// never be deleted and at least one space always remains. If the deleted
   /// space is active, the default space becomes active first so we don't remove
