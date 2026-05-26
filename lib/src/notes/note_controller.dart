@@ -305,6 +305,77 @@ class NoteController with ChangeNotifier {
     await _db.updateNoteSortOrders(scope);
   }
 
+  /// Long-press-drag insertion: move [movedId] to come right before
+  /// [beforeId] within [parentFolderId]. Null [beforeId] = end of list.
+  Future<void> reorderNoteFolderBefore({
+    required String movedId,
+    String? beforeId,
+    required String? parentFolderId,
+  }) async {
+    final scope = _folders
+        .where((f) =>
+            f.parentFolderId == parentFolderId && f.id != movedId)
+        .toList();
+    _sortFoldersByDefault(scope);
+
+    final moved = _folders.firstWhere((f) => f.id == movedId,
+        orElse: () => NoteFolder(id: movedId, name: ''));
+    if (moved.name.isEmpty &&
+        _folders.indexWhere((f) => f.id == movedId) == -1) return;
+
+    int insertAt = beforeId == null
+        ? scope.length
+        : scope.indexWhere((f) => f.id == beforeId);
+    if (insertAt < 0) insertAt = scope.length;
+    scope.insert(insertAt, moved);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _folders.indexWhere((f) => f.id == updated.id);
+      if (idx != -1) _folders[idx] = updated;
+    }
+    notifyListeners();
+    await _db.updateNoteFolderSortOrders(scope);
+  }
+
+  /// Same as [reorderNoteFolderBefore] but for note rows. Preserves
+  /// modifiedDate so reordering doesn't bump notes to the top.
+  Future<void> reorderNoteBefore({
+    required String movedId,
+    String? beforeId,
+    required String? folderId,
+  }) async {
+    final scope = _notes
+        .where((n) => n.folderId == folderId && n.id != movedId)
+        .toList();
+    _sortNotesByDefault(scope);
+
+    final moved = _notes.firstWhere((n) => n.id == movedId,
+        orElse: () => Note(id: movedId, title: '', content: ''));
+    if (moved.title.isEmpty &&
+        moved.content.isEmpty &&
+        _notes.indexWhere((n) => n.id == movedId) == -1) return;
+
+    int insertAt = beforeId == null
+        ? scope.length
+        : scope.indexWhere((n) => n.id == beforeId);
+    if (insertAt < 0) insertAt = scope.length;
+    scope.insert(insertAt, moved);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i]
+          .copyWith(sortOrder: i + 1, preserveModifiedDate: true);
+    }
+    for (final updated in scope) {
+      final idx = _notes.indexWhere((n) => n.id == updated.id);
+      if (idx != -1) _notes[idx] = updated;
+    }
+    notifyListeners();
+    await _db.updateNoteSortOrders(scope);
+  }
+
   static void _sortFoldersByDefault(List<NoteFolder> list) {
     list.sort((a, b) {
       if (a.sortOrder != b.sortOrder) return a.sortOrder.compareTo(b.sortOrder);

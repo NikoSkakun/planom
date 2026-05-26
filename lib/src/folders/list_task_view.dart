@@ -253,9 +253,18 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
         final children = <Widget>[];
 
         // Top "no section" group — no header; tasks render directly.
+        // Each task is wrapped in a DragTarget that, on drop, inserts the
+        // dragged task immediately before it (within the same list+section).
         for (final t in topTasks) {
-          children.add(_buildDraggableTask(context, t, sectionId: null));
+          children.add(_buildDraggableTask(
+            context,
+            t,
+            sectionId: null,
+            beforeId: t.id,
+          ));
         }
+        // Trailing slot to drop at the end of the top group.
+        children.add(_buildTaskDropSlot(context, null, null));
 
         for (final section in sections) {
           final secTasks = widget.taskController
@@ -287,9 +296,15 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
           ));
           if (!section.isCollapsed) {
             for (final t in secTasks) {
-              children
-                  .add(_buildDraggableTask(context, t, sectionId: section.id));
+              children.add(_buildDraggableTask(
+                context,
+                t,
+                sectionId: section.id,
+                beforeId: t.id,
+              ));
             }
+            // Trailing slot inside this section.
+            children.add(_buildTaskDropSlot(context, null, section.id));
           }
         }
 
@@ -317,10 +332,18 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
     );
   }
 
-  Widget _buildDraggableTask(BuildContext context, Task task,
-      {required String? sectionId}) {
+  /// Wraps a task row so:
+  ///   • Long-pressing starts a drag with the task id.
+  ///   • Hovering another task triggers a reorder-insert-before drop target.
+  Widget _buildDraggableTask(
+    BuildContext context,
+    Task task, {
+    required String? sectionId,
+    required String beforeId,
+  }) {
     return LongPressDraggable<String>(
       data: task.id,
+      delay: const Duration(milliseconds: 400),
       feedback: Material(
         color: const Color(0x00000000),
         child: Container(
@@ -347,7 +370,56 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
         opacity: 0.3,
         child: _buildTaskRow(context, task),
       ),
-      child: _buildTaskRow(context, task),
+      child: DragTarget<String>(
+        onWillAcceptWithDetails: (d) => d.data != task.id,
+        onAcceptWithDetails: (d) => widget.taskController.reorderTaskBefore(
+          movedTaskId: d.data,
+          beforeTaskId: beforeId,
+          listId: widget.list.id,
+          sectionId: sectionId,
+        ),
+        builder: (context, candidates, _) {
+          final highlighted = candidates.isNotEmpty;
+          return Stack(
+            children: [
+              _buildTaskRow(context, task),
+              if (highlighted)
+                const Positioned(
+                  top: 0,
+                  left: 16,
+                  right: 16,
+                  child: _DropInsertLine(),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Trailing drop zone after the last task in a section so the user can
+  /// drop a task at the very end of that section.
+  Widget _buildTaskDropSlot(
+      BuildContext context, String? beforeId, String? sectionId) {
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (d) => widget.taskController.reorderTaskBefore(
+        movedTaskId: d.data,
+        beforeTaskId: beforeId,
+        listId: widget.list.id,
+        sectionId: sectionId,
+      ),
+      builder: (context, candidates, _) {
+        return SizedBox(
+          height: 12,
+          child: candidates.isEmpty
+              ? null
+              : const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: _DropInsertLine(),
+                ),
+        );
+      },
     );
   }
 
@@ -378,6 +450,24 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Thin accent-coloured horizontal bar shown across a row while a drag is
+/// hovering over it — visualises the insert-before position for the
+/// long-press reorder.
+class _DropInsertLine extends StatelessWidget {
+  const _DropInsertLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 2,
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(1),
       ),
     );
   }
