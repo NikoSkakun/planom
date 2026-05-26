@@ -212,6 +212,14 @@ class S {
   String get checkboxStyleSharpRect => t('checkboxStyleSharpRect');
   String get checkboxStyleCircle => t('checkboxStyleCircle');
   String get firstDayOfWeek => t('firstDayOfWeek');
+  String get appBadge => t('appBadge');
+  String get appBadgeMode => t('appBadgeMode');
+  String get appBadgeHint => t('appBadgeHint');
+  String get appBadgeNone => t('appBadgeNone');
+  String get appBadgeTodayTasks => t('appBadgeTodayTasks');
+  String get appBadgeTodayTasksAndEvents => t('appBadgeTodayTasksAndEvents');
+  String get appBadgeInbox => t('appBadgeInbox');
+  String get appBadgeAllUncompleted => t('appBadgeAllUncompleted');
   String get showListCount => t('showListCount');
   String get revert => t('revert');
   String get taskTrashedToast => t('taskTrashedToast');
@@ -719,6 +727,14 @@ const Map<String, String> _en = {
   'checkboxStyleSharpRect': 'Square',
   'checkboxStyleCircle': 'Circle',
   'firstDayOfWeek': 'First day of week',
+  'appBadge': 'APP ICON BADGE',
+  'appBadgeMode': 'Show as badge',
+  'appBadgeHint': 'The number shown on the app icon on your home screen.',
+  'appBadgeNone': 'None',
+  'appBadgeTodayTasks': "Today's uncompleted tasks",
+  'appBadgeTodayTasksAndEvents': "Today's tasks + upcoming events",
+  'appBadgeInbox': 'Inbox uncompleted',
+  'appBadgeAllUncompleted': 'All uncompleted tasks',
   'showListCount': 'List counter',
   'revert': 'Undo',
   'taskTrashedToast': 'Task moved to Trash',

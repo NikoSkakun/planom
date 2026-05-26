@@ -300,7 +300,9 @@ class _SettingsViewState extends State<SettingsView> {
               icon: CupertinoIcons.bell,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
-                  builder: (_) => const NotificationsSettingsView(),
+                  builder: (_) => NotificationsSettingsView(
+                    settingsController: widget.controller,
+                  ),
                 ),
               ),
             ),

@@ -13,6 +13,24 @@ import 'smart_list_prefs.dart';
 /// open when the app was closed, rather than a fixed tab.
 const String kLastOpenedTab = 'last';
 
+/// What the app icon badge counts. Only the current space's data feeds in.
+enum BadgeMode {
+  /// No badge at all.
+  none,
+
+  /// Default: today's uncompleted tasks (including overdue).
+  todayTasks,
+
+  /// Today's uncompleted tasks plus today's not-yet-started events.
+  todayTasksAndEvents,
+
+  /// Inbox uncompleted tasks (`listId == null`).
+  inboxTasks,
+
+  /// All uncompleted top-level tasks across every list.
+  allUncompleted,
+}
+
 class SettingsController with ChangeNotifier {
   SettingsController(this._settingsService, this._db);
 
@@ -45,6 +63,9 @@ class SettingsController with ChangeNotifier {
   // Default is Monday to match the existing calendar grid.
   int _firstDayOfWeek = DateTime.monday;
   int get firstDayOfWeek => _firstDayOfWeek;
+
+  BadgeMode _badgeMode = BadgeMode.todayTasks;
+  BadgeMode get badgeMode => _badgeMode;
 
   /// Bumped whenever the accent/completion color changes. Those colors live in
   /// AppColors statics read all over the tree, so instead of firing the main
@@ -141,6 +162,8 @@ class SettingsController with ChangeNotifier {
       } else if (key == 'first_day_of_week') {
         final v = int.tryParse(value);
         if (v != null && v >= 1 && v <= 7) _firstDayOfWeek = v;
+      } else if (key == 'badge_mode') {
+        _badgeMode = _decodeBadgeMode(value);
       } else if (key == TaskFieldPrefs.storageKey) {
         _taskFieldPrefs = TaskFieldPrefs.fromJson(value);
       }
@@ -196,6 +219,44 @@ class SettingsController with ChangeNotifier {
     _firstDayOfWeek = isoDay;
     notifyListeners();
     await _db.setAppSetting('first_day_of_week', isoDay.toString());
+  }
+
+  Future<void> updateBadgeMode(BadgeMode mode) async {
+    if (mode == _badgeMode) return;
+    _badgeMode = mode;
+    notifyListeners();
+    await _db.setAppSetting('badge_mode', _encodeBadgeMode(mode));
+  }
+
+  static String _encodeBadgeMode(BadgeMode m) {
+    switch (m) {
+      case BadgeMode.none:
+        return 'none';
+      case BadgeMode.todayTasks:
+        return 'todayTasks';
+      case BadgeMode.todayTasksAndEvents:
+        return 'todayTasksAndEvents';
+      case BadgeMode.inboxTasks:
+        return 'inboxTasks';
+      case BadgeMode.allUncompleted:
+        return 'allUncompleted';
+    }
+  }
+
+  static BadgeMode _decodeBadgeMode(String v) {
+    switch (v) {
+      case 'none':
+        return BadgeMode.none;
+      case 'todayTasksAndEvents':
+        return BadgeMode.todayTasksAndEvents;
+      case 'inboxTasks':
+        return BadgeMode.inboxTasks;
+      case 'allUncompleted':
+        return BadgeMode.allUncompleted;
+      case 'todayTasks':
+      default:
+        return BadgeMode.todayTasks;
+    }
   }
 
   Future<void> updateLocale(Locale locale) async {
