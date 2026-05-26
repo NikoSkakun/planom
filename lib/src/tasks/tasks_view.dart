@@ -695,6 +695,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                 child: _CircleAddButton(
                   onPressed: () => showCreateFolderListSheet(
                       context, widget.folderController),
+                  onAcceptPlus: () => PlusDragScope.of(context)
+                      ?.onDropOnAddFolderButton
+                      ?.call(),
                 ),
               ),
           ],
@@ -1077,11 +1080,14 @@ class _TasksOptionsDropdown extends StatelessWidget {
 }
 
 class _CircleAddButton extends StatelessWidget {
-  const _CircleAddButton({required this.onPressed});
+  const _CircleAddButton({required this.onPressed, this.onAcceptPlus});
   final VoidCallback onPressed;
+  // When set, the button doubles as a drop target for the global Plus
+  // drag — releasing the Plus button here opens the create-list/folder
+  // sheet instead of the standard task creation flow.
+  final VoidCallback? onAcceptPlus;
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _button(BuildContext context) {
     return CupertinoButton(
       padding: EdgeInsets.zero,
       onPressed: onPressed,
@@ -1099,6 +1105,34 @@ class _CircleAddButton extends StatelessWidget {
           color: CupertinoColors.label.resolveFrom(context),
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (onAcceptPlus == null) return _button(context);
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (_) => onAcceptPlus!(),
+      builder: (context, candidates, _) {
+        final hovering = candidates.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: hovering
+                ? [
+                    BoxShadow(
+                      color: AppColors.accent.withOpacity(0.4),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : null,
+          ),
+          child: _button(context),
+        );
+      },
     );
   }
 }

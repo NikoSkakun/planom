@@ -6,9 +6,11 @@ import 'calendar/event_controller.dart';
 import 'calendar/event_creation_sheet.dart';
 import 'contacts/contact_controller.dart';
 import 'contacts/contact_creation_sheet.dart';
+import 'folders/create_folder_list_sheet.dart';
 import 'folders/folder_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
 import 'models/list_type.dart';
+import 'notes/create_note_folder_sheet.dart';
 import 'notes/note_controller.dart';
 import 'notes/notes_view.dart';
 import 'spaces/space_manager.dart';
@@ -169,6 +171,18 @@ class _HomeShellState extends State<HomeShell> {
     _plusDragController.onDropOnNoteFolder = _handleDropOnNoteFolder;
     _plusDragController.onDropOnNotesRoot = _handleDropOnNotesRoot;
     _plusDragController.onDropOnSmartList = _handleDropOnSmartList;
+    _plusDragController.onDropOnAddFolderButton =
+        _handleDropOnAddFolderButton;
+    _plusDragController.onDropOnNotesAddFolderButton =
+        _handleDropOnNotesAddFolderButton;
+  }
+
+  void _handleDropOnAddFolderButton() {
+    showCreateFolderListSheet(context, widget.folderController);
+  }
+
+  void _handleDropOnNotesAddFolderButton() {
+    showCreateNoteFolderSheet(context, widget.noteController);
   }
 
   void _handleDropOnSmartList(PlusDropSmartList kind) {

@@ -477,6 +477,9 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                 child: NoteFolderCircleButton(
                   onPressed: () =>
                       showCreateNoteFolderSheet(context, widget.controller),
+                  onAcceptPlus: () => PlusDragScope.of(context)
+                      ?.onDropOnNotesAddFolderButton
+                      ?.call(),
                 ),
               ),
             Positioned(

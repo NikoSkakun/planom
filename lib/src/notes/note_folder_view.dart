@@ -387,6 +387,13 @@ class _NoteFolderViewState extends State<NoteFolderView>
                     widget.controller,
                     parentFolderId: _currentFolder.id,
                   ),
+                  // Dropping the Plus button opens the create-note-folder
+                  // sheet scoped to this folder.
+                  onAcceptPlus: () => showCreateNoteFolderSheet(
+                    context,
+                    widget.controller,
+                    parentFolderId: _currentFolder.id,
+                  ),
                 ),
               ),
             Positioned(
