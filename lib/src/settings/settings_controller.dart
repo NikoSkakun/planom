@@ -67,6 +67,20 @@ class SettingsController with ChangeNotifier {
   BadgeMode _badgeMode = BadgeMode.todayTasks;
   BadgeMode get badgeMode => _badgeMode;
 
+  // Default icons applied when the user creates a new task/list/folder/note
+  // folder without picking one. Strings match the existing iconId scheme:
+  // - Tasks: 'inbox' is the historical default; other values are presets.
+  // - Lists / folders / note folders: null = render the default PNG asset;
+  //   non-null is an SF-symbol key from `kFolderIconPresets`.
+  String _defaultTaskIcon = 'inbox';
+  String get defaultTaskIcon => _defaultTaskIcon;
+  String? _defaultListIcon;
+  String? get defaultListIcon => _defaultListIcon;
+  String? _defaultFolderIcon;
+  String? get defaultFolderIcon => _defaultFolderIcon;
+  String? _defaultNoteFolderIcon;
+  String? get defaultNoteFolderIcon => _defaultNoteFolderIcon;
+
   /// Bumped whenever the accent/completion color changes. Those colors live in
   /// AppColors statics read all over the tree, so instead of firing the main
   /// notifier (which rebuilds the whole CupertinoApp, including routing, locale
@@ -164,6 +178,14 @@ class SettingsController with ChangeNotifier {
         if (v != null && v >= 1 && v <= 7) _firstDayOfWeek = v;
       } else if (key == 'badge_mode') {
         _badgeMode = _decodeBadgeMode(value);
+      } else if (key == 'default_task_icon') {
+        if (value.isNotEmpty) _defaultTaskIcon = value;
+      } else if (key == 'default_list_icon') {
+        _defaultListIcon = value.isEmpty ? null : value;
+      } else if (key == 'default_folder_icon') {
+        _defaultFolderIcon = value.isEmpty ? null : value;
+      } else if (key == 'default_note_folder_icon') {
+        _defaultNoteFolderIcon = value.isEmpty ? null : value;
       } else if (key == TaskFieldPrefs.storageKey) {
         _taskFieldPrefs = TaskFieldPrefs.fromJson(value);
       }
@@ -173,6 +195,10 @@ class SettingsController with ChangeNotifier {
     // every TaskRow/_RoundedCheckbox renders in the user-selected style without
     // having to thread the value through every callsite.
     TaskCheckboxAppearance.current = _taskFieldPrefs.checkboxStyle;
+    AppDefaults.taskIcon = _defaultTaskIcon;
+    AppDefaults.listIcon = _defaultListIcon;
+    AppDefaults.folderIcon = _defaultFolderIcon;
+    AppDefaults.noteFolderIcon = _defaultNoteFolderIcon;
 
     notifyListeners();
   }
@@ -226,6 +252,38 @@ class SettingsController with ChangeNotifier {
     _badgeMode = mode;
     notifyListeners();
     await _db.setAppSetting('badge_mode', _encodeBadgeMode(mode));
+  }
+
+  Future<void> updateDefaultTaskIcon(String iconId) async {
+    if (iconId.isEmpty || iconId == _defaultTaskIcon) return;
+    _defaultTaskIcon = iconId;
+    AppDefaults.taskIcon = iconId;
+    notifyListeners();
+    await _db.setAppSetting('default_task_icon', iconId);
+  }
+
+  Future<void> updateDefaultListIcon(String? iconId) async {
+    if (iconId == _defaultListIcon) return;
+    _defaultListIcon = iconId;
+    AppDefaults.listIcon = iconId;
+    notifyListeners();
+    await _db.setAppSetting('default_list_icon', iconId ?? '');
+  }
+
+  Future<void> updateDefaultFolderIcon(String? iconId) async {
+    if (iconId == _defaultFolderIcon) return;
+    _defaultFolderIcon = iconId;
+    AppDefaults.folderIcon = iconId;
+    notifyListeners();
+    await _db.setAppSetting('default_folder_icon', iconId ?? '');
+  }
+
+  Future<void> updateDefaultNoteFolderIcon(String? iconId) async {
+    if (iconId == _defaultNoteFolderIcon) return;
+    _defaultNoteFolderIcon = iconId;
+    AppDefaults.noteFolderIcon = iconId;
+    notifyListeners();
+    await _db.setAppSetting('default_note_folder_icon', iconId ?? '');
   }
 
   static String _encodeBadgeMode(BadgeMode m) {

@@ -220,6 +220,11 @@ class S {
   String get appBadgeTodayTasksAndEvents => t('appBadgeTodayTasksAndEvents');
   String get appBadgeInbox => t('appBadgeInbox');
   String get appBadgeAllUncompleted => t('appBadgeAllUncompleted');
+  String get sectionDefaults => t('sectionDefaults');
+  String get defaultTaskIcon => t('defaultTaskIcon');
+  String get defaultListIcon => t('defaultListIcon');
+  String get defaultFolderIcon => t('defaultFolderIcon');
+  String get defaultNoteFolderIcon => t('defaultNoteFolderIcon');
   String get showListCount => t('showListCount');
   String get revert => t('revert');
   String get taskTrashedToast => t('taskTrashedToast');
@@ -735,6 +740,11 @@ const Map<String, String> _en = {
   'appBadgeTodayTasksAndEvents': "Today's tasks + upcoming events",
   'appBadgeInbox': 'Inbox uncompleted',
   'appBadgeAllUncompleted': 'All uncompleted tasks',
+  'sectionDefaults': 'DEFAULTS',
+  'defaultTaskIcon': 'Default task icon',
+  'defaultListIcon': 'Default list icon',
+  'defaultFolderIcon': 'Default folder icon',
+  'defaultNoteFolderIcon': 'Default folder icon',
   'showListCount': 'List counter',
   'revert': 'Undo',
   'taskTrashedToast': 'Task moved to Trash',

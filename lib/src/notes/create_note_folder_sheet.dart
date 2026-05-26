@@ -37,7 +37,7 @@ class _CreateSheet extends StatefulWidget {
 
 class _CreateSheetState extends State<_CreateSheet> {
   final _nameCtrl = TextEditingController();
-  String? _selectedIconId;
+  String? _selectedIconId = AppDefaults.noteFolderIcon;
 
   @override
   void dispose() {

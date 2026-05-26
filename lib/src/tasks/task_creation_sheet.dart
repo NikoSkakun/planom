@@ -106,6 +106,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     if (title.isEmpty) return;
     await widget.controller.addTask(Task(
       title: title,
+      iconId: AppDefaults.taskIcon,
       note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
       dueDate: _dueDate,
       doTime: _doTime,
@@ -125,6 +126,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     if (title.isEmpty) return;
     await widget.controller.addTask(Task(
       title: title,
+      iconId: AppDefaults.taskIcon,
       note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
       dueDate: _dueDate,
       doTime: _doTime,

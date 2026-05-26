@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../folders/folder_icon_picker.dart';
 import '../localization/strings.dart';
 import '../utils/selection_menu.dart';
 import 'settings_controller.dart';
@@ -128,6 +129,55 @@ class NotesSettingsView extends StatelessWidget {
                     label: s.showAddFolderButton,
                     value: controller.smartListPrefs.showNotesAddFolderButton,
                     onChanged: controller.updateShowNotesAddFolderButton,
+                  ),
+                  const SizedBox(height: 18),
+                  SettingsSectionHeader(s.sectionDefaults),
+                  GestureDetector(
+                    onTap: () => showFolderIconPickerSheet(
+                      context,
+                      currentIconId: controller.defaultNoteFolderIcon,
+                      isFolder: true,
+                      onSelected: (id, _) =>
+                          controller.updateDefaultNoteFolderIcon(id),
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: CupertinoDynamicColor.resolve(
+                          CupertinoColors.tertiarySystemBackground,
+                          context,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: Center(
+                              child: buildFolderItemIcon(
+                                controller.defaultNoteFolderIcon,
+                                isFolder: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              s.defaultNoteFolderIcon,
+                              style: const TextStyle(fontSize: 17),
+                            ),
+                          ),
+                          Icon(
+                            CupertinoIcons.chevron_right,
+                            size: 14,
+                            color: CupertinoColors.tertiaryLabel
+                                .resolveFrom(context),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
