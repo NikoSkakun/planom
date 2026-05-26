@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../localization/strings.dart';
 import '../models/task.dart';
 import 'calendar_date_picker.dart';
+import 'task_field_prefs.dart';
 
 /// Shared proxy decorator for task drag-reorder animation.
 Widget taskProxyDecorator(
@@ -200,20 +201,38 @@ class RoundedCheckbox extends StatelessWidget {
     final borderColor = !checked && priority > 0
         ? TaskRow._priorityColor(priority)
         : CupertinoColors.tertiaryLabel.resolveFrom(context);
+    final style = TaskCheckboxAppearance.current;
+    final BoxDecoration deco;
+    switch (style) {
+      case TaskCheckboxStyle.sharpRect:
+        deco = BoxDecoration(
+          // borderRadius omitted → sharp corners
+          color: checked ? AppColors.accent : null,
+          border: checked ? null : Border.all(color: borderColor, width: 1.5),
+        );
+      case TaskCheckboxStyle.circle:
+        deco = BoxDecoration(
+          shape: BoxShape.circle,
+          color: checked ? AppColors.accent : null,
+          border: checked ? null : Border.all(color: borderColor, width: 1.5),
+        );
+      case TaskCheckboxStyle.roundedRect:
+        deco = BoxDecoration(
+          borderRadius: BorderRadius.circular(5),
+          color: checked ? AppColors.accent : null,
+          border: checked ? null : Border.all(color: borderColor, width: 1.5),
+        );
+    }
 
+    final size = 20 * AppScale.factor;
     return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        color: checked ? AppColors.accent : null,
-        border: checked
-            ? null
-            : Border.all(color: borderColor, width: 1.5),
-      ),
+      width: size,
+      height: size,
+      decoration: deco,
       child: checked
-          ? const Icon(CupertinoIcons.checkmark,
-              size: 11, color: CupertinoColors.white)
+          ? Icon(CupertinoIcons.checkmark,
+              size: 11 * AppScale.factor,
+              color: CupertinoColors.white)
           : null,
     );
   }

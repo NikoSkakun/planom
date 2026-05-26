@@ -212,9 +212,26 @@ class _CreateSheetState extends State<_CreateSheet> {
   late _CreateType _type = widget.initialType;
   final _nameCtrl = TextEditingController();
   int? _selectedColor;
-  String? _selectedIconId;
+  late String? _selectedIconId =
+      _type == _CreateType.folder ? AppDefaults.folderIcon : AppDefaults.listIcon;
   int? _selectedIconColor;
   ListType _listType = ListType.tasks;
+
+  void _onTypeChanged(_CreateType next) {
+    if (next == _type) return;
+    setState(() {
+      _type = next;
+      // Switching folder ↔ list — apply that type's default icon if the user
+      // hasn't picked one yet (or has the previous type's default selected).
+      final prevDefault =
+          _type == _CreateType.folder ? AppDefaults.folderIcon : AppDefaults.listIcon;
+      if (_selectedIconId == prevDefault) {
+        _selectedIconId = next == _CreateType.folder
+            ? AppDefaults.folderIcon
+            : AppDefaults.listIcon;
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -340,12 +357,7 @@ class _CreateSheetState extends State<_CreateSheet> {
               ),
             },
             onValueChanged: (v) {
-              if (v != null) {
-                setState(() {
-                  _type = v;
-                  _selectedIconId = null;
-                });
-              }
+              if (v != null) _onTypeChanged(v);
             },
           ),
           const SizedBox(height: 16),

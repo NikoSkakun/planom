@@ -26,3 +26,34 @@ class AppDurations {
   /// Standard page-transition / animation duration used across the app.
   static const Duration transition = Duration(milliseconds: 180);
 }
+
+/// Mutable defaults applied to newly created entities when the user hasn't
+/// explicitly picked an icon. Updated by SettingsController on load and on
+/// every preference change so creation sheets can read them statically.
+class AppDefaults {
+  AppDefaults._();
+
+  /// Default `iconId` for a freshly created task. Historical default 'inbox'.
+  static String taskIcon = 'inbox';
+
+  /// Default `iconId` for a list. null = render the default PNG asset.
+  static String? listIcon;
+
+  /// Default `iconId` for a task folder. null = render the default PNG asset.
+  static String? folderIcon;
+
+  /// Default `iconId` for a note folder. null = render the default PNG asset.
+  static String? noteFolderIcon;
+}
+
+/// UI scale factor mirrored from SettingsController. CupertinoApp wraps the
+/// content in a MediaQuery whose `textScaler` is `TextScaler.linear(factor)`
+/// when system scaling is disabled, so text widgets scale automatically.
+/// Widgets that need to scale alongside their attached text (e.g. checkboxes,
+/// row icons) multiply their hardcoded size by [AppScale.factor].
+class AppScale {
+  AppScale._();
+
+  /// Current effective UI scale (1.0 = default). Updated on settings load.
+  static double factor = 1.0;
+}

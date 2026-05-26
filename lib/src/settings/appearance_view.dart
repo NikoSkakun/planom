@@ -2,8 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 
 import '../localization/strings.dart';
-import '../theme/app_theme.dart';
+import '../utils/color_picker.dart';
+import '../utils/selection_menu.dart';
 import 'settings_controller.dart';
+import 'settings_widgets.dart';
 
 // ── Preset palettes ───────────────────────────────────────────────────────────
 
@@ -122,10 +124,147 @@ class AppearanceView extends StatelessWidget {
                   selected: controller.completionColor,
                   onSelect: controller.updateCompletionColor,
                 ),
+
+                // ── Text size ────────────────────────────────────────────
+                const SizedBox(height: 32),
+                Text(
+                  s.textSize,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: labelColor,
+                    letterSpacing: -0.08,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SettingsToggleRow(
+                  label: s.useSystemTextSize,
+                  value: controller.useSystemTextScale,
+                  onChanged: controller.updateUseSystemTextScale,
+                ),
+                if (!controller.useSystemTextScale) ...[
+                  const SizedBox(height: 8),
+                  _TextScaleRow(controller: controller),
+                ],
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    s.textSizeHint,
+                    style: TextStyle(fontSize: 13, color: labelColor),
+                  ),
+                ),
+
+                // ── Calendar ─────────────────────────────────────────────
+                const SizedBox(height: 32),
+                Text(
+                  s.tabCalendar,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: labelColor,
+                    letterSpacing: -0.08,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SettingsNavRow(
+                  label: s.firstDayOfWeek,
+                  trailingLabel: _firstDayLabel(s, controller.firstDayOfWeek),
+                  onTap: () => _pickFirstDay(context, controller),
+                ),
               ],
             );
           },
         ),
+      ),
+    );
+  }
+
+  static String _firstDayLabel(S s, int day) {
+    final long = kWeekdaysLong[s.locale.languageCode] ?? kWeekdaysLong['en']!;
+    // long is Mon=0..Sun=6; ISO day is 1..7
+    return long[(day - 1).clamp(0, 6)];
+  }
+
+  Future<void> _pickFirstDay(
+      BuildContext context, SettingsController controller) async {
+    final s = S.of(context);
+    final selected = await showSelectionMenu<int>(
+      context: context,
+      title: s.firstDayOfWeek,
+      current: controller.firstDayOfWeek,
+      options: [
+        for (var d = 1; d <= 7; d++)
+          SelectionMenuOption(value: d, label: _firstDayLabel(s, d)),
+      ],
+    );
+    if (selected != null) await controller.updateFirstDayOfWeek(selected);
+  }
+}
+
+// ── Text scale ────────────────────────────────────────────────────────────────
+
+class _TextScaleRow extends StatelessWidget {
+  const _TextScaleRow({required this.controller});
+
+  final SettingsController controller;
+
+  static const _presets = <double>[0.85, 1.0, 1.15, 1.3, 1.5];
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = CupertinoDynamicColor.resolve(
+      CupertinoColors.tertiarySystemBackground,
+      context,
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('A', style: TextStyle(fontSize: 13)),
+              Text('A', style: TextStyle(fontSize: 22)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // CupertinoSlider with discrete preset stops. We compute the nearest
+          // preset on commit so the value snaps to a clean number.
+          CupertinoSlider(
+            value: controller.textScale,
+            min: _presets.first,
+            max: _presets.last,
+            divisions: _presets.length - 1,
+            onChanged: (v) {
+              final nearest = _presets.reduce((a, b) =>
+                  (a - v).abs() < (b - v).abs() ? a : b);
+              if (nearest != controller.textScale) {
+                controller.updateTextScale(nearest);
+              }
+            },
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (final p in _presets)
+                Text(
+                  '${(p * 100).round()}%',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: p == controller.textScale
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    color: p == controller.textScale
+                        ? CupertinoColors.label.resolveFrom(context)
+                        : CupertinoColors.tertiaryLabel.resolveFrom(context),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -144,12 +283,23 @@ class _ColorSwatchRow extends StatelessWidget {
   final Color selected;
   final ValueChanged<Color> onSelect;
 
+  Future<void> _showCustomPicker(BuildContext context) async {
+    final picked = await showCustomColorPicker(
+      context,
+      initialColor: selected,
+      title: S.of(context).customColor,
+    );
+    if (picked != null) onSelect(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     final bg = CupertinoDynamicColor.resolve(
       CupertinoColors.tertiarySystemBackground,
       context,
     );
+    final isPresetSelected =
+        options.any((c) => c.value == selected.value);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -159,14 +309,76 @@ class _ColorSwatchRow extends StatelessWidget {
       child: Wrap(
         spacing: 10,
         runSpacing: 10,
-        children: options
-            .map((c) => _Swatch(
-                  color: c,
-                  isSelected: c.value == selected.value,
-                  onTap: () => onSelect(c),
-                  context: context,
-                ))
-            .toList(),
+        children: [
+          ...options.map((c) => _Swatch(
+                color: c,
+                isSelected: c.value == selected.value,
+                onTap: () => onSelect(c),
+                context: context,
+              )),
+          _CustomSwatch(
+            // When the active color isn't one of the presets, the user already
+            // has a custom one — show the live color inside the rainbow ring.
+            currentColor: isPresetSelected ? null : selected,
+            onTap: () => _showCustomPicker(context),
+            context: context,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Rainbow-bordered swatch that opens the HSV color picker. If the current
+/// theme color isn't one of the presets, the centre fills with that color
+/// (and shows a checkmark) so the user can see their custom choice.
+class _CustomSwatch extends StatelessWidget {
+  const _CustomSwatch({
+    required this.currentColor,
+    required this.onTap,
+    required this.context,
+  });
+
+  final Color? currentColor;
+  final VoidCallback onTap;
+  final BuildContext context;
+
+  @override
+  Widget build(BuildContext _) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const SweepGradient(
+            colors: [
+              Color(0xFFFF0000),
+              Color(0xFFFFFF00),
+              Color(0xFF00FF00),
+              Color(0xFF00FFFF),
+              Color(0xFF0000FF),
+              Color(0xFFFF00FF),
+              Color(0xFFFF0000),
+            ],
+          ),
+        ),
+        padding: const EdgeInsets.all(3),
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: currentColor ??
+                CupertinoColors.systemBackground.resolveFrom(context),
+          ),
+          child: currentColor != null
+              ? const Icon(
+                  CupertinoIcons.checkmark,
+                  size: 16,
+                  color: CupertinoColors.white,
+                )
+              : null,
+        ),
       ),
     );
   }

@@ -21,6 +21,8 @@ import 'security/security_service.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
+import 'settings/tab_bar_config.dart';
+import 'utils/shortcut_router.dart';
 import 'tasks/task_controller.dart';
 import 'tasks/task_creation_sheet.dart';
 import 'tasks/tasks_view.dart';
@@ -93,6 +95,9 @@ class _HomeShellState extends State<HomeShell> {
   final ValueNotifier<bool> _globalSettingsOpen = ValueNotifier<bool>(false);
   Route<void>? _globalSettingsRoute;
   int _lastTabIndex = 0;
+  // Which page of the multi-page tab bar is currently visible. Swiping
+  // horizontally on the tab bar moves between pages.
+  int _currentPage = 0;
   late CupertinoTabController _tabController;
 
   void _openGlobalSettings() {
@@ -119,7 +124,7 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     final visible = _computeVisibleIndices();
     _lastTabIndex = widget.settingsController.resolveInitialTab(visible);
-    final initialVisual = visible.indexOf(_lastTabIndex);
+    final initialVisual = _visualForBuiltin(_lastTabIndex);
     _tabController =
         CupertinoTabController(initialIndex: initialVisual < 0 ? 0 : initialVisual);
     widget.settingsController.addListener(_onSettingsChanged);
@@ -353,13 +358,13 @@ class _HomeShellState extends State<HomeShell> {
       }
       _globalSettingsOpen.value = false;
       _lastTabIndex = 4;
-      _tabController.index = visibleIndices.indexOf(4);
+      _tabController.index = _visualForBuiltin(4);
       _showPlusButton.value = false;
       return;
     }
 
     if (visibleIndices.contains(_lastTabIndex)) {
-      _tabController.index = visibleIndices.indexOf(_lastTabIndex);
+      _tabController.index = _visualForBuiltin(_lastTabIndex);
       return;
     }
     // The active tab was just hidden from the tab bar. Fall back to Tasks (or
@@ -367,7 +372,7 @@ class _HomeShellState extends State<HomeShell> {
     final wasSettings = _lastTabIndex == 4;
     final fallback = visibleIndices.contains(0) ? 0 : visibleIndices.first;
     _lastTabIndex = fallback;
-    _tabController.index = visibleIndices.indexOf(fallback);
+    _tabController.index = _visualForBuiltin(fallback);
     switch (fallback) {
       case 0:
         _showPlusButton.value = _depthObservers[0].trackedCount == 0;
@@ -485,6 +490,31 @@ class _HomeShellState extends State<HomeShell> {
     }
   }
 
+  /// Routes a tab-bar tap to either the built-in tap handler or the shortcut
+  /// router. For shortcuts, the CupertinoTabScaffold will still bump the
+  /// controller's index to [visualIdx] — we reset it to the previous
+  /// position in a post-frame callback so the shortcut slot never shows as
+  /// active.
+  void _handleTabTap(int visualIdx) {
+    final pageItems = _pageItems();
+    if (visualIdx < 0 || visualIdx >= pageItems.length) return;
+    final item = pageItems[visualIdx];
+    if (item.kind == TabKind.shortcut) {
+      final prev = _tabController.index;
+      _openShortcut(item);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_tabController.index == visualIdx) {
+          _tabController.index = prev;
+        }
+      });
+      return;
+    }
+    if (item.builtinIndex != null) {
+      _onTabTapped(item.builtinIndex!);
+    }
+  }
+
   void _onTabTapped(int tappedIndex) {
     if (tappedIndex == _lastTabIndex) {
       _navigatorKeys[tappedIndex].currentState
@@ -507,10 +537,169 @@ class _HomeShellState extends State<HomeShell> {
     widget.settingsController.setLastOpenedTab(tappedIndex);
   }
 
+  /// Builtin tab indices appearing in the currently visible page's items,
+  /// in display order. Shortcut items don't count toward this — they're
+  /// rendered on the bar but don't have their own navigator slot.
   List<int> _computeVisibleIndices() {
-    final sc = widget.settingsController;
-    final ordered = sc.tabOrder.where((i) => sc.isTabVisible(i)).toList();
-    return ordered.isEmpty ? [0] : ordered;
+    final builtins = <int>[];
+    for (final item in _pageItems()) {
+      if (item.kind == TabKind.builtin && item.builtinIndex != null) {
+        builtins.add(item.builtinIndex!);
+      }
+    }
+    return builtins.isEmpty ? [0] : builtins;
+  }
+
+  /// All items on the current page (built-ins + shortcuts), in display order.
+  List<TabItem> _pageItems() {
+    final pages = widget.settingsController.tabBarConfig.pages;
+    if (pages.isEmpty) return const [];
+    final pageIdx = _currentPage.clamp(0, pages.length - 1);
+    return pages[pageIdx];
+  }
+
+  /// Returns the visual position (index into `_pageItems()`) of the first
+  /// built-in entry whose logical index matches [logicalIdx], or 0 if none.
+  /// Used to keep `_tabController.index` in sync with the active built-in
+  /// tab when shortcuts share the bar.
+  int _visualForBuiltin(int logicalIdx) {
+    final items = _pageItems();
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind == TabKind.builtin &&
+          items[i].builtinIndex == logicalIdx) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  /// Pushes a shortcut's target view on the relevant navigator and switches
+  /// the active tab to that navigator. Used when the user taps a shortcut
+  /// item in the tab bar.
+  void _openShortcut(TabItem item) {
+    final target = item.shortcutTarget;
+    if (target == null) return;
+
+    // Map shortcut → owning built-in tab (Tasks for tasks/lists/folders,
+    // Notes for note folders).
+    final ownerLogicalIdx = target == ShortcutTarget.noteFolder ? 1 : 0;
+    final navigator = _navigatorKeys[ownerLogicalIdx].currentState;
+    if (navigator == null) return;
+
+    // Pop back to root on the target tab so the shortcut consistently
+    // shows the target view at the top of the stack.
+    navigator.popUntil((route) => route.isFirst);
+
+    // Route the shortcut to the correct view via the existing per-tab
+    // browse routes. The shortcut router knows how to map each target to
+    // the matching view constructor.
+    pushShortcut(
+      navigator: navigator,
+      target: target,
+      shortcutId: item.shortcutId,
+      taskController: widget.taskController,
+      folderController: widget.folderController,
+      noteController: widget.noteController,
+      contactController: widget.contactController,
+      activeDueDate: _activeDueDate,
+      activeListId: _activeListId,
+    );
+
+    // Switch the visible tab to the shortcut's owner. The user lands on
+    // the target view inside that tab's navigator.
+    final visibleIndices = _computeVisibleIndices();
+    if (visibleIndices.contains(ownerLogicalIdx)) {
+      _onTabTapped(ownerLogicalIdx);
+      _tabController.index = _visualForBuiltin(ownerLogicalIdx);
+    } else {
+      // Owner tab isn't on this page — switch to whichever page has it.
+      final pages = widget.settingsController.tabBarConfig.pages;
+      for (var p = 0; p < pages.length; p++) {
+        if (pages[p].any((it) =>
+            it.kind == TabKind.builtin && it.builtinIndex == ownerLogicalIdx)) {
+          setState(() => _currentPage = p);
+          _onTabTapped(ownerLogicalIdx);
+          _tabController.index = _visualForBuiltin(ownerLogicalIdx);
+          break;
+        }
+      }
+    }
+  }
+
+  BottomNavigationBarItem _renderTabItem(
+      BuildContext context, TabItem item, bool hideLabels, bool overlayOpen) {
+    if (item.kind == TabKind.builtin && item.builtinIndex != null) {
+      return _tabItem(context, item.builtinIndex!, hideLabels, overlayOpen);
+    }
+    // Shortcut item.
+    final s = S.of(context);
+    final label = item.customLabel ?? _defaultShortcutLabel(s, item);
+    final icon = _shortcutIcon(item, context);
+    return BottomNavigationBarItem(
+      icon: Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: icon,
+      ),
+      activeIcon: Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: icon,
+      ),
+      label: hideLabels ? null : label,
+    );
+  }
+
+  static String _defaultShortcutLabel(S s, TabItem item) {
+    switch (item.shortcutTarget) {
+      case ShortcutTarget.smartInbox:
+        return s.inbox;
+      case ShortcutTarget.smartToday:
+        return s.today;
+      case ShortcutTarget.smartTomorrow:
+        return s.tomorrow;
+      case ShortcutTarget.smartUpcoming:
+        return s.upcoming;
+      case ShortcutTarget.smartAllTasks:
+        return s.allTasks;
+      case ShortcutTarget.smartCompleted:
+        return s.completed;
+      case ShortcutTarget.smartTrash:
+        return s.trash;
+      case ShortcutTarget.list:
+        return s.list;
+      case ShortcutTarget.folder:
+      case ShortcutTarget.noteFolder:
+        return s.folder;
+      default:
+        return s.tabKindShortcut;
+    }
+  }
+
+  Widget _shortcutIcon(TabItem item, BuildContext context) {
+    switch (item.shortcutTarget) {
+      case ShortcutTarget.smartInbox:
+        return const ImageIcon(AssetImage('assets/icons/inbox.png'), size: 24);
+      case ShortcutTarget.smartToday:
+        return const ImageIcon(AssetImage('assets/icons/today.png'), size: 24);
+      case ShortcutTarget.smartTomorrow:
+        return Icon(CupertinoIcons.sun_max,
+            size: 24, color: CupertinoColors.systemOrange.resolveFrom(context));
+      case ShortcutTarget.smartUpcoming:
+        return const ImageIcon(
+            AssetImage('assets/icons/upcoming.png'), size: 24);
+      case ShortcutTarget.smartAllTasks:
+        return const Icon(CupertinoIcons.tray_full, size: 24);
+      case ShortcutTarget.smartCompleted:
+        return const Icon(CupertinoIcons.checkmark_circle_fill, size: 24);
+      case ShortcutTarget.smartTrash:
+        return const Icon(CupertinoIcons.trash, size: 24);
+      case ShortcutTarget.list:
+        return const ImageIcon(AssetImage('assets/icons/list.png'), size: 24);
+      case ShortcutTarget.folder:
+      case ShortcutTarget.noteFolder:
+        return const ImageIcon(AssetImage('assets/icons/folder.png'), size: 24);
+      default:
+        return const Icon(CupertinoIcons.square, size: 24);
+    }
   }
 
   BottomNavigationBarItem _tabItem(BuildContext context, int logicalIdx,
@@ -701,6 +890,11 @@ class _HomeShellState extends State<HomeShell> {
                   final activeColor = overlayOpen
                       ? CupertinoColors.secondaryLabel
                       : CupertinoColors.label;
+                  // Render all page items (built-ins AND shortcuts) on
+                  // the bar. Shortcut taps push the target route on the
+                  // owning navigator and revert the controller index so the
+                  // shortcut slot itself never appears "selected".
+                  final pageItems = _pageItems();
                   return CupertinoTabScaffold(
                     controller: _tabController,
                     tabBar: CupertinoTabBar(
@@ -711,15 +905,22 @@ class _HomeShellState extends State<HomeShell> {
                         color: Color(0xF0F9F9F9),
                         darkColor: Color(0xF01D1D1D),
                       ),
-                      onTap: (visualIdx) =>
-                          _onTabTapped(visibleIndices[visualIdx]),
-                      items: visibleIndices
-                          .map((i) =>
-                              _tabItem(context, i, hideLabels, overlayOpen))
+                      onTap: (visualIdx) => _handleTabTap(visualIdx),
+                      items: pageItems
+                          .map((it) =>
+                              _renderTabItem(context, it, hideLabels, overlayOpen))
                           .toList(),
                     ),
                     tabBuilder: (context, visualIdx) {
-                      final logicalIdx = visibleIndices[visualIdx];
+                      final item = pageItems[visualIdx];
+                      if (item.kind != TabKind.builtin ||
+                          item.builtinIndex == null) {
+                        // Shortcut slot never displays its own content — the
+                        // tap handler pushes onto a built-in's navigator and
+                        // immediately switches back. A stub is fine here.
+                        return const SizedBox.shrink();
+                      }
+                      final logicalIdx = item.builtinIndex!;
                       return CupertinoTabView(
                         navigatorKey: _navigatorKeys[logicalIdx],
                         navigatorObservers: [_depthObservers[logicalIdx]],
@@ -728,6 +929,46 @@ class _HomeShellState extends State<HomeShell> {
                     },
                   );
                 },
+              ),
+            // Multi-page tab bar swipe overlay — covers the tab bar area and
+            // detects horizontal pan to switch between pages. Only active when
+            // there's more than one page configured and we're in the narrow
+            // (bottom tab bar) layout.
+            if (!isWide &&
+                visibleIndices.length > 1 &&
+                widget.settingsController.tabBarConfig.pages.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 50 + MediaQuery.paddingOf(context).bottom,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragEnd: (d) {
+                    final vel = d.primaryVelocity ?? 0;
+                    if (vel.abs() < 200) return;
+                    _switchPage(vel < 0 ? 1 : -1);
+                  },
+                ),
+              ),
+            // Page indicator dots, shown just above the tab bar when there's
+            // more than one page configured.
+            if (!isWide &&
+                visibleIndices.length > 1 &&
+                widget.settingsController.tabBarConfig.pages.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 50 + MediaQuery.paddingOf(context).bottom + 2,
+                child: IgnorePointer(
+                  child: _PageDots(
+                    count: widget.settingsController.tabBarConfig.pages.length,
+                    current: _currentPage.clamp(
+                        0,
+                        widget.settingsController.tabBarConfig.pages.length -
+                            1),
+                  ),
+                ),
               ),
             ValueListenableBuilder<bool>(
               valueListenable: _showPlusButton,
@@ -758,6 +999,50 @@ class _HomeShellState extends State<HomeShell> {
           ],
         );
       },
+    );
+  }
+
+  void _switchPage(int delta) {
+    final pages = widget.settingsController.tabBarConfig.pages;
+    if (pages.length <= 1) return;
+    final next = (_currentPage + delta).clamp(0, pages.length - 1);
+    if (next == _currentPage) return;
+    setState(() => _currentPage = next);
+    // Recompute initial visible tab so _tabController points to a valid index
+    // on the new page.
+    final visible = _computeVisibleIndices();
+    if (!visible.contains(_lastTabIndex)) {
+      _lastTabIndex = visible.first;
+    }
+    _tabController.index = _visualForBuiltin(_lastTabIndex);
+  }
+}
+
+/// Tiny page indicator (○ ● ○ …) shown above the tab bar.
+class _PageDots extends StatelessWidget {
+  const _PageDots({required this.count, required this.current});
+
+  final int count;
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < count; i++)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: i == current ? 7 : 5,
+            height: i == current ? 7 : 5,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: i == current
+                  ? CupertinoColors.label.resolveFrom(context)
+                  : CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ),
+      ],
     );
   }
 }

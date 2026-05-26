@@ -161,6 +161,27 @@ class SpaceManager with ChangeNotifier {
     _contactController = ContactController(_db);
     await _contactController.load();
 
+    // Wire the badge to the global settings + current space's events.
+    // Counting "not-yet-started events today" gives the user a sense of
+    // upcoming items; we include any timed event whose start moment is in
+    // the future today, plus all all-day events.
+    _taskController.attachBadgeContext(
+      settings: settingsController,
+      eventCountToday: () {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        return _eventController.eventsForDate(today).where((e) {
+          if (e.doTime == null) return true; // all-day
+          final start =
+              today.add(Duration(minutes: e.doTime!));
+          return start.isAfter(now);
+        }).length;
+      },
+    );
+    // EventController changes don't drive the badge automatically — pump it
+    // when events change so the count stays current.
+    _eventController.addListener(_taskController.refreshBadge);
+
     _backupService = BackupService(
       db: _db,
       taskController: _taskController,

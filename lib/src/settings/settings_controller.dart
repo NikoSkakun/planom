@@ -8,10 +8,29 @@ import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 import 'settings_service.dart';
 import 'smart_list_prefs.dart';
+import 'tab_bar_config.dart';
 
 /// Sentinel [SettingsController.defaultTab] value: open whichever tab was last
 /// open when the app was closed, rather than a fixed tab.
 const String kLastOpenedTab = 'last';
+
+/// What the app icon badge counts. Only the current space's data feeds in.
+enum BadgeMode {
+  /// No badge at all.
+  none,
+
+  /// Default: today's uncompleted tasks (including overdue).
+  todayTasks,
+
+  /// Today's uncompleted tasks plus today's not-yet-started events.
+  todayTasksAndEvents,
+
+  /// Inbox uncompleted tasks (`listId == null`).
+  inboxTasks,
+
+  /// All uncompleted top-level tasks across every list.
+  allUncompleted,
+}
 
 class SettingsController with ChangeNotifier {
   SettingsController(this._settingsService, this._db);
@@ -40,6 +59,50 @@ class SettingsController with ChangeNotifier {
 
   Color _completionColor = AppColors.systemGreen;
   Color get completionColor => _completionColor;
+
+  // ISO weekday number for the first day of the week: 1=Monday … 7=Sunday.
+  // Default is Monday to match the existing calendar grid.
+  int _firstDayOfWeek = DateTime.monday;
+  int get firstDayOfWeek => _firstDayOfWeek;
+
+  BadgeMode _badgeMode = BadgeMode.todayTasks;
+  BadgeMode get badgeMode => _badgeMode;
+
+  // App-wide font/UI scale.
+  //
+  // [textScale] is the multiplier applied to text via MediaQuery's
+  // `textScaler` AND mirrored to [AppScale.factor] for UI widgets that want
+  // to grow alongside their attached text (checkbox, row icons). The default
+  // 1.0 matches today's behavior.
+  //
+  // When [useSystemTextScale] is true, the app respects the OS-level text
+  // scale (Dynamic Type on iOS; Display & Text Size on Android) and the
+  // [textScale] value is ignored for text — but still applied to UI widgets
+  // through [AppScale.factor] so the two stay roughly in sync visually.
+  double _textScale = 1.0;
+  double get textScale => _textScale;
+  bool _useSystemTextScale = false;
+  bool get useSystemTextScale => _useSystemTextScale;
+
+  /// Multi-page tab bar layout — supersedes the legacy [tabOrder] +
+  /// [tabVisibility] booleans. On first load the legacy values are migrated
+  /// into a single-page layout if no `tab_bar_config` row exists yet.
+  TabBarConfig _tabBarConfig = TabBarConfig.defaultLayout();
+  TabBarConfig get tabBarConfig => _tabBarConfig;
+
+  // Default icons applied when the user creates a new task/list/folder/note
+  // folder without picking one. Strings match the existing iconId scheme:
+  // - Tasks: 'inbox' is the historical default; other values are presets.
+  // - Lists / folders / note folders: null = render the default PNG asset;
+  //   non-null is an SF-symbol key from `kFolderIconPresets`.
+  String _defaultTaskIcon = 'inbox';
+  String get defaultTaskIcon => _defaultTaskIcon;
+  String? _defaultListIcon;
+  String? get defaultListIcon => _defaultListIcon;
+  String? _defaultFolderIcon;
+  String? get defaultFolderIcon => _defaultFolderIcon;
+  String? _defaultNoteFolderIcon;
+  String? get defaultNoteFolderIcon => _defaultNoteFolderIcon;
 
   /// Bumped whenever the accent/completion color changes. Those colors live in
   /// AppColors statics read all over the tree, so instead of firing the main
@@ -133,12 +196,62 @@ class SettingsController with ChangeNotifier {
       } else if (key == 'last_tab') {
         final v = int.tryParse(value);
         if (v != null && v >= 0 && v <= 4) _lastOpenedTab = v;
+      } else if (key == 'first_day_of_week') {
+        final v = int.tryParse(value);
+        if (v != null && v >= 1 && v <= 7) _firstDayOfWeek = v;
+      } else if (key == 'badge_mode') {
+        _badgeMode = _decodeBadgeMode(value);
+      } else if (key == 'default_task_icon') {
+        if (value.isNotEmpty) _defaultTaskIcon = value;
+      } else if (key == 'default_list_icon') {
+        _defaultListIcon = value.isEmpty ? null : value;
+      } else if (key == 'default_folder_icon') {
+        _defaultFolderIcon = value.isEmpty ? null : value;
+      } else if (key == 'default_note_folder_icon') {
+        _defaultNoteFolderIcon = value.isEmpty ? null : value;
+      } else if (key == 'text_scale') {
+        final v = double.tryParse(value);
+        if (v != null && v >= 0.5 && v <= 2.5) _textScale = v;
+      } else if (key == 'use_system_text_scale') {
+        _useSystemTextScale = value == 'true';
+      } else if (key == 'tab_bar_config') {
+        final parsed = TabBarConfig.tryParse(value);
+        if (parsed != null) _tabBarConfig = parsed;
       } else if (key == TaskFieldPrefs.storageKey) {
         _taskFieldPrefs = TaskFieldPrefs.fromJson(value);
       }
     }
 
+    // Keep the global checkbox-style mirror in sync with persisted prefs so
+    // every TaskRow/_RoundedCheckbox renders in the user-selected style without
+    // having to thread the value through every callsite.
+    TaskCheckboxAppearance.current = _taskFieldPrefs.checkboxStyle;
+    AppDefaults.taskIcon = _defaultTaskIcon;
+    AppDefaults.listIcon = _defaultListIcon;
+    AppDefaults.folderIcon = _defaultFolderIcon;
+    AppDefaults.noteFolderIcon = _defaultNoteFolderIcon;
+    AppScale.factor = _textScale;
+
+    // Migrate the legacy single-row tab layout to TabBarConfig the first time
+    // a user opens the new tab-bar UI. Existing _tabBarConfig is the default
+    // if no `tab_bar_config` row was loaded above; merge the user's visibility
+    // + order into it so they don't lose their existing layout.
+    final loadedConfig =
+        rows.any((r) => r['key'] == 'tab_bar_config');
+    if (!loadedConfig) {
+      _tabBarConfig = TabBarConfig.fromLegacy(
+        tabVisibility: _tabVisibility,
+        tabOrder: _tabOrder,
+      );
+    }
+
     notifyListeners();
+  }
+
+  Future<void> updateTabBarConfig(TabBarConfig config) async {
+    _tabBarConfig = config;
+    notifyListeners();
+    await _db.setAppSetting('tab_bar_config', config.toJsonString());
   }
 
   Future<void> setTabVisible(int index, bool visible) async {
@@ -175,6 +288,100 @@ class SettingsController with ChangeNotifier {
     _themeMode = newThemeMode;
     notifyListeners();
     await _settingsService.updateThemeMode(newThemeMode);
+  }
+
+  Future<void> updateFirstDayOfWeek(int isoDay) async {
+    if (isoDay < 1 || isoDay > 7) return;
+    if (isoDay == _firstDayOfWeek) return;
+    _firstDayOfWeek = isoDay;
+    notifyListeners();
+    await _db.setAppSetting('first_day_of_week', isoDay.toString());
+  }
+
+  Future<void> updateBadgeMode(BadgeMode mode) async {
+    if (mode == _badgeMode) return;
+    _badgeMode = mode;
+    notifyListeners();
+    await _db.setAppSetting('badge_mode', _encodeBadgeMode(mode));
+  }
+
+  Future<void> updateDefaultTaskIcon(String iconId) async {
+    if (iconId.isEmpty || iconId == _defaultTaskIcon) return;
+    _defaultTaskIcon = iconId;
+    AppDefaults.taskIcon = iconId;
+    notifyListeners();
+    await _db.setAppSetting('default_task_icon', iconId);
+  }
+
+  Future<void> updateDefaultListIcon(String? iconId) async {
+    if (iconId == _defaultListIcon) return;
+    _defaultListIcon = iconId;
+    AppDefaults.listIcon = iconId;
+    notifyListeners();
+    await _db.setAppSetting('default_list_icon', iconId ?? '');
+  }
+
+  Future<void> updateDefaultFolderIcon(String? iconId) async {
+    if (iconId == _defaultFolderIcon) return;
+    _defaultFolderIcon = iconId;
+    AppDefaults.folderIcon = iconId;
+    notifyListeners();
+    await _db.setAppSetting('default_folder_icon', iconId ?? '');
+  }
+
+  Future<void> updateDefaultNoteFolderIcon(String? iconId) async {
+    if (iconId == _defaultNoteFolderIcon) return;
+    _defaultNoteFolderIcon = iconId;
+    AppDefaults.noteFolderIcon = iconId;
+    notifyListeners();
+    await _db.setAppSetting('default_note_folder_icon', iconId ?? '');
+  }
+
+  Future<void> updateTextScale(double scale) async {
+    final clamped = scale.clamp(0.5, 2.5).toDouble();
+    if (clamped == _textScale) return;
+    _textScale = clamped;
+    AppScale.factor = clamped;
+    notifyListeners();
+    await _db.setAppSetting('text_scale', clamped.toStringAsFixed(2));
+  }
+
+  Future<void> updateUseSystemTextScale(bool value) async {
+    if (value == _useSystemTextScale) return;
+    _useSystemTextScale = value;
+    notifyListeners();
+    await _db.setAppSetting('use_system_text_scale', value.toString());
+  }
+
+  static String _encodeBadgeMode(BadgeMode m) {
+    switch (m) {
+      case BadgeMode.none:
+        return 'none';
+      case BadgeMode.todayTasks:
+        return 'todayTasks';
+      case BadgeMode.todayTasksAndEvents:
+        return 'todayTasksAndEvents';
+      case BadgeMode.inboxTasks:
+        return 'inboxTasks';
+      case BadgeMode.allUncompleted:
+        return 'allUncompleted';
+    }
+  }
+
+  static BadgeMode _decodeBadgeMode(String v) {
+    switch (v) {
+      case 'none':
+        return BadgeMode.none;
+      case 'todayTasksAndEvents':
+        return BadgeMode.todayTasksAndEvents;
+      case 'inboxTasks':
+        return BadgeMode.inboxTasks;
+      case 'allUncompleted':
+        return BadgeMode.allUncompleted;
+      case 'todayTasks':
+      default:
+        return BadgeMode.todayTasks;
+    }
   }
 
   Future<void> updateLocale(Locale locale) async {
@@ -241,6 +448,7 @@ class SettingsController with ChangeNotifier {
 
   Future<void> updateTaskFieldPrefs(TaskFieldPrefs prefs) async {
     _taskFieldPrefs = prefs.copy();
+    TaskCheckboxAppearance.current = _taskFieldPrefs.checkboxStyle;
     notifyListeners();
     await _db.setAppSetting(TaskFieldPrefs.storageKey, _taskFieldPrefs.toJson());
   }

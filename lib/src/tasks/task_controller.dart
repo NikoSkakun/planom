@@ -6,6 +6,7 @@ import '../models/recurrence.dart';
 import '../models/tag.dart';
 import '../models/task.dart';
 import '../notifications/notification_service.dart';
+import '../settings/settings_controller.dart';
 import '../utils/platform_capabilities.dart';
 
 enum TaskSortOrder { defaultOrder, creationDate, name, priority, dateTime }
@@ -14,6 +15,38 @@ class TaskController with ChangeNotifier {
   TaskController(this._db);
 
   final DatabaseService _db;
+
+  // Optional context for the app icon badge. The controller computes the
+  // count itself for task-only modes; for modes that involve events it asks
+  // the host (SpaceManager / main wiring) via [_eventCountToday].
+  SettingsController? _settings;
+  int Function()? _eventCountToday;
+  VoidCallback? _settingsListener;
+
+  /// Wires the data the badge needs from outside the controller. Pass the
+  /// global [SettingsController] and an optional getter that returns the
+  /// count of today's not-yet-started events. Idempotent — calling again
+  /// detaches the previous listener.
+  void attachBadgeContext({
+    SettingsController? settings,
+    int Function()? eventCountToday,
+  }) {
+    if (_settings != null && _settingsListener != null) {
+      _settings!.removeListener(_settingsListener!);
+    }
+    _settings = settings;
+    _eventCountToday = eventCountToday;
+    if (_settings != null) {
+      _settingsListener = _updateBadge;
+      _settings!.addListener(_settingsListener!);
+    }
+    _updateBadge();
+  }
+
+  /// Re-evaluate and apply the badge count. Hosts that drive event/task
+  /// changes outside the controller (e.g. EventController) can call this to
+  /// keep the badge in sync.
+  void refreshBadge() => _updateBadge();
   List<Task> _tasks = [];
   List<Task> _trashedTasks = [];
   List<Tag> _tags = [];
@@ -573,7 +606,20 @@ class TaskController with ChangeNotifier {
 
   void _updateBadge() {
     if (!PlatformCapabilities.supportsAppBadge) return;
-    final count = todayUncompletedCount;
+    final mode = _settings?.badgeMode ?? BadgeMode.todayTasks;
+    int count;
+    switch (mode) {
+      case BadgeMode.none:
+        count = 0;
+      case BadgeMode.todayTasks:
+        count = todayUncompletedCount;
+      case BadgeMode.todayTasksAndEvents:
+        count = todayUncompletedCount + (_eventCountToday?.call() ?? 0);
+      case BadgeMode.inboxTasks:
+        count = inboxUncompletedCount;
+      case BadgeMode.allUncompleted:
+        count = _topLevel.where((t) => !t.isCompleted).length;
+    }
     try {
       if (count > 0) {
         FlutterAppBadger.updateBadgeCount(count);
@@ -585,5 +631,13 @@ class TaskController with ChangeNotifier {
       // host OS rejects the channel call (e.g. user hasn't granted badges).
       debugPrint('badge update failed: $e\n$st');
     }
+  }
+
+  @override
+  void dispose() {
+    if (_settings != null && _settingsListener != null) {
+      _settings!.removeListener(_settingsListener!);
+    }
+    super.dispose();
   }
 }

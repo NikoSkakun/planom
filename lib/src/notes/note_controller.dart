@@ -16,6 +16,10 @@ class NoteController with ChangeNotifier {
   List<NoteFolder> get trashedFolders => List.unmodifiable(_trashedFolders);
   List<Note> get trashedNotes => List.unmodifiable(_trashedNotes);
 
+  /// Flat list of all non-trashed folders. Used by surfaces that need to
+  /// enumerate every folder regardless of nesting (e.g. tab-bar shortcuts).
+  List<NoteFolder> get folders => List.unmodifiable(_folders);
+
   List<NoteFolder> foldersIn(String? parentId) {
     final result =
         _folders.where((f) => f.parentFolderId == parentId).toList();

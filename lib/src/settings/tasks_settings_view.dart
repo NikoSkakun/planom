@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../folders/folder_icon_picker.dart';
 import '../localization/strings.dart';
 import '../tasks/task_field_prefs.dart';
 import '../theme/app_theme.dart';
@@ -71,6 +72,38 @@ class TasksSettingsView extends StatelessWidget {
     if (selected != null) {
       final next = controller.taskFieldPrefs.copy();
       next.folderCounterMode = selected;
+      await controller.updateTaskFieldPrefs(next);
+    }
+  }
+
+  static String _checkboxStyleLabel(S s, TaskCheckboxStyle style) {
+    switch (style) {
+      case TaskCheckboxStyle.roundedRect:
+        return s.checkboxStyleRoundedRect;
+      case TaskCheckboxStyle.sharpRect:
+        return s.checkboxStyleSharpRect;
+      case TaskCheckboxStyle.circle:
+        return s.checkboxStyleCircle;
+    }
+  }
+
+  Future<void> _showCheckboxStylePicker(
+      BuildContext context, TaskCheckboxStyle current) async {
+    final s = S.of(context);
+    final selected = await showSelectionMenu<TaskCheckboxStyle>(
+      context: context,
+      title: s.checkboxStyle,
+      current: current,
+      options: TaskCheckboxStyle.values
+          .map((v) => SelectionMenuOption(
+                value: v,
+                label: _checkboxStyleLabel(s, v),
+              ))
+          .toList(),
+    );
+    if (selected != null) {
+      final next = controller.taskFieldPrefs.copy();
+      next.checkboxStyle = selected;
       await controller.updateTaskFieldPrefs(next);
     }
   }
@@ -276,9 +309,104 @@ class TasksSettingsView extends StatelessWidget {
                   value: controller.smartListPrefs.showAddFolderButton,
                   onChanged: controller.updateShowAddFolderButton,
                 ),
+                const SizedBox(height: 1),
+                SettingsNavRow(
+                  label: s.checkboxStyle,
+                  trailingLabel:
+                      _checkboxStyleLabel(s, fields.checkboxStyle),
+                  onTap: () =>
+                      _showCheckboxStylePicker(ctx, fields.checkboxStyle),
+                ),
+
+                const SizedBox(height: 18),
+                SettingsSectionHeader(s.sectionDefaults),
+                _DefaultIconRow(
+                  label: s.defaultTaskIcon,
+                  iconId: controller.defaultTaskIcon,
+                  isFolder: false,
+                  // Tasks never have null icons — historical default 'inbox'.
+                  onPicked: (id, _) {
+                    controller.updateDefaultTaskIcon(id ?? 'inbox');
+                  },
+                ),
+                const SizedBox(height: 1),
+                _DefaultIconRow(
+                  label: s.defaultListIcon,
+                  iconId: controller.defaultListIcon,
+                  isFolder: false,
+                  onPicked: (id, _) => controller.updateDefaultListIcon(id),
+                ),
+                const SizedBox(height: 1),
+                _DefaultIconRow(
+                  label: s.defaultFolderIcon,
+                  iconId: controller.defaultFolderIcon,
+                  isFolder: true,
+                  onPicked: (id, _) =>
+                      controller.updateDefaultFolderIcon(id),
+                ),
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _DefaultIconRow extends StatelessWidget {
+  const _DefaultIconRow({
+    required this.label,
+    required this.iconId,
+    required this.isFolder,
+    required this.onPicked,
+  });
+
+  final String label;
+  final String? iconId;
+  final bool isFolder;
+  final void Function(String? iconId, int? iconColor) onPicked;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = CupertinoDynamicColor.resolve(
+      CupertinoColors.tertiarySystemBackground,
+      context,
+    );
+    return GestureDetector(
+      onTap: () => showFolderIconPickerSheet(
+        context,
+        currentIconId: iconId,
+        isFolder: isFolder,
+        onSelected: onPicked,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: Center(
+                child: buildFolderItemIcon(iconId, isFolder: isFolder),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontSize: 17),
+              ),
+            ),
+            Icon(
+              CupertinoIcons.chevron_right,
+              size: 14,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ],
         ),
       ),
     );

@@ -207,6 +207,40 @@ class S {
   String get folderCounterDirect => t('folderCounterDirect');
   String get folderCounterRecursive => t('folderCounterRecursive');
   String get folderCounterHidden => t('folderCounterHidden');
+  String get checkboxStyle => t('checkboxStyle');
+  String get checkboxStyleRoundedRect => t('checkboxStyleRoundedRect');
+  String get checkboxStyleSharpRect => t('checkboxStyleSharpRect');
+  String get checkboxStyleCircle => t('checkboxStyleCircle');
+  String get firstDayOfWeek => t('firstDayOfWeek');
+  String get appBadge => t('appBadge');
+  String get appBadgeMode => t('appBadgeMode');
+  String get appBadgeHint => t('appBadgeHint');
+  String get appBadgeNone => t('appBadgeNone');
+  String get appBadgeTodayTasks => t('appBadgeTodayTasks');
+  String get appBadgeTodayTasksAndEvents => t('appBadgeTodayTasksAndEvents');
+  String get appBadgeInbox => t('appBadgeInbox');
+  String get appBadgeAllUncompleted => t('appBadgeAllUncompleted');
+  String get sectionDefaults => t('sectionDefaults');
+  String get defaultTaskIcon => t('defaultTaskIcon');
+  String get defaultListIcon => t('defaultListIcon');
+  String get defaultFolderIcon => t('defaultFolderIcon');
+  String get defaultNoteFolderIcon => t('defaultNoteFolderIcon');
+  String get textSize => t('textSize');
+  String get useSystemTextSize => t('useSystemTextSize');
+  String get textSizeHint => t('textSizeHint');
+  String get tabBarPages => t('tabBarPages');
+  String get tabBarPagesHint => t('tabBarPagesHint');
+  String get addPage => t('addPage');
+  String get removePageTitle => t('removePageTitle');
+  String get removePageBody => t('removePageBody');
+  String get addTab => t('addTab');
+  String get tabKindBuiltin => t('tabKindBuiltin');
+  String get tabKindShortcut => t('tabKindShortcut');
+  String get tabShortcutList => t('tabShortcutList');
+  String get tabShortcutFolder => t('tabShortcutFolder');
+  String get tabShortcutNoteFolder => t('tabShortcutNoteFolder');
+  String pageNumberLabel(int n) =>
+      t('pageNumberLabel').replaceFirst('{n}', n.toString());
   String get showListCount => t('showListCount');
   String get revert => t('revert');
   String get taskTrashedToast => t('taskTrashedToast');
@@ -588,6 +622,24 @@ List<String> weekdaysLong(BuildContext context) {
   return kWeekdaysLong[code] ?? kWeekdaysLong['en']!;
 }
 
+/// Reorders a Mon..Sun weekday list so [firstDayOfWeek] (1=Mon..7=Sun) is the
+/// first element. Used by the calendar header so the column order matches the
+/// user's preference.
+List<T> rotateWeekdays<T>(List<T> mondayFirst, int firstDayOfWeek) {
+  final shift = ((firstDayOfWeek - 1) % 7 + 7) % 7;
+  if (shift == 0) return mondayFirst;
+  return [...mondayFirst.sublist(shift), ...mondayFirst.sublist(0, shift)];
+}
+
+/// Column index (0..6) for a [DateTime] given [firstDayOfWeek] (1=Mon..7=Sun).
+/// E.g. firstDayOfWeek=1 (Mon): Mon→0, Sun→6. firstDayOfWeek=7 (Sun): Sun→0,
+/// Sat→6.
+int weekdayColumn(DateTime date, int firstDayOfWeek) {
+  final mondayIndex = date.weekday - 1; // 0=Mon..6=Sun
+  final shift = ((firstDayOfWeek - 1) % 7 + 7) % 7;
+  return (mondayIndex - shift + 7) % 7;
+}
+
 List<String> monthsShort(BuildContext context) {
   final code = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
   return kMonthsShort[code] ?? kMonthsShort['en']!;
@@ -691,6 +743,39 @@ const Map<String, String> _en = {
   'folderCounterDirect': 'Direct tasks only',
   'folderCounterRecursive': 'Include nested folders',
   'folderCounterHidden': 'Hidden',
+  'checkboxStyle': 'Checkbox style',
+  'checkboxStyleRoundedRect': 'Rounded square',
+  'checkboxStyleSharpRect': 'Square',
+  'checkboxStyleCircle': 'Circle',
+  'firstDayOfWeek': 'First day of week',
+  'appBadge': 'APP ICON BADGE',
+  'appBadgeMode': 'Show as badge',
+  'appBadgeHint': 'The number shown on the app icon on your home screen.',
+  'appBadgeNone': 'None',
+  'appBadgeTodayTasks': "Today's uncompleted tasks",
+  'appBadgeTodayTasksAndEvents': "Today's tasks + upcoming events",
+  'appBadgeInbox': 'Inbox uncompleted',
+  'appBadgeAllUncompleted': 'All uncompleted tasks',
+  'sectionDefaults': 'DEFAULTS',
+  'defaultTaskIcon': 'Default task icon',
+  'defaultListIcon': 'Default list icon',
+  'defaultFolderIcon': 'Default folder icon',
+  'defaultNoteFolderIcon': 'Default folder icon',
+  'textSize': 'Text size',
+  'useSystemTextSize': 'Use system text size',
+  'textSizeHint': 'Scales all text in the app. UI elements next to text grow with the chosen size.',
+  'tabBarPages': 'Tab Bar Pages',
+  'tabBarPagesHint': 'Add more pages to fit more than 5 tabs. Swipe horizontally on the tab bar to switch between pages.',
+  'addPage': 'Add page',
+  'removePageTitle': 'Remove page?',
+  'removePageBody': 'All tabs on this page will be removed too.',
+  'addTab': 'Add tab',
+  'tabKindBuiltin': 'Built-in tab',
+  'tabKindShortcut': 'Shortcut',
+  'tabShortcutList': 'List…',
+  'tabShortcutFolder': 'Folder…',
+  'tabShortcutNoteFolder': 'Note folder…',
+  'pageNumberLabel': 'PAGE {n}',
   'showListCount': 'List counter',
   'revert': 'Undo',
   'taskTrashedToast': 'Task moved to Trash',
