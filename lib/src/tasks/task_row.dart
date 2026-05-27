@@ -46,7 +46,6 @@ class TaskRow extends StatelessWidget {
     required this.onTap,
     this.showList = false,
     this.listColor,
-    this.isOverdue = false,
   });
 
   final Task task;
@@ -54,7 +53,17 @@ class TaskRow extends StatelessWidget {
   final VoidCallback onTap;
   final bool showList;
   final Color? listColor;
-  final bool isOverdue;
+
+  /// Returns true when the task's due date is in the past (strictly before
+  /// today) and it hasn't been completed yet. Completed tasks don't carry an
+  /// overdue badge even if their date is old.
+  bool _isOverdue() {
+    final due = task.dueDate;
+    if (due == null || task.isCompleted) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return DateTime(due.year, due.month, due.day).isBefore(today);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +71,7 @@ class TaskRow extends StatelessWidget {
     final dateLabel = dueDate != null
         ? formatTaskDateRelative(context, dueDate, doTime: task.doTime)
         : null;
+    final isOverdue = _isOverdue();
     final dateColor = isOverdue
         ? CupertinoColors.destructiveRed
         : CupertinoColors.secondaryLabel.resolveFrom(context);
