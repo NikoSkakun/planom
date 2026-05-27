@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Material;
 
 import '../theme/app_theme.dart';
 
@@ -272,6 +271,8 @@ class _NoteRowState extends State<NoteRow> {
     if (!widget.draggable) {
       return KeyedSubtree(key: _measureKey, child: _content(context));
     }
+    final content = _content(context);
+    final feedbackWidth = MediaQuery.sizeOf(context).width;
     return AnimatedSize(
       duration: const Duration(milliseconds: 160),
       curve: Curves.easeOut,
@@ -283,32 +284,12 @@ class _NoteRowState extends State<NoteRow> {
         onDragEnd: (_) => _onDragEnded(),
         onDraggableCanceled: (_, __) => _onDragEnded(),
         onDragCompleted: _onDragEnded,
-        feedback: Material(
-          color: const Color(0x00000000),
-          child: Container(
-            width: MediaQuery.sizeOf(context).width - 32,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A000000),
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Text(
-              note.title.isEmpty ? S.of(context).untitled : note.title,
-              style: const TextStyle(fontSize: 16),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
+        // Render the actual row as the drag feedback so the lifted
+        // card looks identical to the source row (icon, title, body
+        // preview) rather than a stripped-down title-only card.
+        feedback: buildReorderDragFeedback(context, feedbackWidth, content),
         childWhenDragging: const SizedBox.shrink(),
-        child: KeyedSubtree(key: _measureKey, child: _content(context)),
+        child: KeyedSubtree(key: _measureKey, child: content),
       ),
     );
   }

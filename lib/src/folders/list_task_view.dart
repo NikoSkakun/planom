@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Material;
 
 import '../contacts/contact_controller.dart';
 import '../contacts/contact_list_view.dart';
@@ -13,6 +12,7 @@ import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
 import '../theme/app_theme.dart';
+import '../utils/animated_task_list.dart';
 import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
@@ -499,12 +499,19 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
         // Top "no section" group — no header; tasks render directly.
         // Each task is wrapped in a DragTarget that, on drop, inserts the
         // dragged task immediately before it (within the same list+section).
-        for (final t in topTasks) {
-          children.add(_buildDraggableTask(
-            context,
-            t,
-            sectionId: null,
-            beforeId: t.id,
+        if (topTasks.isNotEmpty) {
+          children.add(AnimatedItemList<Task>(
+            key: const ValueKey('top-tasks'),
+            items: topTasks,
+            idOf: (t) => t.id,
+            itemBuilder: (ctx, task) => _buildDraggableTask(
+              ctx,
+              task,
+              sectionId: null,
+              beforeId: task.id,
+            ),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
           ));
         }
         // Trailing slot to drop at the end of the top group.
@@ -539,12 +546,19 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
                 widget.taskController.moveTaskToSection(taskId, section.id),
           ));
           if (!section.isCollapsed) {
-            for (final t in secTasks) {
-              children.add(_buildDraggableTask(
-                context,
-                t,
-                sectionId: section.id,
-                beforeId: t.id,
+            if (secTasks.isNotEmpty) {
+              children.add(AnimatedItemList<Task>(
+                key: ValueKey('section-${section.id}'),
+                items: secTasks,
+                idOf: (t) => t.id,
+                itemBuilder: (ctx, task) => _buildDraggableTask(
+                  ctx,
+                  task,
+                  sectionId: section.id,
+                  beforeId: task.id,
+                ),
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
               ));
             }
             // Trailing slot inside this section.
@@ -562,9 +576,14 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
                 setState(() => _completedExpanded = !_completedExpanded),
           ));
           if (_completedExpanded) {
-            for (final t in completed) {
-              children.add(_buildTaskRow(context, t));
-            }
+            children.add(AnimatedItemList<Task>(
+              key: const ValueKey('completed-tasks'),
+              items: completed,
+              idOf: (t) => t.id,
+              itemBuilder: (ctx, task) => _buildTaskRow(ctx, task),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+            ));
           }
         }
 
@@ -731,6 +750,7 @@ class _TaskReorderRowState extends State<_TaskReorderRow> {
 
   @override
   Widget build(BuildContext context) {
+    final feedbackWidth = MediaQuery.sizeOf(context).width;
     return AnimatedSize(
       duration: const Duration(milliseconds: 160),
       curve: Curves.easeOut,
@@ -742,30 +762,11 @@ class _TaskReorderRowState extends State<_TaskReorderRow> {
         onDragEnd: (_) => _onDragEnded(),
         onDraggableCanceled: (_, __) => _onDragEnded(),
         onDragCompleted: _onDragEnded,
-        feedback: Material(
-          color: const Color(0x00000000),
-          child: Container(
-            width: MediaQuery.sizeOf(context).width - 32,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A000000),
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Text(
-              widget.task.title,
-              style: const TextStyle(fontSize: 16),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
+        // Render the actual row as the drag feedback so the lifted
+        // card matches the source row exactly (checkbox, date, list
+        // chip, multi-line wrapping, …) instead of a stripped-down
+        // title-only placeholder.
+        feedback: buildReorderDragFeedback(context, feedbackWidth, widget.child),
         childWhenDragging: const SizedBox.shrink(),
         child: DragTarget<String>(
           onWillAcceptWithDetails: (d) => d.data != widget.task.id,

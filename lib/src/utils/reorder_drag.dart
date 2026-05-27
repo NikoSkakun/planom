@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Material;
+import 'package:flutter/material.dart' show Material, MaterialType;
 
 /// Typed payload for a long-press-reorder drag. Distinct payloads keep
 /// folder, list, and note drags from accidentally matching each other's
@@ -110,6 +110,7 @@ class _ReorderableRowState extends State<ReorderableRow> {
   @override
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
+    final width = MediaQuery.sizeOf(context).width;
     return AnimatedSize(
       duration: _kReorderAnim,
       curve: _kReorderCurve,
@@ -121,40 +122,50 @@ class _ReorderableRowState extends State<ReorderableRow> {
         onDragEnd: (_) => _onDragEnded(),
         onDraggableCanceled: (_, __) => _onDragEnded(),
         onDragCompleted: _onDragEnded,
-        feedback: Material(
-          color: const Color(0x00000000),
-          child: Container(
-            width: MediaQuery.sizeOf(context).width - 32,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A000000),
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Text(
-              widget.label.isEmpty ? '—' : widget.label,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-        // Collapsing the original slot to zero (rather than just fading it)
-        // makes the visual reorganization match what the user sees in the
-        // platform Reminders/Files app: the row "leaves" and everything
-        // else shifts to fill the gap.
+        // Render the row itself as the drag feedback so the lifted card
+        // looks identical to the row it came from (same icon, count,
+        // chevron, spacing). The original slot still collapses to zero
+        // beneath it so the list closes the gap.
+        feedback: _dragFeedback(context, width, widget.child),
         childWhenDragging: const SizedBox.shrink(),
         child: KeyedSubtree(key: _measureKey, child: widget.child),
       ),
     );
   }
+}
+
+/// Shared lifted-card scaffolding for reorder drag feedback widgets.
+/// Wraps [child] in a Material layer (required because drags render in
+/// the root overlay) with the system background and a soft shadow so the
+/// row reads as picked up while staying visually identical to the source.
+Widget _dragFeedback(BuildContext context, double width, Widget child) {
+  return Material(
+    type: MaterialType.transparency,
+    child: SizedBox(
+      width: width,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemBackground.resolveFrom(context),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1A000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
+
+/// Public version of [_dragFeedback] for use by other reorder sites
+/// (task rows, note rows) so the lifted visual stays consistent
+/// app-wide.
+Widget buildReorderDragFeedback(
+    BuildContext context, double width, Widget child) {
+  return _dragFeedback(context, width, child);
 }
 
 /// DragTarget paired with [ReorderableRow]: when the user drops onto this
@@ -211,10 +222,11 @@ class ReorderableDropZone extends StatelessWidget {
 }
 
 /// Trailing slot at the end of a reorderable list — accepts a drop and
-/// places the dropped row at the end. Renders empty when nothing is
-/// hovering; on hover, expands to the dragged row's full height (so the
-/// user sees the same blank space they'd see if they dropped above any
-/// other row).
+/// places the dropped row at the end. Collapses to zero height when idle
+/// so the list flows continuously into whatever follows it (a divider,
+/// the next section); on hover, expands to the dragged row's full height
+/// so the user sees the same blank space they'd see if they dropped
+/// above any other row.
 class ReorderableTrailingSlot extends StatelessWidget {
   const ReorderableTrailingSlot({
     super.key,
@@ -235,19 +247,26 @@ class ReorderableTrailingSlot extends StatelessWidget {
           animation: ReorderDragNotifier.instance,
           builder: (context, _) {
             final hovering = candidates.isNotEmpty;
-            final placeholder = hovering
-                ? ReorderDragNotifier.instance.draggingHeight
-                : 0.0;
-            // The hit area needs to stay non-trivial even at rest, so the
-            // user can land a drop at the very end without aiming at the
-            // last row. 16 px is enough to feel forgiving without leaving
-            // a visible gap.
+            // Only takes up vertical space while a matching drag is
+            // actually in flight, so the list flows continuously into
+            // whatever follows it (a divider, the next section) when
+            // the user is just browsing.
+            final dragging = ReorderDragNotifier.instance.isDragging &&
+                ReorderDragNotifier.instance.draggingKind == kind;
+            final double height;
+            if (hovering) {
+              height = ReorderDragNotifier.instance.draggingHeight;
+            } else if (dragging) {
+              height = 16;
+            } else {
+              height = 0;
+            }
             return AnimatedSize(
               duration: _kReorderAnim,
               curve: _kReorderCurve,
               alignment: Alignment.topCenter,
               child: SizedBox(
-                height: hovering ? placeholder : 16,
+                height: height,
                 width: double.infinity,
               ),
             );
