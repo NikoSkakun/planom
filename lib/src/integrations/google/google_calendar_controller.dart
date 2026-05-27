@@ -43,6 +43,8 @@ class GoogleCalendarController with ChangeNotifier {
   static const _kSelected = 'gcal_selected_calendar_ids';
   static const _kDefault = 'gcal_default_calendar_id';
   static const _kLastSyncAt = 'gcal_last_sync_at';
+  static const _kLoadedFrom = 'gcal_loaded_from';
+  static const _kLoadedTo = 'gcal_loaded_to';
   static const _syncTokenPrefix = 'gcal_synctoken_';
 
   /// The complete set of `app_settings` keys this controller owns. Used by
@@ -52,6 +54,8 @@ class GoogleCalendarController with ChangeNotifier {
         _kSelected,
         _kDefault,
         _kLastSyncAt,
+        _kLoadedFrom,
+        _kLoadedTo,
         for (final id in calendarIds) _syncTokenPrefix + id,
       };
 
@@ -62,6 +66,8 @@ class GoogleCalendarController with ChangeNotifier {
       key == _kSelected ||
       key == _kDefault ||
       key == _kLastSyncAt ||
+      key == _kLoadedFrom ||
+      key == _kLoadedTo ||
       key.startsWith(_syncTokenPrefix);
 
   // ── In-memory state ───────────────────────────────────────────────────
@@ -101,6 +107,18 @@ class GoogleCalendarController with ChangeNotifier {
 
   DateTime? _lastSyncAt;
   DateTime? get lastSyncAt => _lastSyncAt;
+
+  /// The time window we've actually fetched events for. Grows outward as the
+  /// user scrolls the calendar — see [ensureRangeLoaded]. Persisted so the
+  /// next launch knows what's already in the cache.
+  DateTime? _loadedFrom;
+  DateTime? _loadedTo;
+  DateTime? get loadedFrom => _loadedFrom;
+  DateTime? get loadedTo => _loadedTo;
+
+  /// Serializes overlapping [ensureRangeLoaded] calls so rapid scroll events
+  /// don't trigger duplicate network requests for the same range.
+  Future<void>? _pendingRangeFetch;
 
   /// All remote events currently held in memory, across every selected
   /// calendar. The day-cell / day-sheet lookups filter from this.
@@ -158,6 +176,12 @@ class GoogleCalendarController with ChangeNotifier {
         case _kLastSyncAt:
           final ms = int.tryParse(value);
           if (ms != null) _lastSyncAt = DateTime.fromMillisecondsSinceEpoch(ms);
+        case _kLoadedFrom:
+          final ms = int.tryParse(value);
+          if (ms != null) _loadedFrom = DateTime.fromMillisecondsSinceEpoch(ms);
+        case _kLoadedTo:
+          final ms = int.tryParse(value);
+          if (ms != null) _loadedTo = DateTime.fromMillisecondsSinceEpoch(ms);
       }
     }
   }
@@ -230,10 +254,14 @@ class GoogleCalendarController with ChangeNotifier {
       _selectedCalendarIds = const {};
       _defaultCalendarId = null;
       _lastSyncAt = null;
+      _loadedFrom = null;
+      _loadedTo = null;
       await _db.setAppSetting(_kEmail, '');
       await _db.setAppSetting(_kSelected, '[]');
       await _db.setAppSetting(_kDefault, '');
       await _db.setAppSetting(_kLastSyncAt, '');
+      await _db.setAppSetting(_kLoadedFrom, '');
+      await _db.setAppSetting(_kLoadedTo, '');
       await _cache.clear();
       notifyListeners();
     } finally {
@@ -255,11 +283,21 @@ class GoogleCalendarController with ChangeNotifier {
   }
 
   Future<void> setSelectedCalendars(Set<String> ids) async {
+    final added = ids.difference(_selectedCalendarIds);
     _selectedCalendarIds = ids;
     await _db.setAppSetting(_kSelected, jsonEncode(ids.toList()));
     // Drop cached events for newly-deselected calendars so the UI updates
     // immediately without waiting for the next refresh.
     _events = _events.where((e) => ids.contains(e.calendarId)).toList();
+    if (added.isNotEmpty) {
+      // Newly-added calendars have no events in the loaded range yet. Reset
+      // so the next refresh + future ensureRangeLoaded calls re-fetch the
+      // window for every selected calendar, not just the new ones.
+      _loadedFrom = null;
+      _loadedTo = null;
+      await _db.setAppSetting(_kLoadedFrom, '');
+      await _db.setAppSetting(_kLoadedTo, '');
+    }
     await _cache.write(_events);
     notifyListeners();
     unawaited(refresh());
@@ -273,11 +311,12 @@ class GoogleCalendarController with ChangeNotifier {
 
   // ── Refresh ───────────────────────────────────────────────────────────
 
-  /// Default refresh window: 6 months back, 18 months forward. Calendar
-  /// view scrolls outside this only for distant history; users in that
-  /// region can pull-to-refresh which expands the window on demand.
-  static const _defaultPastDays = 6 * 30;
-  static const _defaultFutureDays = 18 * 30;
+  /// Default refresh window. Sized to cover the most-visited region of the
+  /// calendar without pulling tens of thousands of events on busy accounts.
+  /// Anything outside this window is fetched lazily on scroll via
+  /// [ensureRangeLoaded].
+  static const _defaultPastDays = 365;
+  static const _defaultFutureDays = 365;
 
   Future<void> refresh({DateTime? from, DateTime? to}) async {
     if (!isConnected) return;
@@ -294,8 +333,12 @@ class GoogleCalendarController with ChangeNotifier {
           to ?? now.add(const Duration(days: _defaultFutureDays));
 
       final keepIds = _selectedCalendarIds;
-      // Events from non-selected calendars get dropped here.
-      final next = <RemoteEvent>[];
+      // Merge events by id so previously-fetched ranges (from
+      // [ensureRangeLoaded]) survive a refresh.
+      final byId = <String, RemoteEvent>{
+        for (final e in _events)
+          if (keepIds.contains(e.calendarId)) e.googleEventId: e,
+      };
       for (final cal in _availableCalendars) {
         if (!keepIds.contains(cal.id)) continue;
         final token = await _readSyncToken(cal.id);
@@ -313,30 +356,20 @@ class GoogleCalendarController with ChangeNotifier {
             timeMax: timeMax,
           );
         }
-        if (token != null && !result.tokenInvalid) {
-          // Incremental: merge deltas with existing events for this calendar.
-          final keep = _events.where((e) => e.calendarId != cal.id).toList();
-          final byId = <String, RemoteEvent>{
-            for (final e in _events.where((e) => e.calendarId == cal.id))
-              e.googleEventId: e,
-          };
-          for (final delta in result.events) {
-            byId[delta.googleEventId] = delta;
-          }
-          next.addAll(keep.where((e) => e.calendarId == cal.id));
-          next.addAll(byId.values);
-        } else {
-          next.addAll(result.events);
+        for (final ev in result.events) {
+          byId[ev.googleEventId] = ev;
         }
         await _writeSyncToken(cal.id, result.nextSyncToken);
       }
 
-      _events = next;
+      _events = byId.values.toList();
+      _expandLoadedRange(timeMin, timeMax);
       _lastSyncAt = DateTime.now();
       await _db.setAppSetting(
         _kLastSyncAt,
         _lastSyncAt!.millisecondsSinceEpoch.toString(),
       );
+      await _persistLoadedRange();
       await _cache.write(_events);
       notifyListeners();
     } catch (e, st) {
@@ -344,6 +377,127 @@ class GoogleCalendarController with ChangeNotifier {
       _lastError = e.toString();
     } finally {
       _setLoading(false);
+    }
+  }
+
+  /// Ensures every event in the [from, to] window is present in memory.
+  /// No-op if the requested range is already covered. Otherwise fetches the
+  /// missing slice(s) for each selected calendar and merges them into
+  /// [_events]. Called by the calendar view as the user scrolls to months
+  /// outside the default refresh window.
+  ///
+  /// Historical/distant ranges fetched this way are snapshots — they don't
+  /// get incremental sync-token updates. A subsequent [refresh] only updates
+  /// the rolling default window.
+  Future<void> ensureRangeLoaded(DateTime from, DateTime to) async {
+    if (!isConnected) return;
+    // Round to month boundaries so consecutive scroll events for the same
+    // month don't keep firing fetches.
+    final wantFrom = DateTime(from.year, from.month, 1);
+    final wantTo = DateTime(to.year, to.month + 1, 1);
+
+    if (_rangeCovers(wantFrom, wantTo)) return;
+
+    // Coalesce: if a fetch is already in flight, wait for it. After it
+    // completes, the range may already be covered.
+    if (_pendingRangeFetch != null) {
+      try {
+        await _pendingRangeFetch;
+      } catch (_) {
+        // Errors are logged inside _doRangeFetch.
+      }
+      if (_rangeCovers(wantFrom, wantTo)) return;
+    }
+
+    final fetch = _doRangeFetch(wantFrom, wantTo);
+    _pendingRangeFetch = fetch;
+    try {
+      await fetch;
+    } finally {
+      if (identical(_pendingRangeFetch, fetch)) {
+        _pendingRangeFetch = null;
+      }
+    }
+  }
+
+  bool _rangeCovers(DateTime from, DateTime to) {
+    final lf = _loadedFrom;
+    final lt = _loadedTo;
+    if (lf == null || lt == null) return false;
+    return !from.isBefore(lf) && !to.isAfter(lt);
+  }
+
+  Future<void> _doRangeFetch(DateTime wantFrom, DateTime wantTo) async {
+    // Compute the gaps to fetch: at most one slice on each side of the
+    // existing loaded range.
+    final slices = <List<DateTime>>[];
+    if (_loadedFrom == null || _loadedTo == null) {
+      slices.add([wantFrom, wantTo]);
+    } else {
+      if (wantFrom.isBefore(_loadedFrom!)) {
+        slices.add([wantFrom, _loadedFrom!]);
+      }
+      if (wantTo.isAfter(_loadedTo!)) {
+        slices.add([_loadedTo!, wantTo]);
+      }
+    }
+    if (slices.isEmpty) return;
+
+    _setLoading(true);
+    try {
+      final byId = <String, RemoteEvent>{
+        for (final e in _events) e.googleEventId: e,
+      };
+      for (final cal in _availableCalendars) {
+        if (!_selectedCalendarIds.contains(cal.id)) continue;
+        for (final slice in slices) {
+          try {
+            // No sync token here: this is a one-shot expansion fetch, not an
+            // incremental refresh.
+            final result = await _api.listEvents(
+              calendar: cal,
+              timeMin: slice[0],
+              timeMax: slice[1],
+            );
+            for (final ev in result.events) {
+              byId[ev.googleEventId] = ev;
+            }
+          } catch (e) {
+            debugPrint(
+              'ensureRangeLoaded ${cal.id} ${slice[0]}..${slice[1]} failed: $e',
+            );
+            _lastError = e.toString();
+          }
+        }
+      }
+
+      _events = byId.values.toList();
+      _expandLoadedRange(wantFrom, wantTo);
+      await _persistLoadedRange();
+      await _cache.write(_events);
+      notifyListeners();
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  void _expandLoadedRange(DateTime from, DateTime to) {
+    if (_loadedFrom == null || from.isBefore(_loadedFrom!)) _loadedFrom = from;
+    if (_loadedTo == null || to.isAfter(_loadedTo!)) _loadedTo = to;
+  }
+
+  Future<void> _persistLoadedRange() async {
+    if (_loadedFrom != null) {
+      await _db.setAppSetting(
+        _kLoadedFrom,
+        _loadedFrom!.millisecondsSinceEpoch.toString(),
+      );
+    }
+    if (_loadedTo != null) {
+      await _db.setAppSetting(
+        _kLoadedTo,
+        _loadedTo!.millisecondsSinceEpoch.toString(),
+      );
     }
   }
 

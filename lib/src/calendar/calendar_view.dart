@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
@@ -67,6 +69,12 @@ class _CalendarViewState extends State<CalendarView>
   late final ScrollController _scrollCtrl;
   final _centerKey = GlobalKey();
   late int _visibleYear;
+  int _visibleMonthEpoch = 0;
+  Timer? _prefetchDebounce;
+
+  /// Months on either side of the visible month we eagerly pull from Google.
+  /// Sized so a fast scroll has data ready by the time the cells appear.
+  static const _prefetchBufferMonths = 3;
 
   @override
   void initState() {
@@ -74,9 +82,15 @@ class _CalendarViewState extends State<CalendarView>
     _now = DateTime.now();
     _currentMonth = DateTime(_now.year, _now.month, 1);
     _visibleYear = _now.year;
+    _visibleMonthEpoch = _now.year * 12 + _now.month - 1;
     _scrollCtrl = ScrollController();
     _scrollCtrl.addListener(_onScroll);
     widget.resetSignal.addListener(_scrollToCurrentMonth);
+    // Pre-warm Google Calendar around the current month so the user sees
+    // events immediately when they open the tab.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestPrefetch(_visibleMonthEpoch);
+    });
   }
 
   @override
@@ -84,6 +98,7 @@ class _CalendarViewState extends State<CalendarView>
     widget.resetSignal.removeListener(_scrollToCurrentMonth);
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
+    _prefetchDebounce?.cancel();
     super.dispose();
   }
 
@@ -93,6 +108,27 @@ class _CalendarViewState extends State<CalendarView>
     final epochMonths = _now.year * 12 + _now.month - 1 + monthsFromNow;
     final year = epochMonths ~/ 12;
     if (year != _visibleYear) setState(() => _visibleYear = year);
+    if (epochMonths != _visibleMonthEpoch) {
+      _visibleMonthEpoch = epochMonths;
+      _requestPrefetch(epochMonths);
+    }
+  }
+
+  /// Asks the Google Calendar controller to make sure events around
+  /// [centerMonthEpoch] are loaded. Debounced so a flick-scroll doesn't fire
+  /// dozens of fetches; the trailing call wins.
+  void _requestPrefetch(int centerMonthEpoch) {
+    final gcal = widget.googleCalendarController;
+    if (gcal == null || !gcal.isConnected) return;
+    _prefetchDebounce?.cancel();
+    _prefetchDebounce = Timer(const Duration(milliseconds: 250), () {
+      final startEpoch = centerMonthEpoch - _prefetchBufferMonths;
+      final endEpoch = centerMonthEpoch + _prefetchBufferMonths;
+      final from = DateTime(startEpoch ~/ 12, startEpoch % 12 + 1, 1);
+      final to = DateTime(endEpoch ~/ 12, endEpoch % 12 + 1 + 1, 1);
+      // Fire and forget; the controller notifies listeners after merging.
+      unawaited(gcal.ensureRangeLoaded(from, to));
+    });
   }
 
   void _scrollToCurrentMonth() {
