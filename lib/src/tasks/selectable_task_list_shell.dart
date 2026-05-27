@@ -4,6 +4,7 @@ import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../localization/strings.dart';
 import '../models/task.dart';
+import '../utils/animated_task_list.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
@@ -292,12 +293,11 @@ class _SelectableTaskListShellState extends State<SelectableTaskListShell>
                                   color: CupertinoColors.secondaryLabel),
                             ),
                           )
-                        : ListView.builder(
-                            itemCount: tasks.length,
-                            itemBuilder: (context, i) {
-                              final task = tasks[i];
-                              return _buildTaskItem(context, task);
-                            },
+                        : AnimatedItemList<Task>(
+                            items: tasks,
+                            idOf: (t) => t.id,
+                            itemBuilder: (context, task) =>
+                                _buildTaskItem(context, task),
                           ),
                   ),
                   if (selecting)
