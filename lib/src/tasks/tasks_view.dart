@@ -21,6 +21,7 @@ import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
+import '../utils/plus_button_inset_scope.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
 import '../utils/reorder_drag.dart';
@@ -396,7 +397,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
         final allSelected = allIds.isNotEmpty &&
             _selection.selectedIds.containsAll(allIds) &&
             _selection.count >= allIds.length;
-        return CupertinoPageScaffold(
+        return PlusButtonLift(
+          lift: selecting ? kSelectionToolbarLift : 0,
+          child: CupertinoPageScaffold(
           navigationBar: CupertinoNavigationBar(
         border: null,
         leading: selecting
@@ -921,6 +924,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
           ],
         ),
       ),
+        ),
         );
       },
     );

@@ -5,6 +5,7 @@ import '../folders/list_picker_sheet.dart';
 import '../localization/strings.dart';
 import '../models/task.dart';
 import '../utils/fast_route.dart';
+import '../utils/plus_button_inset_scope.dart';
 import '../utils/selection_checkbox.dart';
 import '../utils/selection_controller.dart';
 import '../utils/selection_menu.dart';
@@ -224,65 +225,68 @@ class _SelectableTaskListShellState extends State<SelectableTaskListShell> {
         final allSelected = allIds.isNotEmpty &&
             _selection.selectedIds.containsAll(allIds) &&
             _selection.count >= allIds.length;
-        return CupertinoPageScaffold(
-          navigationBar: CupertinoNavigationBar(
-            border: null,
-            leading: selecting
-                ? CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: _selection.cancel,
-                    child: Text(s.cancel),
-                  )
-                : null,
-            automaticallyImplyLeading: !selecting,
-            middle: Text(selecting
-                ? (_selection.count == 0
-                    ? s.selectItems
-                    : s.selectedCount(_selection.count))
-                : widget.title),
-            trailing: tasks.isEmpty
-                ? null
-                : selecting
-                    ? CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: () => _toggleSelectAll(tasks),
-                        child:
-                            Text(allSelected ? s.deselectAll : s.selectAll),
-                      )
-                    : CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: _selection.start,
-                        child: Text(s.select),
-                      ),
-          ),
-          child: SafeArea(
-            bottom: !selecting,
-            child: Column(
-              children: [
-                if (widget.beforeContent != null) widget.beforeContent!,
-                Expanded(
-                  child: tasks.isEmpty
-                      ? Center(
-                          child: Text(
-                            widget.emptyText ?? s.noTasks,
-                            style: const TextStyle(
-                                color: CupertinoColors.secondaryLabel),
-                          ),
+        return PlusButtonLift(
+          lift: selecting ? kSelectionToolbarLift : 0,
+          child: CupertinoPageScaffold(
+            navigationBar: CupertinoNavigationBar(
+              border: null,
+              leading: selecting
+                  ? CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: _selection.cancel,
+                      child: Text(s.cancel),
+                    )
+                  : null,
+              automaticallyImplyLeading: !selecting,
+              middle: Text(selecting
+                  ? (_selection.count == 0
+                      ? s.selectItems
+                      : s.selectedCount(_selection.count))
+                  : widget.title),
+              trailing: tasks.isEmpty
+                  ? null
+                  : selecting
+                      ? CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          onPressed: () => _toggleSelectAll(tasks),
+                          child:
+                              Text(allSelected ? s.deselectAll : s.selectAll),
                         )
-                      : ListView.builder(
-                          itemCount: tasks.length,
-                          itemBuilder: (context, i) {
-                            final task = tasks[i];
-                            return _buildTaskItem(context, task);
-                          },
+                      : CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          onPressed: _selection.start,
+                          child: Text(s.select),
                         ),
-                ),
-                if (selecting)
-                  SelectionToolbar(
-                    bottomInset: MediaQuery.paddingOf(context).bottom,
-                    actions: _batchActions(s),
+            ),
+            child: SafeArea(
+              bottom: !selecting,
+              child: Column(
+                children: [
+                  if (widget.beforeContent != null) widget.beforeContent!,
+                  Expanded(
+                    child: tasks.isEmpty
+                        ? Center(
+                            child: Text(
+                              widget.emptyText ?? s.noTasks,
+                              style: const TextStyle(
+                                  color: CupertinoColors.secondaryLabel),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: tasks.length,
+                            itemBuilder: (context, i) {
+                              final task = tasks[i];
+                              return _buildTaskItem(context, task);
+                            },
+                          ),
                   ),
-              ],
+                  if (selecting)
+                    SelectionToolbar(
+                      bottomInset: MediaQuery.paddingOf(context).bottom,
+                      actions: _batchActions(s),
+                    ),
+                ],
+              ),
             ),
           ),
         );

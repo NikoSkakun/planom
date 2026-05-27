@@ -8,6 +8,7 @@ import '../localization/strings.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 import '../utils/plus_drag_payload.dart';
+import '../utils/reorder_drag.dart';
 
 List<InlineSpan> _parseInlineMarkdown(String text, TextStyle base) {
   final spans = <InlineSpan>[];
@@ -160,7 +161,7 @@ class NoteFolderRow extends StatelessWidget {
   }
 }
 
-class NoteRow extends StatelessWidget {
+class NoteRow extends StatefulWidget {
   const NoteRow({
     super.key,
     required this.note,
@@ -176,11 +177,47 @@ class NoteRow extends StatelessWidget {
   // so the user can drop it on a NoteFolderRow to re-parent the note.
   final bool draggable;
 
+  @override
+  State<NoteRow> createState() => _NoteRowState();
+}
+
+class _NoteRowState extends State<NoteRow> {
+  final GlobalKey _measureKey = GlobalKey();
+
+  double _measureHeight() {
+    final ctx = _measureKey.currentContext;
+    final renderObject = ctx?.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      return renderObject.size.height;
+    }
+    return 56;
+  }
+
+  void _onDragStarted() {
+    ReorderDragNotifier.instance
+        .start(widget.note.id, 'note', _measureHeight());
+  }
+
+  void _onDragEnded() {
+    ReorderDragNotifier.instance.end();
+  }
+
+  @override
+  void dispose() {
+    if (ReorderDragNotifier.instance.draggingId == widget.note.id) {
+      ReorderDragNotifier.instance.end();
+    }
+    super.dispose();
+  }
+
+  Note get note => widget.note;
+  double get indent => widget.indent;
+
   Widget _content(BuildContext context) {
     final hasBody = note.content.isNotEmpty;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Padding(
         padding: EdgeInsets.fromLTRB(16 + indent, 9, 16, 9),
         child: Row(
@@ -232,36 +269,47 @@ class NoteRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!draggable) return _content(context);
-    return LongPressDraggable<NoteDragData>(
-      data: NoteDragData(note.id),
-      delay: const Duration(milliseconds: 400),
-      feedback: Material(
-        color: const Color(0x00000000),
-        child: Container(
-          width: MediaQuery.sizeOf(context).width - 32,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemBackground.resolveFrom(context),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1A000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Text(
-            note.title.isEmpty ? S.of(context).untitled : note.title,
-            style: const TextStyle(fontSize: 16),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+    if (!widget.draggable) {
+      return KeyedSubtree(key: _measureKey, child: _content(context));
+    }
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOut,
+      alignment: Alignment.topCenter,
+      child: LongPressDraggable<NoteDragData>(
+        data: NoteDragData(note.id),
+        delay: const Duration(milliseconds: 400),
+        onDragStarted: _onDragStarted,
+        onDragEnd: (_) => _onDragEnded(),
+        onDraggableCanceled: (_, __) => _onDragEnded(),
+        onDragCompleted: _onDragEnded,
+        feedback: Material(
+          color: const Color(0x00000000),
+          child: Container(
+            width: MediaQuery.sizeOf(context).width - 32,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground.resolveFrom(context),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x1A000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Text(
+              note.title.isEmpty ? S.of(context).untitled : note.title,
+              style: const TextStyle(fontSize: 16),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
+        childWhenDragging: const SizedBox.shrink(),
+        child: KeyedSubtree(key: _measureKey, child: _content(context)),
       ),
-      childWhenDragging: Opacity(opacity: 0.3, child: _content(context)),
-      child: _content(context),
     );
   }
 }

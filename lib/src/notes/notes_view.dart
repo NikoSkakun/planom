@@ -711,63 +711,72 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
                                 }
                               },
                               builder: (context, candidates, _) {
-                                final hovering = candidates.isNotEmpty;
-                                return Stack(
-                                  children: [
-                                    Dismissible(
-                                      key: ValueKey(n.id),
-                                      direction:
-                                          DismissDirection.endToStart,
-                                      background:
-                                          const NoteDeleteBackground(),
-                                      onDismissed: (_) {
-                                        final savedFolderId = n.folderId;
-                                        widget.controller.deleteNote(n.id);
-                                        UndoScope.maybeOf(context)?.show(
-                                          label: S
-                                              .of(context)
-                                              .noteTrashedToast,
-                                          onUndo: () => widget.controller
-                                              .restoreNote(
-                                                  n.id, savedFolderId),
-                                        );
-                                      },
-                                      child: _wrapNoteForSelection(
-                                        n,
-                                        NoteRow(
-                                          note: n,
-                                          onTap: () =>
-                                              Navigator.of(context).push(
-                                            FastRoute<void>(
-                                              settings: const RouteSettings(
-                                                  name: NoteDetailView
-                                                      .routeName),
-                                              builder: (_) =>
-                                                  NoteDetailView(
-                                                note: n,
-                                                controller:
-                                                    widget.controller,
+                                return AnimatedBuilder(
+                                  animation: ReorderDragNotifier.instance,
+                                  builder: (context, _) {
+                                    final hovering = candidates.isNotEmpty;
+                                    final placeholder = hovering
+                                        ? ReorderDragNotifier
+                                            .instance.draggingHeight
+                                        : 0.0;
+                                    return Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        AnimatedSize(
+                                          duration: const Duration(
+                                              milliseconds: 160),
+                                          curve: Curves.easeOut,
+                                          alignment: Alignment.topCenter,
+                                          child: SizedBox(
+                                            height: placeholder,
+                                            width: double.infinity,
+                                          ),
+                                        ),
+                                        Dismissible(
+                                          key: ValueKey(n.id),
+                                          direction:
+                                              DismissDirection.endToStart,
+                                          background:
+                                              const NoteDeleteBackground(),
+                                          onDismissed: (_) {
+                                            final savedFolderId = n.folderId;
+                                            widget.controller
+                                                .deleteNote(n.id);
+                                            UndoScope.maybeOf(context)?.show(
+                                              label: S
+                                                  .of(context)
+                                                  .noteTrashedToast,
+                                              onUndo: () => widget.controller
+                                                  .restoreNote(
+                                                      n.id, savedFolderId),
+                                            );
+                                          },
+                                          child: _wrapNoteForSelection(
+                                            n,
+                                            NoteRow(
+                                              note: n,
+                                              onTap: () =>
+                                                  Navigator.of(context).push(
+                                                FastRoute<void>(
+                                                  settings:
+                                                      const RouteSettings(
+                                                          name:
+                                                              NoteDetailView
+                                                                  .routeName),
+                                                  builder: (_) =>
+                                                      NoteDetailView(
+                                                    note: n,
+                                                    controller:
+                                                        widget.controller,
+                                                  ),
+                                                ),
                                               ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                    if (hovering)
-                                      Positioned(
-                                        top: 0,
-                                        left: 16,
-                                        right: 16,
-                                        child: Container(
-                                          height: 2,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.accent,
-                                            borderRadius:
-                                                BorderRadius.circular(1),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                                      ],
+                                    );
+                                  },
                                 );
                               },
                             );

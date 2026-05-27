@@ -2,6 +2,12 @@ import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
 
+/// Approximate visible height of a [SelectionToolbar], excluding any safe-
+/// area bottom inset the toolbar adds for itself. Use this when computing
+/// how much to lift other bottom-anchored UI (e.g. the floating "+" button)
+/// out of the way while selection mode is active.
+const double kSelectionToolbarLift = 60;
+
 /// A single batch action shown in [SelectionToolbar].
 class SelectionAction {
   const SelectionAction({
