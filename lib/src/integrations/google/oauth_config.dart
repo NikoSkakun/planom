@@ -18,7 +18,8 @@
 //      with the Android OAuth client.
 
 /// iOS Google OAuth 2.0 client ID. Format: `<digits>-<hash>.apps.googleusercontent.com`.
-const String kGoogleIosClientId = '';
+const String kGoogleIosClientId =
+    '264060209270-4l2qk3d1k4ehkmtg8iikjme28590ihp3.apps.googleusercontent.com';
 
 /// Android Google OAuth 2.0 client ID. The `google_sign_in` plugin discovers
 /// this automatically from the SHA-1 fingerprint you register, so leaving
