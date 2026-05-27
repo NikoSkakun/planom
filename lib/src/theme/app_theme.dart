@@ -25,6 +25,23 @@ class AppDurations {
 
   /// Standard page-transition / animation duration used across the app.
   static const Duration transition = Duration(milliseconds: 180);
+
+  /// Multiplier applied to scaled durations. 1.0 = normal, < 1 = faster,
+  /// > 1 = slower, 0 = disabled. Updated by [SettingsController] when the
+  /// user changes the Animation Speed setting. The matching `timeDilation`
+  /// is applied at the same time so AnimationController-driven animations
+  /// (page transitions, AnimatedSize, etc.) honour the same scale.
+  static double scale = 1.0;
+
+  /// Scales [base] by [scale]. Returns [Duration.zero] when animations are
+  /// disabled. Use in places where the duration is consumed outside the
+  /// AnimationController pipeline (e.g. `Future.delayed` for hover timers).
+  /// Tickers already respect `timeDilation` directly, so most call sites
+  /// can keep their existing literal durations.
+  static Duration scaled(Duration base) {
+    if (scale == 0) return Duration.zero;
+    return Duration(microseconds: (base.inMicroseconds * scale).round());
+  }
 }
 
 /// Mutable defaults applied to newly created entities when the user hasn't

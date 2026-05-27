@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:google_fonts/google_fonts.dart';
 
 import '../database/database_service.dart';
@@ -13,6 +14,47 @@ import 'tab_bar_config.dart';
 /// Sentinel [SettingsController.defaultTab] value: open whichever tab was last
 /// open when the app was closed, rather than a fixed tab.
 const String kLastOpenedTab = 'last';
+
+/// Global speed multiplier applied to every animation in the app.
+///
+/// Implemented on top of Flutter's `timeDilation` global (which scales the
+/// time delivered to every Ticker), so AnimationController-driven widgets
+/// — page transitions, AnimatedSize, AnimatedSwitcher, AnimatedList,
+/// scroll physics, drag visuals — all respond without per-call-site
+/// plumbing. The matching numeric scale is mirrored to
+/// [AppDurations.scale] for the rare callers that build a Duration
+/// outside the ticker pipeline (e.g. `Future.delayed`).
+enum AnimationSpeed {
+  /// Transitions are instant: no animation frames at all.
+  off,
+
+  /// Half the normal duration — animations feel "snappy".
+  fast,
+
+  /// Stock duration; matches the app's design timing.
+  normal,
+
+  /// 2× the normal duration — useful for demos and screen recordings.
+  slow,
+}
+
+/// Numeric multiplier for an [AnimationSpeed]. Smaller = faster. The
+/// `off` case maps to a sentinel near-zero scale instead of literal zero
+/// because `timeDilation = 0` divides by zero inside the scheduler; the
+/// chosen value is small enough that every frame appears to traverse the
+/// full animation timeline.
+double animationSpeedScale(AnimationSpeed s) {
+  switch (s) {
+    case AnimationSpeed.off:
+      return 0.0001;
+    case AnimationSpeed.fast:
+      return 0.5;
+    case AnimationSpeed.normal:
+      return 1.0;
+    case AnimationSpeed.slow:
+      return 2.0;
+  }
+}
 
 /// What the app icon badge counts. Only the current space's data feeds in.
 enum BadgeMode {
@@ -67,6 +109,9 @@ class SettingsController with ChangeNotifier {
 
   BadgeMode _badgeMode = BadgeMode.todayTasks;
   BadgeMode get badgeMode => _badgeMode;
+
+  AnimationSpeed _animationSpeed = AnimationSpeed.normal;
+  AnimationSpeed get animationSpeed => _animationSpeed;
 
   // App-wide font/UI scale.
   //
@@ -201,6 +246,8 @@ class SettingsController with ChangeNotifier {
         if (v != null && v >= 1 && v <= 7) _firstDayOfWeek = v;
       } else if (key == 'badge_mode') {
         _badgeMode = _decodeBadgeMode(value);
+      } else if (key == 'animation_speed') {
+        _animationSpeed = _decodeAnimationSpeed(value);
       } else if (key == 'default_task_icon') {
         if (value.isNotEmpty) _defaultTaskIcon = value;
       } else if (key == 'default_list_icon') {
@@ -231,6 +278,7 @@ class SettingsController with ChangeNotifier {
     AppDefaults.folderIcon = _defaultFolderIcon;
     AppDefaults.noteFolderIcon = _defaultNoteFolderIcon;
     AppScale.factor = _textScale;
+    _applyAnimationSpeed(_animationSpeed);
 
     // Migrate the legacy single-row tab layout to TabBarConfig the first time
     // a user opens the new tab-bar UI. Existing _tabBarConfig is the default
@@ -305,6 +353,26 @@ class SettingsController with ChangeNotifier {
     await _db.setAppSetting('badge_mode', _encodeBadgeMode(mode));
   }
 
+  Future<void> updateAnimationSpeed(AnimationSpeed speed) async {
+    if (speed == _animationSpeed) return;
+    _animationSpeed = speed;
+    _applyAnimationSpeed(speed);
+    notifyListeners();
+    await _db.setAppSetting('animation_speed', _encodeAnimationSpeed(speed));
+  }
+
+  /// `timeDilation` and our [AppDurations.scale] use the same convention:
+  /// a value of 2.0 makes animations 2× slower in wall-clock time,
+  /// 0.5 makes them 2× faster. Setting either to 0 would divide by
+  /// zero inside the scheduler, so "off" maps to a near-zero scale
+  /// (0.0001) — small enough that every frame appears to traverse the
+  /// full animation timeline at once.
+  static void _applyAnimationSpeed(AnimationSpeed speed) {
+    final scale = animationSpeedScale(speed);
+    timeDilation = scale;
+    AppDurations.scale = scale;
+  }
+
   Future<void> updateDefaultTaskIcon(String iconId) async {
     if (iconId.isEmpty || iconId == _defaultTaskIcon) return;
     _defaultTaskIcon = iconId;
@@ -365,6 +433,33 @@ class SettingsController with ChangeNotifier {
         return 'inboxTasks';
       case BadgeMode.allUncompleted:
         return 'allUncompleted';
+    }
+  }
+
+  static String _encodeAnimationSpeed(AnimationSpeed s) {
+    switch (s) {
+      case AnimationSpeed.off:
+        return 'off';
+      case AnimationSpeed.fast:
+        return 'fast';
+      case AnimationSpeed.normal:
+        return 'normal';
+      case AnimationSpeed.slow:
+        return 'slow';
+    }
+  }
+
+  static AnimationSpeed _decodeAnimationSpeed(String v) {
+    switch (v) {
+      case 'off':
+        return AnimationSpeed.off;
+      case 'fast':
+        return AnimationSpeed.fast;
+      case 'slow':
+        return AnimationSpeed.slow;
+      case 'normal':
+      default:
+        return AnimationSpeed.normal;
     }
   }
 

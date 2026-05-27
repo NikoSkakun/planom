@@ -20,6 +20,7 @@ import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/reminder_picker.dart';
 import '../utils/selection_menu.dart';
+import '../utils/tap_offset.dart';
 import '../utils/undo_controller.dart';
 import 'calendar_date_picker.dart';
 import 'recurrence_picker.dart';
@@ -92,10 +93,16 @@ class _TaskDetailViewState extends State<TaskDetailView>
     });
   }
 
-  void _startEditingNote() {
+  void _startEditingNote({int? cursorOffset}) {
     setState(() => _isEditingNote = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _noteFocus.requestFocus();
+      if (!mounted) return;
+      _noteFocus.requestFocus();
+      if (cursorOffset != null) {
+        final length = _note.text.length;
+        final clamped = cursorOffset.clamp(0, length);
+        _note.selection = TextSelection.collapsed(offset: clamped);
+      }
     });
   }
 
@@ -343,7 +350,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
     if (_note.text.trim().isEmpty) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: _startEditingNote,
+        onTap: () => _startEditingNote(),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Text(
@@ -357,23 +364,60 @@ class _TaskDetailViewState extends State<TaskDetailView>
       );
     }
     if (!useMarkdown) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _startEditingNote,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Text(
-            _note.text,
-            style: const TextStyle(fontSize: 16, height: 1.35),
-          ),
-        ),
+      const padding = EdgeInsets.symmetric(vertical: 4);
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapUp: (details) {
+              final local = details.localPosition - Offset(
+                padding.left,
+                padding.top,
+              );
+              final width = constraints.maxWidth -
+                  padding.left -
+                  padding.right;
+              final offset = tapOffsetInText(
+                text: _note.text,
+                style: const TextStyle(fontSize: 16, height: 1.35),
+                maxWidth: width <= 0 ? 1 : width,
+                tapPosition: local,
+                textScaler: MediaQuery.textScalerOf(context),
+              );
+              _startEditingNote(cursorOffset: offset);
+            },
+            child: Padding(
+              padding: padding,
+              child: Text(
+                _note.text,
+                style: const TextStyle(fontSize: 16, height: 1.35),
+              ),
+            ),
+          );
+        },
       );
     }
-    return MarkdownView(
-      data: _note.text,
-      shrinkWrap: true,
-      padding: EdgeInsets.zero,
-      onTap: _startEditingNote,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return MarkdownView(
+          data: _note.text,
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          // The tap location lands inside MarkdownView's body at this
+          // local position — measure against the raw markdown to seed
+          // the cursor at the tapped row.
+          onTap: (tapPosition) {
+            final offset = tapOffsetInText(
+              text: _note.text,
+              style: const TextStyle(fontSize: 16, height: 1.35),
+              maxWidth: constraints.maxWidth <= 0 ? 1 : constraints.maxWidth,
+              tapPosition: tapPosition,
+              textScaler: MediaQuery.textScalerOf(context),
+            );
+            _startEditingNote(cursorOffset: offset);
+          },
+        );
+      },
     );
   }
 

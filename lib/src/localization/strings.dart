@@ -228,6 +228,12 @@ class S {
   String get textSize => t('textSize');
   String get useSystemTextSize => t('useSystemTextSize');
   String get textSizeHint => t('textSizeHint');
+  String get animationSpeed => t('animationSpeed');
+  String get animationSpeedHint => t('animationSpeedHint');
+  String get animationSpeedOff => t('animationSpeedOff');
+  String get animationSpeedFast => t('animationSpeedFast');
+  String get animationSpeedNormal => t('animationSpeedNormal');
+  String get animationSpeedSlow => t('animationSpeedSlow');
   String get tabBarPages => t('tabBarPages');
   String get tabBarPagesHint => t('tabBarPagesHint');
   String get addPage => t('addPage');
@@ -764,6 +770,12 @@ const Map<String, String> _en = {
   'textSize': 'Text size',
   'useSystemTextSize': 'Use system text size',
   'textSizeHint': 'Scales all text in the app. UI elements next to text grow with the chosen size.',
+  'animationSpeed': 'Animation speed',
+  'animationSpeedHint': 'Controls how fast page transitions, list reorders, drag and other UI animations play. Choose Off for immediate, snap-style transitions.',
+  'animationSpeedOff': 'Off',
+  'animationSpeedFast': 'Fast',
+  'animationSpeedNormal': 'Normal',
+  'animationSpeedSlow': 'Slow',
   'tabBarPages': 'Tab Bar Pages',
   'tabBarPagesHint': 'Add more pages to fit more than 5 tabs. Swipe horizontally on the tab bar to switch between pages.',
   'addPage': 'Add page',

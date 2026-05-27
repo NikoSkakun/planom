@@ -154,6 +154,50 @@ class AppearanceView extends StatelessWidget {
                   ),
                 ),
 
+                // ── Animation speed ──────────────────────────────────────
+                const SizedBox(height: 32),
+                Text(
+                  s.animationSpeed,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: labelColor,
+                    letterSpacing: -0.08,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                CupertinoSlidingSegmentedControl<AnimationSpeed>(
+                  groupValue: controller.animationSpeed,
+                  onValueChanged: (v) {
+                    if (v != null) controller.updateAnimationSpeed(v);
+                  },
+                  children: {
+                    AnimationSpeed.off: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Text(s.animationSpeedOff),
+                    ),
+                    AnimationSpeed.fast: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Text(s.animationSpeedFast),
+                    ),
+                    AnimationSpeed.normal: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Text(s.animationSpeedNormal),
+                    ),
+                    AnimationSpeed.slow: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Text(s.animationSpeedSlow),
+                    ),
+                  },
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    s.animationSpeedHint,
+                    style: TextStyle(fontSize: 13, color: labelColor),
+                  ),
+                ),
+
                 // ── Calendar ─────────────────────────────────────────────
                 const SizedBox(height: 32),
                 Text(
