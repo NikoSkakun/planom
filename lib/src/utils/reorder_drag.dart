@@ -211,10 +211,11 @@ class ReorderableDropZone extends StatelessWidget {
 }
 
 /// Trailing slot at the end of a reorderable list — accepts a drop and
-/// places the dropped row at the end. Renders empty when nothing is
-/// hovering; on hover, expands to the dragged row's full height (so the
-/// user sees the same blank space they'd see if they dropped above any
-/// other row).
+/// places the dropped row at the end. Collapses to zero height when idle
+/// so the list flows continuously into whatever follows it (a divider,
+/// the next section); on hover, expands to the dragged row's full height
+/// so the user sees the same blank space they'd see if they dropped
+/// above any other row.
 class ReorderableTrailingSlot extends StatelessWidget {
   const ReorderableTrailingSlot({
     super.key,
@@ -235,19 +236,26 @@ class ReorderableTrailingSlot extends StatelessWidget {
           animation: ReorderDragNotifier.instance,
           builder: (context, _) {
             final hovering = candidates.isNotEmpty;
-            final placeholder = hovering
-                ? ReorderDragNotifier.instance.draggingHeight
-                : 0.0;
-            // The hit area needs to stay non-trivial even at rest, so the
-            // user can land a drop at the very end without aiming at the
-            // last row. 16 px is enough to feel forgiving without leaving
-            // a visible gap.
+            // Only takes up vertical space while a matching drag is
+            // actually in flight, so the list flows continuously into
+            // whatever follows it (a divider, the next section) when
+            // the user is just browsing.
+            final dragging = ReorderDragNotifier.instance.isDragging &&
+                ReorderDragNotifier.instance.draggingKind == kind;
+            final double height;
+            if (hovering) {
+              height = ReorderDragNotifier.instance.draggingHeight;
+            } else if (dragging) {
+              height = 16;
+            } else {
+              height = 0;
+            }
             return AnimatedSize(
               duration: _kReorderAnim,
               curve: _kReorderCurve,
               alignment: Alignment.topCenter,
               child: SizedBox(
-                height: hovering ? placeholder : 16,
+                height: height,
                 width: double.infinity,
               ),
             );
