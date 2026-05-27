@@ -4,6 +4,8 @@ import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../localization/strings.dart';
 import '../models/task.dart';
+import '../utils/dropdown_overlay.dart';
+import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
 import '../utils/plus_button_inset_scope.dart';
 import '../utils/selection_checkbox.dart';
@@ -54,13 +56,26 @@ class SelectableTaskListShell extends StatefulWidget {
       _SelectableTaskListShellState();
 }
 
-class _SelectableTaskListShellState extends State<SelectableTaskListShell> {
+class _SelectableTaskListShellState extends State<SelectableTaskListShell>
+    with DropdownOverlayMixin {
   final _selection = SelectionController();
 
   @override
   void dispose() {
     _selection.dispose();
     super.dispose();
+  }
+
+  void _showOptionsDropdown(BuildContext context) {
+    showDropdown(context, (dismiss) {
+      return _ShellOptionsDropdown(
+        onDismiss: dismiss,
+        onSelect: () {
+          dismiss();
+          _selection.start();
+        },
+      );
+    });
   }
 
   // ── Batch actions ────────────────────────────────────────────────────────
@@ -243,20 +258,25 @@ class _SelectableTaskListShellState extends State<SelectableTaskListShell> {
                       ? s.selectItems
                       : s.selectedCount(_selection.count))
                   : widget.title),
-              trailing: tasks.isEmpty
-                  ? null
-                  : selecting
-                      ? CupertinoButton(
+              trailing: selecting
+                  ? (tasks.isEmpty
+                      ? null
+                      : CupertinoButton(
                           padding: EdgeInsets.zero,
                           onPressed: () => _toggleSelectAll(tasks),
                           child:
                               Text(allSelected ? s.deselectAll : s.selectAll),
-                        )
-                      : CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          onPressed: _selection.start,
-                          child: Text(s.select),
-                        ),
+                        ))
+                  : Semantics(
+                      label: s.settings,
+                      button: true,
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _showOptionsDropdown(context),
+                        child:
+                            const Icon(CupertinoIcons.ellipsis, size: 26),
+                      ),
+                    ),
             ),
             child: SafeArea(
               bottom: !selecting,
@@ -352,6 +372,54 @@ class _SelectableTaskListShellState extends State<SelectableTaskListShell> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ShellOptionsDropdown extends StatelessWidget {
+  const _ShellOptionsDropdown({
+    required this.onDismiss,
+    required this.onSelect,
+  });
+
+  final VoidCallback onDismiss;
+  final VoidCallback onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final topOffset = MediaQuery.paddingOf(context).top + 44.0 + 4.0;
+    final s = S.of(context);
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onDismiss,
+          child: const SizedBox.expand(),
+        ),
+        Positioned(
+          top: topOffset,
+          right: 8,
+          child: Container(
+            width: 220,
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground.resolveFrom(context),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 20,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: DropdownRow(
+              label: s.select,
+              icon: CupertinoIcons.checkmark_circle,
+              onTap: onSelect,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
