@@ -39,6 +39,45 @@ class MarkdownView extends StatelessWidget {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  /// Markdown collapses any run of consecutive blank lines into a single
+  /// paragraph break, so a note with deliberate vertical spacing renders
+  /// without it. Walk through [input] line-by-line and, for every blank
+  /// line past the first in a run, insert a non-breaking-space paragraph
+  /// so the renderer keeps the gap. Lines inside a fenced code block are
+  /// passed through unchanged.
+  static String _preserveBlankLines(String input) {
+    final lines = input.split('\n');
+    final out = <String>[];
+    int blankRun = 0;
+    bool inCodeBlock = false;
+    final fence = RegExp(r'^\s*(```|~~~)');
+    for (final line in lines) {
+      if (fence.hasMatch(line)) {
+        inCodeBlock = !inCodeBlock;
+        blankRun = 0;
+        out.add(line);
+        continue;
+      }
+      if (inCodeBlock) {
+        out.add(line);
+        continue;
+      }
+      if (line.trim().isEmpty) {
+        blankRun++;
+        if (blankRun == 1) {
+          out.add('');
+        } else {
+          out.add(' ');
+          out.add('');
+        }
+      } else {
+        blankRun = 0;
+        out.add(line);
+      }
+    }
+    return out.join('\n');
+  }
+
   @override
   Widget build(BuildContext context) {
     final base = CupertinoTheme.of(context).textTheme.textStyle;
@@ -110,6 +149,7 @@ class MarkdownView extends StatelessWidget {
       blockSpacing: 0,
     );
 
+    final source = _preserveBlankLines(data);
     final body = shrinkWrap
         ? Padding(
             padding: padding,
@@ -121,7 +161,7 @@ class MarkdownView extends StatelessWidget {
             child: Align(
               alignment: AlignmentDirectional.topStart,
               child: MarkdownBody(
-                data: data,
+                data: source,
                 selectable: false,
                 fitContent: true,
                 styleSheet: styleSheet,
@@ -131,7 +171,7 @@ class MarkdownView extends StatelessWidget {
             ),
           )
         : Markdown(
-            data: data,
+            data: source,
             selectable: false,
             padding: padding,
             styleSheet: styleSheet,
