@@ -51,35 +51,18 @@
 	<string>Choose a photo to use as the icon for your list or folder.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock Planom.</string>
-	<!--
-	  Google Calendar integration: to enable Google Sign-In on iOS, add two
-	  keys here (with real values from your Google Cloud Console iOS OAuth
-	  client) and also fill in kGoogleIosClientId in
-	  lib/src/integrations/google/oauth_config.dart.
-
-	    1. GIDClientID  — the iOS OAuth client ID, e.g.
-	       <key>GIDClientID</key>
-	       <string>123456789-abc.apps.googleusercontent.com</string>
-
-	    2. CFBundleURLTypes — register the *reversed* client ID as a URL
-	       scheme so Google can call back into the app, e.g.
-	       <key>CFBundleURLTypes</key>
-	       <array>
-	         <dict>
-	           <key>CFBundleTypeRole</key>
-	           <string>Editor</string>
-	           <key>CFBundleURLSchemes</key>
-	           <array>
-	             <string>com.googleusercontent.apps.123456789-abc</string>
-	           </array>
-	         </dict>
-	       </array>
-
-	  These are intentionally NOT added with placeholder values because
-	  Apple's App Store Connect validation rejects URL schemes that contain
-	  underscores or other characters disallowed by RFC1738. Until both real
-	  values are added, the in-app Google Calendar settings page renders a
-	  "setup required" state and no network calls are attempted.
-	-->
+	<key>GIDClientID</key>
+	<string>264060209270-4l2qk3d1k4ehkmtg8iikjme28590ihp3.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.264060209270-4l2qk3d1k4ehkmtg8iikjme28590ihp3</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
