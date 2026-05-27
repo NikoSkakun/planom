@@ -29,6 +29,7 @@ import 'tasks/tasks_view.dart';
 import 'theme/app_theme.dart';
 import 'utils/fast_route.dart';
 import 'utils/platform_capabilities.dart';
+import 'utils/plus_button_inset_scope.dart';
 import 'utils/plus_drag_controller.dart';
 import 'utils/plus_drag_payload.dart';
 import 'utils/selection_menu.dart';
@@ -87,6 +88,7 @@ class _HomeShellState extends State<HomeShell> {
   final _notesCollapseSignal = ValueNotifier<int>(0);
   final _calendarResetSignal = ValueNotifier<int>(0);
   final _showPlusButton = ValueNotifier<bool>(true);
+  final _plusButtonInset = ValueNotifier<double>(0);
   final _undoController = UndoController();
   final _plusDragController = PlusDragController();
   // True while the user is viewing Settings via the global overlay (i.e. the
@@ -339,6 +341,7 @@ class _HomeShellState extends State<HomeShell> {
     _notesCollapseSignal.dispose();
     _calendarResetSignal.dispose();
     _showPlusButton.dispose();
+    _plusButtonInset.dispose();
     _globalSettingsOpen.dispose();
     _undoController.dispose();
     super.dispose();
@@ -838,7 +841,10 @@ class _HomeShellState extends State<HomeShell> {
       controller: _undoController,
       child: PlusDragScope(
         controller: _plusDragController,
-        child: _buildShell(context),
+        child: PlusButtonInsetScope(
+          inset: _plusButtonInset,
+          child: _buildShell(context),
+        ),
       ),
     );
   }
@@ -972,19 +978,24 @@ class _HomeShellState extends State<HomeShell> {
               ),
             ValueListenableBuilder<bool>(
               valueListenable: _showPlusButton,
-              builder: (context, show, child) => show
-                  ? Positioned(
-                      right: 20,
-                      bottom: isWide
-                          ? 24
-                          : visibleIndices.length <= 1
-                              ? MediaQuery.paddingOf(context).bottom + 16
-                              : 50 +
-                                  MediaQuery.paddingOf(context).bottom +
-                                  12,
-                      child: _PlusButton(onPressed: _onPlusPressed),
-                    )
-                  : const SizedBox.shrink(),
+              builder: (context, show, _) {
+                if (!show) return const SizedBox.shrink();
+                final baseBottom = isWide
+                    ? 24.0
+                    : visibleIndices.length <= 1
+                        ? MediaQuery.paddingOf(context).bottom + 16
+                        : 50 + MediaQuery.paddingOf(context).bottom + 12;
+                return ValueListenableBuilder<double>(
+                  valueListenable: _plusButtonInset,
+                  builder: (context, lift, _) => AnimatedPositioned(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    right: 20,
+                    bottom: baseBottom + lift,
+                    child: _PlusButton(onPressed: _onPlusPressed),
+                  ),
+                );
+              },
             ),
             Positioned(
               left: 0,

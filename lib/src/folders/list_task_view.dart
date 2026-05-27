@@ -17,6 +17,7 @@ import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/plus_button_inset_scope.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
 import '../utils/reorder_drag.dart';
@@ -304,59 +305,62 @@ class _ListTaskViewState extends State<ListTaskView>
       builder: (context, _) {
         final selecting = _selection.active;
         final s = S.of(context);
-        return CupertinoPageScaffold(
-          navigationBar: CupertinoNavigationBar(
-            border: null,
-            leading: selecting
-                ? CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: _selection.cancel,
-                    child: Text(s.cancel),
-                  )
-                : null,
-            automaticallyImplyLeading: !selecting,
-            middle: Text(selecting
-                ? (_selection.count == 0
-                    ? s.selectItems
-                    : s.selectedCount(_selection.count))
-                : _currentList.name),
-            trailing: selecting
-                ? CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: _toggleSelectAll,
-                    child: Text(_areAllSelected()
-                        ? s.deselectAll
-                        : s.selectAll),
-                  )
-                : CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: () => _showDropdown(context),
-                    child: const Icon(CupertinoIcons.ellipsis, size: 26),
+        return PlusButtonLift(
+          lift: selecting ? kSelectionToolbarLift : 0,
+          child: CupertinoPageScaffold(
+            navigationBar: CupertinoNavigationBar(
+              border: null,
+              leading: selecting
+                  ? CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: _selection.cancel,
+                      child: Text(s.cancel),
+                    )
+                  : null,
+              automaticallyImplyLeading: !selecting,
+              middle: Text(selecting
+                  ? (_selection.count == 0
+                      ? s.selectItems
+                      : s.selectedCount(_selection.count))
+                  : _currentList.name),
+              trailing: selecting
+                  ? CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: _toggleSelectAll,
+                      child: Text(_areAllSelected()
+                          ? s.deselectAll
+                          : s.selectAll),
+                    )
+                  : CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _showDropdown(context),
+                      child: const Icon(CupertinoIcons.ellipsis, size: 26),
+                    ),
+            ),
+            child: SafeArea(
+              bottom: !selecting,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: _currentList.listType == ListType.birthdays
+                        ? ContactListView(
+                            listId: _currentList.id,
+                            controller: widget.contactController,
+                          )
+                        : _SectionedListBody(
+                            list: _currentList,
+                            taskController: widget.taskController,
+                            folderController: widget.folderController,
+                            selection: _selection,
+                          ),
                   ),
-          ),
-          child: SafeArea(
-            bottom: !selecting,
-            child: Column(
-              children: [
-                Expanded(
-                  child: _currentList.listType == ListType.birthdays
-                      ? ContactListView(
-                          listId: _currentList.id,
-                          controller: widget.contactController,
-                        )
-                      : _SectionedListBody(
-                          list: _currentList,
-                          taskController: widget.taskController,
-                          folderController: widget.folderController,
-                          selection: _selection,
-                        ),
-                ),
-                if (selecting)
-                  SelectionToolbar(
-                    bottomInset: MediaQuery.paddingOf(context).bottom,
-                    actions: _batchActions(s),
-                  ),
-              ],
+                  if (selecting)
+                    SelectionToolbar(
+                      bottomInset: MediaQuery.paddingOf(context).bottom,
+                      actions: _batchActions(s),
+                    ),
+                ],
+              ),
             ),
           ),
         );
