@@ -46,6 +46,14 @@ class MarkdownView extends StatelessWidget {
     final mutedBg = CupertinoColors.systemGrey6.resolveFrom(context);
     final mutedBorder = CupertinoColors.systemGrey4.resolveFrom(context);
 
+    // Single text style shared by paragraphs, list-item bodies and bullets so
+    // the rendered view matches the editor (CupertinoTextField with the same
+    // 16 / 1.35 metrics) — without this the bullet defaults to whatever the
+    // theme provides (no explicit height) and its baseline drifts relative to
+    // the surrounding text, making the line look taller in render than in
+    // edit mode.
+    final pStyle = base.copyWith(fontSize: 16, height: 1.35);
+
     final styleSheet = MarkdownStyleSheet(
       // Force left-aligned text. Some MarkdownStyleSheet defaults wrap
       // paragraph contents in a Wrap whose alignment otherwise pushes single
@@ -61,16 +69,20 @@ class MarkdownView extends StatelessWidget {
       orderedListAlign: WrapAlignment.start,
       blockquoteAlign: WrapAlignment.start,
       codeblockAlign: WrapAlignment.start,
-      p: base.copyWith(fontSize: 16, height: 1.35),
-      h1: base.copyWith(fontSize: 26, fontWeight: FontWeight.w700),
-      h2: base.copyWith(fontSize: 22, fontWeight: FontWeight.w700),
-      h3: base.copyWith(fontSize: 19, fontWeight: FontWeight.w600),
-      strong: base.copyWith(fontWeight: FontWeight.w700, fontSize: 16),
-      em: base.copyWith(fontStyle: FontStyle.italic, fontSize: 16),
-      del: base.copyWith(
-          decoration: TextDecoration.lineThrough, fontSize: 16),
-      a: base.copyWith(color: linkColor, fontSize: 16),
-      code: base.copyWith(
+      p: pStyle,
+      // Restore paragraph breathing room by adding a top gap. Combined with
+      // blockSpacing: 0 below, this keeps paragraphs visually separated
+      // without inflating the gap between consecutive list items (which
+      // share a single parent and don't get pPadding).
+      pPadding: const EdgeInsets.only(top: 8),
+      h1: pStyle.copyWith(fontSize: 26, fontWeight: FontWeight.w700),
+      h2: pStyle.copyWith(fontSize: 22, fontWeight: FontWeight.w700),
+      h3: pStyle.copyWith(fontSize: 19, fontWeight: FontWeight.w600),
+      strong: pStyle.copyWith(fontWeight: FontWeight.w700),
+      em: pStyle.copyWith(fontStyle: FontStyle.italic),
+      del: pStyle.copyWith(decoration: TextDecoration.lineThrough),
+      a: pStyle.copyWith(color: linkColor),
+      code: pStyle.copyWith(
         fontFamily: 'Menlo',
         fontSize: 14,
         backgroundColor: mutedBg,
@@ -80,8 +92,7 @@ class MarkdownView extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: mutedBorder, width: 0.5),
       ),
-      blockquote: base.copyWith(
-        fontSize: 16,
+      blockquote: pStyle.copyWith(
         color: CupertinoColors.secondaryLabel.resolveFrom(context),
         fontStyle: FontStyle.italic,
       ),
@@ -90,8 +101,13 @@ class MarkdownView extends StatelessWidget {
           left: BorderSide(width: 3, color: mutedBorder),
         ),
       ),
-      listBullet: base.copyWith(fontSize: 16),
-      blockSpacing: 10,
+      listBullet: pStyle,
+      listBulletPadding: const EdgeInsets.only(right: 6),
+      // 0 means consecutive bullets / numbered items stack with no extra gap,
+      // matching the editor (where each list line is just a newline). Inter-
+      // paragraph spacing is handled by pPadding above so paragraphs still
+      // get a visible break.
+      blockSpacing: 0,
     );
 
     final body = shrinkWrap
