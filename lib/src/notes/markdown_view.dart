@@ -21,8 +21,11 @@ class MarkdownView extends StatelessWidget {
   final String data;
 
   /// Called when the user taps anywhere on the rendered surface that isn't a
-  /// link — used by the host to switch into edit mode.
-  final VoidCallback onTap;
+  /// link — used by the host to switch into edit mode. The argument is the
+  /// local position of the tap inside the rendered surface, including the
+  /// configured [padding]; callers that don't care about the position can
+  /// ignore it.
+  final ValueChanged<Offset> onTap;
 
   /// When true, renders as a non-scrolling block sized to its content.
   final bool shrinkWrap;
@@ -181,7 +184,7 @@ class MarkdownView extends StatelessWidget {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTapUp: (details) => onTap(details.localPosition),
       child: body,
     );
   }

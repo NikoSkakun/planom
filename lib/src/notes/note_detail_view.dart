@@ -11,6 +11,7 @@ import '../models/note.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/tap_offset.dart';
 import '../utils/undo_controller.dart';
 import 'markdown_toolbar.dart';
 import 'markdown_view.dart';
@@ -264,11 +265,58 @@ class _NoteDetailViewState extends State<NoteDetailView>
     super.dispose();
   }
 
-  void _startEditing() {
+  void _startEditing({int? cursorOffset}) {
     setState(() => _isEditing = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _contentFocus.requestFocus();
+      if (!mounted) return;
+      _contentFocus.requestFocus();
+      if (cursorOffset != null) {
+        // Clamp against the live text length in case it changed between
+        // the tap and the post-frame callback (autosave/race with edits).
+        final length = _content.text.length;
+        final clamped = cursorOffset.clamp(0, length);
+        _content.selection = TextSelection.collapsed(offset: clamped);
+      }
     });
+  }
+
+  /// Wraps [child] so a tap inside it switches into edit mode AND seeds
+  /// the cursor at the position the user tapped. [textForOffset] is the
+  /// source body text used to compute the offset; in markdown preview
+  /// that's the raw markdown, so headings and bullets still resolve to
+  /// somewhere reasonable. [contentPadding] is subtracted from the tap
+  /// before measuring so the offset matches the rendered text geometry.
+  Widget _wrapWithTapToEdit({
+    required Widget child,
+    required String textForOffset,
+    required EdgeInsets contentPadding,
+    TextStyle? measureStyle,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: (details) {
+            final local = details.localPosition - Offset(
+              contentPadding.left,
+              contentPadding.top,
+            );
+            final width = constraints.maxWidth -
+                contentPadding.left -
+                contentPadding.right;
+            final offset = tapOffsetInText(
+              text: textForOffset,
+              style: measureStyle ?? const TextStyle(fontSize: 16, height: 1.35),
+              maxWidth: width <= 0 ? 1 : width,
+              tapPosition: local,
+              textScaler: MediaQuery.textScalerOf(context),
+            );
+            _startEditing(cursorOffset: offset);
+          },
+          child: child,
+        );
+      },
+    );
   }
 
   Widget _buildContentArea({required bool useMarkdown}) {
@@ -306,7 +354,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
         } else if (_content.text.trim().isEmpty) {
           child = GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: _startEditing,
+            onTap: () => _startEditing(),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               child: Align(
@@ -324,12 +372,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
           );
         } else if (!useMarkdown) {
           // Plain-text mode: skip the markdown parser entirely and show the
-          // body verbatim. Tap-to-edit still triggers via the GestureDetector.
-          child = GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _startEditing,
+          // body verbatim. Tap-to-edit lands the cursor where the tap fell.
+          const padding = EdgeInsets.fromLTRB(20, 16, 20, 24);
+          child = _wrapWithTapToEdit(
+            textForOffset: _content.text,
+            contentPadding: padding,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              padding: padding,
               child: Align(
                 alignment: Alignment.topLeft,
                 child: Text(
@@ -340,11 +389,32 @@ class _NoteDetailViewState extends State<NoteDetailView>
             ),
           );
         } else {
-          child = MarkdownView(
-            data: _content.text,
-            onTap: _startEditing,
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          const padding = EdgeInsets.fromLTRB(20, 16, 20, 24);
+          // Markdown preview: the rendered text doesn't match the source
+          // character-for-character (markers, list bullets, headings), so
+          // we measure against the raw markdown with the body's paragraph
+          // style — accurate for plain paragraphs and close enough for
+          // bulleted lines to land the cursor on the tapped row.
+          child = LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth - padding.left - padding.right;
+              return MarkdownView(
+                data: _content.text,
+                shrinkWrap: true,
+                padding: padding,
+                onTap: (tapPosition) {
+                  final local = tapPosition - Offset(padding.left, padding.top);
+                  final offset = tapOffsetInText(
+                    text: _content.text,
+                    style: const TextStyle(fontSize: 16, height: 1.35),
+                    maxWidth: width <= 0 ? 1 : width,
+                    tapPosition: local,
+                    textScaler: MediaQuery.textScalerOf(context),
+                  );
+                  _startEditing(cursorOffset: offset);
+                },
+              );
+            },
           );
         }
         return SingleChildScrollView(

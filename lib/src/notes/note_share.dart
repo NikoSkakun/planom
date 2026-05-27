@@ -285,7 +285,7 @@ class _NotePosterBody extends StatelessWidget {
           const SizedBox(height: 14),
           MarkdownView(
             data: content,
-            onTap: () {},
+            onTap: (_) {},
             shrinkWrap: true,
             padding: EdgeInsets.zero,
           ),
