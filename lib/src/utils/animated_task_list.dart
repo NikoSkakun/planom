@@ -18,6 +18,8 @@ class AnimatedItemList<T> extends StatefulWidget {
     required this.itemBuilder,
     this.padding,
     this.duration = const Duration(milliseconds: 220),
+    this.shrinkWrap = false,
+    this.physics,
   });
 
   final List<T> items;
@@ -30,6 +32,8 @@ class AnimatedItemList<T> extends StatefulWidget {
 
   final EdgeInsetsGeometry? padding;
   final Duration duration;
+  final bool shrinkWrap;
+  final ScrollPhysics? physics;
 
   @override
   State<AnimatedItemList<T>> createState() => _AnimatedItemListState<T>();
@@ -160,6 +164,8 @@ class _AnimatedItemListState<T> extends State<AnimatedItemList<T>> {
     return AnimatedList(
       key: _listKey,
       padding: widget.padding,
+      shrinkWrap: widget.shrinkWrap,
+      physics: widget.physics,
       initialItemCount: _items.length,
       itemBuilder: (context, index, animation) {
         if (index >= _items.length) return const SizedBox.shrink();

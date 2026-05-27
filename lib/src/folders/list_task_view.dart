@@ -12,6 +12,7 @@ import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
 import '../theme/app_theme.dart';
+import '../utils/animated_task_list.dart';
 import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
@@ -498,12 +499,19 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
         // Top "no section" group — no header; tasks render directly.
         // Each task is wrapped in a DragTarget that, on drop, inserts the
         // dragged task immediately before it (within the same list+section).
-        for (final t in topTasks) {
-          children.add(_buildDraggableTask(
-            context,
-            t,
-            sectionId: null,
-            beforeId: t.id,
+        if (topTasks.isNotEmpty) {
+          children.add(AnimatedItemList<Task>(
+            key: const ValueKey('top-tasks'),
+            items: topTasks,
+            idOf: (t) => t.id,
+            itemBuilder: (ctx, task) => _buildDraggableTask(
+              ctx,
+              task,
+              sectionId: null,
+              beforeId: task.id,
+            ),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
           ));
         }
         // Trailing slot to drop at the end of the top group.
@@ -538,12 +546,19 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
                 widget.taskController.moveTaskToSection(taskId, section.id),
           ));
           if (!section.isCollapsed) {
-            for (final t in secTasks) {
-              children.add(_buildDraggableTask(
-                context,
-                t,
-                sectionId: section.id,
-                beforeId: t.id,
+            if (secTasks.isNotEmpty) {
+              children.add(AnimatedItemList<Task>(
+                key: ValueKey('section-${section.id}'),
+                items: secTasks,
+                idOf: (t) => t.id,
+                itemBuilder: (ctx, task) => _buildDraggableTask(
+                  ctx,
+                  task,
+                  sectionId: section.id,
+                  beforeId: task.id,
+                ),
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
               ));
             }
             // Trailing slot inside this section.
@@ -561,9 +576,14 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
                 setState(() => _completedExpanded = !_completedExpanded),
           ));
           if (_completedExpanded) {
-            for (final t in completed) {
-              children.add(_buildTaskRow(context, t));
-            }
+            children.add(AnimatedItemList<Task>(
+              key: const ValueKey('completed-tasks'),
+              items: completed,
+              idOf: (t) => t.id,
+              itemBuilder: (ctx, task) => _buildTaskRow(ctx, task),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+            ));
           }
         }
 
