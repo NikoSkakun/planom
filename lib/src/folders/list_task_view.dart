@@ -19,6 +19,7 @@ import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
+import '../utils/reorder_drag.dart';
 import '../utils/selection_checkbox.dart';
 import '../utils/selection_controller.dart';
 import '../utils/selection_menu.dart';
@@ -585,59 +586,13 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
     if (widget.selection.active) {
       return _buildTaskRow(context, task);
     }
-    return LongPressDraggable<String>(
-      data: task.id,
-      delay: const Duration(milliseconds: 400),
-      feedback: Material(
-        color: const Color(0x00000000),
-        child: Container(
-          width: MediaQuery.sizeOf(context).width - 32,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemBackground.resolveFrom(context),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1A000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Text(
-            task.title,
-            style: const TextStyle(fontSize: 16),
-          ),
-        ),
-      ),
-      childWhenDragging: Opacity(
-        opacity: 0.3,
-        child: _buildTaskRow(context, task),
-      ),
-      child: DragTarget<String>(
-        onWillAcceptWithDetails: (d) => d.data != task.id,
-        onAcceptWithDetails: (d) => widget.taskController.reorderTaskBefore(
-          movedTaskId: d.data,
-          beforeTaskId: beforeId,
-          listId: widget.list.id,
-          sectionId: sectionId,
-        ),
-        builder: (context, candidates, _) {
-          final highlighted = candidates.isNotEmpty;
-          return Stack(
-            children: [
-              _buildTaskRow(context, task),
-              if (highlighted)
-                const Positioned(
-                  top: 0,
-                  left: 16,
-                  right: 16,
-                  child: _DropInsertLine(),
-                ),
-            ],
-          );
-        },
-      ),
+    return _TaskReorderRow(
+      task: task,
+      beforeId: beforeId,
+      sectionId: sectionId,
+      listId: widget.list.id,
+      taskController: widget.taskController,
+      child: _buildTaskRow(context, task),
     );
   }
 
@@ -645,25 +600,10 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
   /// drop a task at the very end of that section.
   Widget _buildTaskDropSlot(
       BuildContext context, String? beforeId, String? sectionId) {
-    return DragTarget<String>(
-      onWillAcceptWithDetails: (_) => true,
-      onAcceptWithDetails: (d) => widget.taskController.reorderTaskBefore(
-        movedTaskId: d.data,
-        beforeTaskId: beforeId,
-        listId: widget.list.id,
-        sectionId: sectionId,
-      ),
-      builder: (context, candidates, _) {
-        return SizedBox(
-          height: 12,
-          child: candidates.isEmpty
-              ? null
-              : const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: _DropInsertLine(),
-                ),
-        );
-      },
+    return _TaskReorderTrailingSlot(
+      listId: widget.list.id,
+      sectionId: sectionId,
+      taskController: widget.taskController,
     );
   }
 
@@ -731,20 +671,184 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
   }
 }
 
-/// Thin accent-coloured horizontal bar shown across a row while a drag is
-/// hovering over it — visualises the insert-before position for the
-/// long-press reorder.
-class _DropInsertLine extends StatelessWidget {
-  const _DropInsertLine();
+/// Long-press-to-drag wrapper for a task row. Collapses the source slot to
+/// zero (animated) while the drag is in flight and reports the row's height
+/// to [ReorderDragNotifier] so the matching drop zones can render an empty
+/// placeholder of the right size.
+class _TaskReorderRow extends StatefulWidget {
+  const _TaskReorderRow({
+    required this.task,
+    required this.beforeId,
+    required this.sectionId,
+    required this.listId,
+    required this.taskController,
+    required this.child,
+  });
+
+  final Task task;
+  final String beforeId;
+  final String? sectionId;
+  final String listId;
+  final TaskController taskController;
+  final Widget child;
+
+  @override
+  State<_TaskReorderRow> createState() => _TaskReorderRowState();
+}
+
+class _TaskReorderRowState extends State<_TaskReorderRow> {
+  final GlobalKey _measureKey = GlobalKey();
+
+  double _measureHeight() {
+    final ctx = _measureKey.currentContext;
+    final renderObject = ctx?.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      return renderObject.size.height;
+    }
+    return 44;
+  }
+
+  void _onDragStarted() {
+    ReorderDragNotifier.instance
+        .start(widget.task.id, 'task', _measureHeight());
+  }
+
+  void _onDragEnded() {
+    ReorderDragNotifier.instance.end();
+  }
+
+  @override
+  void dispose() {
+    if (ReorderDragNotifier.instance.draggingId == widget.task.id) {
+      ReorderDragNotifier.instance.end();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 2,
-      decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(1),
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOut,
+      alignment: Alignment.topCenter,
+      child: LongPressDraggable<String>(
+        data: widget.task.id,
+        delay: const Duration(milliseconds: 400),
+        onDragStarted: _onDragStarted,
+        onDragEnd: (_) => _onDragEnded(),
+        onDraggableCanceled: (_, __) => _onDragEnded(),
+        onDragCompleted: _onDragEnded,
+        feedback: Material(
+          color: const Color(0x00000000),
+          child: Container(
+            width: MediaQuery.sizeOf(context).width - 32,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBackground.resolveFrom(context),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x1A000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Text(
+              widget.task.title,
+              style: const TextStyle(fontSize: 16),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        childWhenDragging: const SizedBox.shrink(),
+        child: DragTarget<String>(
+          onWillAcceptWithDetails: (d) => d.data != widget.task.id,
+          onAcceptWithDetails: (d) =>
+              widget.taskController.reorderTaskBefore(
+            movedTaskId: d.data,
+            beforeTaskId: widget.beforeId,
+            listId: widget.listId,
+            sectionId: widget.sectionId,
+          ),
+          builder: (context, candidates, _) {
+            final highlighted = candidates.isNotEmpty;
+            return AnimatedBuilder(
+              animation: ReorderDragNotifier.instance,
+              builder: (context, _) {
+                final placeholder = highlighted
+                    ? ReorderDragNotifier.instance.draggingHeight
+                    : 0.0;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 160),
+                      curve: Curves.easeOut,
+                      alignment: Alignment.topCenter,
+                      child: SizedBox(
+                          height: placeholder, width: double.infinity),
+                    ),
+                    KeyedSubtree(
+                      key: _measureKey,
+                      child: widget.child,
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
       ),
+    );
+  }
+}
+
+/// Trailing slot after the last task in a section. Stays at a tiny constant
+/// height when idle (so the user has somewhere to aim for an end-of-list
+/// drop) and grows to the dragged row's height while hovering.
+class _TaskReorderTrailingSlot extends StatelessWidget {
+  const _TaskReorderTrailingSlot({
+    required this.listId,
+    required this.sectionId,
+    required this.taskController,
+  });
+
+  final String listId;
+  final String? sectionId;
+  final TaskController taskController;
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (d) => taskController.reorderTaskBefore(
+        movedTaskId: d.data,
+        beforeTaskId: null,
+        listId: listId,
+        sectionId: sectionId,
+      ),
+      builder: (context, candidates, _) {
+        return AnimatedBuilder(
+          animation: ReorderDragNotifier.instance,
+          builder: (context, _) {
+            final hovering = candidates.isNotEmpty;
+            final placeholder = hovering
+                ? ReorderDragNotifier.instance.draggingHeight
+                : 0.0;
+            return AnimatedSize(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                height: hovering ? placeholder : 12,
+                width: double.infinity,
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
