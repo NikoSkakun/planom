@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Material;
+import 'package:flutter/material.dart' show Material, MaterialType;
 
 /// Typed payload for a long-press-reorder drag. Distinct payloads keep
 /// folder, list, and note drags from accidentally matching each other's
@@ -110,6 +110,7 @@ class _ReorderableRowState extends State<ReorderableRow> {
   @override
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
+    final width = MediaQuery.sizeOf(context).width;
     return AnimatedSize(
       duration: _kReorderAnim,
       curve: _kReorderCurve,
@@ -121,40 +122,50 @@ class _ReorderableRowState extends State<ReorderableRow> {
         onDragEnd: (_) => _onDragEnded(),
         onDraggableCanceled: (_, __) => _onDragEnded(),
         onDragCompleted: _onDragEnded,
-        feedback: Material(
-          color: const Color(0x00000000),
-          child: Container(
-            width: MediaQuery.sizeOf(context).width - 32,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A000000),
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Text(
-              widget.label.isEmpty ? '—' : widget.label,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-        // Collapsing the original slot to zero (rather than just fading it)
-        // makes the visual reorganization match what the user sees in the
-        // platform Reminders/Files app: the row "leaves" and everything
-        // else shifts to fill the gap.
+        // Render the row itself as the drag feedback so the lifted card
+        // looks identical to the row it came from (same icon, count,
+        // chevron, spacing). The original slot still collapses to zero
+        // beneath it so the list closes the gap.
+        feedback: _dragFeedback(context, width, widget.child),
         childWhenDragging: const SizedBox.shrink(),
         child: KeyedSubtree(key: _measureKey, child: widget.child),
       ),
     );
   }
+}
+
+/// Shared lifted-card scaffolding for reorder drag feedback widgets.
+/// Wraps [child] in a Material layer (required because drags render in
+/// the root overlay) with the system background and a soft shadow so the
+/// row reads as picked up while staying visually identical to the source.
+Widget _dragFeedback(BuildContext context, double width, Widget child) {
+  return Material(
+    type: MaterialType.transparency,
+    child: SizedBox(
+      width: width,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemBackground.resolveFrom(context),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1A000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
+
+/// Public version of [_dragFeedback] for use by other reorder sites
+/// (task rows, note rows) so the lifted visual stays consistent
+/// app-wide.
+Widget buildReorderDragFeedback(
+    BuildContext context, double width, Widget child) {
+  return _dragFeedback(context, width, child);
 }
 
 /// DragTarget paired with [ReorderableRow]: when the user drops onto this

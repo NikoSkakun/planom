@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Material;
 
 import '../contacts/contact_controller.dart';
 import '../contacts/contact_list_view.dart';
@@ -731,6 +730,7 @@ class _TaskReorderRowState extends State<_TaskReorderRow> {
 
   @override
   Widget build(BuildContext context) {
+    final feedbackWidth = MediaQuery.sizeOf(context).width;
     return AnimatedSize(
       duration: const Duration(milliseconds: 160),
       curve: Curves.easeOut,
@@ -742,30 +742,11 @@ class _TaskReorderRowState extends State<_TaskReorderRow> {
         onDragEnd: (_) => _onDragEnded(),
         onDraggableCanceled: (_, __) => _onDragEnded(),
         onDragCompleted: _onDragEnded,
-        feedback: Material(
-          color: const Color(0x00000000),
-          child: Container(
-            width: MediaQuery.sizeOf(context).width - 32,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A000000),
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Text(
-              widget.task.title,
-              style: const TextStyle(fontSize: 16),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
+        // Render the actual row as the drag feedback so the lifted
+        // card matches the source row exactly (checkbox, date, list
+        // chip, multi-line wrapping, …) instead of a stripped-down
+        // title-only placeholder.
+        feedback: buildReorderDragFeedback(context, feedbackWidth, widget.child),
         childWhenDragging: const SizedBox.shrink(),
         child: DragTarget<String>(
           onWillAcceptWithDetails: (d) => d.data != widget.task.id,
