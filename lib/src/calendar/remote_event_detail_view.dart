@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../integrations/google/google_calendar_controller.dart';
@@ -7,6 +8,7 @@ import '../localization/strings.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
 import '../utils/duration_picker.dart';
+import '../utils/reminder_picker.dart';
 
 /// Detail / edit screen for a single Google Calendar event. Edits are pushed
 /// to Google immediately on save; the event never lands in Planom's local
@@ -31,6 +33,8 @@ class _RemoteEventDetailViewState extends State<RemoteEventDetailView> {
   late DateTime _date;
   late int? _doTime;
   late int? _duration;
+  late List<int> _reminderOffsets;
+  late final List<int> _initialReminders;
   bool _saving = false;
   bool _deleted = false;
 
@@ -42,24 +46,42 @@ class _RemoteEventDetailViewState extends State<RemoteEventDetailView> {
     _date = widget.event.date;
     _doTime = widget.event.doTime;
     _duration = widget.event.duration;
+    _initialReminders = widget.controller.remindersForEvent(widget.event);
+    _reminderOffsets = List.of(_initialReminders);
   }
 
   @override
   void dispose() {
-    if (!_deleted && !widget.event.isReadOnly) {
-      final title = _title.text.trim();
-      if (title.isNotEmpty && _hasChanges(title)) {
-        // Fire-and-forget: same UX as the local EventDetailView, save on pop.
-        widget.controller.updateEvent(widget.event.copyWith(
-          title: title,
-          note: _note.text.trim().isEmpty ? null : _note.text.trim(),
-          clearNote: _note.text.trim().isEmpty,
-          date: _date,
-          doTime: _doTime,
-          clearDoTime: _doTime == null,
-          duration: _duration,
-          clearDuration: _duration == null,
-        ));
+    if (!_deleted) {
+      // Push edits to Google (writable events only) — same fire-and-forget UX
+      // as the local EventDetailView, save on pop.
+      if (!widget.event.isReadOnly) {
+        final title = _title.text.trim();
+        if (title.isNotEmpty && _hasChanges(title)) {
+          widget.controller.updateEvent(widget.event.copyWith(
+            title: title,
+            note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+            clearNote: _note.text.trim().isEmpty,
+            date: _date,
+            doTime: _doTime,
+            clearDoTime: _doTime == null,
+            duration: _duration,
+            clearDuration: _duration == null,
+          ));
+        }
+      }
+      // Planom-only reminders apply even to read-only calendars — they live on
+      // the device, never on Google. Schedule against the (possibly edited)
+      // local date/time.
+      if (!listEquals(_reminderOffsets, _initialReminders)) {
+        widget.controller.setEventReminders(
+          widget.event.copyWith(
+            date: _date,
+            doTime: _doTime,
+            clearDoTime: _doTime == null,
+          ),
+          _reminderOffsets,
+        );
       }
     }
     _title.dispose();
@@ -96,6 +118,12 @@ class _RemoteEventDetailViewState extends State<RemoteEventDetailView> {
     final result = await showDurationPicker(context, _duration);
     if (!mounted) return;
     setState(() => _duration = result);
+  }
+
+  Future<void> _pickReminders() async {
+    final result = await showReminderPicker(context, _reminderOffsets);
+    if (!mounted || result == null) return;
+    setState(() => _reminderOffsets = result);
   }
 
   Future<void> _openInGoogle() async {
@@ -242,6 +270,39 @@ class _RemoteEventDetailViewState extends State<RemoteEventDetailView> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SectionCard(
+              onTap: _pickReminders,
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.bell,
+                    size: 18,
+                    color: _reminderOffsets.isNotEmpty
+                        ? AppColors.accent
+                        : secondary,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    formatReminderOffsets(_reminderOffsets, s),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: _reminderOffsets.isNotEmpty
+                          ? AppColors.accent
+                          : secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                s.googleCalendarReminderHint,
+                style: TextStyle(fontSize: 13, color: secondary),
               ),
             ),
             if (readOnly) ...[
