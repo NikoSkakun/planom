@@ -16,6 +16,8 @@ import '../utils/selection_toolbar.dart';
 import '../utils/undo_controller.dart';
 import '../theme/app_theme.dart';
 import 'calendar_date_picker.dart';
+import 'complete_with_undo.dart';
+import 'completed_section_header.dart';
 import 'task_controller.dart';
 import 'task_detail_view.dart';
 import 'task_row.dart';
@@ -34,6 +36,7 @@ class SelectableTaskListShell extends StatefulWidget {
     required this.tasks,
     this.emptyText,
     this.beforeContent,
+    this.showCompletedSection = true,
   });
 
   /// Title shown in the navigation bar.
@@ -52,6 +55,12 @@ class SelectableTaskListShell extends StatefulWidget {
   /// want to render extra context (e.g. a date header).
   final Widget? beforeContent;
 
+  /// When true, completed tasks are tucked into a collapsible "Completed"
+  /// section at the bottom (mirroring user lists) instead of trailing inline.
+  /// Disabled for the Completed smart list, where every task is completed and
+  /// a section would be redundant.
+  final bool showCompletedSection;
+
   @override
   State<SelectableTaskListShell> createState() =>
       _SelectableTaskListShellState();
@@ -60,6 +69,7 @@ class SelectableTaskListShell extends StatefulWidget {
 class _SelectableTaskListShellState extends State<SelectableTaskListShell>
     with DropdownOverlayMixin {
   final _selection = SelectionController();
+  bool _completedExpanded = false;
 
   @override
   void dispose() {
@@ -284,22 +294,7 @@ class _SelectableTaskListShellState extends State<SelectableTaskListShell>
               child: Column(
                 children: [
                   if (widget.beforeContent != null) widget.beforeContent!,
-                  Expanded(
-                    child: tasks.isEmpty
-                        ? Center(
-                            child: Text(
-                              widget.emptyText ?? s.noTasks,
-                              style: const TextStyle(
-                                  color: CupertinoColors.secondaryLabel),
-                            ),
-                          )
-                        : AnimatedItemList<Task>(
-                            items: tasks,
-                            idOf: (t) => t.id,
-                            itemBuilder: (context, task) =>
-                                _buildTaskItem(context, task),
-                          ),
-                  ),
+                  Expanded(child: _buildBody(context, tasks, s)),
                   if (selecting)
                     SelectionToolbar(
                       bottomInset: MediaQuery.paddingOf(context).bottom,
@@ -311,6 +306,68 @@ class _SelectableTaskListShellState extends State<SelectableTaskListShell>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildBody(BuildContext context, List<Task> tasks, S s) {
+    if (tasks.isEmpty) {
+      return Center(
+        child: Text(
+          widget.emptyText ?? s.noTasks,
+          style: const TextStyle(color: CupertinoColors.secondaryLabel),
+        ),
+      );
+    }
+
+    // Flat list (no Completed section) — used by the Completed smart list,
+    // where pulling everything under one collapsed header would be pointless.
+    if (!widget.showCompletedSection) {
+      return AnimatedItemList<Task>(
+        items: tasks,
+        idOf: (t) => t.id,
+        itemBuilder: (context, task) => _buildTaskItem(context, task),
+      );
+    }
+
+    // The incoming `tasks` snapshot is already ordered incomplete-first with
+    // completed trailing (TaskController._completedLast), so a simple
+    // partition preserves the intended within-group ordering.
+    final incomplete = tasks.where((t) => !t.isCompleted).toList();
+    final completed = tasks.where((t) => t.isCompleted).toList();
+
+    final children = <Widget>[];
+    if (incomplete.isNotEmpty) {
+      children.add(AnimatedItemList<Task>(
+        key: const ValueKey('shell-incomplete'),
+        items: incomplete,
+        idOf: (t) => t.id,
+        itemBuilder: (context, task) => _buildTaskItem(context, task),
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+      ));
+    }
+    if (completed.isNotEmpty) {
+      children.add(CompletedSectionHeader(
+        count: completed.length,
+        expanded: _completedExpanded,
+        onToggle: () =>
+            setState(() => _completedExpanded = !_completedExpanded),
+      ));
+      if (_completedExpanded) {
+        children.add(AnimatedItemList<Task>(
+          key: const ValueKey('shell-completed'),
+          items: completed,
+          idOf: (t) => t.id,
+          itemBuilder: (context, task) => _buildTaskItem(context, task),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+        ));
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.only(top: 4, bottom: 80),
+      children: children,
     );
   }
 
@@ -360,7 +417,8 @@ class _SelectableTaskListShellState extends State<SelectableTaskListShell>
       },
       child: TaskRow(
         task: task,
-        onToggle: () => widget.taskController.toggleCompleted(task.id),
+        onToggle: () => toggleTaskCompletedWithUndo(
+            context, widget.taskController, task),
         onTap: () => Navigator.of(context).push(
           FastRoute<void>(
             settings: const RouteSettings(name: TaskDetailView.routeName),

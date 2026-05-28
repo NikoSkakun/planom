@@ -296,25 +296,9 @@ class _DayViewSheetState extends State<DayViewSheet> {
             ?.eventsForDate(widget.date) ??
         const <RemoteEvent>[];
 
-    // Untimed first (tasks then events), then timed sorted by doTime.
-    final untimedTasks =
-        tasks.where((t) => t.doTime == null).toList();
-    final untimedEvents = events.where((e) => e.doTime == null).toList();
-    final untimedRemote =
-        remoteEvents.where((e) => e.doTime == null).toList();
-    final timedItems = <_TimedItem>[
-      for (final t in tasks.where((t) => t.doTime != null))
-        _TimedItem.task(t),
-      for (final e in events.where((e) => e.doTime != null))
-        _TimedItem.event(e),
-      for (final e in remoteEvents.where((e) => e.doTime != null))
-        _TimedItem.remoteEvent(e),
-    ]..sort((a, b) => a.doTime.compareTo(b.doTime));
-
-    final isEmpty = untimedTasks.isEmpty &&
-        untimedEvents.isEmpty &&
-        untimedRemote.isEmpty &&
-        timedItems.isEmpty &&
+    final isEmpty = tasks.isEmpty &&
+        events.isEmpty &&
+        remoteEvents.isEmpty &&
         birthdays.isEmpty;
 
     if (isEmpty) {
@@ -329,6 +313,21 @@ class _DayViewSheetState extends State<DayViewSheet> {
       );
     }
 
+    // Split into an "active" group (uncompleted tasks + upcoming events) and a
+    // "done/past" group (completed tasks + events whose time has passed). The
+    // done/past group sinks to the bottom so the day reads as what's left
+    // first, with finished items tucked underneath.
+    final activeChildren = _buildGroup(
+      tasks: tasks.where((t) => !t.isCompleted),
+      events: events.where((e) => !_EventCard._isPast(e)),
+      remoteEvents: remoteEvents.where((e) => !_RemoteEventCard._isPast(e)),
+    );
+    final pastChildren = _buildGroup(
+      tasks: tasks.where((t) => t.isCompleted),
+      events: events.where((e) => _EventCard._isPast(e)),
+      remoteEvents: remoteEvents.where((e) => _RemoteEventCard._isPast(e)),
+    );
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       children: [
@@ -340,48 +339,74 @@ class _DayViewSheetState extends State<DayViewSheet> {
           ),
           const SizedBox(height: 8),
         ],
-        for (final t in untimedTasks) ...[
-          _TaskCard(
-            task: t,
-            folderController: widget.folderController,
-            onTap: () => _openTask(t),
-            onToggle: () => widget.taskController.toggleCompleted(t.id),
-          ),
-          const SizedBox(height: 8),
-        ],
-        for (final e in untimedEvents) ...[
-          _EventCard(event: e, onTap: () => _openEvent(e)),
-          const SizedBox(height: 8),
-        ],
-        for (final e in untimedRemote) ...[
-          _RemoteEventCard(event: e, onTap: () => _openRemoteEvent(e)),
-          const SizedBox(height: 8),
-        ],
-        if (timedItems.isNotEmpty &&
-            (untimedTasks.isNotEmpty ||
-                untimedEvents.isNotEmpty ||
-                untimedRemote.isNotEmpty))
-          const SizedBox(height: 4),
-        for (final item in timedItems) ...[
-          if (item.task != null)
-            _TaskCard(
-              task: item.task!,
-              folderController: widget.folderController,
-              onTap: () => _openTask(item.task!),
-              onToggle: () =>
-                  widget.taskController.toggleCompleted(item.task!.id),
-            )
-          else if (item.event != null)
-            _EventCard(event: item.event!, onTap: () => _openEvent(item.event!))
-          else
-            _RemoteEventCard(
-              event: item.remoteEvent!,
-              onTap: () => _openRemoteEvent(item.remoteEvent!),
-            ),
-          const SizedBox(height: 8),
-        ],
+        ...activeChildren,
+        ...pastChildren,
       ],
     );
+  }
+
+  /// Builds the cards for one group (active or done/past). Within a group the
+  /// ordering is the familiar "untimed first (tasks, events, remote), then
+  /// timed sorted by start time".
+  List<Widget> _buildGroup({
+    required Iterable<Task> tasks,
+    required Iterable<Event> events,
+    required Iterable<RemoteEvent> remoteEvents,
+  }) {
+    final untimedTasks = tasks.where((t) => t.doTime == null).toList();
+    final untimedEvents = events.where((e) => e.doTime == null).toList();
+    final untimedRemote = remoteEvents.where((e) => e.doTime == null).toList();
+    final timedItems = <_TimedItem>[
+      for (final t in tasks.where((t) => t.doTime != null))
+        _TimedItem.task(t),
+      for (final e in events.where((e) => e.doTime != null))
+        _TimedItem.event(e),
+      for (final e in remoteEvents.where((e) => e.doTime != null))
+        _TimedItem.remoteEvent(e),
+    ]..sort((a, b) => a.doTime.compareTo(b.doTime));
+
+    final hasUntimed = untimedTasks.isNotEmpty ||
+        untimedEvents.isNotEmpty ||
+        untimedRemote.isNotEmpty;
+
+    return [
+      for (final t in untimedTasks) ...[
+        _TaskCard(
+          task: t,
+          folderController: widget.folderController,
+          onTap: () => _openTask(t),
+          onToggle: () => widget.taskController.toggleCompleted(t.id),
+        ),
+        const SizedBox(height: 8),
+      ],
+      for (final e in untimedEvents) ...[
+        _EventCard(event: e, onTap: () => _openEvent(e)),
+        const SizedBox(height: 8),
+      ],
+      for (final e in untimedRemote) ...[
+        _RemoteEventCard(event: e, onTap: () => _openRemoteEvent(e)),
+        const SizedBox(height: 8),
+      ],
+      if (timedItems.isNotEmpty && hasUntimed) const SizedBox(height: 4),
+      for (final item in timedItems) ...[
+        if (item.task != null)
+          _TaskCard(
+            task: item.task!,
+            folderController: widget.folderController,
+            onTap: () => _openTask(item.task!),
+            onToggle: () =>
+                widget.taskController.toggleCompleted(item.task!.id),
+          )
+        else if (item.event != null)
+          _EventCard(event: item.event!, onTap: () => _openEvent(item.event!))
+        else
+          _RemoteEventCard(
+            event: item.remoteEvent!,
+            onTap: () => _openRemoteEvent(item.remoteEvent!),
+          ),
+        const SizedBox(height: 8),
+      ],
+    ];
   }
 }
 

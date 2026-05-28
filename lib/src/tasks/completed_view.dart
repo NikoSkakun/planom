@@ -24,6 +24,7 @@ class CompletedView extends StatelessWidget {
       folderController: folderController,
       tasks: () => controller.allCompletedTasks,
       emptyText: s.noCompletedTasks,
+      showCompletedSection: false,
     );
   }
 }
