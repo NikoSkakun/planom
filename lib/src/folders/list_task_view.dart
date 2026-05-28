@@ -8,6 +8,8 @@ import '../models/list_section.dart';
 import '../models/list_type.dart';
 import '../models/task.dart';
 import '../tasks/calendar_date_picker.dart';
+import '../tasks/complete_with_undo.dart';
+import '../tasks/completed_section_header.dart';
 import '../tasks/task_controller.dart';
 import '../tasks/task_detail_view.dart';
 import '../tasks/task_row.dart';
@@ -569,7 +571,7 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
         // Implicit "Completed" virtual section — always shown when there's
         // at least one completed task; cannot be edited or deleted.
         if (completed.isNotEmpty) {
-          children.add(_CompletedHeader(
+          children.add(CompletedSectionHeader(
             count: completed.length,
             expanded: _completedExpanded,
             onToggle: () =>
@@ -678,7 +680,8 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
       },
       child: TaskRow(
         task: task,
-        onToggle: () => widget.taskController.toggleCompleted(task.id),
+        onToggle: () => toggleTaskCompletedWithUndo(
+            context, widget.taskController, task),
         onTap: () => Navigator.of(context).push(
           FastRoute<void>(
             settings: const RouteSettings(name: TaskDetailView.routeName),
@@ -959,57 +962,6 @@ class _SectionHeader extends StatelessWidget {
     } else if (choice == 'delete') {
       onDelete();
     }
-  }
-}
-
-/// Implicit virtual "Completed" header — always at the bottom of the list,
-/// not editable. Counts and reveals completed tasks for the list.
-class _CompletedHeader extends StatelessWidget {
-  const _CompletedHeader({
-    required this.count,
-    required this.expanded,
-    required this.onToggle,
-  });
-
-  final int count;
-  final bool expanded;
-  final VoidCallback onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onToggle,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        margin: const EdgeInsets.only(top: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          children: [
-            AnimatedRotation(
-              duration: const Duration(milliseconds: 180),
-              turns: expanded ? 0 : -0.25,
-              child: Icon(
-                CupertinoIcons.chevron_down,
-                size: 14,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '${S.of(context).sectionCompleted} ($count)',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

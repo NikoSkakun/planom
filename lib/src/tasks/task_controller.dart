@@ -11,6 +11,24 @@ import '../utils/platform_capabilities.dart';
 
 enum TaskSortOrder { defaultOrder, creationDate, name, priority, dateTime }
 
+/// Outcome of [TaskController.toggleCompleted], so callers can react to what
+/// actually happened (e.g. only show an Undo banner when a task was checked
+/// off, not when it was un-checked or when a recurring task merely advanced).
+enum TaskToggleResult {
+  /// The task transitioned from incomplete → completed.
+  completed,
+
+  /// The task transitioned from completed → incomplete.
+  uncompleted,
+
+  /// A recurring task's due date advanced to its next occurrence instead of
+  /// being marked done.
+  recurrenceAdvanced,
+
+  /// Nothing happened (e.g. the id was not found).
+  none,
+}
+
 class TaskController with ChangeNotifier {
   TaskController(this._db);
 
@@ -296,9 +314,9 @@ class TaskController with ChangeNotifier {
     NotificationService.instance.scheduleTaskReminders(updated);
   }
 
-  Future<void> toggleCompleted(String id) async {
+  Future<TaskToggleResult> toggleCompleted(String id) async {
     final i = _tasks.indexWhere((t) => t.id == id);
-    if (i == -1) return;
+    if (i == -1) return TaskToggleResult.none;
     final original = _tasks[i];
     final completing = !original.isCompleted;
 
@@ -315,7 +333,7 @@ class TaskController with ChangeNotifier {
         _updateBadge();
         notifyListeners();
         NotificationService.instance.scheduleTaskReminders(advanced);
-        return;
+        return TaskToggleResult.recurrenceAdvanced;
       }
     }
 
@@ -339,6 +357,9 @@ class TaskController with ChangeNotifier {
     } else {
       NotificationService.instance.scheduleTaskReminders(updated);
     }
+    return completing
+        ? TaskToggleResult.completed
+        : TaskToggleResult.uncompleted;
   }
 
   Future<void> deleteTask(String id) async {

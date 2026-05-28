@@ -249,6 +249,7 @@ class S {
       t('pageNumberLabel').replaceFirst('{n}', n.toString());
   String get showListCount => t('showListCount');
   String get revert => t('revert');
+  String get taskCompletedToast => t('taskCompletedToast');
   String get taskTrashedToast => t('taskTrashedToast');
   String get listTrashedToast => t('listTrashedToast');
   String get folderTrashedToast => t('folderTrashedToast');
@@ -800,6 +801,7 @@ const Map<String, String> _en = {
   'pageNumberLabel': 'PAGE {n}',
   'showListCount': 'List counter',
   'revert': 'Undo',
+  'taskCompletedToast': 'Task completed',
   'taskTrashedToast': 'Task moved to Trash',
   'listTrashedToast': 'List moved to Trash',
   'folderTrashedToast': 'Folder moved to Trash',
