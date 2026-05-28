@@ -1,82 +1,117 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:planom/src/database/database_service.dart';
+import 'package:planom/src/integrations/google/google_account.dart';
 import 'package:planom/src/integrations/google/google_auth_service.dart';
 import 'package:planom/src/integrations/google/google_calendar_api.dart';
 import 'package:planom/src/integrations/google/google_calendar_cache.dart';
 import 'package:planom/src/integrations/google/google_calendar_controller.dart';
 import 'package:planom/src/integrations/google/remote_event.dart';
 
-/// A signed-in auth stub. Never touches the real google_sign_in plugin.
+/// Auth stub: no real flutter_appauth / secure storage. The controller only
+/// calls authorize / cacheAccessToken / storeRefreshToken / forget on it; the
+/// API stub handles everything else.
 class _FakeAuth extends GoogleAuthService {
-  bool signedIn = true;
-
   @override
-  bool get isSignedIn => signedIn;
+  Future<GoogleAuthResult?> authorize(List<String> scopes) async =>
+      GoogleAuthResult(accessToken: 'access', refreshToken: 'refresh');
   @override
-  String? get email => signedIn ? 'tester@example.com' : null;
+  void cacheAccessToken(String accountId, String token, DateTime? expiry) {}
   @override
-  Future<bool> trySilentSignIn() async => signedIn;
+  Future<void> storeRefreshToken(String accountId, String? token) async {}
   @override
-  Future<bool> signIn() async {
-    signedIn = true;
-    return true;
-  }
-
-  @override
-  Future<void> signOut() async {
-    signedIn = false;
-  }
-
-  @override
-  Future<http.Client?> authClient() async => null;
+  Future<void> forget(String accountId) async {}
 }
 
-/// Scriptable Calendar API stub. A full fetch (no sync token) returns
-/// [fullEvents]; an incremental fetch (with token) returns the queued deltas /
-/// deletes for that calendar, mimicking Google's real behavior.
+/// Scriptable Calendar API. A full fetch (no token) returns the registered
+/// events; an incremental fetch (with token) returns queued deltas / deletes.
 class _FakeApi extends GoogleCalendarApi {
   _FakeApi() : super(_FakeAuth());
 
-  List<GoogleCalendarMeta> calendars = const [];
-  Map<String, List<RemoteEvent>> fullEvents = {};
+  /// The email the next addAccount() should resolve to.
+  String? nextPrimaryEmail;
+
+  final Map<String, List<GoogleCalendarMeta>> _cals = {};
+  final Map<String, List<RemoteEvent>> _fullEvents = {}; // calKey -> events
   final Map<String, List<RemoteEvent>> _pendingDeltas = {};
   final Map<String, Set<String>> _pendingDeletes = {};
   int _tok = 0;
 
-  void queueDelete(String calId, String eventId) =>
-      (_pendingDeletes[calId] ??= {}).add(eventId);
+  void register(
+    String email, {
+    required List<GoogleCalendarMeta> calendars,
+    Map<String, List<RemoteEvent>> events = const {},
+  }) {
+    _cals[email] = calendars;
+    events.forEach((calId, evs) {
+      _fullEvents[calendarKey(email, calId)] = evs;
+    });
+  }
+
+  void queueDelete(String calKey, String eventId) =>
+      (_pendingDeletes[calKey] ??= {}).add(eventId);
 
   @override
-  Future<List<GoogleCalendarMeta>> listCalendars() async => calendars;
+  Future<String?> primaryCalendarId(GoogleAccount account) async =>
+      nextPrimaryEmail;
+
+  @override
+  Future<List<GoogleCalendarMeta>> listCalendars(GoogleAccount account) async {
+    final base = _cals[account.id] ?? const <GoogleCalendarMeta>[];
+    // Stamp the account's read-only mode, mirroring the real API.
+    return base
+        .map((c) => GoogleCalendarMeta(
+              accountId: account.id,
+              id: c.id,
+              summary: c.summary,
+              color: c.color,
+              accessRole: c.accessRole,
+              primary: c.primary,
+              accountReadOnly: account.readOnly,
+            ))
+        .toList();
+  }
 
   @override
   Future<CalendarListResult> listEvents({
+    required GoogleAccount account,
     required GoogleCalendarMeta calendar,
     DateTime? timeMin,
     DateTime? timeMax,
     String? syncToken,
   }) async {
+    final key = calendar.key;
     if (syncToken == null) {
-      // Full fetch: authoritative snapshot for the window.
       return CalendarListResult(
-        events: List.of(fullEvents[calendar.id] ?? const []),
+        events: List.of(_fullEvents[key] ?? const []),
         nextSyncToken: 'tok${_tok++}',
         tokenInvalid: false,
       );
     }
-    // Incremental: only deltas + deletion tombstones since the last token.
-    final deltas = _pendingDeltas.remove(calendar.id) ?? const [];
-    final deletes = _pendingDeletes.remove(calendar.id) ?? const <String>{};
     return CalendarListResult(
-      events: List.of(deltas),
+      events: List.of(_pendingDeltas.remove(key) ?? const []),
       nextSyncToken: 'tok${_tok++}',
       tokenInvalid: false,
-      deletedEventIds: deletes,
+      deletedEventIds: _pendingDeletes.remove(key) ?? const {},
     );
   }
+
+  @override
+  Future<RemoteEvent?> insertEvent({
+    required GoogleAccount account,
+    required GoogleCalendarMeta calendar,
+    required RemoteEventDraft draft,
+  }) async =>
+      RemoteEvent(
+        googleEventId: 'created${_tok++}',
+        accountId: account.id,
+        calendarId: calendar.id,
+        calendarName: calendar.summary,
+        calendarColor: calendar.color,
+        title: draft.title,
+        date: draft.date,
+      );
 }
 
 class _FakeCache extends GoogleCalendarCache {
@@ -97,16 +132,24 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  GoogleCalendarMeta cal(String id, {bool primary = false}) => GoogleCalendarMeta(
+  GoogleCalendarMeta cal(
+    String email,
+    String id, {
+    bool primary = false,
+    String role = 'owner',
+  }) =>
+      GoogleCalendarMeta(
+        accountId: email,
         id: id,
         summary: id,
         color: 0xFF112233,
-        accessRole: 'owner',
+        accessRole: role,
         primary: primary,
       );
 
-  RemoteEvent ev(String id, String calId) => RemoteEvent(
+  RemoteEvent ev(String email, String calId, String id) => RemoteEvent(
         googleEventId: id,
+        accountId: email,
         calendarId: calId,
         calendarName: calId,
         calendarColor: 0xFF112233,
@@ -115,95 +158,149 @@ void main() {
       );
 
   late DatabaseService db;
-  late _FakeAuth auth;
   late _FakeApi api;
-  late _FakeCache cache;
   late GoogleCalendarController controller;
 
   setUp(() async {
     db = DatabaseService(
-      dbName: 'test_gcal_${DateTime.now().microsecondsSinceEpoch}.db',
-    );
-    auth = _FakeAuth();
-    api = _FakeApi()
-      ..calendars = [cal('A', primary: true), cal('B')]
-      ..fullEvents = {
-        'A': [ev('a1', 'A'), ev('a2', 'A')],
-        'B': [ev('b1', 'B'), ev('b2', 'B')],
-      };
-    cache = _FakeCache();
+        dbName: 'test_gcal_${DateTime.now().microsecondsSinceEpoch}.db');
+    api = _FakeApi();
     controller = GoogleCalendarController(
       db: db,
-      auth: auth,
-      cache: cache,
+      auth: _FakeAuth(),
+      cache: _FakeCache(),
       api: api,
     );
   });
 
-  tearDown(() async {
-    await db.resetUserData();
-  });
+  tearDown(() async => db.resetUserData());
 
-  // Drains the fire-and-forget refresh()es kicked off inside connect() /
-  // setSelectedCalendars().
   Future<void> settle() =>
       Future<void>.delayed(const Duration(milliseconds: 80));
 
-  Set<String> idsFor(String calId) => controller.events
-      .where((e) => e.calendarId == calId)
-      .map((e) => e.googleEventId)
-      .toSet();
+  Set<String> eventIds() =>
+      controller.events.map((e) => e.googleEventId).toSet();
 
-  test('connect loads every event from every calendar', () async {
-    await controller.connect();
+  Future<void> addAccount(String email,
+      {bool readOnly = false, required _FakeApi api}) async {
+    api.nextPrimaryEmail = email;
+    await controller.addAccount(readOnly: readOnly);
+  }
+
+  test('adding an account loads events from all its calendars', () async {
+    api.register('a@x.com', calendars: [
+      cal('a@x.com', 'work', primary: true),
+      cal('a@x.com', 'home'),
+    ], events: {
+      'work': [ev('a@x.com', 'work', 'w1')],
+      'home': [ev('a@x.com', 'home', 'h1')],
+    });
+
+    await addAccount('a@x.com', api: api);
     await settle();
 
-    expect(idsFor('A'), {'a1', 'a2'});
-    expect(idsFor('B'), {'b1', 'b2'});
+    expect(eventIds(), {'w1', 'h1'});
+    expect(controller.accountCount, 1);
   });
 
   test('re-enabling a calendar restores all its events, not just deltas',
       () async {
-    await controller.connect();
+    api.register('a@x.com', calendars: [
+      cal('a@x.com', 'work', primary: true),
+      cal('a@x.com', 'home'),
+    ], events: {
+      'work': [ev('a@x.com', 'work', 'w1')],
+      'home': [ev('a@x.com', 'home', 'h1')],
+    });
+    await addAccount('a@x.com', api: api);
     await settle();
-    expect(idsFor('B'), {'b1', 'b2'});
+    expect(eventIds(), {'w1', 'h1'});
 
-    // Disable calendar B.
-    await controller.setSelectedCalendars({'A'});
-    await settle();
-    expect(idsFor('B'), isEmpty);
+    final home =
+        controller.calendarsForAccount('a@x.com').firstWhere((c) => c.id == 'home');
 
-    // Re-enable B. The stale sync token must have been cleared so this does a
-    // full fetch — otherwise an incremental sync would return no deltas and B
-    // would stay empty (the reported bug).
-    await controller.setSelectedCalendars({'A', 'B'});
+    await controller.setCalendarSelected(home, false);
     await settle();
-    expect(idsFor('B'), {'b1', 'b2'});
+    expect(eventIds(), {'w1'});
+
+    // Re-enable: the cleared sync token must force a full fetch.
+    await controller.setCalendarSelected(home, true);
+    await settle();
+    expect(eventIds(), {'w1', 'h1'});
   });
 
-  test('reconnecting after disconnect restores all events', () async {
-    await controller.connect();
+  test('removing then re-adding an account restores its events', () async {
+    api.register('a@x.com',
+        calendars: [cal('a@x.com', 'work', primary: true)],
+        events: {
+          'work': [ev('a@x.com', 'work', 'w1')]
+        });
+    await addAccount('a@x.com', api: api);
     await settle();
-    expect(idsFor('A'), {'a1', 'a2'});
+    expect(eventIds(), {'w1'});
 
-    await controller.disconnect();
+    await controller.removeAccount(controller.accounts.first);
     expect(controller.events, isEmpty);
+    expect(controller.accountCount, 0);
 
-    await controller.connect();
+    await addAccount('a@x.com', api: api);
     await settle();
-    expect(idsFor('A'), {'a1', 'a2'});
-    expect(idsFor('B'), {'b1', 'b2'});
+    expect(eventIds(), {'w1'});
   });
 
   test('incremental sync evicts events deleted on Google', () async {
-    await controller.connect();
+    api.register('a@x.com',
+        calendars: [cal('a@x.com', 'work', primary: true)],
+        events: {
+          'work': [ev('a@x.com', 'work', 'w1'), ev('a@x.com', 'work', 'w2')]
+        });
+    await addAccount('a@x.com', api: api);
     await settle();
-    expect(idsFor('B'), {'b1', 'b2'});
+    expect(eventIds(), {'w1', 'w2'});
 
-    // Next incremental refresh reports b1 as cancelled (deleted elsewhere).
-    api.queueDelete('B', 'b1');
+    api.queueDelete(calendarKey('a@x.com', 'work'), 'w1');
     await controller.refresh();
 
-    expect(idsFor('B'), {'b2'});
+    expect(eventIds(), {'w2'});
+  });
+
+  test('multiple accounts aggregate their events', () async {
+    api.register('a@x.com',
+        calendars: [cal('a@x.com', 'cal', primary: true)],
+        events: {
+          'cal': [ev('a@x.com', 'cal', 'a1')]
+        });
+    api.register('b@y.com',
+        calendars: [cal('b@y.com', 'cal', primary: true)],
+        events: {
+          'cal': [ev('b@y.com', 'cal', 'b1')]
+        });
+
+    await addAccount('a@x.com', api: api);
+    await settle();
+    await addAccount('b@y.com', api: api);
+    await settle();
+
+    expect(controller.accountCount, 2);
+    expect(eventIds(), {'a1', 'b1'});
+  });
+
+  test('read-only account calendars are not writable and reject creates',
+      () async {
+    api.register('r@x.com',
+        calendars: [cal('r@x.com', 'cal', primary: true)]);
+    await addAccount('r@x.com', readOnly: true, api: api);
+    await settle();
+
+    final cals = controller.calendarsForAccount('r@x.com');
+    expect(cals.isNotEmpty, true);
+    expect(cals.every((c) => !c.canWrite), true);
+
+    final created = await controller.createEvent(
+      RemoteEventDraft(title: 'x', date: DateTime.now()),
+      accountId: 'r@x.com',
+      calendarId: 'cal',
+    );
+    expect(created, isNull);
   });
 }

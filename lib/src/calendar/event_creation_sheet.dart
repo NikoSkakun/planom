@@ -60,7 +60,10 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
   int? _doTime;
   int? _duration; // minutes
   bool _titleEmpty = true;
-  late String _calendarId;
+
+  /// The Google calendar new events go to; null means save as a local Planom
+  /// event.
+  GoogleCalendarMeta? _targetCal;
 
   @override
   void initState() {
@@ -68,17 +71,14 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
     _date = DateTime(
         widget.initialDate.year, widget.initialDate.month, widget.initialDate.day);
     // Default to the user's chosen Google default calendar when they're
-    // connected and have one set; otherwise create locally.
+    // connected and it's writable + selected; otherwise create locally.
     final gc = widget.googleCalendarController;
-    if (gc != null &&
-        gc.isConnected &&
-        gc.defaultCalendarId != null &&
-        gc.defaultCalendarId!.isNotEmpty &&
-        gc.writableSelectedCalendars
-            .any((c) => c.id == gc.defaultCalendarId)) {
-      _calendarId = gc.defaultCalendarId!;
-    } else {
-      _calendarId = kLocalCalendarId;
+    if (gc != null && gc.isConnected) {
+      final def = gc.defaultCalendar;
+      if (def != null &&
+          gc.writableSelectedCalendars.any((c) => c.key == def.key)) {
+        _targetCal = def;
+      }
     }
     _titleCtrl.addListener(() {
       final empty = _titleCtrl.text.trim().isEmpty;
@@ -109,8 +109,8 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
     if (title.isEmpty) return;
     final note = _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
 
-    if (_calendarId == kLocalCalendarId ||
-        widget.googleCalendarController == null) {
+    final target = _targetCal;
+    if (target == null || widget.googleCalendarController == null) {
       await widget.controller.addEvent(Event(
         title: title,
         note: note,
@@ -130,7 +130,8 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
           doTime: _doTime,
           duration: _duration,
         ),
-        calendarId: _calendarId,
+        accountId: target.accountId,
+        calendarId: target.id,
       );
     }
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -139,11 +140,12 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
   Future<void> _pickCalendar() async {
     final s = S.of(context);
     final gc = widget.googleCalendarController;
+    final writable =
+        (gc != null && gc.isConnected) ? gc.writableSelectedCalendars : const [];
     final options = <SelectionMenuOption<String>>[
       SelectionMenuOption(value: kLocalCalendarId, label: s.planomLocal),
-      if (gc != null && gc.isConnected)
-        for (final cal in gc.writableSelectedCalendars)
-          SelectionMenuOption(value: cal.id, label: cal.summary),
+      for (final cal in writable)
+        SelectionMenuOption(value: cal.key, label: _calLabel(gc!, cal)),
     ];
     if (options.length == 1) return;
     final saved = _activeFocus;
@@ -151,22 +153,35 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
     final pick = await showSelectionMenu<String>(
       context: context,
       title: s.eventCalendar,
-      current: _calendarId,
+      current: _targetCal?.key ?? kLocalCalendarId,
       options: options,
     );
     if (!mounted) return;
-    if (pick != null) setState(() => _calendarId = pick);
+    if (pick != null) {
+      final matches =
+          gc == null ? const <GoogleCalendarMeta>[] : gc.writableSelectedCalendars
+              .where((c) => c.key == pick)
+              .toList();
+      setState(() {
+        _targetCal =
+            (pick == kLocalCalendarId || matches.isEmpty) ? null : matches.first;
+      });
+    }
     saved?.requestFocus();
   }
 
+  /// Disambiguates calendars across accounts: shows the account email when
+  /// more than one account is connected.
+  String _calLabel(GoogleCalendarController gc, GoogleCalendarMeta cal) {
+    if (gc.accountCount <= 1) return cal.summary;
+    return '${cal.summary} · ${cal.accountId}';
+  }
+
   String _calendarLabel(S s) {
-    if (_calendarId == kLocalCalendarId) return s.planomLocal;
     final gc = widget.googleCalendarController;
-    if (gc == null) return s.planomLocal;
-    for (final cal in gc.availableCalendars) {
-      if (cal.id == _calendarId) return cal.summary;
-    }
-    return s.planomLocal;
+    final target = _targetCal;
+    if (gc == null || target == null) return s.planomLocal;
+    return _calLabel(gc, target);
   }
 
   Future<void> _pickDate() async {

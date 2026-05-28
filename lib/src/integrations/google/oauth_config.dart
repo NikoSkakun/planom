@@ -1,47 +1,53 @@
-// Google OAuth client identifiers used by [GoogleAuthService].
+// Google OAuth client configuration used by [GoogleAuthService].
 //
-// These are deliberately compile-time constants so they ship inside the app
-// bundle — Google's installed-app OAuth flow accepts this (the so-called
-// client secret is not really a secret). Replace the placeholders below
-// before shipping; until you do, [isGoogleSignInConfigured] returns false
-// and the Google Calendar settings page renders a "setup required" state
-// instead of attempting to sign in.
+// Planom uses the installed-app OAuth 2.0 flow (authorization code + PKCE) via
+// flutter_appauth. The iOS client has no client secret — the redirect back
+// into the app happens over the reversed-client-ID URL scheme registered in
+// ios/Runner/Info.plist. Replace the placeholders below before shipping; until
+// you do, [isGoogleSignInConfigured] returns false and the Google Calendar
+// settings page renders a "setup required" state instead of trying to connect.
 //
 // Setup steps:
-//   1. Create an OAuth 2.0 Client ID in Google Cloud Console for each
-//      platform you target (iOS, Android, Web, macOS).
+//   1. Create an OAuth 2.0 Client ID in Google Cloud Console for each platform
+//      you target (iOS, Android, …).
 //   2. Enable the Google Calendar API for the project.
-//   3. iOS only: add the reversed client ID as a URL scheme in
-//      `ios/Runner/Info.plist` and a `GIDClientID` entry (see the comments
-//      in that file).
-//   4. Android only: register the SHA-1 fingerprint of your signing key
-//      with the Android OAuth client.
+//   3. iOS: add the reversed client ID as a URL scheme in
+//      ios/Runner/Info.plist (already done) — flutter_appauth uses it for the
+//      OAuth redirect.
 
 /// iOS Google OAuth 2.0 client ID. Format: `<digits>-<hash>.apps.googleusercontent.com`.
 const String kGoogleIosClientId =
     '264060209270-4l2qk3d1k4ehkmtg8iikjme28590ihp3.apps.googleusercontent.com';
 
-/// Android Google OAuth 2.0 client ID. The `google_sign_in` plugin discovers
-/// this automatically from the SHA-1 fingerprint you register, so leaving
-/// this empty is fine on Android.
-const String kGoogleAndroidClientId = '';
+/// OAuth redirect URI: the reversed iOS client ID plus the conventional
+/// `:/oauthredirect` path. Its scheme must match a `CFBundleURLSchemes` entry
+/// in ios/Runner/Info.plist.
+const String kGoogleRedirectUri =
+    'com.googleusercontent.apps.264060209270-4l2qk3d1k4ehkmtg8iikjme28590ihp3:/oauthredirect';
 
-/// Web Google OAuth 2.0 client ID. Used for the optional `serverClientId`
-/// argument so the API returns an ID token that can be verified server-side.
-const String kGoogleServerClientId = '';
+/// Google's OAuth endpoints. Specified explicitly so we skip the discovery
+/// round-trip flutter_appauth would otherwise make.
+const String kGoogleAuthorizationEndpoint =
+    'https://accounts.google.com/o/oauth2/v2/auth';
+const String kGoogleTokenEndpoint = 'https://oauth2.googleapis.com/token';
 
-/// Calendar scopes requested at sign-in.
-///   `calendar.events`         — read/write events on calendars the user owns
-///   `calendar.readonly`       — list the user's calendars (for the picker)
-const List<String> kGoogleCalendarScopes = <String>[
+/// Scopes for a read-write connection: create/update/delete events plus
+/// listing the user's calendars.
+const List<String> kGoogleCalendarReadWriteScopes = <String>[
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.readonly',
 ];
 
-/// True when at least one platform's client ID is wired up. The auth service
-/// uses platform-specific config, but for the settings UI we just need a
-/// quick "is this turned on at all?" gate.
+/// Scopes for a read-only connection: list calendars and read events, no
+/// write access. `calendar.readonly` alone covers both.
+const List<String> kGoogleCalendarReadOnlyScopes = <String>[
+  'https://www.googleapis.com/auth/calendar.readonly',
+];
+
+/// Scopes to request for a connection of the given mode.
+List<String> googleScopesFor({required bool readOnly}) =>
+    readOnly ? kGoogleCalendarReadOnlyScopes : kGoogleCalendarReadWriteScopes;
+
+/// True when the OAuth client is wired up. Gates the settings UI.
 bool get isGoogleSignInConfigured =>
-    kGoogleIosClientId.isNotEmpty ||
-    kGoogleAndroidClientId.isNotEmpty ||
-    kGoogleServerClientId.isNotEmpty;
+    kGoogleIosClientId.isNotEmpty && kGoogleRedirectUri.isNotEmpty;
