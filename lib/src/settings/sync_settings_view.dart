@@ -298,16 +298,11 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 _SectionLabel(text: s.syncFreeSection, color: labelColor),
                 _BackendCard(
                   bg: cardBg,
-                  // iCloud is shown as "Coming soon" until the Apple Developer
-                  // Portal one-time setup (iCloud container + capability link)
-                  // is done. The Dart side is ready; toggling on without those
-                  // entitlements produces opaque runtime errors, so guard it.
                   child: _BackendRow(
                     label: s.syncICloudTitle,
                     sublabel: s.syncICloudSublabel,
                     selected: snap.backend == SyncBackend.icloud,
-                    tag: s.tagComingSoon,
-                    onTap: null,
+                    onTap: _enableICloud,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -470,14 +465,14 @@ class _BackendRow extends StatelessWidget {
     required this.label,
     required this.sublabel,
     required this.selected,
-    required this.tag,
+    this.tag,
     required this.onTap,
   });
 
   final String label;
   final String sublabel;
   final bool selected;
-  final String tag;
+  final String? tag;
   final VoidCallback? onTap;
 
   @override
@@ -506,23 +501,25 @@ class _BackendRow extends StatelessWidget {
                       children: [
                         Text(label,
                             style: TextStyle(fontSize: 16, color: labelColor)),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.accent.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            tag,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.w600,
+                        if (tag != null && tag!.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              tag!,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 2),

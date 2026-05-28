@@ -4,8 +4,8 @@ import 'package:flutter/foundation.dart';
 
 import '../database/database_service.dart';
 import '../settings/backup_crypto.dart';
-import '../settings/backup_service.dart';
 import 'icloud_sync_provider.dart';
+import 'sync_payload_source.dart';
 import 'sync_provider.dart';
 import 'sync_secrets.dart';
 import 'sync_state.dart';
@@ -22,15 +22,18 @@ import 'sync_state.dart';
 class SyncController with ChangeNotifier {
   SyncController({
     required DatabaseService db,
-    required BackupService backupService,
+    required SyncPayloadSource backupService,
     SyncSecrets? secrets,
+    @visibleForTesting SyncProvider? Function(SyncBackend)? providerFactory,
   })  : _db = db,
         _backupService = backupService,
-        _secrets = secrets ?? SyncSecrets();
+        _secrets = secrets ?? SyncSecrets(),
+        _providerFactory = providerFactory;
 
   final DatabaseService _db;
-  final BackupService _backupService;
+  final SyncPayloadSource _backupService;
   final SyncSecrets _secrets;
+  final SyncProvider? Function(SyncBackend)? _providerFactory;
 
   static const _kBackendKey = 'sync_backend';
 
@@ -221,6 +224,7 @@ class SyncController with ChangeNotifier {
   }
 
   SyncProvider? _providerFor(SyncBackend backend) {
+    if (_providerFactory != null) return _providerFactory(backend);
     switch (backend) {
       case SyncBackend.none:
         return null;

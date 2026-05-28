@@ -16,12 +16,13 @@ import '../integrations/google/google_calendar_controller.dart';
 import '../notes/note_controller.dart';
 import '../routines/routine_controller.dart';
 import '../security/security_service.dart';
+import '../sync/sync_payload_source.dart';
 import '../tasks/task_controller.dart';
 import '../utils/platform_capabilities.dart';
 import 'backup_crypto.dart';
 import 'settings_controller.dart';
 
-class BackupService {
+class BackupService implements SyncPayloadSource {
   BackupService({
     required this.db,
     required this.taskController,
@@ -45,6 +46,7 @@ class BackupService {
   /// Builds the active space's backup payload as a plain JSON string. Used
   /// both by [exportBackup] (writes to file + share sheet) and by the sync
   /// subsystem (encrypts in memory + uploads).
+  @override
   Future<String> buildPayloadJson() async {
     final docsPath = (await getApplicationDocumentsDirectory()).path;
 
@@ -181,6 +183,7 @@ class BackupService {
   /// Sync-side entry point: takes already-decrypted JSON (e.g. from a remote
   /// blob the controller just downloaded) and applies it. Returns `true` when
   /// the import committed, `false` when the payload was rejected.
+  @override
   Future<bool> importPayloadJson(String plainJson) async {
     Map<String, dynamic> data;
     try {
