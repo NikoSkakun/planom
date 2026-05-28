@@ -211,6 +211,8 @@ class S {
   String get checkboxStyleRoundedRect => t('checkboxStyleRoundedRect');
   String get checkboxStyleSharpRect => t('checkboxStyleSharpRect');
   String get checkboxStyleCircle => t('checkboxStyleCircle');
+  String get undoOnComplete => t('undoOnComplete');
+  String get undoOnCompleteHint => t('undoOnCompleteHint');
   String get firstDayOfWeek => t('firstDayOfWeek');
   String get appBadge => t('appBadge');
   String get appBadgeMode => t('appBadgeMode');
@@ -764,6 +766,9 @@ const Map<String, String> _en = {
   'checkboxStyleRoundedRect': 'Rounded square',
   'checkboxStyleSharpRect': 'Square',
   'checkboxStyleCircle': 'Circle',
+  'undoOnComplete': 'Undo on completion',
+  'undoOnCompleteHint':
+      'Show a brief Undo banner when you check a task off, so an accidental tap is easy to reverse.',
   'firstDayOfWeek': 'First day of week',
   'appBadge': 'APP ICON BADGE',
   'appBadgeMode': 'Show as badge',

@@ -317,6 +317,25 @@ class TasksSettingsView extends StatelessWidget {
                   onTap: () =>
                       _showCheckboxStylePicker(ctx, fields.checkboxStyle),
                 ),
+                const SizedBox(height: 1),
+                SettingsToggleRow(
+                  label: s.undoOnComplete,
+                  value: fields.showUndoOnComplete,
+                  onChanged: (v) =>
+                      updateField((p) => p.showUndoOnComplete = v),
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    s.undoOnCompleteHint,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: CupertinoColors.secondaryLabel
+                          .resolveFrom(context),
+                    ),
+                  ),
+                ),
 
                 const SizedBox(height: 18),
                 SettingsSectionHeader(s.sectionDefaults),

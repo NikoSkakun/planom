@@ -33,6 +33,16 @@ class TaskCheckboxAppearance {
   static TaskCheckboxStyle current = TaskCheckboxStyle.roundedRect;
 }
 
+/// Mutable global gating the "Undo" banner shown when a task is checked off.
+/// Updated by [SettingsController] whenever [TaskFieldPrefs] change. Kept as a
+/// static (rather than threaded through every completion callsite) because
+/// tasks are completed from many places — smart lists, user lists, etc.
+/// Defaults to off so completing a task is silent unless the user opts in.
+class TaskCompletionUndoPref {
+  TaskCompletionUndoPref._();
+  static bool enabled = false;
+}
+
 /// Which optional fields are shown in the task detail view. Defaults to all
 /// visible. Persisted as JSON in `app_settings` under [storageKey].
 class TaskFieldPrefs {
@@ -48,6 +58,7 @@ class TaskFieldPrefs {
     this.useMarkdown = true,
     this.folderCounterMode = FolderCounterMode.directOnly,
     this.checkboxStyle = TaskCheckboxStyle.roundedRect,
+    this.showUndoOnComplete = false,
   });
 
   bool showPriority;
@@ -63,6 +74,9 @@ class TaskFieldPrefs {
   bool useMarkdown;
   FolderCounterMode folderCounterMode;
   TaskCheckboxStyle checkboxStyle;
+  // When true, checking a task off shows a 5-second Undo banner. Off by
+  // default — completing a task is silent unless the user opts in.
+  bool showUndoOnComplete;
 
   static const String storageKey = 'task_fields';
 
@@ -82,6 +96,7 @@ class TaskFieldPrefs {
         useMarkdown: m['useMarkdown'] != false,
         folderCounterMode: _parseFolderMode(m['folderCounter']),
         checkboxStyle: _parseCheckboxStyle(m['checkboxStyle']),
+        showUndoOnComplete: m['undoOnComplete'] == true,
       );
     } catch (_) {
       return TaskFieldPrefs();
@@ -100,6 +115,7 @@ class TaskFieldPrefs {
         'useMarkdown': useMarkdown,
         'folderCounter': _encodeFolderMode(folderCounterMode),
         'checkboxStyle': _encodeCheckboxStyle(checkboxStyle),
+        'undoOnComplete': showUndoOnComplete,
       });
 
   TaskFieldPrefs copy() => TaskFieldPrefs(
@@ -114,6 +130,7 @@ class TaskFieldPrefs {
         useMarkdown: useMarkdown,
         folderCounterMode: folderCounterMode,
         checkboxStyle: checkboxStyle,
+        showUndoOnComplete: showUndoOnComplete,
       );
 
   static FolderCounterMode _parseFolderMode(dynamic v) {
