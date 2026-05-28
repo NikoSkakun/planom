@@ -535,6 +535,16 @@ class S {
   String get googleCalendarSetupRequired => t('googleCalendarSetupRequired');
   String get googleCalendarReadOnlyHint => t('googleCalendarReadOnlyHint');
   String get googleCalendarDeleteBody => t('googleCalendarDeleteBody');
+  String get googleCalendarAddAccount => t('googleCalendarAddAccount');
+  String get googleCalendarAccountsSection => t('googleCalendarAccountsSection');
+  String get googleCalendarRemoveAccount => t('googleCalendarRemoveAccount');
+  String get googleCalendarRemoveAccountBody =>
+      t('googleCalendarRemoveAccountBody');
+  String get googleCalendarReadWrite => t('googleCalendarReadWrite');
+  String get googleCalendarReadOnlyMode => t('googleCalendarReadOnlyMode');
+  String get googleCalendarChooseMode => t('googleCalendarChooseMode');
+  String get googleCalendarReadWriteDesc => t('googleCalendarReadWriteDesc');
+  String get googleCalendarReadOnlyDesc => t('googleCalendarReadOnlyDesc');
   String get planomLocal => t('planomLocal');
   String get eventCalendar => t('eventCalendar');
 
@@ -999,6 +1009,16 @@ const Map<String, String> _en = {
       'This event is on a calendar you only have read access to. To edit it, open Google Calendar.',
   'googleCalendarDeleteBody':
       'This event will be permanently removed from Google Calendar.',
+  'googleCalendarAddAccount': 'Add account',
+  'googleCalendarAccountsSection': 'Accounts',
+  'googleCalendarRemoveAccount': 'Remove account',
+  'googleCalendarRemoveAccountBody':
+      'Stop syncing this account? Its events will be removed from Planom (they stay in Google).',
+  'googleCalendarReadWrite': 'Read & write',
+  'googleCalendarReadOnlyMode': 'Read only',
+  'googleCalendarChooseMode': 'How should Planom access this account?',
+  'googleCalendarReadWriteDesc': 'View, create, edit and delete events',
+  'googleCalendarReadOnlyDesc': 'View events only — never change Google',
   'planomLocal': 'Planom (local)',
   'eventCalendar': 'Calendar',
 };

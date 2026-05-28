@@ -8,6 +8,7 @@ import 'package:googleapis/calendar/v3.dart' as gcal;
 class RemoteEvent {
   RemoteEvent({
     required this.googleEventId,
+    required this.accountId,
     required this.calendarId,
     required this.calendarName,
     required this.calendarColor,
@@ -24,6 +25,10 @@ class RemoteEvent {
 
   /// Google's event id within [calendarId] (`event.id`).
   final String googleEventId;
+
+  /// The connected account this event belongs to (its email / primary
+  /// calendar id). Edits and deletes route through this account's client.
+  final String accountId;
 
   /// Containing calendar id (e.g. `primary` or a long opaque string).
   final String calendarId;
@@ -74,6 +79,7 @@ class RemoteEvent {
   }) {
     return RemoteEvent(
       googleEventId: googleEventId,
+      accountId: accountId,
       calendarId: calendarId,
       calendarName: calendarName,
       calendarColor: calendarColor,
@@ -94,6 +100,7 @@ class RemoteEvent {
   /// it has no usable start time.
   static RemoteEvent? fromGoogle(
     gcal.Event e, {
+    required String accountId,
     required String calendarId,
     required String calendarName,
     required int calendarColor,
@@ -133,6 +140,7 @@ class RemoteEvent {
 
     return RemoteEvent(
       googleEventId: id,
+      accountId: accountId,
       calendarId: calendarId,
       calendarName: calendarName,
       calendarColor: calendarColor,
@@ -174,6 +182,7 @@ class RemoteEvent {
 extension RemoteEventJson on RemoteEvent {
   Map<String, dynamic> toJson() => {
         'googleEventId': googleEventId,
+        'accountId': accountId,
         'calendarId': calendarId,
         'calendarName': calendarName,
         'calendarColor': calendarColor,
@@ -190,6 +199,7 @@ extension RemoteEventJson on RemoteEvent {
 
   static RemoteEvent fromJson(Map<String, dynamic> m) => RemoteEvent(
         googleEventId: m['googleEventId'] as String,
+        accountId: (m['accountId'] as String?) ?? '',
         calendarId: m['calendarId'] as String,
         calendarName: m['calendarName'] as String,
         calendarColor: (m['calendarColor'] as num).toInt(),
@@ -205,16 +215,28 @@ extension RemoteEventJson on RemoteEvent {
       );
 }
 
+/// Composite key identifying a calendar within a specific account. Unique
+/// across accounts (a shared calendar can appear under more than one account
+/// with the same id). The space separator can't appear in an email or a
+/// Google calendar id.
+String calendarKey(String accountId, String calendarId) =>
+    '$accountId $calendarId';
+
 /// Metadata for one of the user's Google calendars (a row in the
 /// settings → calendars list).
 class GoogleCalendarMeta {
   GoogleCalendarMeta({
+    required this.accountId,
     required this.id,
     required this.summary,
     required this.color,
     required this.accessRole,
     required this.primary,
+    this.accountReadOnly = false,
   });
+
+  /// The connected account this calendar belongs to.
+  final String accountId;
 
   final String id;
   final String summary;
@@ -229,23 +251,36 @@ class GoogleCalendarMeta {
 
   final bool primary;
 
-  bool get canWrite => accessRole == 'owner' || accessRole == 'writer';
+  /// True when the owning account was connected read-only — forces the whole
+  /// calendar to be non-editable even if the access role would allow writes.
+  final bool accountReadOnly;
+
+  bool get canWrite =>
+      !accountReadOnly && (accessRole == 'owner' || accessRole == 'writer');
+
+  /// Stable composite key, unique across accounts (a shared calendar can
+  /// appear under more than one account with the same [id]).
+  String get key => calendarKey(accountId, id);
 
   Map<String, dynamic> toJson() => {
+        'accountId': accountId,
         'id': id,
         'summary': summary,
         'color': color,
         'accessRole': accessRole,
         'primary': primary,
+        'accountReadOnly': accountReadOnly,
       };
 
   static GoogleCalendarMeta fromJson(Map<String, dynamic> m) =>
       GoogleCalendarMeta(
+        accountId: (m['accountId'] as String?) ?? '',
         id: m['id'] as String,
         summary: m['summary'] as String,
         color: (m['color'] as num).toInt(),
         accessRole: m['accessRole'] as String,
         primary: (m['primary'] as bool?) ?? false,
+        accountReadOnly: (m['accountReadOnly'] as bool?) ?? false,
       );
 }
 

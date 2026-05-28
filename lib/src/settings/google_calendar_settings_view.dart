@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../integrations/google/google_account.dart';
 import '../integrations/google/google_calendar_controller.dart';
 import '../integrations/google/oauth_config.dart';
 import '../integrations/google/remote_event.dart';
@@ -12,22 +13,39 @@ class GoogleCalendarSettingsView extends StatelessWidget {
 
   final GoogleCalendarController controller;
 
-  Future<void> _connect(BuildContext context) async {
-    await controller.connect();
+  Future<void> _addAccount(BuildContext context) async {
+    final s = S.of(context);
+    final mode = await showSelectionMenu<bool>(
+      context: context,
+      title: s.googleCalendarChooseMode,
+      options: [
+        SelectionMenuOption(
+          value: false,
+          label: '${s.googleCalendarReadWrite} — ${s.googleCalendarReadWriteDesc}',
+        ),
+        SelectionMenuOption(
+          value: true,
+          label: '${s.googleCalendarReadOnlyMode} — ${s.googleCalendarReadOnlyDesc}',
+        ),
+      ],
+    );
+    if (mode == null) return;
+    await controller.addAccount(readOnly: mode);
   }
 
-  Future<void> _confirmDisconnect(BuildContext context) async {
+  Future<void> _confirmRemove(
+      BuildContext context, GoogleAccount account) async {
     final s = S.of(context);
     final ok = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: Text(s.googleCalendarDisconnect),
-        content: Text(s.googleCalendarDisconnectBody),
+        title: Text(account.email),
+        content: Text(s.googleCalendarRemoveAccountBody),
         actions: [
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(s.googleCalendarDisconnect),
+            child: Text(s.googleCalendarRemoveAccount),
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
@@ -37,25 +55,29 @@ class GoogleCalendarSettingsView extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true) await controller.disconnect();
+    if (ok == true) await controller.removeAccount(account);
   }
 
   Future<void> _pickDefault(BuildContext context) async {
     final s = S.of(context);
-    final options = controller.writableSelectedCalendars
+    final cals = controller.writableSelectedCalendars;
+    if (cals.isEmpty) return;
+    final multiAccount = controller.accountCount > 1;
+    final options = cals
         .map((c) => SelectionMenuOption(
-              value: c.id,
-              label: c.summary,
+              value: c.key,
+              label: multiAccount ? '${c.summary} · ${c.accountId}' : c.summary,
             ))
         .toList();
-    if (options.isEmpty) return;
     final pick = await showSelectionMenu<String>(
       context: context,
       title: s.googleCalendarDefault,
-      current: controller.defaultCalendarId,
+      current: controller.defaultCalendar?.key,
       options: options,
     );
-    if (pick != null) await controller.setDefaultCalendar(pick);
+    if (pick == null) return;
+    final match = cals.where((c) => c.key == pick).toList();
+    if (match.isNotEmpty) await controller.setDefaultCalendar(match.first);
   }
 
   @override
@@ -80,70 +102,38 @@ class GoogleCalendarSettingsView extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               children: [
-                _StatusBlock(
-                  controller: controller,
-                  onConnect: () => _connect(context),
-                  onDisconnect: () => _confirmDisconnect(context),
+                Text(
+                  s.googleCalendarAccountsSection,
+                  style: TextStyle(
+                      fontSize: 13, color: labelColor, letterSpacing: -0.08),
                 ),
-
-                if (controller.isConnected) ...[
-                  const SizedBox(height: 18),
-                  Text(
-                    s.googleCalendarCalendarsSection,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: labelColor,
-                      letterSpacing: -0.08,
-                    ),
+                const SizedBox(height: 6),
+                for (final account in controller.accounts) ...[
+                  _AccountCard(
+                    controller: controller,
+                    account: account,
+                    onRemove: () => _confirmRemove(context, account),
                   ),
-                  const SizedBox(height: 6),
-                  if (controller.availableCalendars.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 8),
-                      child: Text(
-                        s.googleCalendarNoCalendars,
-                        style: TextStyle(fontSize: 14, color: labelColor),
-                      ),
-                    )
-                  else
-                    Column(
-                      children: [
-                        for (final cal in controller.availableCalendars)
-                          _CalendarRow(
-                            calendar: cal,
-                            selected: controller
-                                .selectedCalendarIds
-                                .contains(cal.id),
-                            isDefault:
-                                controller.defaultCalendarId == cal.id,
-                            onToggle: (v) {
-                              final next =
-                                  Set<String>.of(controller.selectedCalendarIds);
-                              if (v) {
-                                next.add(cal.id);
-                              } else {
-                                next.remove(cal.id);
-                                if (controller.defaultCalendarId == cal.id) {
-                                  // Default got deselected — clear it; the
-                                  // user can pick a new one below.
-                                  controller.setDefaultCalendar('');
-                                }
-                              }
-                              controller.setSelectedCalendars(next);
-                            },
-                          ),
-                      ],
-                    ),
-
+                  const SizedBox(height: 12),
+                ],
+                _ActionRow(
+                  label: s.googleCalendarAddAccount,
+                  trailing: controller.isLoading
+                      ? const CupertinoActivityIndicator()
+                      : Icon(CupertinoIcons.add_circled,
+                          color: AppColors.accent, size: 20),
+                  onTap: controller.isLoading
+                      ? null
+                      : () => _addAccount(context),
+                ),
+                if (controller.isConnected) ...[
                   const SizedBox(height: 18),
                   Text(
                     s.googleCalendarDefaultSection,
                     style: TextStyle(
-                      fontSize: 13,
-                      color: labelColor,
-                      letterSpacing: -0.08,
-                    ),
+                        fontSize: 13,
+                        color: labelColor,
+                        letterSpacing: -0.08),
                   ),
                   const SizedBox(height: 6),
                   _NavRow(
@@ -151,29 +141,23 @@ class GoogleCalendarSettingsView extends StatelessWidget {
                     trailingLabel: _defaultLabel(controller, s),
                     onTap: () => _pickDefault(context),
                   ),
-
                   const SizedBox(height: 18),
                   Text(
                     s.googleCalendarSyncSection,
                     style: TextStyle(
-                      fontSize: 13,
-                      color: labelColor,
-                      letterSpacing: -0.08,
-                    ),
+                        fontSize: 13,
+                        color: labelColor,
+                        letterSpacing: -0.08),
                   ),
                   const SizedBox(height: 6),
                   _ActionRow(
                     label: s.googleCalendarSyncNow,
                     trailing: controller.isLoading
                         ? const CupertinoActivityIndicator()
-                        : Icon(
-                            CupertinoIcons.arrow_clockwise,
-                            color: AppColors.accent,
-                            size: 18,
-                          ),
-                    onTap: controller.isLoading
-                        ? null
-                        : () => controller.refresh(),
+                        : Icon(CupertinoIcons.arrow_clockwise,
+                            color: AppColors.accent, size: 18),
+                    onTap:
+                        controller.isLoading ? null : () => controller.refresh(),
                   ),
                   const SizedBox(height: 6),
                   Padding(
@@ -181,23 +165,15 @@ class GoogleCalendarSettingsView extends StatelessWidget {
                     child: Text(
                       controller.lastSyncAt == null
                           ? s.googleCalendarNeverSynced
-                          : s.googleCalendarLastSynced
-                              .replaceFirst('{when}',
-                                  _formatLastSync(controller.lastSyncAt!)),
+                          : s.googleCalendarLastSynced.replaceFirst(
+                              '{when}', _formatLastSync(controller.lastSyncAt!)),
                       style: TextStyle(fontSize: 13, color: labelColor),
                     ),
                   ),
-
-                  if (controller.lastError != null) ...[
-                    const SizedBox(height: 12),
-                    _ErrorBanner(text: controller.lastError!),
-                  ],
-
-                  const SizedBox(height: 24),
-                  _DestructiveButton(
-                    label: s.googleCalendarDisconnect,
-                    onPressed: () => _confirmDisconnect(context),
-                  ),
+                ],
+                if (controller.lastError != null) ...[
+                  const SizedBox(height: 12),
+                  _ErrorBanner(text: controller.lastError!),
                 ],
               ],
             );
@@ -208,12 +184,8 @@ class GoogleCalendarSettingsView extends StatelessWidget {
   }
 
   String _defaultLabel(GoogleCalendarController c, S s) {
-    final id = c.defaultCalendarId;
-    if (id == null || id.isEmpty) return s.googleCalendarNoDefault;
-    for (final cal in c.availableCalendars) {
-      if (cal.id == id) return cal.summary;
-    }
-    return s.googleCalendarNoDefault;
+    final def = c.defaultCalendar;
+    return def?.summary ?? s.googleCalendarNoDefault;
   }
 
   String _formatLastSync(DateTime t) {
@@ -242,87 +214,94 @@ class _SetupRequired extends StatelessWidget {
           Icon(CupertinoIcons.exclamationmark_triangle,
               size: 32, color: AppColors.accent),
           const SizedBox(height: 12),
-          Text(
-            message,
-            style: const TextStyle(fontSize: 15, height: 1.4),
-          ),
+          Text(message, style: const TextStyle(fontSize: 15, height: 1.4)),
         ],
       ),
     );
   }
 }
 
-class _StatusBlock extends StatelessWidget {
-  const _StatusBlock({
+class _AccountCard extends StatelessWidget {
+  const _AccountCard({
     required this.controller,
-    required this.onConnect,
-    required this.onDisconnect,
+    required this.account,
+    required this.onRemove,
   });
 
   final GoogleCalendarController controller;
-  final VoidCallback onConnect;
-  final VoidCallback onDisconnect;
+  final GoogleAccount account;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     final bg = CupertinoDynamicColor.resolve(
-      CupertinoColors.tertiarySystemBackground,
-      context,
-    );
+        CupertinoColors.tertiarySystemBackground, context);
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final cals = controller.calendarsForAccount(account.id);
 
-    if (controller.isConnected) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.15),
-                shape: BoxShape.circle,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(CupertinoIcons.person_fill,
+                    size: 16, color: AppColors.accent),
               ),
-              child: Icon(
-                CupertinoIcons.checkmark_alt,
-                size: 18,
-                color: AppColors.accent,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    s.googleCalendarConnected,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  if (controller.email != null)
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(account.email,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                     Text(
-                      controller.email!,
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: CupertinoColors.secondaryLabel
-                              .resolveFrom(context)),
+                      account.readOnly
+                          ? s.googleCalendarReadOnlyMode
+                          : s.googleCalendarReadWrite,
+                      style: TextStyle(fontSize: 12, color: secondary),
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return CupertinoButton.filled(
-      onPressed: controller.isLoading ? null : onConnect,
-      child: controller.isLoading
-          ? const CupertinoActivityIndicator(color: CupertinoColors.white)
-          : Text(s.googleCalendarConnect),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                minSize: 32,
+                onPressed: onRemove,
+                child: const Icon(CupertinoIcons.minus_circle,
+                    size: 22, color: CupertinoColors.destructiveRed),
+              ),
+            ],
+          ),
+          if (cals.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 4),
+              child: Text(s.googleCalendarNoCalendars,
+                  style: TextStyle(fontSize: 13, color: secondary)),
+            )
+          else
+            ...cals.map((cal) => _CalendarRow(
+                  calendar: cal,
+                  selected: controller.isCalendarSelected(cal),
+                  isDefault: controller.defaultCalendar?.key == cal.key,
+                  onToggle: (v) => controller.setCalendarSelected(cal, v),
+                )),
+        ],
+      ),
     );
   }
 }
@@ -343,26 +322,15 @@ class _CalendarRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    final bg = CupertinoDynamicColor.resolve(
-      CupertinoColors.tertiarySystemBackground,
-      context,
-    );
-    return Container(
-      margin: const EdgeInsets.only(bottom: 1),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
       child: Row(
         children: [
           Container(
             width: 14,
             height: 14,
             decoration: BoxDecoration(
-              color: Color(calendar.color),
-              shape: BoxShape.circle,
-            ),
+                color: Color(calendar.color), shape: BoxShape.circle),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -370,12 +338,10 @@ class _CalendarRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  calendar.summary,
-                  style: const TextStyle(fontSize: 16),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(calendar.summary,
+                    style: const TextStyle(fontSize: 15),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
                 if (isDefault || !calendar.canWrite || calendar.primary)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
@@ -386,10 +352,9 @@ class _CalendarRow extends StatelessWidget {
                         if (!calendar.canWrite) s.googleCalendarReadOnly,
                       ].join(' · '),
                       style: TextStyle(
-                        fontSize: 11,
-                        color: CupertinoColors.secondaryLabel
-                            .resolveFrom(context),
-                      ),
+                          fontSize: 11,
+                          color: CupertinoColors.secondaryLabel
+                              .resolveFrom(context)),
                     ),
                   ),
               ],
@@ -407,11 +372,7 @@ class _CalendarRow extends StatelessWidget {
 }
 
 class _NavRow extends StatelessWidget {
-  const _NavRow({
-    required this.label,
-    required this.onTap,
-    this.trailingLabel,
-  });
+  const _NavRow({required this.label, required this.onTap, this.trailingLabel});
 
   final String label;
   final VoidCallback onTap;
@@ -420,44 +381,32 @@ class _NavRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = CupertinoDynamicColor.resolve(
-      CupertinoColors.tertiarySystemBackground,
-      context,
-    );
+        CupertinoColors.tertiarySystemBackground, context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
         child: Row(
           children: [
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 17,
-                  color: CupertinoColors.label.resolveFrom(context),
-                ),
-              ),
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 17,
+                      color: CupertinoColors.label.resolveFrom(context))),
             ),
             if (trailingLabel != null) ...[
-              Text(
-                trailingLabel!,
-                style: TextStyle(
-                  fontSize: 15,
-                  color:
-                      CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-              ),
+              Text(trailingLabel!,
+                  style: TextStyle(
+                      fontSize: 15,
+                      color:
+                          CupertinoColors.secondaryLabel.resolveFrom(context))),
               const SizedBox(width: 4),
             ],
-            Icon(
-              CupertinoIcons.chevron_right,
-              size: 16,
-              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-            ),
+            Icon(CupertinoIcons.chevron_right,
+                size: 16,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context)),
           ],
         ),
       ),
@@ -466,11 +415,8 @@ class _NavRow extends StatelessWidget {
 }
 
 class _ActionRow extends StatelessWidget {
-  const _ActionRow({
-    required this.label,
-    required this.trailing,
-    required this.onTap,
-  });
+  const _ActionRow(
+      {required this.label, required this.trailing, required this.onTap});
 
   final String label;
   final Widget trailing;
@@ -479,27 +425,20 @@ class _ActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = CupertinoDynamicColor.resolve(
-      CupertinoColors.tertiarySystemBackground,
-      context,
-    );
+        CupertinoColors.tertiarySystemBackground, context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
         child: Row(
           children: [
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 17,
-                  color: CupertinoColors.label.resolveFrom(context),
-                ),
-              ),
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 17,
+                      color: CupertinoColors.label.resolveFrom(context))),
             ),
             trailing,
           ],
@@ -520,37 +459,11 @@ class _ErrorBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: CupertinoColors.systemRed.withOpacity(0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: CupertinoColors.systemRed.withOpacity(0.3),
-        ),
+        border: Border.all(color: CupertinoColors.systemRed.withOpacity(0.3)),
       ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 13,
-          color: CupertinoColors.systemRed,
-        ),
-      ),
-    );
-  }
-}
-
-class _DestructiveButton extends StatelessWidget {
-  const _DestructiveButton({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: CupertinoButton(
-        onPressed: onPressed,
-        child: Text(
-          label,
-          style: const TextStyle(color: CupertinoColors.destructiveRed),
-        ),
-      ),
+      child: Text(text,
+          style: const TextStyle(
+              fontSize: 13, color: CupertinoColors.systemRed)),
     );
   }
 }
