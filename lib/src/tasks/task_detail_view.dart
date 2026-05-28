@@ -253,6 +253,9 @@ class _TaskDetailViewState extends State<TaskDetailView>
       _dueDate = result.$1;
       _doTime = result.$2;
     });
+    // Persist immediately so other views (e.g. Calendar) reflect the new date
+    // without waiting for the debounced autosave or for this screen to close.
+    _save();
   }
 
   Future<void> _pickList() async {
@@ -263,12 +266,14 @@ class _TaskDetailViewState extends State<TaskDetailView>
     );
     if (!mounted) return;
     setState(() => _listId = result);
+    _save();
   }
 
   Future<void> _pickDuration() async {
     final result = await showDurationPicker(context, _duration);
     if (!mounted) return;
     setState(() => _duration = result);
+    _save();
   }
 
   Future<void> _pickReminders() async {
