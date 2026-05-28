@@ -273,6 +273,7 @@ class SettingsController with ChangeNotifier {
     // every TaskRow/_RoundedCheckbox renders in the user-selected style without
     // having to thread the value through every callsite.
     TaskCheckboxAppearance.current = _taskFieldPrefs.checkboxStyle;
+    TaskCompletionUndoPref.enabled = _taskFieldPrefs.showUndoOnComplete;
     AppDefaults.taskIcon = _defaultTaskIcon;
     AppDefaults.listIcon = _defaultListIcon;
     AppDefaults.folderIcon = _defaultFolderIcon;
@@ -544,6 +545,7 @@ class SettingsController with ChangeNotifier {
   Future<void> updateTaskFieldPrefs(TaskFieldPrefs prefs) async {
     _taskFieldPrefs = prefs.copy();
     TaskCheckboxAppearance.current = _taskFieldPrefs.checkboxStyle;
+    TaskCompletionUndoPref.enabled = _taskFieldPrefs.showUndoOnComplete;
     notifyListeners();
     await _db.setAppSetting(TaskFieldPrefs.storageKey, _taskFieldPrefs.toJson());
   }
