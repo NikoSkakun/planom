@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../../database/database_service.dart';
+import '../../notifications/notification_service.dart';
 import 'google_account.dart';
 import 'google_auth_service.dart';
 import 'google_calendar_api.dart';
@@ -52,6 +53,7 @@ class GoogleCalendarController with ChangeNotifier {
   static const _kLastSyncAt = 'gcal_last_sync_at';
   static const _kLoadedFrom = 'gcal_loaded_from';
   static const _kLoadedTo = 'gcal_loaded_to';
+  static const _kEventReminders = 'gcal_event_reminders';
   static const _syncTokenPrefix = 'gcal_synctoken_';
 
   /// Every key this controller owns is `gcal_`-prefixed; backups exclude them.
@@ -135,6 +137,36 @@ class GoogleCalendarController with ChangeNotifier {
         .toList();
   }
 
+  /// Planom-only reminders attached to Google Calendar events, keyed by the
+  /// event's composite identity. The reminders never leave the device — the
+  /// event itself stays on Google untouched.
+  Map<String, List<int>> _eventReminders = {};
+
+  /// Reminder offsets (minutes relative to the event time) the user set on
+  /// [event] inside Planom. Empty when none.
+  List<int> remindersForEvent(RemoteEvent event) =>
+      List.unmodifiable(_eventReminders[_eventKey(event)] ?? const <int>[]);
+
+  /// Sets the Planom-only reminders for [event] and (re)schedules the local
+  /// notifications. Pass an empty list to clear them.
+  Future<void> setEventReminders(RemoteEvent event, List<int> offsets) async {
+    final key = _eventKey(event);
+    if (offsets.isEmpty) {
+      _eventReminders.remove(key);
+    } else {
+      _eventReminders[key] = List<int>.from(offsets);
+    }
+    await _persistEventReminders();
+    await NotificationService.instance.scheduleRemoteEventReminders(
+      key: key,
+      title: event.title,
+      date: event.date,
+      doTime: event.doTime,
+      offsets: offsets,
+    );
+    notifyListeners();
+  }
+
   // ── Lifecycle ─────────────────────────────────────────────────────────
 
   Future<void> load() async {
@@ -148,6 +180,8 @@ class GoogleCalendarController with ChangeNotifier {
     // connected) left an account showing "No calendars found" while its cached
     // events kept rendering.
     _calendarsByAccount.addAll(await _cache.readCalendars());
+    // Re-arm Planom-only reminders for cached events (e.g. after a reboot).
+    await _rescheduleEventReminders();
     notifyListeners();
     if (_accounts.isNotEmpty) {
       // Refresh in the background — calendars + a delta since we last synced —
@@ -193,6 +227,14 @@ class GoogleCalendarController with ChangeNotifier {
         case _kLoadedTo:
           final ms = int.tryParse(value);
           if (ms != null) _loadedTo = DateTime.fromMillisecondsSinceEpoch(ms);
+        case _kEventReminders:
+          try {
+            final decoded = jsonDecode(value) as Map<String, dynamic>;
+            _eventReminders = decoded.map((k, v) =>
+                MapEntry(k, (v as List<dynamic>).map((e) => e as int).toList()));
+          } catch (_) {
+            _eventReminders = {};
+          }
       }
     }
   }
@@ -204,6 +246,50 @@ class GoogleCalendarController with ChangeNotifier {
       _db.setAppSetting(_kSelected, jsonEncode(_selectedKeys.toList()));
 
   Future<void> _persistCalendars() => _cache.writeCalendars(_calendarsByAccount);
+
+  Future<void> _persistEventReminders() =>
+      _db.setAppSetting(_kEventReminders, jsonEncode(_eventReminders));
+
+  /// Drops (and cancels) every Planom reminder belonging to [accountId]'s
+  /// events. Reminder keys are `'<accountId> <calendarId> <eventId>'`.
+  Future<void> _removeRemindersForAccount(String accountId) async {
+    final prefix = '$accountId ';
+    final removed =
+        _eventReminders.keys.where((k) => k.startsWith(prefix)).toList();
+    if (removed.isEmpty) return;
+    for (final key in removed) {
+      _eventReminders.remove(key);
+      await NotificationService.instance.cancelRemoteEventReminders(key);
+    }
+    await _persistEventReminders();
+  }
+
+  /// Reconciles the OS notification schedule with [_eventReminders] against the
+  /// currently-loaded events. Matched events get their reminders (re)scheduled
+  /// — picking up any time change — while reminders whose event is no longer
+  /// present (deleted on Google, or outside the loaded window) are cancelled so
+  /// they can't fire for an event that's gone.
+  Future<void> _rescheduleEventReminders() async {
+    if (_eventReminders.isEmpty) return;
+    final byKey = <String, RemoteEvent>{
+      for (final e in _events) _eventKey(e): e,
+    };
+    for (final entry in _eventReminders.entries) {
+      final ev = byKey[entry.key];
+      if (ev == null) {
+        await NotificationService.instance
+            .cancelRemoteEventReminders(entry.key);
+      } else {
+        await NotificationService.instance.scheduleRemoteEventReminders(
+          key: entry.key,
+          title: ev.title,
+          date: ev.date,
+          doTime: ev.doTime,
+          offsets: entry.value,
+        );
+      }
+    }
+  }
 
   Future<String?> _readSyncToken(String calKey) async {
     final rows = await _db.getAppSettings();
@@ -316,6 +402,7 @@ class GoogleCalendarController with ChangeNotifier {
       _selectedKeys
           .removeWhere((k) => k.startsWith('${account.id} '));
       _events = _events.where((e) => e.accountId != account.id).toList();
+      await _removeRemindersForAccount(account.id);
       if (_defaultAccountId == account.id) {
         _defaultAccountId = null;
         _defaultCalendarId = null;
@@ -532,6 +619,9 @@ class GoogleCalendarController with ChangeNotifier {
           _kLastSyncAt, _lastSyncAt!.millisecondsSinceEpoch.toString());
       await _persistLoadedRange();
       await _cache.write(_events);
+      // Events may have shifted in time or been removed remotely; keep the
+      // local reminder schedule in sync.
+      await _rescheduleEventReminders();
       notifyListeners();
     } catch (e, st) {
       debugPrint('GoogleCalendarController.refresh failed: $e\n$st');
@@ -617,6 +707,8 @@ class GoogleCalendarController with ChangeNotifier {
       _expandLoadedRange(wantFrom, wantTo);
       await _persistLoadedRange();
       await _cache.write(_events);
+      // Newly-loaded events may carry reminders set in a previous session.
+      await _rescheduleEventReminders();
       notifyListeners();
     } finally {
       _setLoading(false);
@@ -710,6 +802,10 @@ class GoogleCalendarController with ChangeNotifier {
       final key = _eventKey(event);
       _events = _events.where((e) => _eventKey(e) != key).toList();
       await _cache.write(_events);
+      if (_eventReminders.remove(key) != null) {
+        await _persistEventReminders();
+        await NotificationService.instance.cancelRemoteEventReminders(key);
+      }
       notifyListeners();
       return true;
     } catch (e) {

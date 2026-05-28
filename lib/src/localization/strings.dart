@@ -537,6 +537,7 @@ class S {
   String get googleCalendarLastSynced => t('googleCalendarLastSynced');
   String get googleCalendarSetupRequired => t('googleCalendarSetupRequired');
   String get googleCalendarReadOnlyHint => t('googleCalendarReadOnlyHint');
+  String get googleCalendarReminderHint => t('googleCalendarReminderHint');
   String get googleCalendarDeleteBody => t('googleCalendarDeleteBody');
   String get googleCalendarAddAccount => t('googleCalendarAddAccount');
   String get googleCalendarAccountsSection => t('googleCalendarAccountsSection');
@@ -1014,6 +1015,8 @@ const Map<String, String> _en = {
       'Google Calendar is not configured for this build. Add an OAuth client ID in lib/src/integrations/google/oauth_config.dart and set up the platform-specific URL scheme.',
   'googleCalendarReadOnlyHint':
       'This event is on a calendar you only have read access to. To edit it, open Google Calendar.',
+  'googleCalendarReminderHint':
+      'Reminders are saved on this device only — they notify you in Planom and are not added to the event in Google Calendar.',
   'googleCalendarDeleteBody':
       'This event will be permanently removed from Google Calendar.',
   'googleCalendarAddAccount': 'Add account',

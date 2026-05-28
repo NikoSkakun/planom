@@ -167,6 +167,48 @@ class NotificationService {
     }
   }
 
+  // ── Remote (Google Calendar) event reminders ───────────────────────────────
+  //
+  // These are Planom-only reminders attached to a Google Calendar event. The
+  // event itself stays on Google; only the local notification lives here. The
+  // [key] is the event's composite identity (account + calendar + event id).
+
+  Future<void> scheduleRemoteEventReminders({
+    required String key,
+    required String title,
+    required DateTime date,
+    int? doTime,
+    required List<int> offsets,
+  }) async {
+    await cancelRemoteEventReminders(key);
+    if (offsets.isEmpty) return;
+    if (!_permissionGranted) await checkPermission();
+    if (!_permissionGranted) return;
+
+    final baseTime = doTime == null
+        ? DateTime(date.year, date.month, date.day, 9, 0)
+        : DateTime(date.year, date.month, date.day, doTime ~/ 60, doTime % 60);
+
+    final limited = offsets.take(_maxSlots).toList();
+    for (int i = 0; i < limited.length; i++) {
+      final fireAt = baseTime.add(Duration(minutes: limited[i]));
+      if (fireAt.isBefore(DateTime.now())) continue;
+      await _schedule(
+        id: _remoteSlot(key, i),
+        title: title,
+        body: _offsetLabel(limited[i]),
+        fireAt: fireAt,
+      );
+    }
+  }
+
+  Future<void> cancelRemoteEventReminders(String key) async {
+    if (!PlatformCapabilities.supportsLocalNotifications) return;
+    for (int i = 0; i < _maxSlots; i++) {
+      await _plugin.cancel(_remoteSlot(key, i));
+    }
+  }
+
   // ── Cancel all ────────────────────────────────────────────────────────────
 
   Future<void> cancelAll() async {
@@ -227,6 +269,20 @@ class NotificationService {
     final hex = itemId.replaceAll('-', '').substring(0, 8);
     final base = int.tryParse(hex, radix: 16) ?? itemId.hashCode;
     return (base ^ (slotIndex * 97)) & 0x7FFFFFFF;
+  }
+
+  /// Notification ID for a remote (Google Calendar) event reminder. The
+  /// composite event key shares a long prefix across events on the same
+  /// account, so [_notifSlot]'s "first 8 chars" approach would collide; hash
+  /// the whole key (FNV-1a) instead. Deterministic across runs so cancellation
+  /// recomputes the same ids.
+  int _remoteSlot(String key, int slotIndex) {
+    var hash = 0x811c9dc5;
+    for (final unit in key.codeUnits) {
+      hash = (hash ^ unit) & 0xFFFFFFFF;
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
+    }
+    return (hash ^ (slotIndex * 97)) & 0x7FFFFFFF;
   }
 
   String _offsetLabel(int offset) {
