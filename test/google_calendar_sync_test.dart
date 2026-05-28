@@ -32,6 +32,10 @@ class _FakeApi extends GoogleCalendarApi {
   /// The email the next addAccount() should resolve to.
   String? nextPrimaryEmail;
 
+  /// When true, [listCalendars] throws — simulating a transient token / network
+  /// failure so we can assert cached calendars survive.
+  bool failListCalendars = false;
+
   final Map<String, List<GoogleCalendarMeta>> _cals = {};
   final Map<String, List<RemoteEvent>> _fullEvents = {}; // calKey -> events
   final Map<String, List<RemoteEvent>> _pendingDeltas = {};
@@ -58,6 +62,7 @@ class _FakeApi extends GoogleCalendarApi {
 
   @override
   Future<List<GoogleCalendarMeta>> listCalendars(GoogleAccount account) async {
+    if (failListCalendars) throw Exception('listCalendars failed');
     final base = _cals[account.id] ?? const <GoogleCalendarMeta>[];
     // Stamp the account's read-only mode, mirroring the real API.
     return base
@@ -302,5 +307,65 @@ void main() {
       calendarId: 'cal',
     );
     expect(created, isNull);
+  });
+
+  test('a failed calendar fetch keeps previously-known calendars', () async {
+    api.register('a@x.com',
+        calendars: [cal('a@x.com', 'work', primary: true)],
+        events: {
+          'work': [ev('a@x.com', 'work', 'w1')]
+        });
+    await addAccount('a@x.com', api: api);
+    await settle();
+    expect(controller.calendarsForAccount('a@x.com').map((c) => c.id).toList(),
+        ['work']);
+
+    // A subsequent refresh whose calendar fetch fails must not blank the
+    // account out to "No calendars found".
+    api.failListCalendars = true;
+    await controller.refresh();
+    await settle();
+    expect(controller.calendarsForAccount('a@x.com').map((c) => c.id).toList(),
+        ['work']);
+    // The calendar also stays available to the event-creation picker.
+    expect(
+        controller.writableSelectedCalendars.map((c) => c.id).toList(), ['work']);
+  });
+
+  test('event reminders are stored, read back and cleared', () async {
+    api.register('a@x.com',
+        calendars: [cal('a@x.com', 'work', primary: true)],
+        events: {
+          'work': [ev('a@x.com', 'work', 'w1')]
+        });
+    await addAccount('a@x.com', api: api);
+    await settle();
+    final event = controller.events.firstWhere((e) => e.googleEventId == 'w1');
+    expect(controller.remindersForEvent(event), isEmpty);
+
+    await controller.setEventReminders(event, [-10, -60]);
+    expect(controller.remindersForEvent(event), [-10, -60]);
+
+    await controller.setEventReminders(event, []);
+    expect(controller.remindersForEvent(event), isEmpty);
+  });
+
+  test('removing an account clears its event reminders', () async {
+    api.register('a@x.com',
+        calendars: [cal('a@x.com', 'work', primary: true)],
+        events: {
+          'work': [ev('a@x.com', 'work', 'w1')]
+        });
+    await addAccount('a@x.com', api: api);
+    await settle();
+    final event = controller.events.firstWhere((e) => e.googleEventId == 'w1');
+    await controller.setEventReminders(event, [-15]);
+    expect(controller.remindersForEvent(event), [-15]);
+
+    await controller.removeAccount(controller.accounts.first);
+    await addAccount('a@x.com', api: api);
+    await settle();
+    final again = controller.events.firstWhere((e) => e.googleEventId == 'w1');
+    expect(controller.remindersForEvent(again), isEmpty);
   });
 }
