@@ -141,6 +141,13 @@ class GoogleCalendarController with ChangeNotifier {
     if (!_isConfigured) return;
     await _readPrefs();
     _events = await _cache.read();
+    // Seed calendar metadata from disk so the settings page and the
+    // event-creation picker know each account's calendars immediately — even
+    // before (or without) a successful network refresh. Without this, a
+    // calendar-list fetch that failed (e.g. right after a second account was
+    // connected) left an account showing "No calendars found" while its cached
+    // events kept rendering.
+    _calendarsByAccount.addAll(await _cache.readCalendars());
     notifyListeners();
     if (_accounts.isNotEmpty) {
       // Refresh in the background — calendars + a delta since we last synced —
@@ -195,6 +202,8 @@ class GoogleCalendarController with ChangeNotifier {
 
   Future<void> _persistSelected() =>
       _db.setAppSetting(_kSelected, jsonEncode(_selectedKeys.toList()));
+
+  Future<void> _persistCalendars() => _cache.writeCalendars(_calendarsByAccount);
 
   Future<String?> _readSyncToken(String calKey) async {
     final rows = await _db.getAppSettings();
@@ -265,6 +274,7 @@ class GoogleCalendarController with ChangeNotifier {
       // Load this account's calendars and select them all by default.
       final cals = await _api.listCalendars(account);
       _calendarsByAccount[email] = cals;
+      await _persistCalendars();
       _selectedKeys.addAll(cals.map((c) => c.key));
       await _persistSelected();
 
@@ -314,6 +324,7 @@ class GoogleCalendarController with ChangeNotifier {
       }
       await _persistAccounts();
       await _persistSelected();
+      await _persistCalendars();
       await _cache.write(_events);
       notifyListeners();
     } finally {
@@ -412,30 +423,44 @@ class GoogleCalendarController with ChangeNotifier {
   Future<void> refresh({DateTime? from, DateTime? to}) =>
       _enqueue(() => _refreshLocked(from: from, to: to));
 
-  /// Fetches each account's calendars (if not already loaded) so we can map
-  /// selected keys back to calendar metadata.
+  /// Fetches [account]'s calendars and updates the in-memory map + disk cache.
+  /// Crucially, a failed fetch (network error) or an unexpected empty result
+  /// (e.g. a token that couldn't be refreshed) does NOT blank out an account
+  /// that already has known calendars — that's what left a still-valid account
+  /// reading "No calendars found" after another account was connected.
+  Future<void> _fetchAndCacheCalendars(GoogleAccount account) async {
+    try {
+      final cals = await _api.listCalendars(account);
+      if (cals.isNotEmpty || !_calendarsByAccount.containsKey(account.id)) {
+        _calendarsByAccount[account.id] = cals;
+        await _persistCalendars();
+      }
+    } catch (e) {
+      debugPrint('listCalendars(${account.id}) failed: $e');
+      _lastError = e.toString();
+    }
+  }
+
+  /// Re-fetches every connected account's calendars (best-effort, resilient).
+  Future<void> _refreshAllCalendars() async {
+    for (final account in _accounts) {
+      await _fetchAndCacheCalendars(account);
+    }
+  }
+
+  /// Fetches each account's calendars (only those not already known) so we can
+  /// map selected keys back to calendar metadata. Used by the lazy range-fetch
+  /// path; the full refresh re-fetches everything via [_refreshAllCalendars].
   Future<void> _ensureCalendarsLoaded() async {
     for (final account in _accounts) {
       if (_calendarsByAccount.containsKey(account.id)) continue;
-      try {
-        _calendarsByAccount[account.id] =
-            await _api.listCalendars(account);
-      } catch (e) {
-        debugPrint('listCalendars(${account.id}) failed: $e');
-      }
+      await _fetchAndCacheCalendars(account);
     }
   }
 
   Future<void> refreshCalendars() async {
     if (_accounts.isEmpty) return;
-    for (final account in _accounts) {
-      try {
-        _calendarsByAccount[account.id] = await _api.listCalendars(account);
-      } catch (e) {
-        debugPrint('refreshCalendars(${account.id}) failed: $e');
-        _lastError = e.toString();
-      }
-    }
+    await _refreshAllCalendars();
     notifyListeners();
   }
 
@@ -447,7 +472,7 @@ class GoogleCalendarController with ChangeNotifier {
     _setLoading(true);
     _lastError = null;
     try {
-      await _ensureCalendarsLoaded();
+      await _refreshAllCalendars();
       final now = DateTime.now();
       final timeMin =
           from ?? now.subtract(const Duration(days: _defaultPastDays));
