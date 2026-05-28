@@ -11,6 +11,7 @@ class CalendarListResult {
     required this.events,
     required this.nextSyncToken,
     required this.tokenInvalid,
+    this.deletedEventIds = const {},
   });
 
   final List<RemoteEvent> events;
@@ -19,6 +20,11 @@ class CalendarListResult {
   /// True when the API returned 410 Gone because the persisted sync token
   /// expired. The caller should retry with no token (full re-fetch).
   final bool tokenInvalid;
+
+  /// Ids of events Google reported as `cancelled` during an incremental sync
+  /// (deletion tombstones). The controller drops these from its cache so an
+  /// event deleted elsewhere doesn't linger in Planom.
+  final Set<String> deletedEventIds;
 }
 
 /// Thin wrapper over [gcal.CalendarApi]. Builds a fresh API client per call
@@ -77,6 +83,7 @@ class GoogleCalendarApi {
     }
 
     final events = <RemoteEvent>[];
+    final deletedEventIds = <String>{};
     String? pageToken;
     String? newSyncToken;
     bool tokenInvalid = false;
@@ -94,6 +101,12 @@ class GoogleCalendarApi {
           syncToken: syncToken,
         );
         for (final ge in page.items ?? const <gcal.Event>[]) {
+          // Incremental sync returns cancelled events as tombstones; record
+          // their ids so the controller can evict the stale copy.
+          if (ge.status == 'cancelled') {
+            if (ge.id != null) deletedEventIds.add(ge.id!);
+            continue;
+          }
           final re = RemoteEvent.fromGoogle(
             ge,
             calendarId: calendar.id,
@@ -119,6 +132,7 @@ class GoogleCalendarApi {
       events: events,
       nextSyncToken: newSyncToken,
       tokenInvalid: tokenInvalid,
+      deletedEventIds: deletedEventIds,
     );
   }
 

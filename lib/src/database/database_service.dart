@@ -1118,6 +1118,11 @@ class DatabaseService {
     );
   }
 
+  Future<void> deleteAppSetting(String key) async {
+    final db = await _database;
+    await db.delete('app_settings', where: 'key = ?', whereArgs: [key]);
+  }
+
   // ── Backup / Restore ─────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> exportTasks() async {

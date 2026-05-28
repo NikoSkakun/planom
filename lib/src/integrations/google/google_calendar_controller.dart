@@ -27,10 +27,11 @@ class GoogleCalendarController with ChangeNotifier {
     required DatabaseService db,
     GoogleAuthService? auth,
     GoogleCalendarCache? cache,
+    GoogleCalendarApi? api,
   })  : _db = db,
         _auth = auth ?? GoogleAuthService(),
         _cache = cache ?? GoogleCalendarCache() {
-    _api = GoogleCalendarApi(_auth);
+    _api = api ?? GoogleCalendarApi(_auth);
   }
 
   final DatabaseService _db;
@@ -190,7 +191,10 @@ class GoogleCalendarController with ChangeNotifier {
     final rows = await _db.getAppSettings();
     for (final r in rows) {
       if (r['key'] == _syncTokenPrefix + calendarId) {
-        return r['value'] as String?;
+        final v = r['value'] as String?;
+        // Treat an empty string the same as "no token" so a cleared token
+        // forces a full fetch rather than a broken incremental sync.
+        return (v == null || v.isEmpty) ? null : v;
       }
     }
     return null;
@@ -199,6 +203,28 @@ class GoogleCalendarController with ChangeNotifier {
   Future<void> _writeSyncToken(String calendarId, String? token) async {
     if (token == null) return;
     await _db.setAppSetting(_syncTokenPrefix + calendarId, token);
+  }
+
+  /// Drops the stored sync token for [calendarId]. A sync token is only valid
+  /// while we still hold the baseline set of events it was issued against; the
+  /// moment we discard those events (calendar deselected, account
+  /// disconnected) the token must go too, otherwise the next refresh does an
+  /// incremental sync that returns only deltas and silently loses everything.
+  Future<void> _clearSyncToken(String calendarId) async {
+    await _db.deleteAppSetting(_syncTokenPrefix + calendarId);
+  }
+
+  /// Clears every persisted sync token, regardless of which calendars are
+  /// currently known. Used on disconnect so a later reconnect always
+  /// re-fetches from scratch.
+  Future<void> _clearAllSyncTokens() async {
+    final rows = await _db.getAppSettings();
+    for (final r in rows) {
+      final key = r['key'] as String;
+      if (key.startsWith(_syncTokenPrefix)) {
+        await _db.deleteAppSetting(key);
+      }
+    }
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────
@@ -248,6 +274,9 @@ class GoogleCalendarController with ChangeNotifier {
     _setLoading(true);
     try {
       await _auth.signOut();
+      // Tokens are only valid while their baseline events are held; we're
+      // about to drop every event, so every token must go.
+      await _clearAllSyncTokens();
       _email = null;
       _availableCalendars = const [];
       _events = const [];
@@ -284,11 +313,19 @@ class GoogleCalendarController with ChangeNotifier {
 
   Future<void> setSelectedCalendars(Set<String> ids) async {
     final added = ids.difference(_selectedCalendarIds);
+    final removed = _selectedCalendarIds.difference(ids);
     _selectedCalendarIds = ids;
     await _db.setAppSetting(_kSelected, jsonEncode(ids.toList()));
     // Drop cached events for newly-deselected calendars so the UI updates
     // immediately without waiting for the next refresh.
     _events = _events.where((e) => ids.contains(e.calendarId)).toList();
+    // A deselected calendar's events are now gone, so its sync token is
+    // stale. Clear it; re-selecting later then does a full fetch instead of
+    // an incremental sync that would return only deltas and show almost
+    // nothing.
+    for (final id in removed) {
+      await _clearSyncToken(id);
+    }
     if (added.isNotEmpty) {
       // Newly-added calendars have no events in the loaded range yet. Reset
       // so the next refresh + future ensureRangeLoaded calls re-fetch the
@@ -318,7 +355,35 @@ class GoogleCalendarController with ChangeNotifier {
   static const _defaultPastDays = 365;
   static const _defaultFutureDays = 365;
 
-  Future<void> refresh({DateTime? from, DateTime? to}) async {
+  /// Serializes every fetch (full refresh + range loads) so they never
+  /// interleave. Two concurrent fetches would each read `_events` and the
+  /// sync tokens, then race to overwrite `_events` — the later one, seeing a
+  /// token the earlier one just wrote but an empty/stale baseline, would do
+  /// an incremental sync that returns no deltas and silently wipe the result.
+  Future<void> _opChain = Future<void>.value();
+
+  Future<void> _enqueue(Future<void> Function() op) {
+    final prior = _opChain;
+    final done = Completer<void>();
+    _opChain = done.future;
+    Future<void> run() async {
+      try {
+        await prior;
+      } catch (_) {
+        // Prior op's errors are surfaced to its own caller, not ours.
+      }
+      await op();
+    }
+
+    final result = run();
+    result.whenComplete(done.complete);
+    return result;
+  }
+
+  Future<void> refresh({DateTime? from, DateTime? to}) =>
+      _enqueue(() => _refreshLocked(from: from, to: to));
+
+  Future<void> _refreshLocked({DateTime? from, DateTime? to}) async {
     if (!isConnected) return;
     _setLoading(true);
     _lastError = null;
@@ -333,8 +398,8 @@ class GoogleCalendarController with ChangeNotifier {
           to ?? now.add(const Duration(days: _defaultFutureDays));
 
       final keepIds = _selectedCalendarIds;
-      // Merge events by id so previously-fetched ranges (from
-      // [ensureRangeLoaded]) survive a refresh.
+      // Seed from existing events for kept calendars so ranges fetched via
+      // [ensureRangeLoaded] (outside [timeMin, timeMax]) survive the refresh.
       final byId = <String, RemoteEvent>{
         for (final e in _events)
           if (keepIds.contains(e.calendarId)) e.googleEventId: e,
@@ -348,6 +413,7 @@ class GoogleCalendarController with ChangeNotifier {
           timeMax: timeMax,
           syncToken: token,
         );
+        var fullFetch = token == null;
         if (result.tokenInvalid) {
           // Stored token expired: full re-fetch in the window.
           result = await _api.listEvents(
@@ -355,6 +421,21 @@ class GoogleCalendarController with ChangeNotifier {
             timeMin: timeMin,
             timeMax: timeMax,
           );
+          fullFetch = true;
+        }
+        if (fullFetch) {
+          // A full fetch is authoritative for [timeMin, timeMax]: drop this
+          // calendar's existing events inside the window (so deletions are
+          // reflected) but keep any outside it from earlier range loads.
+          byId.removeWhere((_, e) =>
+              e.calendarId == cal.id &&
+              !e.date.isBefore(timeMin) &&
+              !e.date.isAfter(timeMax));
+        } else {
+          // Incremental: evict events Google reported as deleted.
+          for (final deletedId in result.deletedEventIds) {
+            byId.remove(deletedId);
+          }
         }
         for (final ev in result.events) {
           byId[ev.googleEventId] = ev;
@@ -409,7 +490,8 @@ class GoogleCalendarController with ChangeNotifier {
       if (_rangeCovers(wantFrom, wantTo)) return;
     }
 
-    final fetch = _doRangeFetch(wantFrom, wantTo);
+    // Goes through the same queue as refresh() so the two never interleave.
+    final fetch = _enqueue(() => _doRangeFetch(wantFrom, wantTo));
     _pendingRangeFetch = fetch;
     try {
       await fetch;
