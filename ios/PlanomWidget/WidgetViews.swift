@@ -117,7 +117,6 @@ struct TaskRowView: View {
                 Text(task.title)
                     .font(.system(size: 13))
                     .lineLimit(1)
-                    .strikethrough(task.completed, color: .secondary)
                     .foregroundColor(task.completed ? .secondary : .primary)
                 Spacer(minLength: 2)
                 if task.priority > 0 && !task.completed {
@@ -175,7 +174,6 @@ struct RoutineRowView: View {
                 Text(routine.name)
                     .font(.system(size: 13))
                     .lineLimit(1)
-                    .strikethrough(routine.done, color: .secondary)
                     .foregroundColor(routine.done ? .secondary : .primary)
                 Spacer(minLength: 2)
                 if routine.goalType == "certain_amount", let goal = routine.goal {
