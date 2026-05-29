@@ -55,10 +55,4 @@ class PlatformCapabilities {
   /// have init wiring for iOS + macOS today; Android/Linux/Windows would each
   /// need their own InitializationSettings entry before scheduling.
   static bool get supportsLocalNotifications => isIOS || isMacOS;
-
-  /// Whether home-screen / lock-screen widgets are supported. We ship a
-  /// WidgetKit extension on iOS only today; the `home_widget` plugin also
-  /// supports Android, but no Android widget UI has been built, so we keep the
-  /// data-push path iOS-only to avoid writing to a container nothing reads.
-  static bool get supportsHomeWidgets => isIOS;
 }

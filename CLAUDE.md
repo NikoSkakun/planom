@@ -27,7 +27,6 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 - **Contacts (birthdays)**: `ContactController` + `contacts` table; lists with `listType = birthdays` render contacts instead of tasks (see Contacts feature).
 - **Cloud sync**: `SyncController` (`lib/src/sync/`) + backend-agnostic `SyncProvider`; iCloud Drive provider shipped (`icloud_storage`). Optional E2E AES-256-GCM encryption via passphrase in `flutter_secure_storage`. See Sync section.
 - **MCP server**: `lib/src/mcp/` — transport-agnostic JSON-RPC 2.0 server exposing tasks/notes/events/lists/spaces/search. See MCP section.
-- **iOS widgets**: `home_widget` bridges the Flutter app (`lib/src/widgets/`) to a WidgetKit/SwiftUI extension (`ios/PlanomWidget/`) over an App Group. Home-screen + lock-screen widgets for Today's tasks/events/routines. See iOS widgets section.
 - **State**: Flutter `ChangeNotifier` — no third-party state library.
 - **Routing**: `FastRoute` (custom `CupertinoPageRoute` subclass with 180 ms transition, in `lib/src/utils/fast_route.dart`) used everywhere instead of bare `CupertinoPageRoute`.
 - **Icons**: `cupertino_icons`; custom PNG tab-bar icons in `assets/icons/tab_bar/` (Tasks/Notes/Calendar/Routines use PNGs; Settings uses `CupertinoIcons.gear_alt` / `gear_alt_fill`); list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`.
@@ -555,28 +554,6 @@ Global full-text search across tasks, notes, and events using SQLite FTS5.
 | `search_pull_scope.dart` | Gesture detector wrapper for scroll views. On overscroll/bounce-back it animates a hidden search bar from the top; >30 % reveal on release latches it open. Tap the bar → `SearchView`. Currently wired into `CalendarView`. |
 
 Contacts are intentionally **not** indexed for search yet.
-
-### iOS widgets (`lib/src/widgets/` + `ios/PlanomWidget/`) — new
-
-Home-screen / lock-screen widgets via the `home_widget` plugin. The Flutter app
-serialises the **active space's** "Today" data to JSON and writes it into a
-shared App Group (`group.app.planom`); a WidgetKit/SwiftUI extension reads it
-back and renders. The extension never touches the DB — it's a pure view over
-the pushed snapshot. Gated to iOS via `PlatformCapabilities.supportsHomeWidgets`
-(every Flutter path is a safe no-op elsewhere).
-
-**Flutter side** (`lib/src/widgets/`):
-| File | Purpose |
-|------|---------|
-| `widget_keys.dart` | Shared constants — App Group id, payload key, iOS widget `kind`s, deep-link scheme/hosts. **Mirror of the Swift `WidgetData.swift` / `WidgetLink` constants.** |
-| `widget_data_builder.dart` | Pure builder: controllers + accent/locale → JSON map the native side decodes. Reused by both the foreground push and the headless interactivity isolate, so output is identical. Today tasks (incl. overdue), today events (timed first), today routines (+progress/done), birthdays, counts, localized labels, accent/completion colors. |
-| `home_widget_service.dart` | `HomeWidgetService.init()` (sets App Group + registers the interactivity callback) and `pushFromControllers(...)` (build → `saveWidgetData` → `updateWidget` per kind). Also the `@pragma('vm:entry-point') widgetInteractivityCallback` (iOS 17+) which opens the active DB directly, applies the mutation, and re-publishes. |
-| `widget_sync_coordinator.dart` | Listens to `SpaceManager` (re-attaches on space switch) + the active space's controllers + `SettingsController`; debounced (600 ms) `pushNow()`. Started once in `main.dart`. |
-| `widget_deep_link.dart` | Global `ValueNotifier<Uri?> widgetDeepLink` fed by `HomeWidget.initiallyLaunchedFromHomeWidget()` + `widgetClicked`. Consumed by `HomeShell._handleWidgetUri` (switches tab / opens creation sheet / toggles a task / records a routine). |
-
-**Native side** (`ios/PlanomWidget/`): `PlanomWidgetBundle.swift` (`@main`, 4 widgets), `WidgetData.swift` (Codable payload + `WidgetStore` UserDefaults loader + `WidgetLink` deep-link builder + sample data), `Provider.swift` (shared `TimelineProvider`, refreshes on the half-hour / midnight), `WidgetViews.swift` (rows + per-family layouts + lock-screen accessory views). Widgets: `PlanomTodayTasksWidget` (small/medium/large + accessory circular/rectangular/inline), `PlanomAgendaWidget` (medium/large, tasks+events merged chronologically), `PlanomRoutinesWidget` (small ring / medium / large), `PlanomStatsWidget` (small counts). See `ios/PlanomWidget/README.md` for the one-time App Group / signing setup.
-
-**Key invariants**: the App Group id and `kind` strings must stay in sync between `widget_keys.dart` and the Swift files; deep-link URLs must carry a `homeWidget` query item or the plugin won't forward them; the extension's deployment target is iOS 14 (lock-screen accessories need 16, interactive controls need 17). Tested via `test/widget_data_builder_test.dart` (the only device-independent slice).
 
 ### Settings feature (`lib/src/settings/`)
 

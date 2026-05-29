@@ -36,8 +36,6 @@ import 'utils/selection_menu.dart';
 import 'notes/note_detail_view.dart';
 import 'models/note.dart';
 import 'utils/undo_controller.dart';
-import 'widgets/widget_deep_link.dart';
-import 'widgets/widget_keys.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({
@@ -184,87 +182,6 @@ class _HomeShellState extends State<HomeShell> {
         _handleDropOnAddFolderButton;
     _plusDragController.onDropOnNotesAddFolderButton =
         _handleDropOnNotesAddFolderButton;
-
-    // React to taps on iOS widgets (deep links). A link may already be pending
-    // if the app was cold-launched from a widget, so check after first frame.
-    widgetDeepLink.addListener(_onWidgetDeepLink);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widgetDeepLink.value != null) _onWidgetDeepLink();
-    });
-  }
-
-  void _onWidgetDeepLink() {
-    final uri = widgetDeepLink.value;
-    if (uri == null || !mounted) return;
-    // Consume the link so it isn't re-handled by other HomeShell instances
-    // (e.g. after a space switch rebuilds the tree).
-    widgetDeepLink.value = null;
-    _handleWidgetUri(uri);
-  }
-
-  void _handleWidgetUri(Uri uri) {
-    switch (uri.host) {
-      case WidgetDeepLink.calendar:
-        _selectBuiltinTab(2);
-      case WidgetDeepLink.completeTask:
-        // Tapping a task in a widget opens the app and toggles completion.
-        final id = uri.queryParameters['id'];
-        if (id != null && widget.taskController.taskById(id) != null) {
-          widget.taskController.toggleCompleted(id);
-        }
-        _selectBuiltinTab(0);
-      case WidgetDeepLink.recordRoutine:
-        final id = uri.queryParameters['id'];
-        if (id != null) {
-          final matches =
-              widget.routineController.routines.where((r) => r.id == id);
-          if (matches.isNotEmpty) {
-            widget.routineController.recordProgress(matches.first);
-          }
-        }
-        _selectBuiltinTab(3);
-      case WidgetDeepLink.routines:
-        _selectBuiltinTab(3);
-      case WidgetDeepLink.addEvent:
-        _selectBuiltinTab(2);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          showEventCreationSheet(
-            context,
-            widget.eventController,
-            initialDate: DateTime.now(),
-            googleCalendarController: widget.googleCalendarController,
-          );
-        });
-      case WidgetDeepLink.addTask:
-        _selectBuiltinTab(0);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          showTaskCreationSheet(
-            context,
-            widget.taskController,
-            widget.folderController,
-            initialDueDate: DateTime.now(),
-            settingsController: widget.settingsController,
-          );
-        });
-      case WidgetDeepLink.today:
-      case WidgetDeepLink.tasks:
-      default:
-        _selectBuiltinTab(0);
-    }
-  }
-
-  /// Switches the visible tab to the given built-in logical index. Works for
-  /// both the narrow (bottom tab bar) and wide (sidebar) layouts — the wide
-  /// layout reads `_lastTabIndex`, so we `setState` to force its rebuild.
-  void _selectBuiltinTab(int logicalIdx) {
-    if (!mounted) return;
-    setState(() {
-      _onTabTapped(logicalIdx);
-      final visual = _visualForBuiltin(logicalIdx);
-      _tabController.index = visual < 0 ? 0 : visual;
-    });
   }
 
   void _handleDropOnAddFolderButton() {
@@ -427,7 +344,6 @@ class _HomeShellState extends State<HomeShell> {
     _plusButtonInset.dispose();
     _globalSettingsOpen.dispose();
     _undoController.dispose();
-    widgetDeepLink.removeListener(_onWidgetDeepLink);
     super.dispose();
   }
 

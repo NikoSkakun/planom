@@ -1,11 +1,5 @@
 default_platform(:ios)
 
-# ── Constants ────────────────────────────────────────────────────────────────
-APP_BUNDLE_ID    = "app.planom".freeze
-WIDGET_BUNDLE_ID = "app.planom.PlanomWidget".freeze
-APP_GROUP_ID     = "group.app.planom".freeze
-TEAM_ID          = "GH6HRY4EWZ".freeze
-
 platform :ios do
 
   # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -18,85 +12,6 @@ platform :ios do
       key_content:   ENV["APP_STORE_CONNECT_API_KEY_CONTENT"].gsub("\\n", "\n"),
       in_house:      false,
     )
-  end
-
-  # Ensures the widget's App ID exists and that the App Groups capability +
-  # the shared `group.app.planom` group are enabled/assigned on BOTH the app
-  # and the widget App IDs. Without this, match-generated profiles won't carry
-  # the `com.apple.security.application-groups` entitlement the widgets need.
-  #
-  # The App Store Connect API key can create Bundle IDs and toggle the
-  # APP_GROUPS *capability*, but Apple does not expose App Group *entities* over
-  # that API — creating/assigning the group itself needs Developer Portal
-  # (Apple-ID) auth. We do as much as the key allows, then (if Apple-ID
-  # credentials are present) finish the group via Spaceship::Portal. Every step
-  # is best-effort + idempotent so re-runs are safe.
-  def ensure_signing_prereqs(api_key, key_path)
-    require "spaceship"
-
-    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
-      key_id:    api_key[:key_id],
-      issuer_id: api_key[:issuer_id],
-      filepath:  key_path,
-    )
-
-    # 1. Make sure the widget extension's App ID exists.
-    begin
-      bundle_ids = Spaceship::ConnectAPI::BundleId.all
-      unless bundle_ids.any? { |b| b.identifier == WIDGET_BUNDLE_ID }
-        Spaceship::ConnectAPI::BundleId.create(
-          name:       "Planom Widget",
-          identifier: WIDGET_BUNDLE_ID,
-          platform:   "IOS",
-          seed_id:    TEAM_ID,
-        )
-        UI.success("Created App ID #{WIDGET_BUNDLE_ID}")
-      end
-    rescue => e
-      UI.important("Widget App ID setup (match will retry): #{e.message}")
-    end
-
-    # 2. Enable the App Groups capability on both App IDs (idempotent).
-    [APP_BUNDLE_ID, WIDGET_BUNDLE_ID].each do |bid|
-      bundle = Spaceship::ConnectAPI::BundleId.all.find { |b| b.identifier == bid }
-      next unless bundle
-      begin
-        bundle.create_capability(
-          Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS,
-        )
-        UI.success("Enabled App Groups capability on #{bid}")
-      rescue => e
-        UI.important("App Groups capability on #{bid} (likely already enabled): #{e.message}")
-      end
-    end
-
-    # 3. Create + assign the actual App Group. Not available via the ASC API
-    #    key, so this needs Apple-ID portal auth. Skip gracefully if absent.
-    if ENV["FASTLANE_USER"].to_s.empty?
-      UI.important("⚠️  No Apple-ID credentials (FASTLANE_USER) — skipping App Group creation/assignment.")
-      UI.important("    If the build fails on the application-groups entitlement, create '#{APP_GROUP_ID}'")
-      UI.important("    in the Developer Portal once and tick it on both '#{APP_BUNDLE_ID}' and '#{WIDGET_BUNDLE_ID}'.")
-      return
-    end
-
-    begin
-      Spaceship::Portal.login(ENV["FASTLANE_USER"], ENV["FASTLANE_PASSWORD"])
-      Spaceship::Portal.client.team_id = TEAM_ID
-
-      group = Spaceship::Portal.app_group.find(APP_GROUP_ID) ||
-              Spaceship::Portal.app_group.create!(group_id: APP_GROUP_ID, name: "Planom Group")
-      UI.success("App Group #{APP_GROUP_ID} ready")
-
-      [APP_BUNDLE_ID, WIDGET_BUNDLE_ID].each do |bid|
-        app = Spaceship::Portal.app.find(bid)
-        next unless app
-        app.update_service(Spaceship::Portal.app_service.app_group.on)
-        app.associate_groups([group])
-        UI.success("Associated #{bid} with #{APP_GROUP_ID}")
-      end
-    rescue => e
-      UI.important("App Group portal setup skipped/failed: #{e.message}")
-    end
   end
 
   # ── Lanes ─────────────────────────────────────────────────────────────────────
@@ -129,45 +44,17 @@ platform :ios do
       add_to_search_list: true,
     )
 
-    # Make sure the widget App ID + App Groups capability/group exist before
-    # match generates profiles, so the profiles carry the entitlement.
-    ensure_signing_prereqs(api_key, key_path)
-
     # Fetch (or create on first run) the distribution certificate and
-    # provisioning profiles for BOTH the app and the widget extension.
-    # force: true regenerates profiles so newly-enabled capabilities (App
-    # Groups) are baked into them. Match stores them encrypted in the certs
-    # repo; MATCH_PASSWORD is the decryption key.
+    # provisioning profile from the private certificates repo.
+    # Match stores them encrypted; MATCH_PASSWORD is the decryption key.
     match(
       type:              "appstore",
-      app_identifier:    [APP_BUNDLE_ID, WIDGET_BUNDLE_ID],
+      app_identifier:    "app.planom",
       git_url:           "https://x-access-token:#{ENV['MATCH_GITHUB_TOKEN']}@github.com/nikoskakun/ios-certificates",
+
       api_key:           api_key,
       keychain_name:     "ci_build.keychain",
       keychain_password: "ci_temp_pass",
-      force:             true,
-    )
-
-    # Apply manual signing per target. A single global PROVISIONING_PROFILE_
-    # SPECIFIER can't serve two bundle IDs, so set each target's profile in the
-    # project (CI workspace only) instead of via xcargs.
-    update_code_signing_settings(
-      path:                  "ios/Runner.xcodeproj",
-      use_automatic_signing: false,
-      team_id:               TEAM_ID,
-      targets:               ["Runner"],
-      bundle_identifier:     APP_BUNDLE_ID,
-      code_sign_identity:    "Apple Distribution",
-      profile_name:          "match AppStore #{APP_BUNDLE_ID}",
-    )
-    update_code_signing_settings(
-      path:                  "ios/Runner.xcodeproj",
-      use_automatic_signing: false,
-      team_id:               TEAM_ID,
-      targets:               ["PlanomWidgetExtension"],
-      bundle_identifier:     WIDGET_BUNDLE_ID,
-      code_sign_identity:    "Apple Distribution",
-      profile_name:          "match AppStore #{WIDGET_BUNDLE_ID}",
     )
 
     build_app(
@@ -175,19 +62,16 @@ platform :ios do
       scheme:         "Runner",
       configuration:  "Release",
       export_method:  "app-store",
-      # Per-target profiles are set on the project above; here we only pass the
-      # ASC API-key auth args. The export step maps each bundle ID to its
-      # profile via export_options below.
-      xcargs:         "-authenticationKeyPath #{key_path}" \
+      # Force manual signing on Runner. Pod targets are excluded from signing
+      # via Podfile CODE_SIGNING_ALLOWED=NO, so this profile specifier only
+      # affects Runner and won't bleed into pods.
+      xcargs:         "CODE_SIGN_STYLE=Manual" \
+                      " DEVELOPMENT_TEAM=GH6HRY4EWZ" \
+                      " PROVISIONING_PROFILE_SPECIFIER='match AppStore app.planom'" \
+                      " CODE_SIGN_IDENTITY='Apple Distribution'" \
+                      " -authenticationKeyPath #{key_path}" \
                       " -authenticationKeyID #{api_key[:key_id]}" \
                       " -authenticationKeyIssuerID #{api_key[:issuer_id]}",
-      export_options: {
-        method: "app-store",
-        provisioningProfiles: {
-          APP_BUNDLE_ID    => "match AppStore #{APP_BUNDLE_ID}",
-          WIDGET_BUNDLE_ID => "match AppStore #{WIDGET_BUNDLE_ID}",
-        },
-      },
       output_directory: "build/ios/ipa",
       output_name:      "Planom.ipa",
       buildlog_path:    "build/ios/logs",
