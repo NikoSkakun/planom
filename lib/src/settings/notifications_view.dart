@@ -3,9 +3,15 @@ import 'package:flutter/cupertino.dart';
 import '../localization/strings.dart';
 import '../notifications/notification_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/platform_capabilities.dart';
+import '../utils/selection_menu.dart';
+import 'settings_controller.dart';
+import 'settings_widgets.dart';
 
 class NotificationsSettingsView extends StatefulWidget {
-  const NotificationsSettingsView({super.key});
+  const NotificationsSettingsView({super.key, this.settingsController});
+
+  final SettingsController? settingsController;
 
   @override
   State<NotificationsSettingsView> createState() =>
@@ -112,9 +118,71 @@ class _NotificationsSettingsViewState
                 style: TextStyle(fontSize: 13, color: labelColor),
               ),
             ),
+
+            // ── App icon badge ─────────────────────────────────────────
+            if (PlatformCapabilities.supportsAppBadge &&
+                widget.settingsController != null) ...[
+              const SizedBox(height: 24),
+              Text(
+                s.appBadge,
+                style: TextStyle(
+                    fontSize: 13, color: labelColor, letterSpacing: -0.08),
+              ),
+              const SizedBox(height: 8),
+              ListenableBuilder(
+                listenable: widget.settingsController!,
+                builder: (ctx, _) => SettingsNavRow(
+                  label: s.appBadgeMode,
+                  trailingLabel: _badgeModeLabel(
+                      s, widget.settingsController!.badgeMode),
+                  onTap: () => _pickBadgeMode(
+                      ctx, widget.settingsController!),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  s.appBadgeHint,
+                  style: TextStyle(fontSize: 13, color: labelColor),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  static String _badgeModeLabel(S s, BadgeMode m) {
+    switch (m) {
+      case BadgeMode.none:
+        return s.appBadgeNone;
+      case BadgeMode.todayTasks:
+        return s.appBadgeTodayTasks;
+      case BadgeMode.todayTasksAndEvents:
+        return s.appBadgeTodayTasksAndEvents;
+      case BadgeMode.inboxTasks:
+        return s.appBadgeInbox;
+      case BadgeMode.allUncompleted:
+        return s.appBadgeAllUncompleted;
+    }
+  }
+
+  Future<void> _pickBadgeMode(
+      BuildContext context, SettingsController sc) async {
+    final s = S.of(context);
+    final selected = await showSelectionMenu<BadgeMode>(
+      context: context,
+      title: s.appBadgeMode,
+      current: sc.badgeMode,
+      options: BadgeMode.values
+          .map((m) => SelectionMenuOption(
+                value: m,
+                label: _badgeModeLabel(s, m),
+              ))
+          .toList(),
+    );
+    if (selected != null) await sc.updateBadgeMode(selected);
   }
 }

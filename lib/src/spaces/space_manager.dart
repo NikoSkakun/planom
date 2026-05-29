@@ -8,12 +8,14 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../calendar/event_controller.dart';
+import '../contacts/contact_controller.dart';
 import '../database/database_service.dart';
 import '../folders/folder_controller.dart';
 import '../notes/note_controller.dart';
 import '../routines/routine_controller.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
+import '../sync/sync_controller.dart';
 import '../tasks/task_controller.dart';
 import 'space.dart';
 
@@ -38,7 +40,9 @@ class SpaceManager with ChangeNotifier {
   late NoteController _noteController;
   late RoutineController _routineController;
   late EventController _eventController;
+  late ContactController _contactController;
   late BackupService _backupService;
+  late SyncController _syncController;
 
   List<Space> get spaces => List.unmodifiable(_spaces);
   String get activeSpaceId => _activeSpaceId;
@@ -52,7 +56,13 @@ class SpaceManager with ChangeNotifier {
   NoteController get noteController => _noteController;
   RoutineController get routineController => _routineController;
   EventController get eventController => _eventController;
+  ContactController get contactController => _contactController;
   BackupService get backupService => _backupService;
+  SyncController get syncController => _syncController;
+  // Exposed for features (e.g. search) that need to query the active space's
+  // DB directly. Always the current space's handle — re-grabbed by widgets
+  // each time the active space switches because MyApp is keyed by space id.
+  DatabaseService get db => _db;
 
   Future<void> load() async {
     await _loadMetadata();
@@ -66,6 +76,17 @@ class SpaceManager with ChangeNotifier {
     await switchSpace(id);
   }
 
+  Future<void> renameSpace(String id, String newName) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return;
+    final index = _spaces.indexWhere((s) => s.id == id);
+    if (index < 0) return;
+    if (_spaces[index].name == trimmed) return;
+    _spaces[index] = _spaces[index].copyWith(name: trimmed);
+    await _saveMetadata();
+    notifyListeners();
+  }
+
   Future<void> switchSpace(String id) async {
     if (id == _activeSpaceId && _initialized) return;
     _activeSpaceId = id;
@@ -73,6 +94,12 @@ class SpaceManager with ChangeNotifier {
     await _initControllers(id);
     notifyListeners();
   }
+
+  /// Returns the on-disk filename for [spaceId]. The default space lives in
+  /// `planom.db`; all others live in `planom_<id>.db`. Used by storage
+  /// analysis to size every space, not just the active one.
+  String dbNameFor(String spaceId) =>
+      spaceId == 'default' ? 'planom.db' : 'planom_$spaceId.db';
 
   /// Permanently deletes a space and its database file. The default space can
   /// never be deleted and at least one space always remains. If the deleted
@@ -131,6 +158,30 @@ class SpaceManager with ChangeNotifier {
     _eventController = EventController(_db);
     await _eventController.load();
 
+    _contactController = ContactController(_db);
+    await _contactController.load();
+
+    // Wire the badge to the global settings + current space's events.
+    // Counting "not-yet-started events today" gives the user a sense of
+    // upcoming items; we include any timed event whose start moment is in
+    // the future today, plus all all-day events.
+    _taskController.attachBadgeContext(
+      settings: settingsController,
+      eventCountToday: () {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        return _eventController.eventsForDate(today).where((e) {
+          if (e.doTime == null) return true; // all-day
+          final start =
+              today.add(Duration(minutes: e.doTime!));
+          return start.isAfter(now);
+        }).length;
+      },
+    );
+    // EventController changes don't drive the badge automatically — pump it
+    // when events change so the count stays current.
+    _eventController.addListener(_taskController.refreshBadge);
+
     _backupService = BackupService(
       db: _db,
       taskController: _taskController,
@@ -138,8 +189,15 @@ class SpaceManager with ChangeNotifier {
       noteController: _noteController,
       routineController: _routineController,
       eventController: _eventController,
+      contactController: _contactController,
       settingsController: settingsController,
     );
+
+    _syncController = SyncController(
+      db: _db,
+      backupService: _backupService,
+    );
+    await _syncController.load();
 
     _initialized = true;
   }
@@ -209,6 +267,12 @@ class SpaceManagerProvider extends InheritedWidget {
         context.dependOnInheritedWidgetOfExactType<SpaceManagerProvider>();
     assert(p != null, 'SpaceManagerProvider not found in context');
     return p!.spaceManager;
+  }
+
+  static SpaceManager? maybeOf(BuildContext context) {
+    final p =
+        context.dependOnInheritedWidgetOfExactType<SpaceManagerProvider>();
+    return p?.spaceManager;
   }
 
   @override

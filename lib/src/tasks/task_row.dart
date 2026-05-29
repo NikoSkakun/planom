@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../localization/strings.dart';
 import '../models/task.dart';
 import 'calendar_date_picker.dart';
+import 'task_field_prefs.dart';
 
 /// Shared proxy decorator for task drag-reorder animation.
 Widget taskProxyDecorator(
@@ -45,7 +46,6 @@ class TaskRow extends StatelessWidget {
     required this.onTap,
     this.showList = false,
     this.listColor,
-    this.isOverdue = false,
   });
 
   final Task task;
@@ -53,7 +53,17 @@ class TaskRow extends StatelessWidget {
   final VoidCallback onTap;
   final bool showList;
   final Color? listColor;
-  final bool isOverdue;
+
+  /// Returns true when the task's due date is in the past (strictly before
+  /// today) and it hasn't been completed yet. Completed tasks don't carry an
+  /// overdue badge even if their date is old.
+  bool _isOverdue() {
+    final due = task.dueDate;
+    if (due == null || task.isCompleted) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return DateTime(due.year, due.month, due.day).isBefore(today);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,12 +71,15 @@ class TaskRow extends StatelessWidget {
     final dateLabel = dueDate != null
         ? formatTaskDateRelative(context, dueDate, doTime: task.doTime)
         : null;
+    final isOverdue = _isOverdue();
     final dateColor = isOverdue
         ? CupertinoColors.destructiveRed
         : CupertinoColors.secondaryLabel.resolveFrom(context);
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      // Top-align so the checkbox lines up with the first line of the
+      // title when the title wraps to multiple lines.
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Checkbox zone — includes the vertical padding so the full item height is tappable
         MergeSemantics(
@@ -198,20 +211,38 @@ class RoundedCheckbox extends StatelessWidget {
     final borderColor = !checked && priority > 0
         ? TaskRow._priorityColor(priority)
         : CupertinoColors.tertiaryLabel.resolveFrom(context);
+    final style = TaskCheckboxAppearance.current;
+    final BoxDecoration deco;
+    switch (style) {
+      case TaskCheckboxStyle.sharpRect:
+        deco = BoxDecoration(
+          // borderRadius omitted → sharp corners
+          color: checked ? AppColors.accent : null,
+          border: checked ? null : Border.all(color: borderColor, width: 1.5),
+        );
+      case TaskCheckboxStyle.circle:
+        deco = BoxDecoration(
+          shape: BoxShape.circle,
+          color: checked ? AppColors.accent : null,
+          border: checked ? null : Border.all(color: borderColor, width: 1.5),
+        );
+      case TaskCheckboxStyle.roundedRect:
+        deco = BoxDecoration(
+          borderRadius: BorderRadius.circular(5),
+          color: checked ? AppColors.accent : null,
+          border: checked ? null : Border.all(color: borderColor, width: 1.5),
+        );
+    }
 
+    final size = 20 * AppScale.factor;
     return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        color: checked ? AppColors.accent : null,
-        border: checked
-            ? null
-            : Border.all(color: borderColor, width: 1.5),
-      ),
+      width: size,
+      height: size,
+      decoration: deco,
       child: checked
-          ? const Icon(CupertinoIcons.checkmark,
-              size: 11, color: CupertinoColors.white)
+          ? Icon(CupertinoIcons.checkmark,
+              size: 11 * AppScale.factor,
+              color: CupertinoColors.white)
           : null,
     );
   }

@@ -1,18 +1,28 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
 
+import '../contacts/contact_controller.dart';
+import '../database/database_service.dart';
 import '../folders/folder_controller.dart';
+import '../home_shell.dart';
+import '../integrations/google/google_calendar_controller.dart';
+import '../integrations/google/remote_event.dart';
 import '../localization/strings.dart';
+import '../models/contact.dart';
 import '../models/event.dart';
 import '../models/task.dart';
+import '../notes/note_controller.dart';
+import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_menu.dart';
-import '../settings/settings_view.dart';
 import '../tasks/task_controller.dart';
 import '../utils/dropdown_overlay.dart';
-import '../utils/fast_route.dart';
+import '../utils/plus_drag_controller.dart';
+import '../utils/plus_drag_payload.dart';
 import 'day_view_sheet.dart';
 import 'event_controller.dart';
 
@@ -22,19 +32,27 @@ class CalendarView extends StatefulWidget {
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.contactController,
     required this.resetSignal,
     this.settingsController,
     this.backupService,
     this.onDaySelected,
+    this.db,
+    this.noteController,
+    this.googleCalendarController,
   });
 
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final ContactController contactController;
   final ValueNotifier<int> resetSignal;
   final SettingsController? settingsController;
   final BackupService? backupService;
   final ValueChanged<DateTime?>? onDaySelected;
+  final DatabaseService? db;
+  final NoteController? noteController;
+  final GoogleCalendarController? googleCalendarController;
 
   @override
   State<CalendarView> createState() => _CalendarViewState();
@@ -51,6 +69,12 @@ class _CalendarViewState extends State<CalendarView>
   late final ScrollController _scrollCtrl;
   final _centerKey = GlobalKey();
   late int _visibleYear;
+  int _visibleMonthEpoch = 0;
+  Timer? _prefetchDebounce;
+
+  /// Months on either side of the visible month we eagerly pull from Google.
+  /// Sized so a fast scroll has data ready by the time the cells appear.
+  static const _prefetchBufferMonths = 3;
 
   @override
   void initState() {
@@ -58,9 +82,15 @@ class _CalendarViewState extends State<CalendarView>
     _now = DateTime.now();
     _currentMonth = DateTime(_now.year, _now.month, 1);
     _visibleYear = _now.year;
+    _visibleMonthEpoch = _now.year * 12 + _now.month - 1;
     _scrollCtrl = ScrollController();
     _scrollCtrl.addListener(_onScroll);
     widget.resetSignal.addListener(_scrollToCurrentMonth);
+    // Pre-warm Google Calendar around the current month so the user sees
+    // events immediately when they open the tab.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestPrefetch(_visibleMonthEpoch);
+    });
   }
 
   @override
@@ -68,6 +98,7 @@ class _CalendarViewState extends State<CalendarView>
     widget.resetSignal.removeListener(_scrollToCurrentMonth);
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
+    _prefetchDebounce?.cancel();
     super.dispose();
   }
 
@@ -77,6 +108,27 @@ class _CalendarViewState extends State<CalendarView>
     final epochMonths = _now.year * 12 + _now.month - 1 + monthsFromNow;
     final year = epochMonths ~/ 12;
     if (year != _visibleYear) setState(() => _visibleYear = year);
+    if (epochMonths != _visibleMonthEpoch) {
+      _visibleMonthEpoch = epochMonths;
+      _requestPrefetch(epochMonths);
+    }
+  }
+
+  /// Asks the Google Calendar controller to make sure events around
+  /// [centerMonthEpoch] are loaded. Debounced so a flick-scroll doesn't fire
+  /// dozens of fetches; the trailing call wins.
+  void _requestPrefetch(int centerMonthEpoch) {
+    final gcal = widget.googleCalendarController;
+    if (gcal == null || !gcal.isConnected) return;
+    _prefetchDebounce?.cancel();
+    _prefetchDebounce = Timer(const Duration(milliseconds: 250), () {
+      final startEpoch = centerMonthEpoch - _prefetchBufferMonths;
+      final endEpoch = centerMonthEpoch + _prefetchBufferMonths;
+      final from = DateTime(startEpoch ~/ 12, startEpoch % 12 + 1, 1);
+      final to = DateTime(endEpoch ~/ 12, endEpoch % 12 + 1 + 1, 1);
+      // Fire and forget; the controller notifies listeners after merging.
+      unawaited(gcal.ensureRangeLoaded(from, to));
+    });
   }
 
   void _scrollToCurrentMonth() {
@@ -102,8 +154,9 @@ class _CalendarViewState extends State<CalendarView>
   Future<void> _openDay(DateTime date) async {
     final monthsFromNow =
         (date.year - _now.year) * 12 + (date.month - _now.month);
+    final firstDay = widget.settingsController?.firstDayOfWeek ?? DateTime.monday;
     final firstWeekday =
-        DateTime(date.year, date.month, 1).weekday - 1; // 0..6
+        weekdayColumn(DateTime(date.year, date.month, 1), firstDay);
     final weekIndex = (firstWeekday + date.day - 1) ~/ 7;
 
     // Approximate: month header ~30px, each week row ~88px.
@@ -131,6 +184,9 @@ class _CalendarViewState extends State<CalendarView>
       taskController: widget.controller,
       eventController: widget.eventController,
       folderController: widget.folderController,
+      contactController: widget.contactController,
+      settingsController: widget.settingsController,
+      googleCalendarController: widget.googleCalendarController,
     );
     if (!mounted) return;
     widget.onDaySelected?.call(null);
@@ -141,26 +197,27 @@ class _CalendarViewState extends State<CalendarView>
           widget.controller,
           widget.folderController,
           widget.eventController,
+          widget.contactController,
+          if (widget.googleCalendarController != null)
+            widget.googleCalendarController!,
+          if (widget.settingsController != null) widget.settingsController!,
         ]),
         builder: (context, _) => _MonthSection(
           month: month,
           today: _now,
+          firstDayOfWeek:
+              widget.settingsController?.firstDayOfWeek ?? DateTime.monday,
           controller: widget.controller,
           folderController: widget.folderController,
           eventController: widget.eventController,
+          contactController: widget.contactController,
+          googleCalendarController: widget.googleCalendarController,
           onDayTap: _openDay,
         ),
       );
 
   void _openSettings(BuildContext context) {
-    Navigator.of(context).push(
-      FastRoute<void>(
-        builder: (_) => SettingsView(
-          controller: widget.settingsController!,
-          backupService: widget.backupService,
-        ),
-      ),
-    );
+    HomeShell.openGlobalSettings(context);
   }
 
   void _showSettingsMenu(BuildContext context) {
@@ -185,17 +242,29 @@ class _CalendarViewState extends State<CalendarView>
         border: null,
         middle: Text('$_visibleYear'),
         trailing: settingsHidden
-            ? CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () => _showSettingsMenu(context),
-                child: const Icon(CupertinoIcons.ellipsis, size: 26),
+            ? Semantics(
+                label: S.of(context).settings,
+                button: true,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _showSettingsMenu(context),
+                  child: const Icon(CupertinoIcons.ellipsis, size: 26),
+                ),
               )
             : null,
       ),
       child: SafeArea(
-        child: Column(
+        child: _maybeWrapWithSearchPull(
+          child: Column(
           children: [
-            _WeekdayHeader(),
+            ListenableBuilder(
+              listenable: widget.settingsController ??
+                  const _NeverNotifier(),
+              builder: (_, __) => _WeekdayHeader(
+                firstDayOfWeek: widget.settingsController?.firstDayOfWeek ??
+                    DateTime.monday,
+              ),
+            ),
             Expanded(
               child: CustomScrollView(
                 center: _centerKey,
@@ -223,22 +292,48 @@ class _CalendarViewState extends State<CalendarView>
             ),
           ],
         ),
+        ),
       ),
+    );
+  }
+
+  Widget _maybeWrapWithSearchPull({required Widget child}) {
+    if (widget.db == null || widget.noteController == null) return child;
+    return SearchPullScope(
+      db: widget.db!,
+      taskController: widget.controller,
+      folderController: widget.folderController,
+      noteController: widget.noteController!,
+      eventController: widget.eventController,
+      child: child,
     );
   }
 }
 
 // ─── Weekday header ───────────────────────────────────────────────────────────
 
+class _NeverNotifier extends Listenable {
+  const _NeverNotifier();
+  @override
+  void addListener(VoidCallback listener) {}
+  @override
+  void removeListener(VoidCallback listener) {}
+}
+
 class _WeekdayHeader extends StatelessWidget {
+  const _WeekdayHeader({required this.firstDayOfWeek});
+
+  final int firstDayOfWeek;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 32,
       color: CupertinoColors.systemBackground.resolveFrom(context),
       child: Row(
-        children: weekdaysShort(context)
-            .map((l) => Expanded(
+        children:
+            rotateWeekdays(weekdaysShort(context), firstDayOfWeek)
+                .map((l) => Expanded(
                   child: Center(
                     child: Text(
                       l,
@@ -263,22 +358,29 @@ class _MonthSection extends StatelessWidget {
   const _MonthSection({
     required this.month,
     required this.today,
+    required this.firstDayOfWeek,
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.contactController,
+    required this.googleCalendarController,
     required this.onDayTap,
   });
 
   final DateTime month;
   final DateTime today;
+  final int firstDayOfWeek;
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final ContactController contactController;
+  final GoogleCalendarController? googleCalendarController;
   final ValueChanged<DateTime> onDayTap;
 
   List<DateTime?> _buildGrid() {
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    final startOffset = DateTime(month.year, month.month, 1).weekday - 1;
+    final startOffset =
+        weekdayColumn(DateTime(month.year, month.month, 1), firstDayOfWeek);
     final cells = <DateTime?>[];
     for (var i = 0; i < startOffset; i++) {
       cells.add(null);
@@ -313,6 +415,8 @@ class _MonthSection extends StatelessWidget {
             controller: controller,
             folderController: folderController,
             eventController: eventController,
+            contactController: contactController,
+            googleCalendarController: googleCalendarController,
             onDayTap: onDayTap,
           ),
       ],
@@ -329,6 +433,8 @@ class _WeekRow extends StatelessWidget {
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.contactController,
+    required this.googleCalendarController,
     required this.onDayTap,
   });
 
@@ -337,6 +443,8 @@ class _WeekRow extends StatelessWidget {
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final ContactController contactController;
+  final GoogleCalendarController? googleCalendarController;
   final ValueChanged<DateTime> onDayTap;
 
   @override
@@ -352,6 +460,8 @@ class _WeekRow extends StatelessWidget {
                     controller: controller,
                     folderController: folderController,
                     eventController: eventController,
+                    contactController: contactController,
+                    googleCalendarController: googleCalendarController,
                     onTap: day == null ? null : () => onDayTap(day),
                   ),
                 ))
@@ -370,6 +480,8 @@ class _DayCell extends StatelessWidget {
     required this.controller,
     required this.folderController,
     required this.eventController,
+    required this.contactController,
+    required this.googleCalendarController,
     required this.onTap,
   });
 
@@ -378,6 +490,8 @@ class _DayCell extends StatelessWidget {
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
+  final ContactController contactController;
+  final GoogleCalendarController? googleCalendarController;
   final VoidCallback? onTap;
 
   bool get _isToday =>
@@ -403,23 +517,37 @@ class _DayCell extends StatelessWidget {
     }
 
     final allTasks = controller.tasksForDate(date!);
+    final birthdays = contactController.contactsForDate(date!);
     final uncompleted = allTasks.where((t) => !t.isCompleted).toList();
     final completed = allTasks.where((t) => t.isCompleted).toList();
     final events = eventController.eventsForDate(date!);
+    final remoteEvents =
+        googleCalendarController?.eventsForDate(date!) ?? const <RemoteEvent>[];
 
-    // Order: events first, then incomplete tasks, then completed tasks.
+    // Order: events first (local + Google), then birthdays, then incomplete
+    // tasks, then completed tasks. Remote events render with their calendar
+    // color so different Google calendars stay visually distinct.
     final chips = <_ChipData>[
       for (final e in events) _ChipData.event(e),
+      for (final e in remoteEvents) _ChipData.remoteEvent(e),
+      for (final b in birthdays) _ChipData.birthday(b),
       for (final t in uncompleted) _ChipData.task(t, false),
       for (final t in completed) _ChipData.task(t, true),
     ];
 
-    return GestureDetector(
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (_) =>
+          PlusDragScope.of(context)?.onDropOnDay?.call(date!),
+      builder: (context, candidates, _) {
+        final highlighted = candidates.isNotEmpty;
+        return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
         constraints: const BoxConstraints(minHeight: 88),
         decoration: BoxDecoration(
+          color: highlighted ? AppColors.accent.withOpacity(0.15) : null,
           border: Border(
             top: BorderSide(
               color: CupertinoColors.separator.resolveFrom(context),
@@ -462,6 +590,16 @@ class _DayCell extends StatelessWidget {
                   isPast: _eventIsPast(c.event!),
                 );
               }
+              if (c.isRemoteEvent) {
+                return _RemoteEventChip(
+                  title: c.remoteEvent!.title,
+                  color: Color(c.remoteEvent!.calendarColor),
+                  isPast: _remoteEventIsPast(c.remoteEvent!),
+                );
+              }
+              if (c.isBirthday) {
+                return _BirthdayChip(title: c.birthday!.name);
+              }
               final listColor = c.task!.listId != null
                   ? folderController.listById(c.task!.listId!)?.color
                   : null;
@@ -487,6 +625,8 @@ class _DayCell extends StatelessWidget {
         ),
       ),
     );
+      },
+    );
   }
 }
 
@@ -494,17 +634,37 @@ class _ChipData {
   _ChipData.task(Task t, bool c)
       : task = t,
         event = null,
+        remoteEvent = null,
+        birthday = null,
         completed = c;
   _ChipData.event(Event e)
       : task = null,
         event = e,
+        remoteEvent = null,
+        birthday = null,
+        completed = false;
+  _ChipData.remoteEvent(RemoteEvent e)
+      : task = null,
+        event = null,
+        remoteEvent = e,
+        birthday = null,
+        completed = false;
+  _ChipData.birthday(Contact b)
+      : task = null,
+        event = null,
+        remoteEvent = null,
+        birthday = b,
         completed = false;
 
   final Task? task;
   final Event? event;
+  final RemoteEvent? remoteEvent;
+  final Contact? birthday;
   final bool completed;
 
   bool get isEvent => event != null;
+  bool get isRemoteEvent => remoteEvent != null;
+  bool get isBirthday => birthday != null;
 }
 
 // ─── Task chip ────────────────────────────────────────────────────────────────
@@ -548,6 +708,42 @@ class _TaskChip extends StatelessWidget {
   }
 }
 
+class _BirthdayChip extends StatelessWidget {
+  const _BirthdayChip({required this.title});
+  final String title;
+
+  static const _color = Color(0xFFFF2D55); // birthday pink
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      decoration: BoxDecoration(
+        color: _color,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(CupertinoIcons.gift_fill,
+              size: 8, color: CupertinoColors.white),
+          const SizedBox(width: 2),
+          Flexible(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 9, color: CupertinoColors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EventChip extends StatelessWidget {
   const _EventChip({required this.title, this.isPast = false});
   final String title;
@@ -584,4 +780,49 @@ bool _eventIsPast(Event event) {
   final eventDay = DateTime(event.date.year, event.date.month, event.date.day);
   final today = DateTime(now.year, now.month, now.day);
   return eventDay.isBefore(today);
+}
+
+bool _remoteEventIsPast(RemoteEvent event) {
+  final now = DateTime.now();
+  if (event.doTime != null) {
+    final endMinutes = event.doTime! + (event.duration ?? 0);
+    return event.date.add(Duration(minutes: endMinutes)).isBefore(now);
+  }
+  final eventDay = DateTime(event.date.year, event.date.month, event.date.day);
+  final today = DateTime(now.year, now.month, now.day);
+  return eventDay.isBefore(today);
+}
+
+/// Chip for a Google Calendar event. Uses the calendar's color so different
+/// connected calendars stay visually distinct.
+class _RemoteEventChip extends StatelessWidget {
+  const _RemoteEventChip({
+    required this.title,
+    required this.color,
+    this.isPast = false,
+  });
+
+  final String title;
+  final Color color;
+  final bool isPast;
+
+  static const _pastColor = Color(0xFF8E8E93);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      decoration: BoxDecoration(
+        color: isPast ? _pastColor : color,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 9, color: CupertinoColors.white),
+      ),
+    );
+  }
 }

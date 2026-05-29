@@ -1,22 +1,43 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'src/app.dart';
 import 'src/database/database_service.dart';
 import 'src/folders/folder_icon_picker.dart';
+import 'src/integrations/google/google_calendar_controller.dart';
 import 'src/notifications/notification_service.dart';
 import 'src/security/security_service.dart';
 import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
 import 'src/spaces/space_manager.dart';
+import 'src/utils/platform_capabilities.dart';
+import 'src/widgets/home_widget_service.dart';
+import 'src/widgets/widget_deep_link.dart';
+import 'src/widgets/widget_sync_coordinator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+
+  // Linux/Windows have no native sqflite backend; swap in the FFI factory
+  // before any controller opens a database. macOS uses the native plugin.
+  if (PlatformCapabilities.sqfliteNeedsFfi) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
+  if (PlatformCapabilities.supportsOrientationLock) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      // iPad opens to a sidebar+detail layout in HomeShell; allowing landscape
+      // here lets users actually use that extra room. Phone bottom-tab layout
+      // still works in landscape too.
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
 
   await initFolderIconService();
   await NotificationService.initTimezone();
@@ -34,9 +55,26 @@ void main() async {
   final securityService = SecurityService(globalDb);
   await securityService.load();
 
+  // Google Calendar integration is global (lives outside any space) so the
+  // same connection appears in every space. Initialisation is best-effort —
+  // a missing client ID or offline state just leaves the controller in its
+  // disconnected default and the rest of the app continues to work.
+  final googleCalendarController =
+      GoogleCalendarController(db: globalDb);
+  await googleCalendarController.load();
+
   final spaceManager =
       SpaceManager(settingsController: settingsController, globalDb: globalDb);
   await spaceManager.load();
+
+  // iOS home-screen / lock-screen widgets. Best-effort: the service no-ops on
+  // unsupported platforms, and the coordinator pushes an initial "Today"
+  // payload then keeps it live as the active space's data changes. Deep links
+  // (widget taps) flow through `widgetDeepLink`, consumed by HomeShell.
+  await HomeWidgetService.instance.init();
+  await initWidgetDeepLinks();
+  WidgetSyncCoordinator(spaceManager: spaceManager, settings: settingsController)
+      .start();
 
   runApp(
     ListenableBuilder(
@@ -53,8 +91,10 @@ void main() async {
           noteController: spaceManager.noteController,
           routineController: spaceManager.routineController,
           eventController: spaceManager.eventController,
+          contactController: spaceManager.contactController,
           backupService: spaceManager.backupService,
           securityService: securityService,
+          googleCalendarController: googleCalendarController,
         ),
       ),
     ),

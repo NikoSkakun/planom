@@ -3,7 +3,9 @@ import 'package:sqflite/sqflite.dart';
 
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
+import '../models/contact.dart';
 import '../models/event.dart';
+import '../models/list_section.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
 import '../models/routine.dart';
@@ -14,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 17;
+  static const _dbVersion = 25;
 
   Database? _db;
 
@@ -43,7 +45,38 @@ class DatabaseService {
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
             completionDate INTEGER,
-            reminderOffsets TEXT
+            reminderOffsets TEXT,
+            parentTaskId TEXT,
+            tagIds TEXT,
+            recurrence TEXT,
+            sectionId TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE contacts (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            note TEXT,
+            listId TEXT NOT NULL,
+            birthMonth INTEGER NOT NULL,
+            birthDay INTEGER NOT NULL,
+            birthYear INTEGER,
+            isCompletable INTEGER NOT NULL DEFAULT 0,
+            isCompleted INTEGER NOT NULL DEFAULT 0,
+            completionDate INTEGER,
+            reminderOffsets TEXT,
+            creationDate INTEGER NOT NULL,
+            sortOrder INTEGER NOT NULL DEFAULT 0,
+            isDeleted INTEGER NOT NULL DEFAULT 0,
+            deletedDate INTEGER
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE tags (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            color INTEGER,
+            creationDate INTEGER NOT NULL
           )
         ''');
         await db.execute('''
@@ -54,6 +87,7 @@ class DatabaseService {
             creationDate INTEGER NOT NULL,
             sortOrder INTEGER NOT NULL DEFAULT 0,
             iconId TEXT,
+            iconColor INTEGER,
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER
           )
@@ -67,8 +101,10 @@ class DatabaseService {
             sortOrder INTEGER NOT NULL DEFAULT 0,
             color INTEGER,
             iconId TEXT,
+            iconColor INTEGER,
             isDeleted INTEGER NOT NULL DEFAULT 0,
-            deletedDate INTEGER
+            deletedDate INTEGER,
+            listType TEXT NOT NULL DEFAULT 'tasks'
           )
         ''');
         await db.execute('''
@@ -142,6 +178,17 @@ class DatabaseService {
             reminderOffsets TEXT
           )
         ''');
+        await db.execute('''
+          CREATE TABLE list_sections (
+            id TEXT PRIMARY KEY,
+            listId TEXT NOT NULL,
+            name TEXT NOT NULL,
+            sortOrder INTEGER NOT NULL DEFAULT 0,
+            isCollapsed INTEGER NOT NULL DEFAULT 0,
+            creationDate INTEGER NOT NULL
+          )
+        ''');
+        await _createFtsTables(db);
       },
       onUpgrade: (db, oldVersion, _) async {
         if (oldVersion < 2) {
@@ -303,6 +350,145 @@ class DatabaseService {
         if (oldVersion < 17) {
           await db.execute('ALTER TABLE tasks ADD COLUMN reminderOffsets TEXT');
           await db.execute('ALTER TABLE events ADD COLUMN reminderOffsets TEXT');
+        }
+        if (oldVersion < 18) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN parentTaskId TEXT');
+        }
+        if (oldVersion < 19) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN tagIds TEXT');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS tags (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              color INTEGER,
+              creationDate INTEGER NOT NULL
+            )
+          ''');
+        }
+        if (oldVersion < 20) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN recurrence TEXT');
+        }
+        if (oldVersion < 21) {
+          await _createFtsTables(db);
+          await _backfillFts(db);
+        }
+        if (oldVersion < 22) {
+          await db.execute('ALTER TABLE folders ADD COLUMN iconColor INTEGER');
+          await db.execute('ALTER TABLE app_lists ADD COLUMN iconColor INTEGER');
+        }
+        if (oldVersion < 23) {
+          await db.execute(
+              "ALTER TABLE app_lists ADD COLUMN listType TEXT NOT NULL DEFAULT 'tasks'");
+        }
+        if (oldVersion < 24) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN birthMonth INTEGER');
+          await db.execute('ALTER TABLE tasks ADD COLUMN birthDay INTEGER');
+          await db.execute('ALTER TABLE tasks ADD COLUMN birthYear INTEGER');
+          await db.execute(
+              'ALTER TABLE tasks ADD COLUMN isCompletable INTEGER NOT NULL DEFAULT 1');
+          await db.execute('ALTER TABLE tasks ADD COLUMN sectionId TEXT');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS list_sections (
+              id TEXT PRIMARY KEY,
+              listId TEXT NOT NULL,
+              name TEXT NOT NULL,
+              sortOrder INTEGER NOT NULL DEFAULT 0,
+              isCollapsed INTEGER NOT NULL DEFAULT 0,
+              creationDate INTEGER NOT NULL
+            )
+          ''');
+        }
+        if (oldVersion < 25) {
+          // Move birthday tasks to the new contacts table, then drop the
+          // birthday columns from tasks. SQLite can't drop columns directly
+          // pre-3.35, so we recreate the tasks table.
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS contacts (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              note TEXT,
+              listId TEXT NOT NULL,
+              birthMonth INTEGER NOT NULL,
+              birthDay INTEGER NOT NULL,
+              birthYear INTEGER,
+              isCompletable INTEGER NOT NULL DEFAULT 0,
+              isCompleted INTEGER NOT NULL DEFAULT 0,
+              completionDate INTEGER,
+              reminderOffsets TEXT,
+              creationDate INTEGER NOT NULL,
+              sortOrder INTEGER NOT NULL DEFAULT 0,
+              isDeleted INTEGER NOT NULL DEFAULT 0,
+              deletedDate INTEGER
+            )
+          ''');
+          await db.execute('''
+            INSERT INTO contacts (
+              id, name, note, listId,
+              birthMonth, birthDay, birthYear,
+              isCompletable, isCompleted, completionDate,
+              reminderOffsets, creationDate, sortOrder,
+              isDeleted, deletedDate
+            )
+            SELECT id, title, note, listId,
+                   birthMonth, birthDay, birthYear,
+                   isCompletable, isCompleted, completionDate,
+                   reminderOffsets, creationDate, sortOrder,
+                   isDeleted, deletedDate
+            FROM tasks
+            WHERE birthMonth IS NOT NULL AND birthDay IS NOT NULL
+          ''');
+          await db.execute('''
+            DELETE FROM tasks
+            WHERE birthMonth IS NOT NULL AND birthDay IS NOT NULL
+          ''');
+          // Recreate `tasks` without the birthday columns. Preserve every
+          // remaining row by copying through a temp table.
+          await db.execute('''
+            CREATE TABLE tasks_new (
+              id TEXT PRIMARY KEY,
+              creationDate INTEGER NOT NULL,
+              iconId TEXT NOT NULL,
+              title TEXT NOT NULL,
+              note TEXT,
+              isCompleted INTEGER NOT NULL DEFAULT 0,
+              dueDate INTEGER,
+              doTime INTEGER,
+              duration INTEGER,
+              listId TEXT,
+              priority INTEGER NOT NULL DEFAULT 0,
+              sortOrder INTEGER NOT NULL DEFAULT 0,
+              isDeleted INTEGER NOT NULL DEFAULT 0,
+              deletedDate INTEGER,
+              completionDate INTEGER,
+              reminderOffsets TEXT,
+              parentTaskId TEXT,
+              tagIds TEXT,
+              recurrence TEXT,
+              sectionId TEXT
+            )
+          ''');
+          await db.execute('''
+            INSERT INTO tasks_new (
+              id, creationDate, iconId, title, note, isCompleted,
+              dueDate, doTime, duration, listId, priority, sortOrder,
+              isDeleted, deletedDate, completionDate, reminderOffsets,
+              parentTaskId, tagIds, recurrence, sectionId
+            )
+            SELECT id, creationDate, iconId, title, note, isCompleted,
+                   dueDate, doTime, duration, listId, priority, sortOrder,
+                   isDeleted, deletedDate, completionDate, reminderOffsets,
+                   parentTaskId, tagIds, recurrence, sectionId
+            FROM tasks
+          ''');
+          await db.execute('DROP TABLE tasks');
+          await db.execute('ALTER TABLE tasks_new RENAME TO tasks');
+          // FTS triggers reference the old `tasks` table by name and
+          // SQLite re-points them automatically when the table is renamed;
+          // but to be safe, drop and recreate them.
+          await db.execute('DROP TRIGGER IF EXISTS tasks_ai');
+          await db.execute('DROP TRIGGER IF EXISTS tasks_ad');
+          await db.execute('DROP TRIGGER IF EXISTS tasks_au');
+          await _createTaskFtsTriggers(db);
         }
       },
     );
@@ -745,6 +931,133 @@ class DatabaseService {
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
+  // List sections — user-defined groups of tasks within a list
+  Future<List<ListSection>> getListSections() async {
+    final db = await _database;
+    final rows =
+        await db.query('list_sections', orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(ListSection.fromMap).toList();
+  }
+
+  Future<void> insertListSection(ListSection section) async {
+    final db = await _database;
+    await db.insert('list_sections', section.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateListSection(ListSection section) async {
+    final db = await _database;
+    await db.update('list_sections', section.toMap(),
+        where: 'id = ?', whereArgs: [section.id]);
+  }
+
+  Future<void> deleteListSection(String id) async {
+    final db = await _database;
+    await db.delete('list_sections', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteSectionsForList(String listId) async {
+    final db = await _database;
+    await db.delete('list_sections',
+        where: 'listId = ?', whereArgs: [listId]);
+  }
+
+  Future<void> updateListSectionSortOrders(List<ListSection> sections) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final s in sections) {
+      batch.update('list_sections', {'sortOrder': s.sortOrder},
+          where: 'id = ?', whereArgs: [s.id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<Map<String, dynamic>>> exportListSections() async {
+    final db = await _database;
+    final rows = await db.query('list_sections');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  // Contacts — birthday entries that belong to a Birthdays-type AppList.
+  Future<List<Contact>> getContacts() async {
+    final db = await _database;
+    final rows = await db.query('contacts',
+        where: 'isDeleted = 0',
+        orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(Contact.fromMap).toList();
+  }
+
+  Future<List<Contact>> getTrashedContacts() async {
+    final db = await _database;
+    final rows = await db.query('contacts',
+        where: 'isDeleted = 1', orderBy: 'deletedDate DESC');
+    return rows.map(Contact.fromMap).toList();
+  }
+
+  Future<void> insertContact(Contact contact) async {
+    final db = await _database;
+    await db.insert('contacts', contact.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateContact(Contact contact) async {
+    final db = await _database;
+    await db.update('contacts', contact.toMap(),
+        where: 'id = ?', whereArgs: [contact.id]);
+  }
+
+  Future<void> softDeleteContact(String id, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'contacts',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> softDeleteContactsForList(
+      String listId, DateTime deletedDate) async {
+    final db = await _database;
+    await db.update(
+      'contacts',
+      {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
+      where: 'listId = ? AND isDeleted = 0',
+      whereArgs: [listId],
+    );
+  }
+
+  Future<void> restoreContact(String id) async {
+    final db = await _database;
+    await db.update(
+      'contacts',
+      {'isDeleted': 0, 'deletedDate': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> permanentlyDeleteContact(String id) async {
+    final db = await _database;
+    await db.delete('contacts', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteContactsForList(String listId) async {
+    final db = await _database;
+    await db.delete('contacts', where: 'listId = ?', whereArgs: [listId]);
+  }
+
+  Future<void> clearTrashedContacts() async {
+    final db = await _database;
+    await db.delete('contacts', where: 'isDeleted = 1');
+  }
+
+  Future<List<Map<String, dynamic>>> exportContacts() async {
+    final db = await _database;
+    final rows = await db.query('contacts');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
 
   Future<void> clearTrashedTasks() async {
     final db = await _database;
@@ -761,6 +1074,35 @@ class DatabaseService {
     await db.delete('app_lists', where: 'isDeleted = 1');
   }
 
+  // Tags — flat, name-uniqueness enforced in the controller
+  Future<List<Map<String, dynamic>>> getTags() async {
+    final db = await _database;
+    final rows = await db.query('tags', orderBy: 'name COLLATE NOCASE ASC');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<void> insertTag(Map<String, dynamic> tag) async {
+    final db = await _database;
+    await db.insert('tags', tag,
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateTag(Map<String, dynamic> tag) async {
+    final db = await _database;
+    await db.update('tags', tag, where: 'id = ?', whereArgs: [tag['id']]);
+  }
+
+  Future<void> deleteTag(String id) async {
+    final db = await _database;
+    await db.delete('tags', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> exportTags() async {
+    final db = await _database;
+    final rows = await db.query('tags');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
   // App settings — generic key/value store for app-level preferences
   Future<List<Map<String, dynamic>>> getAppSettings() async {
     final db = await _database;
@@ -774,6 +1116,11 @@ class DatabaseService {
       {'key': key, 'value': value},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  Future<void> deleteAppSetting(String key) async {
+    final db = await _database;
+    await db.delete('app_settings', where: 'key = ?', whereArgs: [key]);
   }
 
   // ── Backup / Restore ─────────────────────────────────────────────────────
@@ -827,7 +1174,9 @@ class DatabaseService {
   }
 
   static const _allTables = [
+    'contacts',
     'events',
+    'list_sections',
     'app_settings',
     'routine_entries',
     'routines',
@@ -835,6 +1184,7 @@ class DatabaseService {
     'note_folders',
     'app_lists',
     'folders',
+    'tags',
     'tasks',
   ];
 
@@ -863,13 +1213,16 @@ class DatabaseService {
 
   Future<void> resetUserData() async {
     final db = await _database;
+    await db.delete('contacts');
     await db.delete('events');
+    await db.delete('list_sections');
     await db.delete('routine_entries');
     await db.delete('routines');
     await db.delete('notes');
     await db.delete('note_folders');
     await db.delete('app_lists');
     await db.delete('folders');
+    await db.delete('tags');
     await db.delete('tasks');
   }
 
@@ -877,4 +1230,155 @@ class DatabaseService {
     await _db?.close();
     _db = null;
   }
+
+  // ── Full-text search (FTS5) ────────────────────────────────────────────────
+
+  /// Searches tasks, notes and events for [query] and returns up to [limit]
+  /// matching ids per source table. Excludes trashed rows. Quotes/escapes the
+  /// query so user input can't poison the FTS MATCH expression.
+  Future<SearchResults> searchAll(String query, {int limit = 50}) async {
+    final db = await _database;
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return const SearchResults({}, {}, {});
+
+    // Wrap each whitespace-separated token in double quotes (with internal
+    // quotes doubled) and join with a space — gives the user implicit AND
+    // matching without exposing FTS5 syntax to typos.
+    final tokens = trimmed
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .map((t) => '"${t.replaceAll('"', '""')}"*')
+        .join(' ');
+
+    Future<Set<String>> idsFrom(String fts) async {
+      final rows = await db.rawQuery(
+        'SELECT id FROM $fts WHERE $fts MATCH ? LIMIT ?',
+        [tokens, limit],
+      );
+      return rows.map((r) => r['id'] as String).toSet();
+    }
+
+    final tasks = await idsFrom('tasks_fts');
+    final notes = await idsFrom('notes_fts');
+    final events = await idsFrom('events_fts');
+    return SearchResults(tasks, notes, events);
+  }
+
+  static Future<void> _createFtsTables(Database db) async {
+    // Contentless FTS5 tables keyed by the source row's id (UNINDEXED so it
+    // doesn't get tokenised). Triggers below keep them in sync — see
+    // _backfillFts for the one-time population on migration.
+    await db.execute('''
+      CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts
+      USING fts5(id UNINDEXED, title, body, tokenize='unicode61');
+    ''');
+    await db.execute('''
+      CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts
+      USING fts5(id UNINDEXED, title, body, tokenize='unicode61');
+    ''');
+    await db.execute('''
+      CREATE VIRTUAL TABLE IF NOT EXISTS events_fts
+      USING fts5(id UNINDEXED, title, body, tokenize='unicode61');
+    ''');
+
+    await _createTaskFtsTriggers(db);
+
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+        DELETE FROM notes_fts WHERE id = new.id;
+        INSERT INTO notes_fts(id, title, body)
+          VALUES (new.id, new.title, new.content);
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+        DELETE FROM notes_fts WHERE id = old.id;
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
+        DELETE FROM notes_fts WHERE id = old.id;
+        INSERT INTO notes_fts(id, title, body)
+          VALUES (new.id, new.title, new.content);
+      END;
+    ''');
+
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS events_ai AFTER INSERT ON events BEGIN
+        DELETE FROM events_fts WHERE id = new.id;
+        INSERT INTO events_fts(id, title, body)
+          VALUES (new.id, new.title, COALESCE(new.note, ''));
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS events_ad AFTER DELETE ON events BEGIN
+        DELETE FROM events_fts WHERE id = old.id;
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS events_au AFTER UPDATE ON events BEGIN
+        DELETE FROM events_fts WHERE id = old.id;
+        INSERT INTO events_fts(id, title, body)
+          VALUES (new.id, new.title, COALESCE(new.note, ''));
+      END;
+    ''');
+  }
+
+  /// Tasks FTS triggers — extracted so [onUpgrade] can re-create them after
+  /// rebuilding the `tasks` table (DROP/RENAME breaks the original triggers).
+  static Future<void> _createTaskFtsTriggers(Database db) async {
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS tasks_ai AFTER INSERT ON tasks BEGIN
+        DELETE FROM tasks_fts WHERE id = new.id;
+        INSERT INTO tasks_fts(id, title, body)
+          VALUES (new.id, new.title, COALESCE(new.note, ''));
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS tasks_ad AFTER DELETE ON tasks BEGIN
+        DELETE FROM tasks_fts WHERE id = old.id;
+      END;
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS tasks_au AFTER UPDATE ON tasks BEGIN
+        DELETE FROM tasks_fts WHERE id = old.id;
+        INSERT INTO tasks_fts(id, title, body)
+          VALUES (new.id, new.title, COALESCE(new.note, ''));
+      END;
+    ''');
+  }
+
+  /// One-shot backfill of every row that existed before FTS arrived.
+  /// Idempotent: triggers above start the moment the tables exist, so any new
+  /// rows are already in fts; this catches the legacy ones.
+  static Future<void> _backfillFts(Database db) async {
+    await db.execute(
+      "INSERT INTO tasks_fts(id, title, body) "
+      "SELECT id, title, COALESCE(note, '') FROM tasks "
+      "WHERE id NOT IN (SELECT id FROM tasks_fts);",
+    );
+    await db.execute(
+      "INSERT INTO notes_fts(id, title, body) "
+      "SELECT id, title, content FROM notes "
+      "WHERE id NOT IN (SELECT id FROM notes_fts);",
+    );
+    await db.execute(
+      "INSERT INTO events_fts(id, title, body) "
+      "SELECT id, title, COALESCE(note, '') FROM events "
+      "WHERE id NOT IN (SELECT id FROM events_fts);",
+    );
+  }
+}
+
+/// Container for the three buckets returned by [DatabaseService.searchAll].
+class SearchResults {
+  const SearchResults(this.taskIds, this.noteIds, this.eventIds);
+
+  final Set<String> taskIds;
+  final Set<String> noteIds;
+  final Set<String> eventIds;
+
+  bool get isEmpty =>
+      taskIds.isEmpty && noteIds.isEmpty && eventIds.isEmpty;
+  int get total => taskIds.length + noteIds.length + eventIds.length;
 }

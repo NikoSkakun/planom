@@ -6,6 +6,7 @@ import '../tasks/calendar_date_picker.dart';
 import '../theme/app_theme.dart';
 import '../utils/duration_picker.dart';
 import '../utils/reminder_picker.dart';
+import '../utils/undo_controller.dart';
 import 'event_controller.dart';
 
 class EventDetailView extends StatefulWidget {
@@ -113,7 +114,13 @@ class _EventDetailViewState extends State<EventDetailView> {
     );
     if (confirmed != true || !mounted) return;
     _deleted = true;
+    final snapshot = widget.event;
+    final undo = UndoScope.maybeOf(context);
     await widget.controller.deleteEvent(widget.event.id);
+    undo?.show(
+      label: s.eventDeletedToast,
+      onUndo: () => widget.controller.addEvent(snapshot),
+    );
     if (mounted) Navigator.of(context).pop();
   }
 

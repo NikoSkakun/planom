@@ -7,17 +7,31 @@ enum SmartListVisibility { show, showIfNotEmpty, hidden }
 
 class SmartListPrefs {
   SmartListVisibility today;
+  SmartListVisibility tomorrow;
   SmartListVisibility upcoming;
+  SmartListVisibility allTasks;
   SmartListVisibility completed;
   SmartListVisibility trash;
+  SmartListVisibility notesTrash;
   bool hideTabLabels;
+  bool showAddFolderButton;
+  bool showNotesAddFolderButton;
+  // When false, note bodies are rendered/edited as plain text. The markdown
+  // toolbar in NoteDetailView is also hidden in that mode.
+  bool notesUseMarkdown;
 
   SmartListPrefs({
     this.today = SmartListVisibility.show,
+    this.tomorrow = SmartListVisibility.showIfNotEmpty,
     this.upcoming = SmartListVisibility.show,
+    this.allTasks = SmartListVisibility.hidden,
     this.completed = SmartListVisibility.showIfNotEmpty,
     this.trash = SmartListVisibility.showIfNotEmpty,
+    this.notesTrash = SmartListVisibility.showIfNotEmpty,
     this.hideTabLabels = false,
+    this.showAddFolderButton = true,
+    this.showNotesAddFolderButton = true,
+    this.notesUseMarkdown = true,
   });
 
   static Future<File> _file() async {
@@ -33,10 +47,20 @@ class SmartListPrefs {
           jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       return SmartListPrefs(
         today: _parse(data['today']),
+        tomorrow: _parse(data['tomorrow'],
+            fallback: SmartListVisibility.showIfNotEmpty),
         upcoming: _parse(data['upcoming']),
+        allTasks: _parse(data['allTasks'],
+            fallback: SmartListVisibility.hidden),
         completed: _parse(data['completed']),
         trash: _parse(data['trash']),
+        notesTrash: _parse(data['notesTrash'],
+            fallback: SmartListVisibility.showIfNotEmpty),
         hideTabLabels: data['hideTabLabels'] == true,
+        showAddFolderButton: data['showAddFolderButton'] != false,
+        showNotesAddFolderButton:
+            data['showNotesAddFolderButton'] != false,
+        notesUseMarkdown: data['notesUseMarkdown'] != false,
       );
     } catch (_) {
       return SmartListPrefs();
@@ -50,21 +74,37 @@ class SmartListPrefs {
 
   Map<String, dynamic> toJson() => {
         'today': _encode(today),
+        'tomorrow': _encode(tomorrow),
         'upcoming': _encode(upcoming),
+        'allTasks': _encode(allTasks),
         'completed': _encode(completed),
         'trash': _encode(trash),
+        'notesTrash': _encode(notesTrash),
         'hideTabLabels': hideTabLabels,
+        'showAddFolderButton': showAddFolderButton,
+        'showNotesAddFolderButton': showNotesAddFolderButton,
+        'notesUseMarkdown': notesUseMarkdown,
       };
 
   void applyJson(Map<String, dynamic> data) {
     today = _parse(data['today']);
+    tomorrow =
+        _parse(data['tomorrow'], fallback: SmartListVisibility.showIfNotEmpty);
     upcoming = _parse(data['upcoming']);
+    allTasks = _parse(data['allTasks'], fallback: SmartListVisibility.hidden);
     completed = _parse(data['completed']);
     trash = _parse(data['trash']);
+    notesTrash = _parse(data['notesTrash'],
+        fallback: SmartListVisibility.showIfNotEmpty);
     hideTabLabels = data['hideTabLabels'] == true;
+    showAddFolderButton = data['showAddFolderButton'] != false;
+    showNotesAddFolderButton =
+        data['showNotesAddFolderButton'] != false;
+    notesUseMarkdown = data['notesUseMarkdown'] != false;
   }
 
-  static SmartListVisibility _parse(dynamic value) {
+  static SmartListVisibility _parse(dynamic value,
+      {SmartListVisibility fallback = SmartListVisibility.show}) {
     switch (value) {
       case 'show':
         return SmartListVisibility.show;
@@ -73,7 +113,7 @@ class SmartListPrefs {
       case 'hidden':
         return SmartListVisibility.hidden;
       default:
-        return SmartListVisibility.show;
+        return fallback;
     }
   }
 

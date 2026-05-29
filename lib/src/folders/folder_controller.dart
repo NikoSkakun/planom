@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../database/database_service.dart';
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
+import '../models/list_section.dart';
 
 class FolderController with ChangeNotifier {
   FolderController(this._db);
@@ -12,6 +13,7 @@ class FolderController with ChangeNotifier {
   List<AppList> _lists = [];
   List<AppFolder> _trashedFolders = [];
   List<AppList> _trashedLists = [];
+  List<ListSection> _sections = [];
 
   List<AppFolder> get folders => List.unmodifiable(_folders);
   List<AppList> get lists => List.unmodifiable(_lists);
@@ -49,12 +51,103 @@ class FolderController with ChangeNotifier {
     }
   }
 
+  /// IDs of every list that lives directly inside [folderId].
+  List<String> listIdsIn(String folderId) =>
+      _lists.where((l) => l.folderId == folderId).map((l) => l.id).toList();
+
+  /// IDs of every list inside [folderId] **and** every nested subfolder.
+  /// Walks the folder tree iteratively to avoid stack growth on deep trees.
+  List<String> listIdsInRecursive(String folderId) {
+    final ids = <String>[];
+    final stack = <String>[folderId];
+    while (stack.isNotEmpty) {
+      final current = stack.removeLast();
+      for (final l in _lists) {
+        if (l.folderId == current) ids.add(l.id);
+      }
+      for (final f in _folders) {
+        if (f.parentFolderId == current) stack.add(f.id);
+      }
+    }
+    return ids;
+  }
+
   Future<void> load() async {
     _folders = await _db.getFolders();
     _lists = await _db.getLists();
     _trashedFolders = await _db.getTrashedFolders();
     _trashedLists = await _db.getTrashedLists();
+    _sections = await _db.getListSections();
     notifyListeners();
+  }
+
+  // ── Sections ────────────────────────────────────────────────────────────
+
+  /// User-defined sections within [listId], in display order.
+  List<ListSection> sectionsForList(String listId) {
+    final scoped = _sections.where((s) => s.listId == listId).toList();
+    scoped.sort((a, b) {
+      if (a.sortOrder != b.sortOrder) {
+        return a.sortOrder.compareTo(b.sortOrder);
+      }
+      return a.creationDate.compareTo(b.creationDate);
+    });
+    return scoped;
+  }
+
+  ListSection? sectionById(String id) {
+    try {
+      return _sections.firstWhere((s) => s.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> addSection(ListSection section) async {
+    await _db.insertListSection(section);
+    _sections = [..._sections, section];
+    notifyListeners();
+  }
+
+  Future<void> updateSection(ListSection section) async {
+    await _db.updateListSection(section);
+    final idx = _sections.indexWhere((s) => s.id == section.id);
+    if (idx != -1) _sections[idx] = section;
+    notifyListeners();
+  }
+
+  Future<void> deleteSection(String id) async {
+    await _db.deleteListSection(id);
+    _sections = _sections.where((s) => s.id != id).toList();
+    notifyListeners();
+  }
+
+  Future<void> reorderSections(
+      String listId, int oldIndex, int newIndex) async {
+    final scope = sectionsForList(listId);
+    if (newIndex > oldIndex) newIndex--;
+    final item = scope.removeAt(oldIndex);
+    scope.insert(newIndex, item);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _sections.indexWhere((s) => s.id == updated.id);
+      if (idx != -1) _sections[idx] = updated;
+    }
+    notifyListeners();
+    await _db.updateListSectionSortOrders(scope);
+  }
+
+  Future<void> toggleSectionCollapsed(String id) async {
+    final idx = _sections.indexWhere((s) => s.id == id);
+    if (idx == -1) return;
+    final updated = _sections[idx]
+        .copyWith(isCollapsed: !_sections[idx].isCollapsed);
+    _sections[idx] = updated;
+    notifyListeners();
+    await _db.updateListSection(updated);
   }
 
   Future<void> addFolder(AppFolder folder) async {
@@ -102,6 +195,42 @@ class FolderController with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Restores every folder and list that was soft-deleted at exactly
+  /// [deletedDate] — used by Revert for folder-deep deletes which mark every
+  /// nested item with the same timestamp.
+  Future<void> restoreAt(DateTime deletedDate) async {
+    final ts = deletedDate.millisecondsSinceEpoch;
+    final folders = _trashedFolders
+        .where((f) => f.deletedDate?.millisecondsSinceEpoch == ts)
+        .toList();
+    final lists = _trashedLists
+        .where((l) => l.deletedDate?.millisecondsSinceEpoch == ts)
+        .toList();
+    for (final f in folders) {
+      await _db.restoreFolder(f.id);
+    }
+    for (final l in lists) {
+      await _db.restoreList(l.id);
+    }
+    _trashedFolders = _trashedFolders
+        .where((f) => f.deletedDate?.millisecondsSinceEpoch != ts)
+        .toList();
+    _trashedLists = _trashedLists
+        .where((l) => l.deletedDate?.millisecondsSinceEpoch != ts)
+        .toList();
+    _folders = [
+      ..._folders,
+      ...folders.map((f) =>
+          f.copyWith(isDeleted: false, clearDeletedDate: true)),
+    ];
+    _lists = [
+      ..._lists,
+      ...lists.map((l) =>
+          l.copyWith(isDeleted: false, clearDeletedDate: true)),
+    ];
+    notifyListeners();
+  }
+
   Future<void> permanentlyDeleteList(String id) async {
     await _db.deleteList(id);
     _trashedLists = _trashedLists.where((l) => l.id != id).toList();
@@ -134,6 +263,8 @@ class FolderController with ChangeNotifier {
       sortOrder: orig.sortOrder,
       color: orig.color,
       iconId: orig.iconId,
+      iconColor: orig.iconColor,
+      listType: orig.listType,
     );
     await _db.restoreList(id);
     if (targetFolderId != orig.folderId) {
@@ -155,6 +286,7 @@ class FolderController with ChangeNotifier {
       creationDate: orig.creationDate,
       sortOrder: orig.sortOrder,
       iconId: orig.iconId,
+      iconColor: orig.iconColor,
     );
     await _db.restoreFolder(id);
     if (targetParentId != orig.parentFolderId) {
@@ -211,28 +343,99 @@ class FolderController with ChangeNotifier {
     await _db.updateListSortOrders(scope);
   }
 
+  /// Moves the folder with [movedId] to come right before [beforeId] inside
+  /// [parentFolderId]. When [beforeId] is null it lands at the end. Drives
+  /// the long-press-drag reorder.
+  Future<void> reorderFolderBefore({
+    required String movedId,
+    String? beforeId,
+    required String? parentFolderId,
+  }) async {
+    final scope = _folders
+        .where((f) =>
+            f.parentFolderId == parentFolderId && f.id != movedId)
+        .toList();
+    _sortByDefault(scope);
+
+    final moved = _folders.firstWhere((f) => f.id == movedId,
+        orElse: () => AppFolder(id: movedId, name: ''));
+    if (moved.name.isEmpty && _folders.indexWhere((f) => f.id == movedId) == -1) {
+      return;
+    }
+    int insertAt =
+        beforeId == null ? scope.length : scope.indexWhere((f) => f.id == beforeId);
+    if (insertAt < 0) insertAt = scope.length;
+    scope.insert(insertAt, moved);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _folders.indexWhere((f) => f.id == updated.id);
+      if (idx != -1) _folders[idx] = updated;
+    }
+    notifyListeners();
+    await _db.updateFolderSortOrders(scope);
+  }
+
+  /// Moves the list with [movedId] to come right before [beforeId] inside
+  /// [folderId]. When [beforeId] is null it lands at the end.
+  Future<void> reorderListBefore({
+    required String movedId,
+    String? beforeId,
+    required String? folderId,
+  }) async {
+    final scope = _lists
+        .where((l) => l.folderId == folderId && l.id != movedId)
+        .toList();
+    _sortListsByDefault(scope);
+
+    final moved = _lists.firstWhere((l) => l.id == movedId,
+        orElse: () => AppList(id: movedId, name: ''));
+    if (moved.name.isEmpty && _lists.indexWhere((l) => l.id == movedId) == -1) {
+      return;
+    }
+    int insertAt =
+        beforeId == null ? scope.length : scope.indexWhere((l) => l.id == beforeId);
+    if (insertAt < 0) insertAt = scope.length;
+    scope.insert(insertAt, moved);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _lists.indexWhere((l) => l.id == updated.id);
+      if (idx != -1) _lists[idx] = updated;
+    }
+    notifyListeners();
+    await _db.updateListSortOrders(scope);
+  }
+
   /// Recursively soft-deletes a folder, all nested subfolders, all lists inside
   /// them, and calls [onDeleteList] for each deleted list so the caller can
-  /// soft-delete associated tasks.
-  Future<void> deleteFolderDeep(
+  /// soft-delete associated tasks. Returns the shared `deletedDate` so a
+  /// caller can later pass it to [restoreAt] / [TaskController.restoreAt] to
+  /// revert the entire subtree in one shot.
+  Future<DateTime> deleteFolderDeep(
     String id,
-    Future<void> Function(String listId) onDeleteList,
+    Future<void> Function(String listId, DateTime deletedDate) onDeleteList,
   ) async {
     final now = DateTime.now();
     await _softDeleteFolderRecursive(id, now, onDeleteList);
     notifyListeners();
+    return now;
   }
 
   Future<void> _softDeleteFolderRecursive(
     String id,
     DateTime deletedDate,
-    Future<void> Function(String listId) onDeleteList,
+    Future<void> Function(String listId, DateTime deletedDate) onDeleteList,
   ) async {
     for (final f in foldersIn(id)) {
       await _softDeleteFolderRecursive(f.id, deletedDate, onDeleteList);
     }
     for (final l in listsIn(id)) {
-      await onDeleteList(l.id);
+      await onDeleteList(l.id, deletedDate);
       await _db.softDeleteList(l.id, deletedDate);
       _lists = _lists.where((x) => x.id != l.id).toList();
       _trashedLists = [

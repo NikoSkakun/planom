@@ -5,10 +5,12 @@ import '../folders/folder_controller.dart';
 import '../folders/list_picker_sheet.dart';
 import '../localization/strings.dart';
 import '../models/task.dart';
+import '../settings/settings_controller.dart';
 import '../theme/app_theme.dart';
 import '../utils/duration_picker.dart';
 import 'calendar_date_picker.dart';
 import 'task_controller.dart';
+import 'task_field_prefs.dart';
 
 void showTaskCreationSheet(
   BuildContext context,
@@ -16,6 +18,8 @@ void showTaskCreationSheet(
   FolderController folderController, {
   String? initialListId,
   DateTime? initialDueDate,
+  String? initialSectionId,
+  SettingsController? settingsController,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -27,6 +31,8 @@ void showTaskCreationSheet(
       folderController: folderController,
       initialListId: initialListId,
       initialDueDate: initialDueDate,
+      initialSectionId: initialSectionId,
+      settingsController: settingsController,
     ),
   );
 }
@@ -38,12 +44,16 @@ class TaskCreationSheet extends StatefulWidget {
     required this.folderController,
     this.initialListId,
     this.initialDueDate,
+    this.initialSectionId,
+    this.settingsController,
   });
 
   final TaskController controller;
   final FolderController folderController;
   final String? initialListId;
   final DateTime? initialDueDate;
+  final String? initialSectionId;
+  final SettingsController? settingsController;
 
   @override
   State<TaskCreationSheet> createState() => _TaskCreationSheetState();
@@ -96,14 +106,40 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     if (title.isEmpty) return;
     await widget.controller.addTask(Task(
       title: title,
+      iconId: AppDefaults.taskIcon,
       note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
       dueDate: _dueDate,
       doTime: _doTime,
       duration: _duration,
       listId: _listId,
       priority: _priority,
+      sectionId: widget.initialSectionId,
     ));
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
+  }
+
+  /// Creates the task but keeps the sheet open with the title cleared so
+  /// the user can keep adding follow-up tasks back-to-back. Wired to the
+  /// title field's "Next" return key.
+  Future<void> _submitAndContinue() async {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) return;
+    await widget.controller.addTask(Task(
+      title: title,
+      iconId: AppDefaults.taskIcon,
+      note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+      dueDate: _dueDate,
+      doTime: _doTime,
+      duration: _duration,
+      listId: _listId,
+      priority: _priority,
+      sectionId: widget.initialSectionId,
+    ));
+    if (!mounted) return;
+    _titleCtrl.clear();
+    _noteCtrl.clear();
+    setState(() => _titleEmpty = true);
+    _titleFocus.requestFocus();
   }
 
   Future<void> _pickDate() async {
@@ -171,6 +207,12 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
     final s = S.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
+    final prefs =
+        widget.settingsController?.taskFieldPrefs ?? TaskFieldPrefs();
+    final showDate = prefs.showDate;
+    final showPriority = prefs.showPriority;
+    final showDuration = prefs.showDuration;
+    final showList = prefs.showList;
 
     return Container(
       decoration: BoxDecoration(
@@ -200,11 +242,17 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
             focusNode: _titleFocus,
             placeholder: s.taskName,
             autofocus: true,
+            // The keyboard's return key reads "Next" (visual cue that you can
+            // keep adding more) but pressing it creates the task and leaves
+            // the sheet open with an empty title — the standard bulk-add
+            // pattern. The Add button to the right does the same plus closes
+            // the sheet.
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.sentences,
             style: const TextStyle(
                 fontSize: 17, fontWeight: FontWeight.w500),
             decoration: const BoxDecoration(),
+            onSubmitted: (_) => _submitAndContinue(),
           ),
           Container(
             height: 0.5,
@@ -225,116 +273,119 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
             children: [
               Row(
                 children: [
-                  // List picker
-                  GestureDetector(
-                    onTap: _pickList,
-                    child: Row(
-                      children: [
-                        ImageIcon(
-                          AssetImage(_listIcon),
-                          size: 18,
-                          color: CupertinoColors.secondaryLabel
-                              .resolveFrom(context),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _listLabel(context),
-                          style: TextStyle(
-                            fontSize: 14,
+                  if (showList) ...[
+                    GestureDetector(
+                      onTap: _pickList,
+                      child: Row(
+                        children: [
+                          ImageIcon(
+                            AssetImage(_listIcon),
+                            size: 18,
                             color: CupertinoColors.secondaryLabel
                                 .resolveFrom(context),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  // Date picker
-                  GestureDetector(
-                    onTap: _pickDate,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.calendar,
-                          size: 16,
-                          color: _dueDate != null
-                              ? AppColors.accent
-                              : CupertinoColors.secondaryLabel
+                          const SizedBox(width: 6),
+                          Text(
+                            _listLabel(context),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: CupertinoColors.secondaryLabel
                                   .resolveFrom(context),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _dueDate != null
-                              ? formatTaskDate(context, _dueDate!,
-                                  doTime: _doTime)
-                              : s.dateLabel,
-                          style: TextStyle(
-                            fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                  ],
+                  if (showDate) ...[
+                    GestureDetector(
+                      onTap: _pickDate,
+                      child: Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.calendar,
+                            size: 16,
                             color: _dueDate != null
                                 ? AppColors.accent
                                 : CupertinoColors.secondaryLabel
                                     .resolveFrom(context),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  // Priority toggle
-                  GestureDetector(
-                    onTap: _cyclePriority,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.flag_fill,
-                          size: 15,
-                          color: _priority == 0
-                              ? CupertinoColors.secondaryLabel
-                                  .resolveFrom(context)
-                              : _priorityColors[_priority],
-                        ),
-                        if (_priority > 0) ...[
                           const SizedBox(width: 4),
                           Text(
-                            _priorityLabels(context)[_priority],
+                            _dueDate != null
+                                ? formatTaskDate(context, _dueDate!,
+                                    doTime: _doTime)
+                                : s.dateLabel,
                             style: TextStyle(
-                              fontSize: 13,
-                              color: _priorityColors[_priority],
-                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                              color: _dueDate != null
+                                  ? AppColors.accent
+                                  : CupertinoColors.secondaryLabel
+                                      .resolveFrom(context),
                             ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  // Duration picker
-                  GestureDetector(
-                    onTap: _pickDuration,
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.timer,
-                          size: 16,
-                          color: _duration != null
-                              ? AppColors.accent
-                              : CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
-                        ),
-                        if (_duration != null) ...[
-                          const SizedBox(width: 4),
-                          Text(
-                            formatDuration(_duration!),
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.w500,
-                            ),
+                    const SizedBox(width: 14),
+                  ],
+                  if (showPriority) ...[
+                    GestureDetector(
+                      onTap: _cyclePriority,
+                      child: Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.flag_fill,
+                            size: 15,
+                            color: _priority == 0
+                                ? CupertinoColors.secondaryLabel
+                                    .resolveFrom(context)
+                                : _priorityColors[_priority],
                           ),
+                          if (_priority > 0) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              _priorityLabels(context)[_priority],
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _priorityColors[_priority],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 14),
+                  ],
+                  if (showDuration)
+                    GestureDetector(
+                      onTap: _pickDuration,
+                      child: Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.timer,
+                            size: 16,
+                            color: _duration != null
+                                ? AppColors.accent
+                                : CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                          ),
+                          if (_duration != null) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              formatDuration(_duration!),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                 ],
               ),
               CupertinoButton(

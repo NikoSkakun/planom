@@ -1,10 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../models/event.dart';
 import '../models/task.dart';
+import '../utils/platform_capabilities.dart';
 
 class NotificationService {
   NotificationService._();
@@ -42,22 +42,39 @@ class NotificationService {
 
   Future<void> init() async {
     if (_initialized) return;
+    if (!PlatformCapabilities.supportsLocalNotifications) {
+      // Mark initialised so subsequent calls short-circuit cheaply on
+      // platforms we don't schedule on (Linux/Windows/Android).
+      _initialized = true;
+      return;
+    }
     const initSettings = InitializationSettings(
       iOS: DarwinInitializationSettings(
         requestAlertPermission: false,
         requestBadgePermission: false,
         requestSoundPermission: false,
       ),
+      macOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
     );
-    await _plugin.initialize(initSettings);
+    try {
+      await _plugin.initialize(initSettings);
+    } catch (_) {
+      // Some hosts (notably the macOS App Sandbox without notification
+      // entitlements) fail the channel handshake here; we'd rather have
+      // a working app without notifications than a crashed launch.
+    }
     _initialized = true;
   }
 
   Future<bool> requestPermission() async {
     await init();
-    final iOS = _plugin
-        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-    final result = await iOS?.requestPermissions(
+    if (!PlatformCapabilities.supportsLocalNotifications) return false;
+    final darwin = _darwinPlugin();
+    final result = await darwin?.requestPermissions(
       alert: true,
       badge: false,
       sound: true,
@@ -68,11 +85,23 @@ class NotificationService {
 
   Future<bool> checkPermission() async {
     await init();
-    final iOS = _plugin
-        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-    final status = await iOS?.checkPermissions();
+    if (!PlatformCapabilities.supportsLocalNotifications) return false;
+    final darwin = _darwinPlugin();
+    final status = await darwin?.checkPermissions();
     _permissionGranted = status?.isEnabled ?? false;
     return _permissionGranted;
+  }
+
+  /// Returns whichever Darwin (iOS/macOS) implementation is registered on the
+  /// running host, or null on platforms without one. `IOS…Plugin` is the
+  /// concrete type even on macOS — the platform interface is shared.
+  dynamic _darwinPlugin() {
+    if (PlatformCapabilities.isMacOS) {
+      return _plugin.resolvePlatformSpecificImplementation<
+          MacOSFlutterLocalNotificationsPlugin>();
+    }
+    return _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
   }
 
   // ── Task reminders ─────────────────────────────────────────────────────────
@@ -101,6 +130,7 @@ class NotificationService {
   }
 
   Future<void> cancelTaskReminders(String taskId) async {
+    if (!PlatformCapabilities.supportsLocalNotifications) return;
     for (int i = 0; i < _maxSlots; i++) {
       await _plugin.cancel(_notifSlot(taskId, i));
     }
@@ -131,14 +161,58 @@ class NotificationService {
   }
 
   Future<void> cancelEventReminders(String eventId) async {
+    if (!PlatformCapabilities.supportsLocalNotifications) return;
     for (int i = 0; i < _maxSlots; i++) {
       await _plugin.cancel(_notifSlot(eventId, i));
+    }
+  }
+
+  // ── Remote (Google Calendar) event reminders ───────────────────────────────
+  //
+  // These are Planom-only reminders attached to a Google Calendar event. The
+  // event itself stays on Google; only the local notification lives here. The
+  // [key] is the event's composite identity (account + calendar + event id).
+
+  Future<void> scheduleRemoteEventReminders({
+    required String key,
+    required String title,
+    required DateTime date,
+    int? doTime,
+    required List<int> offsets,
+  }) async {
+    await cancelRemoteEventReminders(key);
+    if (offsets.isEmpty) return;
+    if (!_permissionGranted) await checkPermission();
+    if (!_permissionGranted) return;
+
+    final baseTime = doTime == null
+        ? DateTime(date.year, date.month, date.day, 9, 0)
+        : DateTime(date.year, date.month, date.day, doTime ~/ 60, doTime % 60);
+
+    final limited = offsets.take(_maxSlots).toList();
+    for (int i = 0; i < limited.length; i++) {
+      final fireAt = baseTime.add(Duration(minutes: limited[i]));
+      if (fireAt.isBefore(DateTime.now())) continue;
+      await _schedule(
+        id: _remoteSlot(key, i),
+        title: title,
+        body: _offsetLabel(limited[i]),
+        fireAt: fireAt,
+      );
+    }
+  }
+
+  Future<void> cancelRemoteEventReminders(String key) async {
+    if (!PlatformCapabilities.supportsLocalNotifications) return;
+    for (int i = 0; i < _maxSlots; i++) {
+      await _plugin.cancel(_remoteSlot(key, i));
     }
   }
 
   // ── Cancel all ────────────────────────────────────────────────────────────
 
   Future<void> cancelAll() async {
+    if (!PlatformCapabilities.supportsLocalNotifications) return;
     await _plugin.cancelAll();
   }
 
@@ -150,18 +224,18 @@ class NotificationService {
     required String body,
     required DateTime fireAt,
   }) async {
+    if (!PlatformCapabilities.supportsLocalNotifications) return;
+    const darwinDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: false,
+      presentSound: true,
+    );
     await _plugin.zonedSchedule(
       id,
       title,
       body,
       tz.TZDateTime.from(fireAt, tz.local),
-      const NotificationDetails(
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: false,
-          presentSound: true,
-        ),
-      ),
+      const NotificationDetails(iOS: darwinDetails, macOS: darwinDetails),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
@@ -195,6 +269,20 @@ class NotificationService {
     final hex = itemId.replaceAll('-', '').substring(0, 8);
     final base = int.tryParse(hex, radix: 16) ?? itemId.hashCode;
     return (base ^ (slotIndex * 97)) & 0x7FFFFFFF;
+  }
+
+  /// Notification ID for a remote (Google Calendar) event reminder. The
+  /// composite event key shares a long prefix across events on the same
+  /// account, so [_notifSlot]'s "first 8 chars" approach would collide; hash
+  /// the whole key (FNV-1a) instead. Deterministic across runs so cancellation
+  /// recomputes the same ids.
+  int _remoteSlot(String key, int slotIndex) {
+    var hash = 0x811c9dc5;
+    for (final unit in key.codeUnits) {
+      hash = (hash ^ unit) & 0xFFFFFFFF;
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
+    }
+    return (hash ^ (slotIndex * 97)) & 0x7FFFFFFF;
   }
 
   String _offsetLabel(int offset) {

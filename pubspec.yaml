@@ -16,6 +16,7 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.2
   sqflite: ^2.3.2
+  sqflite_common_ffi: ^2.3.3
   path: ^1.9.0
   uuid: ^4.4.0
   flutter_app_badger: ^1.5.0
@@ -30,6 +31,21 @@ dependencies:
   crypto: ^3.0.3
   flutter_local_notifications: ^18.0.0
   timezone: ^0.9.4
+  local_auth: ^2.3.0
+  cryptography: ^2.7.0
+  icloud_storage: ^2.2.0
+  flutter_secure_storage: ^9.2.2
+  # Google Calendar integration. flutter_appauth runs the OAuth2 + PKCE flow so
+  # we can connect multiple accounts (one refresh token each, kept in
+  # flutter_secure_storage); googleapis gives us the Calendar API client.
+  flutter_appauth: ^9.0.1
+  googleapis: ^13.2.0
+  http: ^1.2.0
+  pdf: ^3.11.3
+  # Home-screen / lock-screen widgets (WidgetKit on iOS). Provides the shared
+  # app-group bridge the Flutter app uses to push "Today" data to the native
+  # widget extension, plus the deep-link / interactivity callbacks.
+  home_widget: ^0.6.0
 
 dev_dependencies:
   flutter_test:

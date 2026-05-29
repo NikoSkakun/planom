@@ -113,8 +113,20 @@ class S {
   String get yesterday => t('yesterday');
   String get tomorrow => t('tomorrow');
   String get upcoming => t('upcoming');
+  String get allTasks => t('allTasks');
   String get completed => t('completed');
   String get trash => t('trash');
+
+  // ── Home-screen widgets ─────────────────────────────────────────────────────
+  String get widgetNoTasks => t('widgetNoTasks');
+  String get widgetAllDone => t('widgetAllDone');
+  String get widgetNoEvents => t('widgetNoEvents');
+  String get widgetNoRoutines => t('widgetNoRoutines');
+  String get widgetAgendaTitle => t('widgetAgendaTitle');
+  String get widgetAddTask => t('widgetAddTask');
+  String get widgetRemaining => t('widgetRemaining');
+  String get widgetAllDay => t('widgetAllDay');
+  String get widgetBirthday => t('widgetBirthday');
 
   // ── Settings ──────────────────────────────────────────────────────────────
   String get settings => t('settings');
@@ -164,6 +176,112 @@ class S {
   String get exportFailedBody => t('exportFailedBody');
   String get newSpace => t('newSpace');
   String get spaceName => t('spaceName');
+  String get spaces => t('spaces');
+  String get noOptionsYet => t('noOptionsYet');
+  String get sectionModules => t('sectionModules');
+  String get sectionTaskFields => t('sectionTaskFields');
+  String get taskFieldsHint => t('taskFieldsHint');
+  String get sectionBody => t('sectionBody');
+  String get useMarkdown => t('useMarkdown');
+  String get useMarkdownHint => t('useMarkdownHint');
+  String get storage => t('storage');
+  String get storageSublabel => t('storageSublabel');
+  String get storageAppCaches => t('storageAppCaches');
+  String get storageCustomIcons => t('storageCustomIcons');
+  String get storageFontsCache => t('storageFontsCache');
+  String get storageTempCache => t('storageTempCache');
+  String get storageClearOrphans => t('storageClearOrphans');
+  String get storageFoldersLists => t('storageFoldersLists');
+  String get storageTotal => t('storageTotal');
+  String get storageItemsSuffix => t('storageItemsSuffix');
+  String get storageFilesSuffix => t('storageFilesSuffix');
+  String storageDataIn(String space) =>
+      t('storageDataIn').replaceFirst('{space}', space);
+  String get space => t('space');
+  String get clearFontsCacheQ => t('clearFontsCacheQ');
+  String get clearFontsCacheBody => t('clearFontsCacheBody');
+  String get clearTempCacheQ => t('clearTempCacheQ');
+  String get clearTempCacheBody => t('clearTempCacheBody');
+  String get clearOrphanIconsQ => t('clearOrphanIconsQ');
+  String get clearOrphanIconsBody => t('clearOrphanIconsBody');
+  String get showHidePriority => t('showHidePriority');
+  String get showHideDate => t('showHideDate');
+  String get showHideRepeat => t('showHideRepeat');
+  String get showHideList => t('showHideList');
+  String get showHideDuration => t('showHideDuration');
+  String get showHideTags => t('showHideTags');
+  String get showHideReminders => t('showHideReminders');
+  String get sectionTasksUi => t('sectionTasksUi');
+  String get showAddFolderButton => t('showAddFolderButton');
+  String get sectionTaskCounters => t('sectionTaskCounters');
+  String get folderCounter => t('folderCounter');
+  String get folderCounterDirect => t('folderCounterDirect');
+  String get folderCounterRecursive => t('folderCounterRecursive');
+  String get folderCounterHidden => t('folderCounterHidden');
+  String get checkboxStyle => t('checkboxStyle');
+  String get checkboxStyleRoundedRect => t('checkboxStyleRoundedRect');
+  String get checkboxStyleSharpRect => t('checkboxStyleSharpRect');
+  String get checkboxStyleCircle => t('checkboxStyleCircle');
+  String get undoOnComplete => t('undoOnComplete');
+  String get undoOnCompleteHint => t('undoOnCompleteHint');
+  String get firstDayOfWeek => t('firstDayOfWeek');
+  String get appBadge => t('appBadge');
+  String get appBadgeMode => t('appBadgeMode');
+  String get appBadgeHint => t('appBadgeHint');
+  String get appBadgeNone => t('appBadgeNone');
+  String get appBadgeTodayTasks => t('appBadgeTodayTasks');
+  String get appBadgeTodayTasksAndEvents => t('appBadgeTodayTasksAndEvents');
+  String get appBadgeInbox => t('appBadgeInbox');
+  String get appBadgeAllUncompleted => t('appBadgeAllUncompleted');
+  String get sectionDefaults => t('sectionDefaults');
+  String get defaultTaskIcon => t('defaultTaskIcon');
+  String get defaultListIcon => t('defaultListIcon');
+  String get defaultFolderIcon => t('defaultFolderIcon');
+  String get defaultNoteFolderIcon => t('defaultNoteFolderIcon');
+  String get textSize => t('textSize');
+  String get useSystemTextSize => t('useSystemTextSize');
+  String get textSizeHint => t('textSizeHint');
+  String get animationSpeed => t('animationSpeed');
+  String get animationSpeedHint => t('animationSpeedHint');
+  String get animationSpeedOff => t('animationSpeedOff');
+  String get animationSpeedFast => t('animationSpeedFast');
+  String get animationSpeedNormal => t('animationSpeedNormal');
+  String get animationSpeedSlow => t('animationSpeedSlow');
+  String get tabBarPages => t('tabBarPages');
+  String get tabBarPagesHint => t('tabBarPagesHint');
+  String get addPage => t('addPage');
+  String get removePageTitle => t('removePageTitle');
+  String get removePageBody => t('removePageBody');
+  String get addTab => t('addTab');
+  String get tabKindBuiltin => t('tabKindBuiltin');
+  String get tabKindShortcut => t('tabKindShortcut');
+  String get tabShortcutList => t('tabShortcutList');
+  String get tabShortcutFolder => t('tabShortcutFolder');
+  String get tabShortcutNoteFolder => t('tabShortcutNoteFolder');
+  String pageNumberLabel(int n) =>
+      t('pageNumberLabel').replaceFirst('{n}', n.toString());
+  String get showListCount => t('showListCount');
+  String get revert => t('revert');
+  String get taskCompletedToast => t('taskCompletedToast');
+  String get taskTrashedToast => t('taskTrashedToast');
+  String get listTrashedToast => t('listTrashedToast');
+  String get folderTrashedToast => t('folderTrashedToast');
+  String get noteTrashedToast => t('noteTrashedToast');
+  String get noteFolderTrashedToast => t('noteFolderTrashedToast');
+  String get eventDeletedToast => t('eventDeletedToast');
+  String get iconColor => t('iconColor');
+  String get useAccentColor => t('useAccentColor');
+  String get todayShort => t('todayShort');
+  String get tomorrowShort => t('tomorrowShort');
+  String get addList => t('addList');
+  String get addFolder => t('addFolder');
+  String get addNote => t('addNote');
+  String get share => t('share');
+  String get shareAsText => t('shareAsText');
+  String get shareAsPdf => t('shareAsPdf');
+  String get shareAsImage => t('shareAsImage');
+  String get preparingPdf => t('preparingPdf');
+  String get preparingImage => t('preparingImage');
   String get deleteSpace => t('deleteSpace');
   String get deleteSpaceBody => t('deleteSpaceBody');
 
@@ -192,6 +310,56 @@ class S {
   String get lockDisabled => t('lockDisabled');
   String get verifyToDisable => t('verifyToDisable');
   String get verifyToChange => t('verifyToChange');
+  String get useBiometric => t('useBiometric');
+  String get unlockPrompt => t('unlockPrompt');
+  String get exportPlain => t('exportPlain');
+  String get exportEncrypted => t('exportEncrypted');
+  String get setPassphrase => t('setPassphrase');
+  String get enterPassphrase => t('enterPassphrase');
+  String get passwordRequired => t('passwordRequired');
+  String get search => t('search');
+  String get searchPlaceholder => t('searchPlaceholder');
+  String get searchEmptyHint => t('searchEmptyHint');
+  String get searchNoResults => t('searchNoResults');
+
+  // ── Sync ──────────────────────────────────────────────────────────────
+  String get sync => t('sync');
+  String get syncFreeSection => t('syncFreeSection');
+  String get syncPaidSection => t('syncPaidSection');
+  String get syncStatusSection => t('syncStatusSection');
+  String get syncEncryptionSection => t('syncEncryptionSection');
+  String get syncEncryptionLabel => t('syncEncryptionLabel');
+  String get syncEncryptionOn => t('syncEncryptionOn');
+  String get syncEncryptionOff => t('syncEncryptionOff');
+  String get removeEncryption => t('removeEncryption');
+  String get removeEncryptionBody => t('removeEncryptionBody');
+  String get syncDefaultEncryptionHint => t('syncDefaultEncryptionHint');
+  String get syncICloudTitle => t('syncICloudTitle');
+  String get syncICloudSublabel => t('syncICloudSublabel');
+  String get syncPlanomTitle => t('syncPlanomTitle');
+  String get syncPlanomSublabel => t('syncPlanomSublabel');
+  String get syncCustomTitle => t('syncCustomTitle');
+  String get syncCustomSublabel => t('syncCustomSublabel');
+  String get tagFree => t('tagFree');
+  String get tagComingSoon => t('tagComingSoon');
+  String get syncStatusLabel => t('syncStatusLabel');
+  String get syncNow => t('syncNow');
+  String get syncPullReplace => t('syncPullReplace');
+  String get disableSync => t('disableSync');
+  String get disableSyncBody => t('disableSyncBody');
+  String get pullReplacesLocal => t('pullReplacesLocal');
+  String get syncPassphraseHint => t('syncPassphraseHint');
+  String get syncPassphraseLossHint => t('syncPassphraseLossHint');
+  String get syncNever => t('syncNever');
+  String get syncPushing => t('syncPushing');
+  String get syncPulling => t('syncPulling');
+  String get syncSucceeded => t('syncSucceeded');
+  String get syncFailed => t('syncFailed');
+  String get syncNotConfigured => t('syncNotConfigured');
+  String get syncPassphraseRequired => t('syncPassphraseRequired');
+  String get syncNotAvailable => t('syncNotAvailable');
+  String syncLastAt(String relative) =>
+      t('syncLastAt').replaceAll('{when}', relative);
 
   // ── Notifications ─────────────────────────────────────────────────────────
   String get sectionNotifications => t('sectionNotifications');
@@ -246,6 +414,19 @@ class S {
   String get taskName => t('taskName');
   String get eventName => t('eventName');
   String get note => t('note');
+  String get subtasks => t('subtasks');
+  String get addSubtask => t('addSubtask');
+  String get repeat => t('repeat');
+  String get repeatNone => t('repeatNone');
+  String get repeatDaily => t('repeatDaily');
+  String get repeatWeekly => t('repeatWeekly');
+  String get repeatMonthly => t('repeatMonthly');
+  String get repeatYearly => t('repeatYearly');
+  String get tags => t('tags');
+  String get noTags => t('noTags');
+  String get addTag => t('addTag');
+  String get createTag => t('createTag');
+  String get searchOrCreateTag => t('searchOrCreateTag');
   String get title => t('title');
   String get folderName => t('folderName');
   String get listName => t('listName');
@@ -269,9 +450,32 @@ class S {
   String get priorityHigh => t('priorityHigh');
   String get changeIcon => t('changeIcon');
   String get changeColor => t('changeColor');
+  String get editList => t('editList');
+  String get editFolder => t('editFolder');
   String get listColor => t('listColor');
+  String get listType => t('listType');
+  String get listTypeTasks => t('listTypeTasks');
+  String get listTypeBirthdays => t('listTypeBirthdays');
+  String get listTypeShopping => t('listTypeShopping');
+  String get addBirthday => t('addBirthday');
+  String get birthdayName => t('birthdayName');
+  String get birthDate => t('birthDate');
+  String get includeYear => t('includeYear');
+  String get completable => t('completable');
+  String get thisYear => t('thisYear');
+  String get nextYear => t('nextYear');
+  String get addSection => t('addSection');
+  String get sectionName => t('sectionName');
+  String get sectionCompleted => t('sectionCompleted');
+  String get turns => t('turns');
   String get customColor => t('customColor');
   String get selectColor => t('selectColor');
+  String get select => t('select');
+  String get selectAll => t('selectAll');
+  String get deselectAll => t('deselectAll');
+  String get selectItems => t('selectItems');
+  String selectedCount(int n) => t('selectedCount').replaceFirst('{n}', '$n');
+  String get duplicate => t('duplicate');
   String get otherDots => t('otherDots');
   String get chooseIcon => t('chooseIcon');
   String get opening => t('opening');
@@ -319,6 +523,45 @@ class S {
   // ── Markdown toolbar ──────────────────────────────────────────────────────
   String get insertLink => t('insertLink');
   String get insertLinkTextPlaceholder => t('insertLinkTextPlaceholder');
+
+  // ── Google Calendar integration ──────────────────────────────────────────
+  String get sectionIntegrations => t('sectionIntegrations');
+  String get googleCalendar => t('googleCalendar');
+  String get googleCalendarOn => t('googleCalendarOn');
+  String get googleCalendarOff => t('googleCalendarOff');
+  String get googleCalendarConnect => t('googleCalendarConnect');
+  String get googleCalendarConnected => t('googleCalendarConnected');
+  String get googleCalendarDisconnect => t('googleCalendarDisconnect');
+  String get googleCalendarDisconnectBody => t('googleCalendarDisconnectBody');
+  String get googleCalendarCalendarsSection =>
+      t('googleCalendarCalendarsSection');
+  String get googleCalendarNoCalendars => t('googleCalendarNoCalendars');
+  String get googleCalendarPrimary => t('googleCalendarPrimary');
+  String get googleCalendarReadOnly => t('googleCalendarReadOnly');
+  String get googleCalendarDefaultBadge => t('googleCalendarDefaultBadge');
+  String get googleCalendarDefault => t('googleCalendarDefault');
+  String get googleCalendarDefaultSection => t('googleCalendarDefaultSection');
+  String get googleCalendarNoDefault => t('googleCalendarNoDefault');
+  String get googleCalendarSyncSection => t('googleCalendarSyncSection');
+  String get googleCalendarSyncNow => t('googleCalendarSyncNow');
+  String get googleCalendarNeverSynced => t('googleCalendarNeverSynced');
+  String get googleCalendarLastSynced => t('googleCalendarLastSynced');
+  String get googleCalendarSetupRequired => t('googleCalendarSetupRequired');
+  String get googleCalendarReadOnlyHint => t('googleCalendarReadOnlyHint');
+  String get googleCalendarReminderHint => t('googleCalendarReminderHint');
+  String get googleCalendarDeleteBody => t('googleCalendarDeleteBody');
+  String get googleCalendarAddAccount => t('googleCalendarAddAccount');
+  String get googleCalendarAccountsSection => t('googleCalendarAccountsSection');
+  String get googleCalendarRemoveAccount => t('googleCalendarRemoveAccount');
+  String get googleCalendarRemoveAccountBody =>
+      t('googleCalendarRemoveAccountBody');
+  String get googleCalendarReadWrite => t('googleCalendarReadWrite');
+  String get googleCalendarReadOnlyMode => t('googleCalendarReadOnlyMode');
+  String get googleCalendarChooseMode => t('googleCalendarChooseMode');
+  String get googleCalendarReadWriteDesc => t('googleCalendarReadWriteDesc');
+  String get googleCalendarReadOnlyDesc => t('googleCalendarReadOnlyDesc');
+  String get planomLocal => t('planomLocal');
+  String get eventCalendar => t('eventCalendar');
 
   // ── Parameterized helpers ────────────────────────────────────────────────
   String moveToTrashQuestion(String name) =>
@@ -410,6 +653,24 @@ List<String> weekdaysLong(BuildContext context) {
   return kWeekdaysLong[code] ?? kWeekdaysLong['en']!;
 }
 
+/// Reorders a Mon..Sun weekday list so [firstDayOfWeek] (1=Mon..7=Sun) is the
+/// first element. Used by the calendar header so the column order matches the
+/// user's preference.
+List<T> rotateWeekdays<T>(List<T> mondayFirst, int firstDayOfWeek) {
+  final shift = ((firstDayOfWeek - 1) % 7 + 7) % 7;
+  if (shift == 0) return mondayFirst;
+  return [...mondayFirst.sublist(shift), ...mondayFirst.sublist(0, shift)];
+}
+
+/// Column index (0..6) for a [DateTime] given [firstDayOfWeek] (1=Mon..7=Sun).
+/// E.g. firstDayOfWeek=1 (Mon): Mon→0, Sun→6. firstDayOfWeek=7 (Sun): Sun→0,
+/// Sat→6.
+int weekdayColumn(DateTime date, int firstDayOfWeek) {
+  final mondayIndex = date.weekday - 1; // 0=Mon..6=Sun
+  final shift = ((firstDayOfWeek - 1) % 7 + 7) % 7;
+  return (mondayIndex - shift + 7) % 7;
+}
+
 List<String> monthsShort(BuildContext context) {
   final code = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
   return kMonthsShort[code] ?? kMonthsShort['en']!;
@@ -441,9 +702,18 @@ const Map<String, String> _en = {
   'create': 'Create', 'save': 'Save', 'delete': 'Delete', 'deleteAll': 'Delete All',
   'edit': 'Edit', 'rename': 'Rename', 'confirm': 'Confirm', 'insert': 'Insert',
   'move': 'Move', 'putBack': 'Put Back', 'clear': 'Clear', 'untitled': 'Untitled',
+  'select': 'Select', 'selectAll': 'Select All', 'deselectAll': 'Deselect All',
+  'selectItems': 'Select Items', 'selectedCount': '{n} selected',
+  'duplicate': 'Duplicate',
   'tabTasks': 'Tasks', 'tabNotes': 'Notes', 'tabCalendar': 'Calendar',
   'tabRoutines': 'Routines', 'tabSettings': 'Settings',
   'inbox': 'Inbox', 'today': 'Today', 'yesterday': 'Yesterday', 'tomorrow': 'Tomorrow', 'upcoming': 'Upcoming',
+  'allTasks': 'All Tasks',
+  'widgetNoTasks': 'No tasks today', 'widgetAllDone': 'All done!',
+  'widgetNoEvents': 'No events', 'widgetNoRoutines': 'No routines today',
+  'widgetAgendaTitle': 'Today', 'widgetAddTask': 'Add Task',
+  'widgetRemaining': 'remaining', 'widgetAllDay': 'All-day',
+  'widgetBirthday': 'Birthday',
   'completed': 'Completed', 'trash': 'Trash',
   'settings': 'Settings',
   'sectionAppearance': 'Appearance', 'themeLight': 'Light',
@@ -470,7 +740,105 @@ const Map<String, String> _en = {
   'importFailedRead': 'An error occurred while reading the file.',
   'exportFailed': 'Export Failed',
   'exportFailedBody': 'An error occurred while creating the backup.',
-  'newSpace': 'New Space', 'spaceName': 'Space name',
+  'newSpace': 'New Space', 'spaceName': 'Space name', 'spaces': 'Spaces',
+  'noOptionsYet': 'No options yet.', 'sectionModules': 'MODULES',
+  'sectionTaskFields': 'TASK FIELDS',
+  'taskFieldsHint': 'Hidden fields are not shown when editing a task.',
+  'sectionBody': 'BODY', 'useMarkdown': 'Format with Markdown',
+  'useMarkdownHint': 'When off, the body is shown and edited as plain text and the formatting toolbar is hidden.',
+  'storage': 'Storage',
+  'storageSublabel': "Disk usage by category · clear caches",
+  'storageAppCaches': 'APP CACHES',
+  'storageCustomIcons': 'Custom icons',
+  'storageFontsCache': 'Fonts cache',
+  'storageTempCache': 'Temporary files',
+  'storageClearOrphans': 'Clear orphans',
+  'storageFoldersLists': 'Folders & lists',
+  'storageTotal': 'Total',
+  'storageItemsSuffix': 'items',
+  'storageFilesSuffix': 'files',
+  'storageDataIn': 'DATA IN {space}',
+  'space': 'Space',
+  'clearFontsCacheQ': 'Clear fonts cache?',
+  'clearFontsCacheBody':
+      'Removes cached Google Fonts files. They will be re-downloaded when needed.',
+  'clearTempCacheQ': 'Clear temporary files?',
+  'clearTempCacheBody':
+      'Removes the OS temporary directory. Doesn\'t affect saved data.',
+  'clearOrphanIconsQ': 'Clear orphan icons?',
+  'clearOrphanIconsBody':
+      'Removes custom icon files that are no longer referenced by any folder or list across every space.',
+  'showHidePriority': 'Priority', 'showHideDate': 'Date',
+  'showHideRepeat': 'Repeat', 'showHideList': 'List',
+  'showHideDuration': 'Duration', 'showHideTags': 'Tags',
+  'showHideReminders': 'Reminders',
+  'sectionTasksUi': 'INTERFACE',
+  'showAddFolderButton': 'Add-folder button',
+  'sectionTaskCounters': 'COUNTERS',
+  'folderCounter': 'Folder counter',
+  'folderCounterDirect': 'Direct tasks only',
+  'folderCounterRecursive': 'Include nested folders',
+  'folderCounterHidden': 'Hidden',
+  'checkboxStyle': 'Checkbox style',
+  'checkboxStyleRoundedRect': 'Rounded square',
+  'checkboxStyleSharpRect': 'Square',
+  'checkboxStyleCircle': 'Circle',
+  'undoOnComplete': 'Undo on completion',
+  'undoOnCompleteHint':
+      'Show a brief Undo banner when you check a task off, so an accidental tap is easy to reverse.',
+  'firstDayOfWeek': 'First day of week',
+  'appBadge': 'APP ICON BADGE',
+  'appBadgeMode': 'Show as badge',
+  'appBadgeHint': 'The number shown on the app icon on your home screen.',
+  'appBadgeNone': 'None',
+  'appBadgeTodayTasks': "Today's uncompleted tasks",
+  'appBadgeTodayTasksAndEvents': "Today's tasks + upcoming events",
+  'appBadgeInbox': 'Inbox uncompleted',
+  'appBadgeAllUncompleted': 'All uncompleted tasks',
+  'sectionDefaults': 'DEFAULTS',
+  'defaultTaskIcon': 'Default task icon',
+  'defaultListIcon': 'Default list icon',
+  'defaultFolderIcon': 'Default folder icon',
+  'defaultNoteFolderIcon': 'Default folder icon',
+  'textSize': 'Text size',
+  'useSystemTextSize': 'Use system text size',
+  'textSizeHint': 'Scales all text in the app. UI elements next to text grow with the chosen size.',
+  'animationSpeed': 'Animation speed',
+  'animationSpeedHint': 'Controls how fast page transitions, list reorders, drag and other UI animations play. Choose Off for immediate, snap-style transitions.',
+  'animationSpeedOff': 'Off',
+  'animationSpeedFast': 'Fast',
+  'animationSpeedNormal': 'Normal',
+  'animationSpeedSlow': 'Slow',
+  'tabBarPages': 'Tab Bar Pages',
+  'tabBarPagesHint': 'Add more pages to fit more than 5 tabs. Swipe horizontally on the tab bar to switch between pages.',
+  'addPage': 'Add page',
+  'removePageTitle': 'Remove page?',
+  'removePageBody': 'All tabs on this page will be removed too.',
+  'addTab': 'Add tab',
+  'tabKindBuiltin': 'Built-in tab',
+  'tabKindShortcut': 'Shortcut',
+  'tabShortcutList': 'List…',
+  'tabShortcutFolder': 'Folder…',
+  'tabShortcutNoteFolder': 'Note folder…',
+  'pageNumberLabel': 'PAGE {n}',
+  'showListCount': 'List counter',
+  'revert': 'Undo',
+  'taskCompletedToast': 'Task completed',
+  'taskTrashedToast': 'Task moved to Trash',
+  'listTrashedToast': 'List moved to Trash',
+  'folderTrashedToast': 'Folder moved to Trash',
+  'noteTrashedToast': 'Note moved to Trash',
+  'noteFolderTrashedToast': 'Folder moved to Trash',
+  'eventDeletedToast': 'Event deleted',
+  'iconColor': 'Icon Color',
+  'useAccentColor': 'Use Accent Color',
+  'todayShort': 'Today',
+  'tomorrowShort': 'Tomorrow',
+  'addList': 'Add List', 'addFolder': 'Add Folder', 'addNote': 'Add Note',
+  'share': 'Share', 'shareAsText': 'Plain Text',
+  'shareAsPdf': 'PDF', 'shareAsImage': 'Image',
+  'preparingPdf': 'Preparing PDF…',
+  'preparingImage': 'Preparing image…',
   'a11yToggleComplete': 'Toggle completion',
   'deleteSpace': 'Delete Space?',
   'deleteSpaceBody':
@@ -488,6 +856,61 @@ const Map<String, String> _en = {
   'lockEnabled': 'Lock enabled', 'lockDisabled': 'Lock disabled',
   'verifyToDisable': 'Enter current password to disable lock',
   'verifyToChange': 'Enter current password to change lock',
+  'useBiometric': 'Use Face ID / Touch ID',
+  'unlockPrompt': 'Unlock Planom',
+  'exportPlain': 'Plain backup',
+  'exportEncrypted': 'Encrypted with passphrase…',
+  'setPassphrase': 'Set passphrase',
+  'enterPassphrase': 'Enter passphrase',
+  'passwordRequired': 'Password is required',
+  'search': 'Search', 'searchPlaceholder': 'Search tasks, notes, events',
+  'searchEmptyHint': 'Type to search across tasks, notes, and events.',
+  'searchNoResults': 'No matches.',
+  'sync': 'Sync',
+  'syncFreeSection': 'Free',
+  'syncPaidSection': 'Cross-device',
+  'syncStatusSection': 'Status',
+  'syncEncryptionSection': 'Encryption',
+  'syncEncryptionLabel': 'Encryption',
+  'syncEncryptionOn': 'End-to-end (passphrase)',
+  'syncEncryptionOff': 'Apple-encrypted',
+  'removeEncryption': 'Remove passphrase',
+  'removeEncryptionBody':
+      'Removes the local passphrase. The cloud copy is left as-is until you push again.',
+  'syncDefaultEncryptionHint':
+      'Apple encrypts your data in transit and at rest, but holds the keys. Set a passphrase below to encrypt on this device first so no one — including Apple — can read it.',
+  'syncICloudTitle': 'iCloud',
+  'syncICloudSublabel':
+      'Free on your iCloud storage. Apple devices only. Apple-encrypted; add a passphrase below for end-to-end.',
+  'syncPlanomTitle': 'Planom Account',
+  'syncPlanomSublabel':
+      'Sync across iOS, Android, and Web with a Planom subscription.',
+  'syncCustomTitle': 'Custom Server',
+  'syncCustomSublabel':
+      'Bring your own PocketBase / WebDAV server. Free; you host it.',
+  'tagFree': 'FREE',
+  'tagComingSoon': 'SOON',
+  'syncStatusLabel': 'Status',
+  'syncNow': 'Push now',
+  'syncPullReplace': 'Pull from cloud (replaces local)',
+  'disableSync': 'Disable sync',
+  'disableSyncBody':
+      'Stops syncing on this device and removes the cloud copy. Local data is kept.',
+  'pullReplacesLocal':
+      'Pulling will replace all local data with the cloud copy. This cannot be undone.',
+  'syncPassphraseHint':
+      'Pick a passphrase. We use it to encrypt your data before it leaves the device. We never see it.',
+  'syncPassphraseLossHint':
+      'If you forget the passphrase, your cloud backup cannot be decrypted. There is no recovery.',
+  'syncNever': 'Never synced',
+  'syncPushing': 'Uploading…',
+  'syncPulling': 'Downloading…',
+  'syncSucceeded': 'Up to date',
+  'syncFailed': 'Sync failed',
+  'syncNotConfigured': 'Sign into iCloud to enable',
+  'syncPassphraseRequired': 'Enter passphrase to continue',
+  'syncNotAvailable': 'Not available on this platform',
+  'syncLastAt': 'Last sync: {when}',
   'sectionNotifications': 'Notifications',
   'notificationsEnabled': 'Notifications Enabled',
   'notificationsPermissionHint': 'Open Settings to allow notifications for Planom.',
@@ -523,6 +946,12 @@ const Map<String, String> _en = {
   'restoreBody': 'This will be moved back to {destination}.',
   'deletePermanentlyQuestion': 'Delete "{name}" permanently?',
   'taskName': 'Task name', 'eventName': 'Event name', 'note': 'Note',
+  'subtasks': 'Subtasks', 'addSubtask': 'Add subtask',
+  'repeat': 'Repeat', 'repeatNone': 'No Repeat',
+  'repeatDaily': 'Daily', 'repeatWeekly': 'Weekly',
+  'repeatMonthly': 'Monthly', 'repeatYearly': 'Yearly',
+  'tags': 'Tags', 'noTags': 'No tags yet', 'addTag': 'Add tag',
+  'createTag': 'Create', 'searchOrCreateTag': 'Search or create tag',
   'title': 'Title', 'folderName': 'Folder name', 'listName': 'List name',
   'routineName': 'Routine name',
   'duration': 'Duration', 'noDuration': 'No Duration', 'noDate': 'No Date',
@@ -533,7 +962,17 @@ const Map<String, String> _en = {
   'priorityNone': 'None', 'priorityLow': 'Low',
   'priorityMed': 'Med', 'priorityHigh': 'High',
   'changeIcon': 'Change Icon', 'changeColor': 'Change Color',
+  'editList': 'Edit List', 'editFolder': 'Edit Folder',
   'listColor': 'List Color', 'customColor': 'Custom Color',
+  'listType': 'List Type',
+  'listTypeTasks': 'Tasks', 'listTypeBirthdays': 'Birthdays',
+  'listTypeShopping': 'Shopping',
+  'addBirthday': 'Add Birthday', 'birthdayName': 'Name',
+  'birthDate': 'Birth Date', 'includeYear': 'Include year',
+  'completable': 'Show checkbox', 'thisYear': 'This year',
+  'nextYear': 'Next year', 'addSection': 'Add Section',
+  'sectionName': 'Section name', 'sectionCompleted': 'Completed',
+  'turns': 'turns',
   'selectColor': 'Select Color', 'otherDots': 'Other…',
   'chooseIcon': 'Choose Icon', 'opening': 'Opening…',
   'chooseFromLibrary': 'Choose from Library',
@@ -566,6 +1005,48 @@ const Map<String, String> _en = {
   'deleteEventBody': 'This event will be permanently removed.',
   'insertLink': 'Insert Link',
   'insertLinkTextPlaceholder': 'Link text (optional)',
+  // ── Google Calendar integration ────────────────────────────────────────
+  'sectionIntegrations': 'Integrations',
+  'googleCalendar': 'Google Calendar',
+  'googleCalendarOn': 'On',
+  'googleCalendarOff': 'Off',
+  'googleCalendarConnect': 'Connect Google account',
+  'googleCalendarConnected': 'Connected',
+  'googleCalendarDisconnect': 'Disconnect',
+  'googleCalendarDisconnectBody':
+      'Planom will stop reading and writing your Google Calendar from this device. Your Google data is not changed.',
+  'googleCalendarCalendarsSection': 'Calendars',
+  'googleCalendarNoCalendars': 'No calendars found.',
+  'googleCalendarPrimary': 'Primary',
+  'googleCalendarReadOnly': 'Read-only',
+  'googleCalendarDefaultBadge': 'Default for new events',
+  'googleCalendarDefault': 'Default calendar',
+  'googleCalendarDefaultSection': 'New events',
+  'googleCalendarNoDefault': 'None',
+  'googleCalendarSyncSection': 'Sync',
+  'googleCalendarSyncNow': 'Sync now',
+  'googleCalendarNeverSynced': 'Never synced',
+  'googleCalendarLastSynced': 'Last synced {when}',
+  'googleCalendarSetupRequired':
+      'Google Calendar is not configured for this build. Add an OAuth client ID in lib/src/integrations/google/oauth_config.dart and set up the platform-specific URL scheme.',
+  'googleCalendarReadOnlyHint':
+      'This event is on a calendar you only have read access to. To edit it, open Google Calendar.',
+  'googleCalendarReminderHint':
+      'Reminders are saved on this device only — they notify you in Planom and are not added to the event in Google Calendar.',
+  'googleCalendarDeleteBody':
+      'This event will be permanently removed from Google Calendar.',
+  'googleCalendarAddAccount': 'Add account',
+  'googleCalendarAccountsSection': 'Accounts',
+  'googleCalendarRemoveAccount': 'Remove account',
+  'googleCalendarRemoveAccountBody':
+      'Stop syncing this account? Its events will be removed from Planom (they stay in Google).',
+  'googleCalendarReadWrite': 'Read & write',
+  'googleCalendarReadOnlyMode': 'Read only',
+  'googleCalendarChooseMode': 'How should Planom access this account?',
+  'googleCalendarReadWriteDesc': 'View, create, edit and delete events',
+  'googleCalendarReadOnlyDesc': 'View events only — never change Google',
+  'planomLocal': 'Planom (local)',
+  'eventCalendar': 'Calendar',
 };
 
 const Map<String, String> _uk = {
@@ -573,11 +1054,20 @@ const Map<String, String> _uk = {
   'cancel': 'Скасувати', 'done': 'Готово', 'ok': 'OK', 'add': 'Додати',
   'create': 'Створити', 'save': 'Зберегти', 'delete': 'Видалити',
   'deleteAll': 'Видалити все', 'edit': 'Редагувати', 'rename': 'Перейменувати',
+  'select': 'Вибрати', 'selectAll': 'Вибрати все', 'deselectAll': 'Скасувати вибір',
+  'selectItems': 'Виберіть елементи', 'selectedCount': 'Вибрано: {n}',
+  'duplicate': 'Дублювати',
   'confirm': 'Підтвердити', 'insert': 'Вставити', 'move': 'Перемістити',
   'putBack': 'Відновити', 'clear': 'Очистити', 'untitled': 'Без назви',
   'tabTasks': 'Завдання', 'tabNotes': 'Нотатки', 'tabCalendar': 'Календар',
   'tabRoutines': 'Звички', 'tabSettings': 'Налаштування',
   'inbox': 'Вхідні', 'today': 'Сьогодні', 'yesterday': 'Вчора', 'tomorrow': 'Завтра', 'upcoming': 'Майбутні',
+  'allTasks': 'Всі завдання',
+  'widgetNoTasks': 'Немає завдань сьогодні', 'widgetAllDone': 'Усе виконано!',
+  'widgetNoEvents': 'Немає подій', 'widgetNoRoutines': 'Немає звичок сьогодні',
+  'widgetAgendaTitle': 'Сьогодні', 'widgetAddTask': 'Додати завдання',
+  'widgetRemaining': 'залишилось', 'widgetAllDay': 'Весь день',
+  'widgetBirthday': 'День народження',
   'completed': 'Виконані', 'trash': 'Кошик',
   'settings': 'Налаштування',
   'sectionAppearance': 'Зовнішній вигляд', 'themeLight': 'Світла',
@@ -604,7 +1094,19 @@ const Map<String, String> _uk = {
   'importFailedRead': 'Сталася помилка під час читання файлу.',
   'exportFailed': 'Помилка експорту',
   'exportFailedBody': 'Сталася помилка під час створення резервної копії.',
-  'newSpace': 'Новий простір', 'spaceName': 'Назва простору',
+  'newSpace': 'Новий простір', 'spaceName': 'Назва простору', 'spaces': 'Простори',
+  'noOptionsYet': 'Параметрів ще немає.', 'sectionModules': 'МОДУЛІ',
+  'sectionTaskFields': 'ПОЛЯ ЗАВДАННЯ',
+  'taskFieldsHint': 'Приховані поля не показуються при редагуванні завдання.',
+  'sectionBody': 'ТІЛО', 'useMarkdown': 'Форматувати з Markdown',
+  'useMarkdownHint': 'Коли вимкнено, тіло відображається й редагується як простий текст, а панель форматування прихована.',
+  'showHidePriority': 'Пріоритет', 'showHideDate': 'Дата',
+  'showHideRepeat': 'Повтор', 'showHideList': 'Список',
+  'showHideDuration': 'Тривалість', 'showHideTags': 'Мітки',
+  'showHideReminders': 'Нагадування',
+  'sectionTasksUi': 'ІНТЕРФЕЙС',
+  'showAddFolderButton': 'Кнопка додавання теки',
+  'addList': 'Додати список', 'addFolder': 'Додати теку',
   'sortTasks': 'Сортування завдань', 'sortDefault': 'За замовчуванням',
   'sortByCreation': 'За датою створення', 'sortByName': 'За назвою',
   'sortByPriority': 'За пріоритетом', 'sortByDateTime': 'За датою і часом',
@@ -627,6 +1129,12 @@ const Map<String, String> _uk = {
   'restoreBody': 'Буде повернуто до {destination}.',
   'deletePermanentlyQuestion': 'Видалити «{name}» назавжди?',
   'taskName': 'Назва завдання', 'eventName': 'Назва події', 'note': 'Нотатка',
+  'subtasks': 'Підзавдання', 'addSubtask': 'Додати підзавдання',
+  'repeat': 'Повтор', 'repeatNone': 'Без повтору',
+  'repeatDaily': 'Щодня', 'repeatWeekly': 'Щотижня',
+  'repeatMonthly': 'Щомісяця', 'repeatYearly': 'Щороку',
+  'tags': 'Теги', 'noTags': 'Тегів ще немає', 'addTag': 'Додати тег',
+  'createTag': 'Створити', 'searchOrCreateTag': 'Пошук або створення тегу',
   'title': 'Заголовок', 'folderName': 'Назва папки', 'listName': 'Назва списку',
   'routineName': 'Назва звички',
   'duration': 'Тривалість', 'noDuration': 'Без тривалості', 'noDate': 'Без дати',
@@ -637,7 +1145,17 @@ const Map<String, String> _uk = {
   'priorityNone': 'Немає', 'priorityLow': 'Низький',
   'priorityMed': 'Середній', 'priorityHigh': 'Високий',
   'changeIcon': 'Змінити іконку', 'changeColor': 'Змінити колір',
+  'editList': 'Редагувати список', 'editFolder': 'Редагувати теку',
   'listColor': 'Колір списку', 'customColor': 'Власний колір',
+  'listType': 'Тип списку',
+  'listTypeTasks': 'Завдання', 'listTypeBirthdays': 'Дні народження',
+  'listTypeShopping': 'Покупки',
+  'addBirthday': 'Додати день народження', 'birthdayName': 'Ім\'я',
+  'birthDate': 'Дата народження', 'includeYear': 'Включити рік',
+  'completable': 'Показати чекбокс', 'thisYear': 'Цей рік',
+  'nextYear': 'Наступний рік', 'addSection': 'Додати розділ',
+  'sectionName': 'Назва розділу', 'sectionCompleted': 'Виконано',
+  'turns': 'виповнюється',
   'selectColor': 'Вибрати колір', 'otherDots': 'Інше…',
   'chooseIcon': 'Вибрати іконку', 'opening': 'Відкриття…',
   'chooseFromLibrary': 'Вибрати з бібліотеки',
@@ -677,11 +1195,20 @@ const Map<String, String> _es = {
   'cancel': 'Cancelar', 'done': 'Listo', 'ok': 'OK', 'add': 'Añadir',
   'create': 'Crear', 'save': 'Guardar', 'delete': 'Eliminar',
   'deleteAll': 'Eliminar todo', 'edit': 'Editar', 'rename': 'Renombrar',
+  'select': 'Seleccionar', 'selectAll': 'Seleccionar todo',
+  'deselectAll': 'Deseleccionar todo', 'selectItems': 'Seleccionar elementos',
+  'selectedCount': '{n} seleccionados', 'duplicate': 'Duplicar',
   'confirm': 'Confirmar', 'insert': 'Insertar', 'move': 'Mover',
   'putBack': 'Restaurar', 'clear': 'Borrar', 'untitled': 'Sin título',
   'tabTasks': 'Tareas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendario',
   'tabRoutines': 'Rutinas', 'tabSettings': 'Ajustes',
   'inbox': 'Bandeja', 'today': 'Hoy', 'yesterday': 'Ayer', 'tomorrow': 'Mañana', 'upcoming': 'Próximas',
+  'allTasks': 'Todas las tareas',
+  'widgetNoTasks': 'Sin tareas hoy', 'widgetAllDone': '¡Todo hecho!',
+  'widgetNoEvents': 'Sin eventos', 'widgetNoRoutines': 'Sin rutinas hoy',
+  'widgetAgendaTitle': 'Hoy', 'widgetAddTask': 'Añadir tarea',
+  'widgetRemaining': 'restantes', 'widgetAllDay': 'Todo el día',
+  'widgetBirthday': 'Cumpleaños',
   'completed': 'Completadas', 'trash': 'Papelera',
   'settings': 'Ajustes',
   'sectionAppearance': 'Apariencia', 'themeLight': 'Claro',
@@ -708,7 +1235,19 @@ const Map<String, String> _es = {
   'importFailedRead': 'Ocurrió un error al leer el archivo.',
   'exportFailed': 'Error al exportar',
   'exportFailedBody': 'Ocurrió un error al crear la copia.',
-  'newSpace': 'Nuevo espacio', 'spaceName': 'Nombre del espacio',
+  'newSpace': 'Nuevo espacio', 'spaceName': 'Nombre del espacio', 'spaces': 'Espacios',
+  'noOptionsYet': 'Aún no hay opciones.', 'sectionModules': 'MÓDULOS',
+  'sectionTaskFields': 'CAMPOS DE TAREA',
+  'taskFieldsHint': 'Los campos ocultos no se muestran al editar una tarea.',
+  'sectionBody': 'CUERPO', 'useMarkdown': 'Formatear con Markdown',
+  'useMarkdownHint': 'Cuando está desactivado, el cuerpo se muestra y edita como texto plano y la barra de formato queda oculta.',
+  'showHidePriority': 'Prioridad', 'showHideDate': 'Fecha',
+  'showHideRepeat': 'Repetir', 'showHideList': 'Lista',
+  'showHideDuration': 'Duración', 'showHideTags': 'Etiquetas',
+  'showHideReminders': 'Recordatorios',
+  'sectionTasksUi': 'INTERFAZ',
+  'showAddFolderButton': 'Botón Añadir carpeta',
+  'addList': 'Añadir lista', 'addFolder': 'Añadir carpeta',
   'sortTasks': 'Ordenar tareas', 'sortDefault': 'Predeterminado',
   'sortByCreation': 'Por fecha de creación', 'sortByName': 'Por nombre',
   'sortByPriority': 'Por prioridad', 'sortByDateTime': 'Por fecha y hora',
@@ -731,6 +1270,12 @@ const Map<String, String> _es = {
   'restoreBody': 'Se moverá a {destination}.',
   'deletePermanentlyQuestion': '¿Eliminar "{name}" permanentemente?',
   'taskName': 'Nombre de la tarea', 'eventName': 'Nombre del evento', 'note': 'Nota',
+  'subtasks': 'Subtareas', 'addSubtask': 'Añadir subtarea',
+  'repeat': 'Repetir', 'repeatNone': 'Sin repetición',
+  'repeatDaily': 'Diariamente', 'repeatWeekly': 'Semanalmente',
+  'repeatMonthly': 'Mensualmente', 'repeatYearly': 'Anualmente',
+  'tags': 'Etiquetas', 'noTags': 'Sin etiquetas aún', 'addTag': 'Añadir etiqueta',
+  'createTag': 'Crear', 'searchOrCreateTag': 'Buscar o crear etiqueta',
   'title': 'Título', 'folderName': 'Nombre de la carpeta', 'listName': 'Nombre de la lista',
   'routineName': 'Nombre de la rutina',
   'duration': 'Duración', 'noDuration': 'Sin duración', 'noDate': 'Sin fecha',
@@ -741,7 +1286,17 @@ const Map<String, String> _es = {
   'priorityNone': 'Ninguna', 'priorityLow': 'Baja',
   'priorityMed': 'Media', 'priorityHigh': 'Alta',
   'changeIcon': 'Cambiar icono', 'changeColor': 'Cambiar color',
+  'editList': 'Editar lista', 'editFolder': 'Editar carpeta',
   'listColor': 'Color de la lista', 'customColor': 'Color personalizado',
+  'listType': 'Tipo de lista',
+  'listTypeTasks': 'Tareas', 'listTypeBirthdays': 'Cumpleaños',
+  'listTypeShopping': 'Compras',
+  'addBirthday': 'Añadir cumpleaños', 'birthdayName': 'Nombre',
+  'birthDate': 'Fecha de nacimiento', 'includeYear': 'Incluir año',
+  'completable': 'Mostrar casilla', 'thisYear': 'Este año',
+  'nextYear': 'Próximo año', 'addSection': 'Añadir sección',
+  'sectionName': 'Nombre de la sección', 'sectionCompleted': 'Completadas',
+  'turns': 'cumple',
   'selectColor': 'Seleccionar color', 'otherDots': 'Otro…',
   'chooseIcon': 'Elegir icono', 'opening': 'Abriendo…',
   'chooseFromLibrary': 'Elegir de la biblioteca',
@@ -781,11 +1336,20 @@ const Map<String, String> _fr = {
   'cancel': 'Annuler', 'done': 'Terminé', 'ok': 'OK', 'add': 'Ajouter',
   'create': 'Créer', 'save': 'Enregistrer', 'delete': 'Supprimer',
   'deleteAll': 'Tout supprimer', 'edit': 'Modifier', 'rename': 'Renommer',
+  'select': 'Sélectionner', 'selectAll': 'Tout sélectionner',
+  'deselectAll': 'Tout désélectionner', 'selectItems': 'Sélectionner des éléments',
+  'selectedCount': '{n} sélectionnés', 'duplicate': 'Dupliquer',
   'confirm': 'Confirmer', 'insert': 'Insérer', 'move': 'Déplacer',
   'putBack': 'Restaurer', 'clear': 'Effacer', 'untitled': 'Sans titre',
   'tabTasks': 'Tâches', 'tabNotes': 'Notes', 'tabCalendar': 'Calendrier',
   'tabRoutines': 'Routines', 'tabSettings': 'Réglages',
   'inbox': 'Boîte', 'today': "Aujourd'hui", 'yesterday': 'Hier', 'tomorrow': 'Demain', 'upcoming': 'À venir',
+  'allTasks': 'Toutes les tâches',
+  'widgetNoTasks': "Aucune tâche aujourd'hui", 'widgetAllDone': 'Tout est fait !',
+  'widgetNoEvents': 'Aucun événement', 'widgetNoRoutines': "Aucune routine aujourd'hui",
+  'widgetAgendaTitle': "Aujourd'hui", 'widgetAddTask': 'Ajouter une tâche',
+  'widgetRemaining': 'restantes', 'widgetAllDay': 'Toute la journée',
+  'widgetBirthday': 'Anniversaire',
   'completed': 'Terminé', 'trash': 'Corbeille',
   'settings': 'Réglages',
   'sectionAppearance': 'Apparence', 'themeLight': 'Clair',
@@ -812,7 +1376,19 @@ const Map<String, String> _fr = {
   'importFailedRead': 'Une erreur est survenue lors de la lecture du fichier.',
   'exportFailed': 'Échec de l\'export',
   'exportFailedBody': 'Une erreur est survenue lors de la création de la sauvegarde.',
-  'newSpace': 'Nouvel espace', 'spaceName': 'Nom de l\'espace',
+  'newSpace': 'Nouvel espace', 'spaceName': 'Nom de l\'espace', 'spaces': 'Espaces',
+  'noOptionsYet': 'Aucune option pour le moment.', 'sectionModules': 'MODULES',
+  'sectionTaskFields': 'CHAMPS DE TÂCHE',
+  'taskFieldsHint': "Les champs masqués ne s'affichent pas lors de l'édition d'une tâche.",
+  'sectionBody': 'CORPS', 'useMarkdown': 'Formater en Markdown',
+  'useMarkdownHint': "Lorsque désactivé, le corps est affiché et modifié en texte brut, et la barre de mise en forme est masquée.",
+  'showHidePriority': 'Priorité', 'showHideDate': 'Date',
+  'showHideRepeat': 'Répéter', 'showHideList': 'Liste',
+  'showHideDuration': 'Durée', 'showHideTags': 'Étiquettes',
+  'showHideReminders': 'Rappels',
+  'sectionTasksUi': 'INTERFACE',
+  'showAddFolderButton': 'Bouton Ajouter un dossier',
+  'addList': 'Ajouter une liste', 'addFolder': 'Ajouter un dossier',
   'sortTasks': 'Trier les tâches', 'sortDefault': 'Par défaut',
   'sortByCreation': 'Par date de création', 'sortByName': 'Par nom',
   'sortByPriority': 'Par priorité', 'sortByDateTime': 'Par date et heure',
@@ -835,6 +1411,12 @@ const Map<String, String> _fr = {
   'restoreBody': 'Sera déplacé vers {destination}.',
   'deletePermanentlyQuestion': 'Supprimer « {name} » définitivement ?',
   'taskName': 'Nom de la tâche', 'eventName': 'Nom de l\'événement', 'note': 'Note',
+  'subtasks': 'Sous-tâches', 'addSubtask': 'Ajouter une sous-tâche',
+  'repeat': 'Répéter', 'repeatNone': 'Aucune répétition',
+  'repeatDaily': 'Quotidien', 'repeatWeekly': 'Hebdomadaire',
+  'repeatMonthly': 'Mensuel', 'repeatYearly': 'Annuel',
+  'tags': 'Étiquettes', 'noTags': 'Aucune étiquette', 'addTag': 'Ajouter une étiquette',
+  'createTag': 'Créer', 'searchOrCreateTag': 'Rechercher ou créer une étiquette',
   'title': 'Titre', 'folderName': 'Nom du dossier', 'listName': 'Nom de la liste',
   'routineName': 'Nom de la routine',
   'duration': 'Durée', 'noDuration': 'Sans durée', 'noDate': 'Sans date',
@@ -845,7 +1427,17 @@ const Map<String, String> _fr = {
   'priorityNone': 'Aucune', 'priorityLow': 'Basse',
   'priorityMed': 'Moyenne', 'priorityHigh': 'Haute',
   'changeIcon': 'Changer l\'icône', 'changeColor': 'Changer la couleur',
+  'editList': 'Modifier la liste', 'editFolder': 'Modifier le dossier',
   'listColor': 'Couleur de la liste', 'customColor': 'Couleur personnalisée',
+  'listType': 'Type de liste',
+  'listTypeTasks': 'Tâches', 'listTypeBirthdays': 'Anniversaires',
+  'listTypeShopping': 'Courses',
+  'addBirthday': 'Ajouter un anniversaire', 'birthdayName': 'Nom',
+  'birthDate': 'Date de naissance', 'includeYear': "Inclure l'année",
+  'completable': 'Afficher la case', 'thisYear': 'Cette année',
+  'nextYear': 'Année prochaine', 'addSection': 'Ajouter une section',
+  'sectionName': 'Nom de la section', 'sectionCompleted': 'Terminé',
+  'turns': 'fête',
   'selectColor': 'Sélectionner', 'otherDots': 'Autre…',
   'chooseIcon': 'Choisir une icône', 'opening': 'Ouverture…',
   'chooseFromLibrary': 'Choisir depuis la bibliothèque',
@@ -885,11 +1477,20 @@ const Map<String, String> _de = {
   'cancel': 'Abbrechen', 'done': 'Fertig', 'ok': 'OK', 'add': 'Hinzufügen',
   'create': 'Erstellen', 'save': 'Speichern', 'delete': 'Löschen',
   'deleteAll': 'Alle löschen', 'edit': 'Bearbeiten', 'rename': 'Umbenennen',
+  'select': 'Auswählen', 'selectAll': 'Alle auswählen',
+  'deselectAll': 'Auswahl aufheben', 'selectItems': 'Elemente auswählen',
+  'selectedCount': '{n} ausgewählt', 'duplicate': 'Duplizieren',
   'confirm': 'Bestätigen', 'insert': 'Einfügen', 'move': 'Verschieben',
   'putBack': 'Wiederherstellen', 'clear': 'Löschen', 'untitled': 'Ohne Titel',
   'tabTasks': 'Aufgaben', 'tabNotes': 'Notizen', 'tabCalendar': 'Kalender',
   'tabRoutines': 'Routinen', 'tabSettings': 'Einstellungen',
   'inbox': 'Eingang', 'today': 'Heute', 'yesterday': 'Gestern', 'tomorrow': 'Morgen', 'upcoming': 'Anstehend',
+  'allTasks': 'Alle Aufgaben',
+  'widgetNoTasks': 'Keine Aufgaben heute', 'widgetAllDone': 'Alles erledigt!',
+  'widgetNoEvents': 'Keine Termine', 'widgetNoRoutines': 'Keine Routinen heute',
+  'widgetAgendaTitle': 'Heute', 'widgetAddTask': 'Aufgabe hinzufügen',
+  'widgetRemaining': 'verbleibend', 'widgetAllDay': 'Ganztägig',
+  'widgetBirthday': 'Geburtstag',
   'completed': 'Erledigt', 'trash': 'Papierkorb',
   'settings': 'Einstellungen',
   'sectionAppearance': 'Erscheinungsbild', 'themeLight': 'Hell',
@@ -916,7 +1517,19 @@ const Map<String, String> _de = {
   'importFailedRead': 'Beim Lesen der Datei ist ein Fehler aufgetreten.',
   'exportFailed': 'Export fehlgeschlagen',
   'exportFailedBody': 'Beim Erstellen des Backups ist ein Fehler aufgetreten.',
-  'newSpace': 'Neuer Bereich', 'spaceName': 'Bereichsname',
+  'newSpace': 'Neuer Bereich', 'spaceName': 'Bereichsname', 'spaces': 'Bereiche',
+  'noOptionsYet': 'Noch keine Optionen.', 'sectionModules': 'MODULE',
+  'sectionTaskFields': 'AUFGABENFELDER',
+  'taskFieldsHint': 'Ausgeblendete Felder erscheinen nicht beim Bearbeiten einer Aufgabe.',
+  'sectionBody': 'KÖRPER', 'useMarkdown': 'Mit Markdown formatieren',
+  'useMarkdownHint': 'Wenn aus, wird der Text als Klartext angezeigt und bearbeitet, und die Formatierungsleiste ist ausgeblendet.',
+  'showHidePriority': 'Priorität', 'showHideDate': 'Datum',
+  'showHideRepeat': 'Wiederholen', 'showHideList': 'Liste',
+  'showHideDuration': 'Dauer', 'showHideTags': 'Tags',
+  'showHideReminders': 'Erinnerungen',
+  'sectionTasksUi': 'OBERFLÄCHE',
+  'showAddFolderButton': 'Ordner-hinzufügen-Schaltfläche',
+  'addList': 'Liste hinzufügen', 'addFolder': 'Ordner hinzufügen',
   'sortTasks': 'Aufgaben sortieren', 'sortDefault': 'Standard',
   'sortByCreation': 'Nach Erstellungsdatum', 'sortByName': 'Nach Name',
   'sortByPriority': 'Nach Priorität', 'sortByDateTime': 'Nach Datum & Zeit',
@@ -939,6 +1552,12 @@ const Map<String, String> _de = {
   'restoreBody': 'Wird zurück nach {destination} verschoben.',
   'deletePermanentlyQuestion': '„{name}" endgültig löschen?',
   'taskName': 'Aufgabenname', 'eventName': 'Ereignisname', 'note': 'Notiz',
+  'subtasks': 'Unteraufgaben', 'addSubtask': 'Unteraufgabe hinzufügen',
+  'repeat': 'Wiederholung', 'repeatNone': 'Keine Wiederholung',
+  'repeatDaily': 'Täglich', 'repeatWeekly': 'Wöchentlich',
+  'repeatMonthly': 'Monatlich', 'repeatYearly': 'Jährlich',
+  'tags': 'Tags', 'noTags': 'Noch keine Tags', 'addTag': 'Tag hinzufügen',
+  'createTag': 'Erstellen', 'searchOrCreateTag': 'Tag suchen oder erstellen',
   'title': 'Titel', 'folderName': 'Ordnername', 'listName': 'Listenname',
   'routineName': 'Routinename',
   'duration': 'Dauer', 'noDuration': 'Keine Dauer', 'noDate': 'Kein Datum',
@@ -949,7 +1568,17 @@ const Map<String, String> _de = {
   'priorityNone': 'Keine', 'priorityLow': 'Niedrig',
   'priorityMed': 'Mittel', 'priorityHigh': 'Hoch',
   'changeIcon': 'Symbol ändern', 'changeColor': 'Farbe ändern',
+  'editList': 'Liste bearbeiten', 'editFolder': 'Ordner bearbeiten',
   'listColor': 'Listenfarbe', 'customColor': 'Eigene Farbe',
+  'listType': 'Listentyp',
+  'listTypeTasks': 'Aufgaben', 'listTypeBirthdays': 'Geburtstage',
+  'listTypeShopping': 'Einkaufen',
+  'addBirthday': 'Geburtstag hinzufügen', 'birthdayName': 'Name',
+  'birthDate': 'Geburtsdatum', 'includeYear': 'Jahr einschließen',
+  'completable': 'Kästchen anzeigen', 'thisYear': 'Dieses Jahr',
+  'nextYear': 'Nächstes Jahr', 'addSection': 'Abschnitt hinzufügen',
+  'sectionName': 'Abschnittsname', 'sectionCompleted': 'Erledigt',
+  'turns': 'wird',
   'selectColor': 'Farbe wählen', 'otherDots': 'Andere…',
   'chooseIcon': 'Symbol wählen', 'opening': 'Öffne…',
   'chooseFromLibrary': 'Aus Bibliothek wählen',
@@ -989,11 +1618,20 @@ const Map<String, String> _it = {
   'cancel': 'Annulla', 'done': 'Fatto', 'ok': 'OK', 'add': 'Aggiungi',
   'create': 'Crea', 'save': 'Salva', 'delete': 'Elimina',
   'deleteAll': 'Elimina tutto', 'edit': 'Modifica', 'rename': 'Rinomina',
+  'select': 'Seleziona', 'selectAll': 'Seleziona tutto',
+  'deselectAll': 'Deseleziona tutto', 'selectItems': 'Seleziona elementi',
+  'selectedCount': '{n} selezionati', 'duplicate': 'Duplica',
   'confirm': 'Conferma', 'insert': 'Inserisci', 'move': 'Sposta',
   'putBack': 'Ripristina', 'clear': 'Cancella', 'untitled': 'Senza titolo',
   'tabTasks': 'Attività', 'tabNotes': 'Note', 'tabCalendar': 'Calendario',
   'tabRoutines': 'Abitudini', 'tabSettings': 'Impostazioni',
   'inbox': 'In arrivo', 'today': 'Oggi', 'yesterday': 'Ieri', 'tomorrow': 'Domani', 'upcoming': 'In arrivo',
+  'allTasks': 'Tutte le attività',
+  'widgetNoTasks': 'Nessuna attività oggi', 'widgetAllDone': 'Tutto fatto!',
+  'widgetNoEvents': 'Nessun evento', 'widgetNoRoutines': 'Nessuna routine oggi',
+  'widgetAgendaTitle': 'Oggi', 'widgetAddTask': 'Aggiungi attività',
+  'widgetRemaining': 'rimanenti', 'widgetAllDay': 'Tutto il giorno',
+  'widgetBirthday': 'Compleanno',
   'completed': 'Completate', 'trash': 'Cestino',
   'settings': 'Impostazioni',
   'sectionAppearance': 'Aspetto', 'themeLight': 'Chiaro',
@@ -1020,7 +1658,19 @@ const Map<String, String> _it = {
   'importFailedRead': 'Si è verificato un errore durante la lettura del file.',
   'exportFailed': 'Esportazione fallita',
   'exportFailedBody': 'Si è verificato un errore durante la creazione del backup.',
-  'newSpace': 'Nuovo spazio', 'spaceName': 'Nome dello spazio',
+  'newSpace': 'Nuovo spazio', 'spaceName': 'Nome dello spazio', 'spaces': 'Spazi',
+  'noOptionsYet': 'Ancora nessuna opzione.', 'sectionModules': 'MODULI',
+  'sectionTaskFields': 'CAMPI ATTIVITÀ',
+  'taskFieldsHint': "I campi nascosti non vengono mostrati durante la modifica di un'attività.",
+  'sectionBody': 'CORPO', 'useMarkdown': 'Formatta con Markdown',
+  'useMarkdownHint': 'Se disattivato, il corpo viene mostrato e modificato come testo semplice e la barra di formattazione è nascosta.',
+  'showHidePriority': 'Priorità', 'showHideDate': 'Data',
+  'showHideRepeat': 'Ripeti', 'showHideList': 'Elenco',
+  'showHideDuration': 'Durata', 'showHideTags': 'Tag',
+  'showHideReminders': 'Promemoria',
+  'sectionTasksUi': 'INTERFACCIA',
+  'showAddFolderButton': 'Pulsante aggiungi cartella',
+  'addList': 'Aggiungi elenco', 'addFolder': 'Aggiungi cartella',
   'sortTasks': 'Ordina attività', 'sortDefault': 'Predefinito',
   'sortByCreation': 'Per data creazione', 'sortByName': 'Per nome',
   'sortByPriority': 'Per priorità', 'sortByDateTime': 'Per data e ora',
@@ -1043,6 +1693,12 @@ const Map<String, String> _it = {
   'restoreBody': 'Verrà ripristinato in {destination}.',
   'deletePermanentlyQuestion': 'Eliminare "{name}" definitivamente?',
   'taskName': 'Nome attività', 'eventName': 'Nome evento', 'note': 'Nota',
+  'subtasks': 'Sotto-attività', 'addSubtask': 'Aggiungi sotto-attività',
+  'repeat': 'Ripeti', 'repeatNone': 'Nessuna ripetizione',
+  'repeatDaily': 'Giornalmente', 'repeatWeekly': 'Settimanalmente',
+  'repeatMonthly': 'Mensilmente', 'repeatYearly': 'Annualmente',
+  'tags': 'Tag', 'noTags': 'Nessun tag', 'addTag': 'Aggiungi tag',
+  'createTag': 'Crea', 'searchOrCreateTag': 'Cerca o crea tag',
   'title': 'Titolo', 'folderName': 'Nome cartella', 'listName': 'Nome lista',
   'routineName': 'Nome abitudine',
   'duration': 'Durata', 'noDuration': 'Nessuna durata', 'noDate': 'Nessuna data',
@@ -1053,7 +1709,17 @@ const Map<String, String> _it = {
   'priorityNone': 'Nessuna', 'priorityLow': 'Bassa',
   'priorityMed': 'Media', 'priorityHigh': 'Alta',
   'changeIcon': 'Cambia icona', 'changeColor': 'Cambia colore',
+  'editList': 'Modifica elenco', 'editFolder': 'Modifica cartella',
   'listColor': 'Colore della lista', 'customColor': 'Colore personalizzato',
+  'listType': 'Tipo di lista',
+  'listTypeTasks': 'Attività', 'listTypeBirthdays': 'Compleanni',
+  'listTypeShopping': 'Spesa',
+  'addBirthday': 'Aggiungi compleanno', 'birthdayName': 'Nome',
+  'birthDate': 'Data di nascita', 'includeYear': 'Includi anno',
+  'completable': 'Mostra casella', 'thisYear': "Quest'anno",
+  'nextYear': 'Anno prossimo', 'addSection': 'Aggiungi sezione',
+  'sectionName': 'Nome sezione', 'sectionCompleted': 'Completate',
+  'turns': 'compie',
   'selectColor': 'Seleziona colore', 'otherDots': 'Altro…',
   'chooseIcon': 'Scegli icona', 'opening': 'Apertura…',
   'chooseFromLibrary': 'Scegli dalla libreria',
@@ -1093,11 +1759,20 @@ const Map<String, String> _pt = {
   'cancel': 'Cancelar', 'done': 'Concluído', 'ok': 'OK', 'add': 'Adicionar',
   'create': 'Criar', 'save': 'Salvar', 'delete': 'Excluir',
   'deleteAll': 'Excluir tudo', 'edit': 'Editar', 'rename': 'Renomear',
+  'select': 'Selecionar', 'selectAll': 'Selecionar tudo',
+  'deselectAll': 'Desmarcar tudo', 'selectItems': 'Selecionar itens',
+  'selectedCount': '{n} selecionados', 'duplicate': 'Duplicar',
   'confirm': 'Confirmar', 'insert': 'Inserir', 'move': 'Mover',
   'putBack': 'Restaurar', 'clear': 'Limpar', 'untitled': 'Sem título',
   'tabTasks': 'Tarefas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendário',
   'tabRoutines': 'Rotinas', 'tabSettings': 'Ajustes',
   'inbox': 'Caixa', 'today': 'Hoje', 'yesterday': 'Ontem', 'tomorrow': 'Amanhã', 'upcoming': 'Próximas',
+  'allTasks': 'Todas as tarefas',
+  'widgetNoTasks': 'Sem tarefas hoje', 'widgetAllDone': 'Tudo feito!',
+  'widgetNoEvents': 'Sem eventos', 'widgetNoRoutines': 'Sem rotinas hoje',
+  'widgetAgendaTitle': 'Hoje', 'widgetAddTask': 'Adicionar tarefa',
+  'widgetRemaining': 'restantes', 'widgetAllDay': 'Dia inteiro',
+  'widgetBirthday': 'Aniversário',
   'completed': 'Concluídas', 'trash': 'Lixeira',
   'settings': 'Ajustes',
   'sectionAppearance': 'Aparência', 'themeLight': 'Claro',
@@ -1124,7 +1799,19 @@ const Map<String, String> _pt = {
   'importFailedRead': 'Ocorreu um erro ao ler o arquivo.',
   'exportFailed': 'Falha na exportação',
   'exportFailedBody': 'Ocorreu um erro ao criar o backup.',
-  'newSpace': 'Novo espaço', 'spaceName': 'Nome do espaço',
+  'newSpace': 'Novo espaço', 'spaceName': 'Nome do espaço', 'spaces': 'Espaços',
+  'noOptionsYet': 'Ainda sem opções.', 'sectionModules': 'MÓDULOS',
+  'sectionTaskFields': 'CAMPOS DE TAREFA',
+  'taskFieldsHint': 'Os campos ocultos não aparecem ao editar uma tarefa.',
+  'sectionBody': 'CORPO', 'useMarkdown': 'Formatar com Markdown',
+  'useMarkdownHint': 'Quando desativado, o corpo é exibido e editado como texto simples e a barra de formatação fica oculta.',
+  'showHidePriority': 'Prioridade', 'showHideDate': 'Data',
+  'showHideRepeat': 'Repetir', 'showHideList': 'Lista',
+  'showHideDuration': 'Duração', 'showHideTags': 'Etiquetas',
+  'showHideReminders': 'Lembretes',
+  'sectionTasksUi': 'INTERFACE',
+  'showAddFolderButton': 'Botão Adicionar pasta',
+  'addList': 'Adicionar lista', 'addFolder': 'Adicionar pasta',
   'sortTasks': 'Ordenar tarefas', 'sortDefault': 'Padrão',
   'sortByCreation': 'Por data de criação', 'sortByName': 'Por nome',
   'sortByPriority': 'Por prioridade', 'sortByDateTime': 'Por data e hora',
@@ -1147,6 +1834,12 @@ const Map<String, String> _pt = {
   'restoreBody': 'Será movido de volta para {destination}.',
   'deletePermanentlyQuestion': 'Excluir "{name}" permanentemente?',
   'taskName': 'Nome da tarefa', 'eventName': 'Nome do evento', 'note': 'Nota',
+  'subtasks': 'Subtarefas', 'addSubtask': 'Adicionar subtarefa',
+  'repeat': 'Repetir', 'repeatNone': 'Sem repetição',
+  'repeatDaily': 'Diariamente', 'repeatWeekly': 'Semanalmente',
+  'repeatMonthly': 'Mensalmente', 'repeatYearly': 'Anualmente',
+  'tags': 'Etiquetas', 'noTags': 'Sem etiquetas', 'addTag': 'Adicionar etiqueta',
+  'createTag': 'Criar', 'searchOrCreateTag': 'Buscar ou criar etiqueta',
   'title': 'Título', 'folderName': 'Nome da pasta', 'listName': 'Nome da lista',
   'routineName': 'Nome da rotina',
   'duration': 'Duração', 'noDuration': 'Sem duração', 'noDate': 'Sem data',
@@ -1157,7 +1850,17 @@ const Map<String, String> _pt = {
   'priorityNone': 'Nenhuma', 'priorityLow': 'Baixa',
   'priorityMed': 'Média', 'priorityHigh': 'Alta',
   'changeIcon': 'Mudar ícone', 'changeColor': 'Mudar cor',
+  'editList': 'Editar lista', 'editFolder': 'Editar pasta',
   'listColor': 'Cor da lista', 'customColor': 'Cor personalizada',
+  'listType': 'Tipo de lista',
+  'listTypeTasks': 'Tarefas', 'listTypeBirthdays': 'Aniversários',
+  'listTypeShopping': 'Compras',
+  'addBirthday': 'Adicionar aniversário', 'birthdayName': 'Nome',
+  'birthDate': 'Data de nascimento', 'includeYear': 'Incluir ano',
+  'completable': 'Mostrar caixa', 'thisYear': 'Este ano',
+  'nextYear': 'Próximo ano', 'addSection': 'Adicionar seção',
+  'sectionName': 'Nome da seção', 'sectionCompleted': 'Concluídas',
+  'turns': 'faz',
   'selectColor': 'Selecionar cor', 'otherDots': 'Outro…',
   'chooseIcon': 'Escolher ícone', 'opening': 'Abrindo…',
   'chooseFromLibrary': 'Escolher da biblioteca',
@@ -1197,11 +1900,20 @@ const Map<String, String> _ru = {
   'cancel': 'Отмена', 'done': 'Готово', 'ok': 'OK', 'add': 'Добавить',
   'create': 'Создать', 'save': 'Сохранить', 'delete': 'Удалить',
   'deleteAll': 'Удалить всё', 'edit': 'Изменить', 'rename': 'Переименовать',
+  'select': 'Выбрать', 'selectAll': 'Выбрать всё',
+  'deselectAll': 'Снять выделение', 'selectItems': 'Выберите элементы',
+  'selectedCount': 'Выбрано: {n}', 'duplicate': 'Дублировать',
   'confirm': 'Подтвердить', 'insert': 'Вставить', 'move': 'Переместить',
   'putBack': 'Восстановить', 'clear': 'Очистить', 'untitled': 'Без названия',
   'tabTasks': 'Задачи', 'tabNotes': 'Заметки', 'tabCalendar': 'Календарь',
   'tabRoutines': 'Привычки', 'tabSettings': 'Настройки',
   'inbox': 'Входящие', 'today': 'Сегодня', 'yesterday': 'Вчера', 'tomorrow': 'Завтра', 'upcoming': 'Предстоящие',
+  'allTasks': 'Все задачи',
+  'widgetNoTasks': 'Нет задач сегодня', 'widgetAllDone': 'Всё выполнено!',
+  'widgetNoEvents': 'Нет событий', 'widgetNoRoutines': 'Нет привычек сегодня',
+  'widgetAgendaTitle': 'Сегодня', 'widgetAddTask': 'Добавить задачу',
+  'widgetRemaining': 'осталось', 'widgetAllDay': 'Весь день',
+  'widgetBirthday': 'День рождения',
   'completed': 'Выполненные', 'trash': 'Корзина',
   'settings': 'Настройки',
   'sectionAppearance': 'Внешний вид', 'themeLight': 'Светлая',
@@ -1228,7 +1940,19 @@ const Map<String, String> _ru = {
   'importFailedRead': 'Произошла ошибка при чтении файла.',
   'exportFailed': 'Ошибка экспорта',
   'exportFailedBody': 'Произошла ошибка при создании резервной копии.',
-  'newSpace': 'Новое пространство', 'spaceName': 'Название пространства',
+  'newSpace': 'Новое пространство', 'spaceName': 'Название пространства', 'spaces': 'Пространства',
+  'noOptionsYet': 'Пока нет параметров.', 'sectionModules': 'МОДУЛИ',
+  'sectionTaskFields': 'ПОЛЯ ЗАДАЧИ',
+  'taskFieldsHint': 'Скрытые поля не отображаются при редактировании задачи.',
+  'sectionBody': 'ТЕЛО', 'useMarkdown': 'Форматировать с Markdown',
+  'useMarkdownHint': 'Если выключено, тело отображается и редактируется как простой текст, панель форматирования скрыта.',
+  'showHidePriority': 'Приоритет', 'showHideDate': 'Дата',
+  'showHideRepeat': 'Повтор', 'showHideList': 'Список',
+  'showHideDuration': 'Длительность', 'showHideTags': 'Метки',
+  'showHideReminders': 'Напоминания',
+  'sectionTasksUi': 'ИНТЕРФЕЙС',
+  'showAddFolderButton': 'Кнопка добавления папки',
+  'addList': 'Добавить список', 'addFolder': 'Добавить папку',
   'sortTasks': 'Сортировать задачи', 'sortDefault': 'По умолчанию',
   'sortByCreation': 'По дате создания', 'sortByName': 'По имени',
   'sortByPriority': 'По приоритету', 'sortByDateTime': 'По дате и времени',
@@ -1251,6 +1975,12 @@ const Map<String, String> _ru = {
   'restoreBody': 'Будет восстановлено в {destination}.',
   'deletePermanentlyQuestion': 'Удалить «{name}» навсегда?',
   'taskName': 'Название задачи', 'eventName': 'Название события', 'note': 'Заметка',
+  'subtasks': 'Подзадачи', 'addSubtask': 'Добавить подзадачу',
+  'repeat': 'Повтор', 'repeatNone': 'Без повтора',
+  'repeatDaily': 'Ежедневно', 'repeatWeekly': 'Еженедельно',
+  'repeatMonthly': 'Ежемесячно', 'repeatYearly': 'Ежегодно',
+  'tags': 'Теги', 'noTags': 'Тегов пока нет', 'addTag': 'Добавить тег',
+  'createTag': 'Создать', 'searchOrCreateTag': 'Найти или создать тег',
   'title': 'Заголовок', 'folderName': 'Название папки', 'listName': 'Название списка',
   'routineName': 'Название привычки',
   'duration': 'Длительность', 'noDuration': 'Без длительности', 'noDate': 'Без даты',
@@ -1261,7 +1991,17 @@ const Map<String, String> _ru = {
   'priorityNone': 'Нет', 'priorityLow': 'Низкий',
   'priorityMed': 'Средний', 'priorityHigh': 'Высокий',
   'changeIcon': 'Изменить значок', 'changeColor': 'Изменить цвет',
+  'editList': 'Изменить список', 'editFolder': 'Изменить папку',
   'listColor': 'Цвет списка', 'customColor': 'Свой цвет',
+  'listType': 'Тип списка',
+  'listTypeTasks': 'Задачи', 'listTypeBirthdays': 'Дни рождения',
+  'listTypeShopping': 'Покупки',
+  'addBirthday': 'Добавить день рождения', 'birthdayName': 'Имя',
+  'birthDate': 'Дата рождения', 'includeYear': 'Включить год',
+  'completable': 'Показывать чекбокс', 'thisYear': 'В этом году',
+  'nextYear': 'В следующем году', 'addSection': 'Добавить раздел',
+  'sectionName': 'Название раздела', 'sectionCompleted': 'Выполнено',
+  'turns': 'исполняется',
   'selectColor': 'Выбрать цвет', 'otherDots': 'Другое…',
   'chooseIcon': 'Выбрать значок', 'opening': 'Открытие…',
   'chooseFromLibrary': 'Выбрать из библиотеки',
@@ -1301,11 +2041,19 @@ const Map<String, String> _zh = {
   'cancel': '取消', 'done': '完成', 'ok': '好', 'add': '添加',
   'create': '创建', 'save': '保存', 'delete': '删除',
   'deleteAll': '全部删除', 'edit': '编辑', 'rename': '重命名',
+  'select': '选择', 'selectAll': '全选', 'deselectAll': '取消全选',
+  'selectItems': '选择项目', 'selectedCount': '已选 {n} 项', 'duplicate': '复制',
   'confirm': '确认', 'insert': '插入', 'move': '移动',
   'putBack': '恢复', 'clear': '清除', 'untitled': '无标题',
   'tabTasks': '任务', 'tabNotes': '笔记', 'tabCalendar': '日历',
   'tabRoutines': '习惯', 'tabSettings': '设置',
   'inbox': '收件箱', 'today': '今天', 'yesterday': '昨天', 'tomorrow': '明天', 'upcoming': '即将',
+  'allTasks': '所有任务',
+  'widgetNoTasks': '今天没有任务', 'widgetAllDone': '全部完成！',
+  'widgetNoEvents': '没有事件', 'widgetNoRoutines': '今天没有习惯',
+  'widgetAgendaTitle': '今天', 'widgetAddTask': '添加任务',
+  'widgetRemaining': '剩余', 'widgetAllDay': '全天',
+  'widgetBirthday': '生日',
   'completed': '已完成', 'trash': '垃圾箱',
   'settings': '设置',
   'sectionAppearance': '外观', 'themeLight': '浅色',
@@ -1332,7 +2080,19 @@ const Map<String, String> _zh = {
   'importFailedRead': '读取文件时出错。',
   'exportFailed': '导出失败',
   'exportFailedBody': '创建备份时出错。',
-  'newSpace': '新空间', 'spaceName': '空间名称',
+  'newSpace': '新空间', 'spaceName': '空间名称', 'spaces': '空间',
+  'noOptionsYet': '尚无选项。', 'sectionModules': '模块',
+  'sectionTaskFields': '任务字段',
+  'taskFieldsHint': '隐藏的字段在编辑任务时不会显示。',
+  'sectionBody': '正文', 'useMarkdown': '使用 Markdown 格式',
+  'useMarkdownHint': '关闭时，正文将以纯文本显示和编辑，格式工具栏被隐藏。',
+  'showHidePriority': '优先级', 'showHideDate': '日期',
+  'showHideRepeat': '重复', 'showHideList': '列表',
+  'showHideDuration': '时长', 'showHideTags': '标签',
+  'showHideReminders': '提醒',
+  'sectionTasksUi': '界面',
+  'showAddFolderButton': '添加文件夹按钮',
+  'addList': '添加列表', 'addFolder': '添加文件夹',
   'sortTasks': '排序任务', 'sortDefault': '默认',
   'sortByCreation': '按创建日期', 'sortByName': '按名称',
   'sortByPriority': '按优先级', 'sortByDateTime': '按日期和时间',
@@ -1355,6 +2115,12 @@ const Map<String, String> _zh = {
   'restoreBody': '将被恢复到 {destination}。',
   'deletePermanentlyQuestion': '永久删除"{name}"？',
   'taskName': '任务名称', 'eventName': '事件名称', 'note': '笔记',
+  'subtasks': '子任务', 'addSubtask': '添加子任务',
+  'repeat': '重复', 'repeatNone': '不重复',
+  'repeatDaily': '每天', 'repeatWeekly': '每周',
+  'repeatMonthly': '每月', 'repeatYearly': '每年',
+  'tags': '标签', 'noTags': '暂无标签', 'addTag': '添加标签',
+  'createTag': '创建', 'searchOrCreateTag': '搜索或创建标签',
   'title': '标题', 'folderName': '文件夹名称', 'listName': '列表名称',
   'routineName': '习惯名称',
   'duration': '时长', 'noDuration': '无时长', 'noDate': '无日期',
@@ -1365,7 +2131,17 @@ const Map<String, String> _zh = {
   'priorityNone': '无', 'priorityLow': '低',
   'priorityMed': '中', 'priorityHigh': '高',
   'changeIcon': '更改图标', 'changeColor': '更改颜色',
+  'editList': '编辑列表', 'editFolder': '编辑文件夹',
   'listColor': '列表颜色', 'customColor': '自定义颜色',
+  'listType': '列表类型',
+  'listTypeTasks': '任务', 'listTypeBirthdays': '生日',
+  'listTypeShopping': '购物',
+  'addBirthday': '添加生日', 'birthdayName': '姓名',
+  'birthDate': '出生日期', 'includeYear': '包含年份',
+  'completable': '显示复选框', 'thisYear': '今年',
+  'nextYear': '明年', 'addSection': '添加分组',
+  'sectionName': '分组名称', 'sectionCompleted': '已完成',
+  'turns': '将满',
   'selectColor': '选择颜色', 'otherDots': '其他…',
   'chooseIcon': '选择图标', 'opening': '打开中…',
   'chooseFromLibrary': '从图库选择',
@@ -1405,11 +2181,19 @@ const Map<String, String> _ja = {
   'cancel': 'キャンセル', 'done': '完了', 'ok': 'OK', 'add': '追加',
   'create': '作成', 'save': '保存', 'delete': '削除',
   'deleteAll': 'すべて削除', 'edit': '編集', 'rename': '名前変更',
+  'select': '選択', 'selectAll': 'すべて選択', 'deselectAll': 'すべて解除',
+  'selectItems': '項目を選択', 'selectedCount': '{n}件選択', 'duplicate': '複製',
   'confirm': '確認', 'insert': '挿入', 'move': '移動',
   'putBack': '戻す', 'clear': 'クリア', 'untitled': '無題',
   'tabTasks': 'タスク', 'tabNotes': 'ノート', 'tabCalendar': 'カレンダー',
   'tabRoutines': '習慣', 'tabSettings': '設定',
   'inbox': '受信箱', 'today': '今日', 'yesterday': '昨日', 'tomorrow': '明日', 'upcoming': '今後',
+  'allTasks': 'すべてのタスク',
+  'widgetNoTasks': '今日のタスクはありません', 'widgetAllDone': 'すべて完了！',
+  'widgetNoEvents': 'イベントなし', 'widgetNoRoutines': '今日の習慣はありません',
+  'widgetAgendaTitle': '今日', 'widgetAddTask': 'タスクを追加',
+  'widgetRemaining': '残り', 'widgetAllDay': '終日',
+  'widgetBirthday': '誕生日',
   'completed': '完了済み', 'trash': 'ゴミ箱',
   'settings': '設定',
   'sectionAppearance': '外観', 'themeLight': 'ライト',
@@ -1436,7 +2220,19 @@ const Map<String, String> _ja = {
   'importFailedRead': 'ファイルの読み込み中にエラーが発生しました。',
   'exportFailed': '書き出し失敗',
   'exportFailedBody': 'バックアップの作成中にエラーが発生しました。',
-  'newSpace': '新規スペース', 'spaceName': 'スペース名',
+  'newSpace': '新規スペース', 'spaceName': 'スペース名', 'spaces': 'スペース',
+  'noOptionsYet': 'まだ設定はありません。', 'sectionModules': 'モジュール',
+  'sectionTaskFields': 'タスク項目',
+  'taskFieldsHint': '非表示の項目はタスク編集時に表示されません。',
+  'sectionBody': '本文', 'useMarkdown': 'Markdown でフォーマット',
+  'useMarkdownHint': 'オフにすると、本文はプレーンテキストとして表示・編集され、書式バーは非表示になります。',
+  'showHidePriority': '優先度', 'showHideDate': '日付',
+  'showHideRepeat': '繰り返し', 'showHideList': 'リスト',
+  'showHideDuration': '所要時間', 'showHideTags': 'タグ',
+  'showHideReminders': 'リマインダー',
+  'sectionTasksUi': 'インターフェース',
+  'showAddFolderButton': 'フォルダ追加ボタン',
+  'addList': 'リストを追加', 'addFolder': 'フォルダを追加',
   'sortTasks': 'タスクを並べ替え', 'sortDefault': 'デフォルト',
   'sortByCreation': '作成日順', 'sortByName': '名前順',
   'sortByPriority': '優先度順', 'sortByDateTime': '日時順',
@@ -1459,6 +2255,12 @@ const Map<String, String> _ja = {
   'restoreBody': '{destination} に戻されます。',
   'deletePermanentlyQuestion': '「{name}」を完全に削除しますか？',
   'taskName': 'タスク名', 'eventName': 'イベント名', 'note': 'ノート',
+  'subtasks': 'サブタスク', 'addSubtask': 'サブタスクを追加',
+  'repeat': '繰り返し', 'repeatNone': '繰り返しなし',
+  'repeatDaily': '毎日', 'repeatWeekly': '毎週',
+  'repeatMonthly': '毎月', 'repeatYearly': '毎年',
+  'tags': 'タグ', 'noTags': 'タグがありません', 'addTag': 'タグを追加',
+  'createTag': '作成', 'searchOrCreateTag': 'タグを検索または作成',
   'title': 'タイトル', 'folderName': 'フォルダ名', 'listName': 'リスト名',
   'routineName': '習慣名',
   'duration': '所要時間', 'noDuration': '所要時間なし', 'noDate': '日付なし',
@@ -1469,7 +2271,17 @@ const Map<String, String> _ja = {
   'priorityNone': 'なし', 'priorityLow': '低',
   'priorityMed': '中', 'priorityHigh': '高',
   'changeIcon': 'アイコンを変更', 'changeColor': '色を変更',
+  'editList': 'リストを編集', 'editFolder': 'フォルダを編集',
   'listColor': 'リストの色', 'customColor': 'カスタムカラー',
+  'listType': 'リストの種類',
+  'listTypeTasks': 'タスク', 'listTypeBirthdays': '誕生日',
+  'listTypeShopping': '買い物',
+  'addBirthday': '誕生日を追加', 'birthdayName': '名前',
+  'birthDate': '生年月日', 'includeYear': '年を含める',
+  'completable': 'チェックボックスを表示', 'thisYear': '今年',
+  'nextYear': '来年', 'addSection': 'セクションを追加',
+  'sectionName': 'セクション名', 'sectionCompleted': '完了',
+  'turns': '歳',
   'selectColor': '色を選択', 'otherDots': 'その他…',
   'chooseIcon': 'アイコンを選択', 'opening': '開いています…',
   'chooseFromLibrary': 'ライブラリから選択',

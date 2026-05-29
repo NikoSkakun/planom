@@ -6,6 +6,8 @@ import '../folders/folder_icon_picker.dart';
 import '../localization/strings.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
+import '../utils/plus_drag_payload.dart';
+import '../utils/reorder_drag.dart';
 
 List<InlineSpan> _parseInlineMarkdown(String text, TextStyle base) {
   final spans = <InlineSpan>[];
@@ -158,24 +160,63 @@ class NoteFolderRow extends StatelessWidget {
   }
 }
 
-class NoteRow extends StatelessWidget {
+class NoteRow extends StatefulWidget {
   const NoteRow({
     super.key,
     required this.note,
     required this.onTap,
     this.indent = 0,
+    this.draggable = true,
   });
 
   final Note note;
   final VoidCallback onTap;
   final double indent;
+  // When true (default), wraps the row in a LongPressDraggable<NoteDragData>
+  // so the user can drop it on a NoteFolderRow to re-parent the note.
+  final bool draggable;
 
   @override
-  Widget build(BuildContext context) {
+  State<NoteRow> createState() => _NoteRowState();
+}
+
+class _NoteRowState extends State<NoteRow> {
+  final GlobalKey _measureKey = GlobalKey();
+
+  double _measureHeight() {
+    final ctx = _measureKey.currentContext;
+    final renderObject = ctx?.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      return renderObject.size.height;
+    }
+    return 56;
+  }
+
+  void _onDragStarted() {
+    ReorderDragNotifier.instance
+        .start(widget.note.id, 'note', _measureHeight());
+  }
+
+  void _onDragEnded() {
+    ReorderDragNotifier.instance.end();
+  }
+
+  @override
+  void dispose() {
+    if (ReorderDragNotifier.instance.draggingId == widget.note.id) {
+      ReorderDragNotifier.instance.end();
+    }
+    super.dispose();
+  }
+
+  Note get note => widget.note;
+  double get indent => widget.indent;
+
+  Widget _content(BuildContext context) {
     final hasBody = note.content.isNotEmpty;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Padding(
         padding: EdgeInsets.fromLTRB(16 + indent, 9, 16, 9),
         child: Row(
@@ -224,14 +265,54 @@ class NoteRow extends StatelessWidget {
       ),
     );
   }
-}
-
-class NoteFolderCircleButton extends StatelessWidget {
-  const NoteFolderCircleButton({super.key, required this.onPressed});
-  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.draggable) {
+      return KeyedSubtree(key: _measureKey, child: _content(context));
+    }
+    final content = _content(context);
+    final feedbackWidth = MediaQuery.sizeOf(context).width;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOut,
+      alignment: Alignment.topCenter,
+      child: LongPressDraggable<NoteDragData>(
+        data: NoteDragData(note.id),
+        delay: const Duration(milliseconds: 400),
+        onDragStarted: _onDragStarted,
+        onDragEnd: (_) => _onDragEnded(),
+        onDraggableCanceled: (_, __) => _onDragEnded(),
+        onDragCompleted: _onDragEnded,
+        // Render the actual row as the drag feedback so the lifted
+        // card looks identical to the source row (icon, title, body
+        // preview) rather than a stripped-down title-only card.
+        feedback: buildReorderDragFeedback(context, feedbackWidth, content),
+        childWhenDragging: const SizedBox.shrink(),
+        child: KeyedSubtree(key: _measureKey, child: content),
+      ),
+    );
+  }
+}
+
+/// Payload dragged when the user long-presses a note. Distinct from
+/// the generic string used by tasks so DragTargets can route notes and
+/// tasks differently.
+class NoteDragData {
+  const NoteDragData(this.noteId);
+  final String noteId;
+}
+
+class NoteFolderCircleButton extends StatelessWidget {
+  const NoteFolderCircleButton({
+    super.key,
+    required this.onPressed,
+    this.onAcceptPlus,
+  });
+  final VoidCallback onPressed;
+  final VoidCallback? onAcceptPlus;
+
+  Widget _button(BuildContext context) {
     return CupertinoButton(
       padding: EdgeInsets.zero,
       onPressed: onPressed,
@@ -248,6 +329,34 @@ class NoteFolderCircleButton extends StatelessWidget {
           color: CupertinoColors.label.resolveFrom(context),
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (onAcceptPlus == null) return _button(context);
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (_) => onAcceptPlus!(),
+      builder: (context, candidates, _) {
+        final hovering = candidates.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: hovering
+                ? [
+                    BoxShadow(
+                      color: AppColors.accent.withOpacity(0.4),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : null,
+          ),
+          child: _button(context),
+        );
+      },
     );
   }
 }

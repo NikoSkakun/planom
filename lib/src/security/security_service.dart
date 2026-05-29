@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
+import 'package:local_auth/local_auth.dart';
 
 import '../database/database_service.dart';
 
@@ -30,7 +32,14 @@ class SecurityService {
   /// app_settings keys holding the local passcode. These are device-local and
   /// must never be written into a shared backup nor overwritten by an imported
   /// one — backup export/import filters them out via this set.
-  static const authSettingKeys = {'auth_hash', 'auth_type', 'auth_salt'};
+  static const authSettingKeys = {
+    'auth_hash',
+    'auth_type',
+    'auth_salt',
+    'auth_biometric',
+  };
+
+  final LocalAuthentication _localAuth = LocalAuthentication();
 
   /// Key-stretching rounds. Runs synchronously on the unlock path; tune (or
   /// move to an isolate) if it ever feels slow on a real device.
@@ -40,12 +49,59 @@ class SecurityService {
   PasswordType get type => _type;
   bool get isLocked => _type != PasswordType.none;
 
+  bool _biometricEnabled = false;
+  bool get biometricEnabled => _biometricEnabled;
+
   Future<void> load() async {
     final rows = await _db.getAppSettings();
     for (final row in rows) {
       if (row['key'] == 'auth_type') {
         _type = _typeFromString(row['value'] as String?);
       }
+      if (row['key'] == 'auth_biometric') {
+        _biometricEnabled = row['value'] == 'true';
+      }
+    }
+  }
+
+  // ── Biometric ──────────────────────────────────────────────────────────────
+
+  /// Whether the device has any enrolled biometric. Returns false on platforms
+  /// without local_auth support (e.g. desktop), so callers can hide the toggle.
+  Future<bool> isBiometricAvailable() async {
+    try {
+      final supported = await _localAuth.isDeviceSupported();
+      if (!supported) return false;
+      final available = await _localAuth.canCheckBiometrics;
+      if (!available) return false;
+      final enrolled = await _localAuth.getAvailableBiometrics();
+      return enrolled.isNotEmpty;
+    } catch (e, st) {
+      debugPrint('biometric check failed: $e\n$st');
+      return false;
+    }
+  }
+
+  Future<void> setBiometricEnabled(bool enabled) async {
+    _biometricEnabled = enabled;
+    await _db.setAppSetting('auth_biometric', enabled ? 'true' : 'false');
+  }
+
+  /// Prompts Face ID / Touch ID. Returns true on success. Silently returns
+  /// false on any error so callers can fall back to the PIN/password path.
+  Future<bool> authenticateBiometric(String reason) async {
+    if (!_biometricEnabled) return false;
+    try {
+      return await _localAuth.authenticate(
+        localizedReason: reason,
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('biometric auth failed: $e\n$st');
+      return false;
     }
   }
 

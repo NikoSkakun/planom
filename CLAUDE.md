@@ -10,344 +10,598 @@ flutter analyze          # Static analysis / lint
 flutter test             # Run all tests
 flutter test test/widget_test.dart  # Run a single test file
 flutter run              # Run on connected device or emulator
-flutter gen-l10n         # Regenerate localization files after editing .arb files
 ```
 
 Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 
+> Localization is **hand-rolled** in `lib/src/localization/strings.dart` (no `gen-l10n` / `.arb` codegen). Add new keys to the `_translations` map there — there is no build step. A stale `app_en.arb` file is kept in-tree but unused. See "Localization" below.
+
 ## Tech stack
 
 - **Framework**: Flutter / Dart, Cupertino (iOS-native) widgets throughout — no Material widgets in UI except `showModalBottomSheet` (which requires `GlobalMaterialLocalizations.delegate` already registered)
-- **Database**: `sqflite` v2, per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **17**
-- **Multi-space**: `SpaceManager` (`lib/src/spaces/`) owns a list of `Space`s (metadata in `spaces.json`) and swaps the active space's controllers; the default space shares the global `planom.db` handle. See "Spaces" section below.
-- **App lock**: `SecurityService` (`lib/src/security/`) — optional PIN/password gate; salted + key-stretched hash in `app_settings` (`auth_*` keys), excluded from backups
-- **Local notifications**: `NotificationService` (`lib/src/notifications/`) — `flutter_local_notifications` + `timezone`; per-item reminder scheduling via slot-based IDs
-- **Calendar/events**: `EventController` + `events` table (separate from tasks); see Calendar feature
-- **State**: Flutter `ChangeNotifier` — no third-party state library
-- **Routing**: `FastRoute` (custom `CupertinoPageRoute` subclass with 180 ms transition, in `lib/src/utils/fast_route.dart`) used everywhere instead of bare `CupertinoPageRoute`
-- **Icons**: `cupertino_icons` package required for `CupertinoIcons`; custom PNG tab-bar icons in `assets/icons/tab_bar/` (Tasks/Notes/Calendar/Routines use PNGs; Settings tab uses `CupertinoIcons.gear_alt` / `gear_alt_fill`); list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`; use `Image.asset` (not `ImageIcon`) when original PNG colors must be preserved. Smart lists that have no PNG asset (Completed, Trash) use `CupertinoIcons` passed as `iconWidget` to `_ListItem`.
-- **App badge**: `flutter_app_badger ^1.5.0` (discontinued but functional) — set by `TaskController._updateBadge()` to `todayUncompletedCount`; iOS badge permission requested in `AppDelegate.swift` via `UNUserNotificationCenter`
-- **Backup / share**: `share_plus ^7.2.1` — iOS share sheet for exporting `.planom` backup files; `file_picker ^8.0.0` — document picker for importing backup files
-- **Fonts**: `google_fonts` package — `GoogleFonts.asMap()` returns ~1500 font constructors keyed by camelCase name; fonts are downloaded and cached automatically at `<appSupport>/google_fonts/` by the package
+- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **25**. FTS5 virtual tables for search.
+- **Multi-space**: `SpaceManager` (`lib/src/spaces/`) owns a list of `Space`s and swaps the active space's controllers; the default space shares the global `planom.db` handle.
+- **App lock**: `SecurityService` (`lib/src/security/`) — optional PIN (4–8 digit) / custom password + optional biometric (Face ID, Touch ID, Windows Hello via `local_auth`); salted + key-stretched PBKDF2/HMAC-SHA256 hash in `app_settings` (`auth_*` keys), excluded from backups.
+- **Local notifications**: `NotificationService` (`lib/src/notifications/`) — `flutter_local_notifications` + `timezone`; per-task / per-event reminder scheduling via slot-based IDs. iOS + macOS only today.
+- **Calendar/events**: `EventController` + `events` table (separate from tasks); see Calendar feature.
+- **Contacts (birthdays)**: `ContactController` + `contacts` table; lists with `listType = birthdays` render contacts instead of tasks (see Contacts feature).
+- **Cloud sync**: `SyncController` (`lib/src/sync/`) + backend-agnostic `SyncProvider`; iCloud Drive provider shipped (`icloud_storage`). Optional E2E AES-256-GCM encryption via passphrase in `flutter_secure_storage`. See Sync section.
+- **MCP server**: `lib/src/mcp/` — transport-agnostic JSON-RPC 2.0 server exposing tasks/notes/events/lists/spaces/search. See MCP section.
+- **iOS widgets**: `home_widget` bridges the Flutter app (`lib/src/widgets/`) to a WidgetKit/SwiftUI extension (`ios/PlanomWidget/`) over an App Group. Home-screen + lock-screen widgets for Today's tasks/events/routines. See iOS widgets section.
+- **State**: Flutter `ChangeNotifier` — no third-party state library.
+- **Routing**: `FastRoute` (custom `CupertinoPageRoute` subclass with 180 ms transition, in `lib/src/utils/fast_route.dart`) used everywhere instead of bare `CupertinoPageRoute`.
+- **Icons**: `cupertino_icons`; custom PNG tab-bar icons in `assets/icons/tab_bar/` (Tasks/Notes/Calendar/Routines use PNGs; Settings uses `CupertinoIcons.gear_alt` / `gear_alt_fill`); list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`.
+- **App badge**: `flutter_app_badger ^1.5.0` (discontinued but functional) — set by `TaskController._updateBadge()` to `todayUncompletedCount`. Gated to mobile via `PlatformCapabilities.supportsAppBadge`.
+- **Backup / share**: `share_plus` (iOS/Android/macOS share sheet) for `.planom` files; `file_picker` for document picker import. `pdf` for note PDF export. `image_picker` (mobile) + `file_picker` (desktop) for custom-icon photo selection.
+- **Markdown**: `flutter_markdown` for note rendering; custom inline-markdown stripper used in note-row previews.
+- **Fonts**: `google_fonts` — full ~1500-font catalogue exposed via the in-app Font Picker; cached at `<appSupport>/google_fonts/` automatically.
+- **Google Calendar**: `google_sign_in` + `googleapis` + `extension_google_sign_in_as_googleapis_auth` (see Google Calendar integration). Optional — disabled until client IDs are configured.
+
+## Platforms
+
+Centralised in `PlatformCapabilities` (`lib/src/utils/platform_capabilities.dart`). Use the predicates — never `Platform.isX` at call sites.
+
+- `isMobile` (iOS + Android) — gates `flutter_app_badger`, `SystemChrome.setPreferredOrientations`, `image_picker`'s system gallery.
+- `isDesktop` (macOS + Linux + Windows) — Planom always uses the iPad sidebar layout regardless of window width on these platforms.
+- `sqfliteNeedsFfi` (Linux + Windows) — `main.dart` swaps in `databaseFactoryFfi` from `sqflite_common_ffi` before any controller opens a DB.
+- `supportsBiometricAuth` (iOS + Android + Windows) — macOS/Linux have no `local_auth` implementation; PIN/password fallback only.
+- `supportsLocalNotifications` (iOS + macOS today) — Android/Linux/Windows would need their own `InitializationSettings`.
+- `supportsImagePicker` (mobile) — desktop falls back to `file_picker` with image filetype filters.
+
+iPad-sized layout (width ≥ 700 px) and all desktop platforms use a persistent sidebar (`_WideLayout` in `home_shell.dart`) instead of the bottom `CupertinoTabBar`.
 
 ## Architecture
 
 Source lives in `lib/src/` with a three-layer pattern:
 
-- **Models** (`lib/src/models/`) — plain Dart, extend `AppItem` base class
-- **Services** (`*_service.dart`) — I/O only, called only by controllers
-- **Controllers** (`*_controller.dart`) — `ChangeNotifier`; own in-memory state, persist via services, call `notifyListeners()` after mutations
-- **Views** (`*_view.dart`) — Cupertino widgets, subscribe via `ListenableBuilder`
+- **Models** (`lib/src/models/`) — plain Dart. `Task`/`Routine` extend the `AppItem` base; `AppFolder`/`AppList`/`Note`/`NoteFolder`/`Contact`/`Event`/`RoutineEntry`/`ListSection`/`Tag` are standalone.
+- **Services** (`*_service.dart`) — I/O only, called by controllers.
+- **Controllers** (`*_controller.dart`) — `ChangeNotifier`; own in-memory state, persist via services, call `notifyListeners()` after mutations.
+- **Views** (`*_view.dart`) — Cupertino widgets, subscribe via `ListenableBuilder` / `ValueListenableBuilder`.
 
 ### Data model hierarchy
 
 ```
-AppItem (lib/src/models/item.dart)   ← base for all app records
+AppItem (lib/src/models/item.dart)         ← base for Task & Routine
   id: String (UUID v4)
   creationDate: DateTime
   iconId: String
 
 Task extends AppItem (lib/src/models/task.dart)
-  title: String
-  note: String?
-  isCompleted: bool
-  dueDate: DateTime?          ← nullable; drives calendar view
-  doTime: int?                ← minutes since midnight (0–1439); null = no time set
-  listId: String?
-  priority: int               ← TaskPriority.index (0=none 1=low 2=medium 3=high)
-  sortOrder: int              ← 0 = not yet manually sorted; >0 = user-defined position
-  isDeleted: bool             ← soft-delete flag; true = item is in Trash
-  deletedDate: DateTime?      ← when the item was moved to Trash
-
-AppFolder (lib/src/models/app_folder.dart)   ← NOT an AppItem
-  id: String (UUID v4)
-  name: String
-  parentFolderId: String?     ← null = root level
-  creationDate: DateTime
-  sortOrder: int
-  iconId: String?             ← null = default folder asset; SF-symbol key or relative file path (see custom icons)
-  isDeleted: bool
-  deletedDate: DateTime?
-
-AppList (lib/src/models/app_list.dart)   ← NOT an AppItem
-  id: String (UUID v4)
-  name: String
-  folderId: String?           ← null = root level
-  creationDate: DateTime
-  sortOrder: int
-  color: int?                 ← ARGB; null = no color accent
-  iconId: String?             ← null = default list asset; SF-symbol key or relative file path (see custom icons)
-  isDeleted: bool
-  deletedDate: DateTime?
+  title, note?, isCompleted
+  dueDate?, doTime? (mins since midnight, 0–1439), duration? (mins)
+  listId?, sectionId?                ← null sectionId = default top section
+  priority (0=none 1=low 2=medium 3=high)
+  sortOrder                          ← 0 = unsorted; >0 user position
+  isDeleted, deletedDate?
+  completionDate?
+  reminderOffsets: List<int>         ← minutes before/after dueDate+doTime
+  parentTaskId?                      ← non-null = subtask; excluded from smart lists
+  tagIds: List<String>               ← references tags table
+  recurrence?                        ← JSON-encoded Recurrence rule
 
 Routine extends AppItem (lib/src/models/routine.dart)
-  name: String
-  iconColor: int              ← ARGB; iconId (from AppItem) is the SF-symbol key
-  goalType: String            ← 'achieve_all' | 'certain_amount'
-  goalAmount: int?            ← daily target; only for 'certain_amount'
-  goalUnit: String?           ← 'ml', 'km', 'count', etc.; only for 'certain_amount'
-  recordAmount: int?          ← amount added per tap; only for 'certain_amount'
-  frequencyType: String       ← 'daily' | 'days_after_complete'
-  weekdays: List<int>?        ← 0=Mon … 6=Sun; null = all days (daily only)
-  daysAfterComplete: int?     ← gap before routine reappears (days_after_complete only)
-  autoReset: String           ← 'everyday' | 'none'
+  name, iconColor (ARGB; iconId is the SF-symbol key)
+  goalType ('achieve_all' | 'certain_amount')
+  goalAmount?, goalUnit?, recordAmount?   ← certain_amount only
+  frequencyType ('daily' | 'days_after_complete')
+  weekdays?: List<int>               ← 0=Mon … 6=Sun; null = all (daily only)
+  daysAfterComplete?
+  autoReset ('everyday' | 'none')
 
-RoutineEntry (lib/src/models/routine_entry.dart)   ← NOT an AppItem; no iconId
-  id: String (UUID v4)
-  routineId: String
-  date: DateTime              ← normalized to midnight
-  amount: int                 ← progress units recorded on that date
+AppFolder (lib/src/models/app_folder.dart)
+  name, parentFolderId?, sortOrder, iconId?, iconColor? (ARGB override)
+  isDeleted, deletedDate?
+
+AppList (lib/src/models/app_list.dart)
+  name, folderId?, sortOrder
+  color? (ARGB accent), iconId?, iconColor? (ARGB override)
+  listType: ListType                 ← 'tasks' | 'birthdays' | 'shopping'
+  isDeleted, deletedDate?
+
+ListSection (lib/src/models/list_section.dart)   ← NOT an AppItem
+  id, listId, name, sortOrder, isCollapsed, creationDate
+
+NoteFolder (lib/src/models/note_folder.dart)
+  name, parentFolderId?, sortOrder, iconId?
+  isDeleted, deletedDate?
+
+Note (lib/src/models/note.dart)                  ← NOT an AppItem
+  id, title, content, folderId?
+  creationDate, modifiedDate, sortOrder
+  isDeleted, deletedDate?
+  copyWith({preserveModifiedDate})   ← skip bumping modifiedDate on moves/reorder
+
+Event (lib/src/models/event.dart)                ← calendar entity
+  id, title, note?, date, doTime?, duration?, reminderOffsets
+  isDeleted, deletedDate?
+
+Contact (lib/src/models/contact.dart)            ← belongs to a Birthdays list
+  id, name, note?, listId (REQUIRED)
+  birthMonth, birthDay, birthYear?   ← year optional → no age shown
+  isCompletable, isCompleted, completionDate?
+  reminderOffsets, creationDate, sortOrder
+  isDeleted, deletedDate?
+
+Tag (lib/src/models/tag.dart)
+  id, name (case-insensitively unique), color? (ARGB), creationDate
+
+Recurrence (lib/src/models/recurrence.dart)
+  type ('daily'|'weekly'|'monthly'|'yearly'), interval, weekdays? (weekly)
+  nextAfter(DateTime) → DateTime     ← month-length edge cases handled
+  JSON-encoded into Task.recurrence
+
+RoutineEntry (lib/src/models/routine_entry.dart) ← per-day progress
+  id, routineId, date (midnight), amount (cumulative for the day)
+
+RemoteEvent (lib/src/integrations/google/remote_event.dart) ← in-memory only,
+  never persisted; mirrors Event + Google fields (googleEventId, calendarId,
+  calendarColor, htmlLink, etag, isReadOnly, recurringEventId)
 ```
 
-`Task.copyWith` accepts clear-flags (`clearDueDate`, `clearDoTime`, `clearListId`, `clearDeletedDate`) to explicitly null out nullable fields — the standard Dart nullable-copyWith pattern used throughout. `AppFolder.copyWith` and `AppList.copyWith` follow the same pattern. Item spacing: task rows use `vertical: 7` padding; list/folder items use `vertical: 9` in custom `GestureDetector` rows (not `CupertinoListTile.notched`).
+`Task.copyWith` accepts clear-flags (`clearDueDate`, `clearDoTime`, `clearDuration`, `clearListId`, `clearDeletedDate`, `clearCompletionDate`, `clearParentTaskId`, `clearRecurrence`, `clearSectionId`). `AppFolder` / `AppList` / `Contact` / `Event` / `Note` follow the same pattern. Item spacing: task rows use `vertical: 7` padding; list/folder rows use `vertical: 9`.
 
 ### Soft-delete pattern
 
-**All deletes are soft-deletes.** Nothing is removed from the database immediately — items get `isDeleted = true` and `deletedDate = now`, then move into a Trash in-memory list inside the controller. The DB queries for active items filter `WHERE isDeleted = 0`.
+**All user-facing deletes are soft-deletes.** Nothing is removed from the database immediately — items get `isDeleted = true` and `deletedDate = now`, then move into a Trash in-memory list inside the controller. DB queries for active items filter `WHERE isDeleted = 0`.
 
-- `TaskController.deleteTask(id)` — moves task from `_tasks` to `_trashedTasks`
-- `TaskController.deleteTasksForList(listId)` — bulk soft-deletes all tasks for a list (called when a list is trashed)
-- `FolderController.deleteList(id)` — soft-deletes the list
-- `FolderController.deleteFolderDeep(id, onDeleteList)` — recursively soft-deletes the folder, all nested subfolders, all their lists (`onDeleteList` is called per list so the task controller can also soft-delete tasks); all items in the same deep-delete share the same `deletedDate` timestamp
-- Swipe-to-delete on lists and folders shows a `confirmDismiss` `CupertinoAlertDialog` before acting; the Dismissible bounces back if the user cancels
-- Items are restored via `restoreTask / restoreList / restoreFolder`; the restore target is the original parent if it is still active (non-trashed), else the item falls back to Inbox / root
+- `TaskController.deleteTask(id)` — soft-deletes the task *and its entire subtask subtree*; all share one `deletedDate`.
+- `TaskController.deleteTasksForList(listId)` — bulk soft-delete (called when a list is trashed).
+- `FolderController.deleteList(id)` — soft-deletes the list.
+- `FolderController.deleteFolderDeep(id, onDeleteList)` — recursively soft-deletes the folder, all nested subfolders, all their lists; `onDeleteList` is `TaskController.deleteTasksForList`. All items in the same deep-delete share one `deletedDate` timestamp.
+- `NoteController.deleteFolderDeep(id)` — analogous (no callback; notes have no cross-controller dependency).
+- `ContactController.deleteContact(id)` — soft-delete.
+- Swipe-to-delete on lists/folders/notes shows a `confirmMoveToTrash` `CupertinoAlertDialog`; `Dismissible.confirmDismiss` bounces back on cancel.
+- **Bulk restore by `deletedDate`**: `restoreAt(DateTime)` exists on `TaskController`, `FolderController`, `NoteController`, `ContactController`. The shared timestamp from a deep-delete lets the Undo banner restore everything atomically.
 
-Permanent deletion (from Trash) removes the row from the DB:
-- `TaskController.permanentlyDeleteTask(id)`
-- `TaskController.permanentlyDeleteAllTrashed()` — bulk hard-delete all trashed tasks
-- `FolderController.permanentlyDeleteList(id)`
-- `FolderController.permanentlyDeleteFolder(id)`
-- `FolderController.permanentlyDeleteAllTrashed()` — bulk hard-delete all trashed lists and folders
+Permanent deletion (from Trash) hard-deletes the row:
+- `TaskController.permanentlyDeleteTask(id)` / `permanentlyDeleteAllTrashed()`
+- `FolderController.permanentlyDeleteList(id)` / `permanentlyDeleteFolder(id)` / `permanentlyDeleteAllTrashed()`
+- `NoteController.permanentlyDeleteNote(id)` / `permanentlyDeleteFolder(id)` / `permanentlyDeleteAllTrashed()`
+- `ContactController.permanentlyDeleteContact(id)` / `permanentlyDeleteAllTrashed()`
+- `EventController.permanentlyDeleteEvent(id)` (events have no soft-delete path; calendar delete is immediate but routed through `UndoController` for revert).
 
 ### Custom icon storage (`lib/src/folders/folder_icon_picker.dart`)
 
-Custom photo icons for folders and lists are stored as **relative paths** (`icons/<timestamp>.<ext>`) under the app's documents directory. This is critical for iOS — absolute paths break after every reinstall because the app container UUID changes.
+Custom photo icons for folders and lists are stored as **relative paths** (`icons/<timestamp>.<ext>`) under the app's documents directory. Critical for iOS — absolute paths break after every reinstall because the container UUID changes.
 
-- `initFolderIconService()` — called once in `main.dart` before `runApp`; caches `getApplicationDocumentsDirectory()` so path resolution is synchronous during widget builds
-- `isCustomIconId(iconId)` — returns `true` for relative paths (`icons/…`) and legacy absolute paths (`/…`)
-- `resolveCustomIconPath(iconId)` — returns the absolute path at runtime using the cached docs dir; handles both new relative format and legacy absolute paths (with graceful fallback)
-- `buildFolderItemIcon(iconId, isFolder)` — synchronous widget builder; uses `resolveCustomIconPath` for custom icons and `folderItemIconData` for SF-symbol keys; falls back to the default PNG on error
-- **Legacy absolute paths** (stored before this fix) still display if the file exists (e.g. on first launch after an in-place update on device), and fall back to the default icon otherwise; re-picking the icon writes the new relative format
+- `initFolderIconService()` — called once in `main.dart` before `runApp`; caches `getApplicationDocumentsDirectory()` so path resolution is synchronous during widget builds.
+- `isCustomIconId(iconId)` — `true` for relative paths (`icons/…`) and legacy absolute paths (`/…`).
+- `resolveCustomIconPath(iconId)` — runtime absolute path; handles new relative + legacy absolute (graceful fallback).
+- `buildFolderItemIcon(iconId, isFolder)` — synchronous widget builder; falls back to the default PNG on error.
+- Backups inline icon bytes as base64 in a top-level `customIcons` map keyed by relative path; on import they're written back to `<docsDir>/icons/`.
 
 ### Database (`lib/src/database/database_service.dart`)
 
-Single `DatabaseService` class, lazy-opens its DB file (`dbName`, default `planom.db`) via sqflite. Current version: **17**. One `DatabaseService` instance per file — never open the same file with two handles (the default space reuses the global handle; see Spaces).
+Single `DatabaseService` class, lazy-opens its DB file (`dbName`, default `planom.db`) via sqflite. Current version: **25**. One `DatabaseService` instance per file — never open the same file with two handles (the default space reuses the global handle; see Spaces).
 
 Migration history:
 | Version | Changes |
 |---------|---------|
-| v2 | `tasks.dueDate INTEGER` |
-| v3 | `tasks.listId TEXT` + `folders` + `app_lists` tables |
-| v4 | `tasks.doTime INTEGER`; `folders` / `app_lists` tables (IF NOT EXISTS guard) |
-| v5 | `note_folders` + `notes` tables |
-| v6 | `routines` + `routine_entries` tables |
-| v7 | `tasks.priority`, `tasks.sortOrder`, `folders.sortOrder`, `app_lists.sortOrder`, `note_folders.sortOrder`, `notes.sortOrder` |
-| v8 | `app_lists.color INTEGER` |
-| v9 | `folders.iconId TEXT`, `app_lists.iconId TEXT` |
-| v10 | `note_folders.iconId TEXT` |
-| v11 | `tasks.isDeleted`, `tasks.deletedDate`, `folders.isDeleted`, `folders.deletedDate`, `app_lists.isDeleted`, `app_lists.deletedDate` |
-| v12 | `note_folders.isDeleted`, `note_folders.deletedDate`, `notes.isDeleted`, `notes.deletedDate` |
+| v2  | `tasks.dueDate INTEGER` |
+| v3  | `tasks.listId TEXT` + `folders` + `app_lists` tables |
+| v4  | `tasks.doTime INTEGER`; `folders` / `app_lists` (IF NOT EXISTS) |
+| v5  | `note_folders` + `notes` tables |
+| v6  | `routines` + `routine_entries` tables |
+| v7  | priority + sortOrder columns on tasks, folders, app_lists, note_folders, notes |
+| v8  | `app_lists.color INTEGER` |
+| v9  | `folders.iconId`, `app_lists.iconId` |
+| v10 | `note_folders.iconId` |
+| v11 | `isDeleted`/`deletedDate` on tasks, folders, app_lists |
+| v12 | `isDeleted`/`deletedDate` on note_folders, notes |
 | v13 | `tasks.completionDate INTEGER` |
-| v14 | `app_settings` table (`key` TEXT PK, `value` TEXT) — persists tab visibility prefs across backups |
-| v15 | `events` table (calendar events; separate from tasks) |
+| v14 | `app_settings` table (TEXT key PK, TEXT value) |
+| v15 | `events` table (calendar entity, separate from tasks) |
 | v16 | `tasks.duration INTEGER` |
-| v17 | `tasks.reminderOffsets TEXT`, `events.reminderOffsets TEXT` (comma-separated minute offsets for local notifications) |
+| v17 | `tasks.reminderOffsets TEXT`, `events.reminderOffsets TEXT` |
+| v18 | `tasks.parentTaskId TEXT` (subtasks) |
+| v19 | `tasks.tagIds TEXT` + `tags` table |
+| v20 | `tasks.recurrence TEXT` |
+| v21 | FTS5 virtual tables (`tasks_fts`, `notes_fts`, `events_fts`) + sync triggers + one-shot backfill |
+| v22 | `folders.iconColor INTEGER`, `app_lists.iconColor INTEGER` (per-icon color override) |
+| v23 | `app_lists.listType TEXT NOT NULL DEFAULT 'tasks'` |
+| v24 | Birthday columns added to `tasks` (transitional); `tasks.sectionId TEXT`; `list_sections` table |
+| v25 | Migrates birthday rows out of `tasks` into a new `contacts` table; recreates `tasks` without birthday columns (SQLite < 3.35 can't drop columns); re-creates `tasks_*` FTS triggers after the rename |
 
 When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 
-**`app_settings` also holds** (beyond the tab/appearance/font/locale keys): `auth_type`, `auth_hash`, `auth_salt` (the app-lock passcode — salted + key-stretched, owned by `SecurityService`, **excluded from backup export and never overwritten on import**, see `SecurityService.authSettingKeys`).
+**Full-text search (FTS5)** — `DatabaseService.searchAll(query, {limit = 50}) → SearchResults` returns id sets keyed by source table. Each token is wrapped in `"…"*` (with internal quotes doubled), so the user gets implicit AND prefix matching without exposed FTS5 syntax. Triggers keep `tasks_fts` / `notes_fts` / `events_fts` in sync; `_backfillFts` populates pre-existing rows during the v21 upgrade.
 
-**Backup import is atomic**: `BackupService.importBackup` parses/validates the whole payload first, then `DatabaseService.replaceAllData` clears + re-inserts every table inside one transaction (rolls back on any error, so a corrupt/partial backup can't destroy existing data). Backups currently cover only the **active** space (multi-space backup is a known follow-up).
+**`app_settings` keys** (all stored as strings):
+- `tab_<i>_visible` (i = 0..4) — per-tab visibility booleans
+- `tab_order` — comma-separated ordered list of logical tab indices
+- `default_tab` — logical index `'0'..'4'` or sentinel `'last'` (`kLastOpenedTab`) to restore the last-used tab on launch
+- `last_tab` — last logical tab opened (persisted for `default_tab = last`)
+- `accent_color`, `completion_color` — ARGB int as decimal string
+- `font` — Google Fonts camelCase key or `'__system__'`
+- `locale` — BCP-47 language code (`en`, `uk`, `es`, `fr`, `de`, `it`, `pt`, `ru`, `zh`, `ja`)
+- `task_field_prefs` — JSON-serialised `TaskFieldPrefs`
+- `auth_type`, `auth_hash`, `auth_salt`, `auth_biometric` — passcode + biometric flag (owned by `SecurityService.authSettingKeys`; **excluded from backup export and never overwritten on import**)
+- `gcal_email`, `gcal_selected_calendar_ids` (JSON list), `gcal_default_calendar_id`, `gcal_last_sync_at`, `gcal_synctoken_<calendarId>` — Google Calendar state (owned by `GoogleCalendarController`; **excluded from backups** via `isReservedKey`)
+- `sync_backend` — selected `SyncBackend` (owned by `SyncController`)
 
-**`app_settings` keys** (all stored as strings in the `value` column):
-- `tab_1_visible` … `tab_4_visible` — per-tab visibility booleans (`'true'`/`'false'`)
-- `accent_color` — ARGB int as decimal string (e.g. `'4294930688'`); loaded into `AppColors.accent` at startup
-- `completion_color` — ARGB int as decimal string; loaded into `AppColors.systemGreen` at startup
-- `font` — Google Fonts camelCase key or `'__system__'`; applied to the app's `CupertinoTheme`
-- `locale` — BCP-47 language code (e.g. `'en'`, `'uk'`)
+**Backup import is atomic**: `BackupService` parses/validates the whole payload first, then `DatabaseService.replaceAllData` clears + re-inserts every table inside one transaction (rolls back on any error, so a corrupt or partial backup can't destroy existing data). Backups currently cover only the **active** space (multi-space backup is a known follow-up).
 
-Key query methods (tasks):
-- `getTasks()` — active only (`isDeleted = 0`), sorted by `sortOrder ASC, creationDate DESC`
-- `getTrashedTasks()` — `isDeleted = 1`, sorted by `deletedDate DESC`
-- `softDeleteTask(id, deletedDate)` / `softDeleteTasksForList(listId, deletedDate)`
-- `restoreTask(id)` — sets `isDeleted = 0, deletedDate = NULL`
-- `permanentlyDeleteTask(id)` — hard `DELETE`
-- `clearTrashedTasks()` / `clearTrashedFolders()` / `clearTrashedLists()` — bulk `DELETE WHERE isDeleted = 1` (used by "Empty Trash")
-
-Equivalent soft-delete/restore/trash methods exist for `folders` and `app_lists`.
-
-Backup methods (no filters — export includes active + trashed items):
-- `exportTasks()` / `exportFolders()` / `exportLists()` / `exportNoteFolders()` / `exportNotes()` / `exportRoutines()` / `exportRoutineEntries()` — return `List<Map<String, dynamic>>` (raw sqflite rows)
-- `clearAllData()` — deletes all rows from all 7 tables (used before import)
-- `importTasks(maps)` / `importFolders(maps)` / `importLists(maps)` / `importNoteFolders(maps)` / `importNotes(maps)` / `importRoutines(maps)` / `importRoutineEntries(maps)` — batch-insert from raw maps
-
-Routine DB schema:
-- `routines` — stores routine definitions (all Routine fields; `weekdays` stored as comma-separated string e.g. `"0,1,2,3,4,5,6"`)
-- `routine_entries` — per-day progress records; one row per (routineId, date); `amount` is cumulative for the day
+Other useful methods:
+- `getTasks()` / `getTrashedTasks()` — active vs trashed
+- `softDeleteTask`, `restoreTask`, `permanentlyDeleteTask` (+ equivalents for folders, lists, note_folders, notes, contacts)
+- `clearTrashed*` — bulk hard-delete (`isDeleted = 1` rows), used by "Empty Trash"
+- `resetUserData()` — wipes all user tables (used by "Reset Data" in Settings → Data)
+- `replaceAllData(tables)` — atomic clear+restore for backup import / sync pull
+- `_allTables` — canonical list of user tables used by reset/restore (note: tables are deleted in FK-friendly order)
 
 ### Controllers
 
+Every controller is a `ChangeNotifier`. They're constructed in `main.dart` (global) or by `SpaceManager` (per-space), then passed through `MyApp` → `HomeShell` → views via plain constructor injection.
+
 **`TaskController`** (`lib/src/tasks/task_controller.dart`)
-- Initialized in `main.dart`, passed through `MyApp` → `HomeShell` → individual views
-- Owns two in-memory lists: `_tasks` (active) and `_trashedTasks` (soft-deleted)
-- Key API:
-  - `inboxTasks`, `inboxUncompletedCount`
-  - `todayTasks`, `todayUncompletedCount`
-  - `upcomingTasks`, `upcomingUncompletedCount`
-  - `tasksForList(listId)`, `uncompletedCountForList(listId)`, `tasksForDate(date)`
-  - `allCompletedTasks` — all non-trashed completed tasks across every list/inbox
-  - `completedTasksCount` — length of above (used to show/hide the Completed smart list)
-  - `trashedTasks` — read-only view of `_trashedTasks`
-  - `addTask`, `updateTask`, `toggleCompleted`
-  - `deleteTask(id)` — soft-delete (moves to `_trashedTasks`)
-  - `deleteTasksForList(listId)` — bulk soft-delete (called when list is trashed)
-  - `restoreTask(id, targetListId)` — moves from `_trashedTasks` back to `_tasks`; if `targetListId` differs from the original `listId` (e.g. list was trashed), updates the DB row too
-  - `permanentlyDeleteTask(id)` — hard delete from `_trashedTasks` + DB
-  - `permanentlyDeleteAllTrashed()` — bulk hard-delete all items in `_trashedTasks`; used by "Empty Trash"
-  - `sortOrder` / `setSortOrder(TaskSortOrder)` — affects all list views
-  - `reorderTasks({listId, oldIndex, newIndex})` — manual drag reorder within a scope
+- Owns `_tasks`, `_trashedTasks`, `_tags` (flat global namespace).
+- Smart-list getters (all exclude subtasks, i.e. `parentTaskId == null`): `inboxTasks`, `todayTasks`, `tomorrowTasks`, `upcomingTasks`, `allTasks`, `allCompletedTasks`.
+- Scoped queries: `tasksForList(listId)`, `tasksForListSection(listId, sectionId?)` (active only — completed roll up to the implicit "Completed" virtual section at the bottom), `completedTasksForList(listId)`, `tasksForDate(date)`, `subtasksOf(parentId)` (oldest first).
+- Sorting: `setSortOrder(TaskSortOrder)` — `defaultOrder` | `creationDate` | `name` | `priority` | `dateTime`. Only `defaultOrder` enables drag-reorder. Smart lists apply the chosen sort then move completed to the end (oldest completion first).
+- Mutations: `addTask`, `updateTask`, `toggleCompleted`, `moveTaskToSection`, `reorderTasks({listId, sectionId, oldIndex, newIndex})`, `reorderTaskBefore(...)` (long-press drag, can change section / list).
+- Recurrence: `toggleCompleted` checks `Recurrence.parse(task.recurrence)` — on completion of a recurring task, advances `dueDate` to `Recurrence.nextAfter(...)` and reschedules reminders **instead of** marking it done.
+- Tags: `tagById`, `tagsForTask`, `tasksWithTag`, `addOrGetTag(name, {color})` (case-insensitive dedup), `updateTag`, `deleteTag` (also strips the id from every referencing task).
+- Reminders: `scheduleTaskReminders(task)` / `cancelTaskReminders(taskId)` via `NotificationService` — toggling complete cancels, un-completing reschedules, delete cancels.
+- Trash: `deleteTask` (soft, recursive into subtasks), `restoreTask(id, targetListId)`, `restoreAt(deletedDate)`, `permanentlyDeleteTask`, `permanentlyDeleteAllTrashed`.
+- iOS app badge: `_updateBadge()` writes `todayUncompletedCount` to `flutter_app_badger`. Overdue uncompleted tasks roll into `todayTasks` (any `dueDate ≤ today`), so the badge counts them automatically. No-op on platforms where `supportsAppBadge == false`.
 
 **`FolderController`** (`lib/src/folders/folder_controller.dart`)
-- Initialized in `main.dart`, passed through `MyApp` → `HomeShell` → task-related views
-- Owns four in-memory lists: `_folders`, `_lists`, `_trashedFolders`, `_trashedLists`
-- Key API:
-  - `foldersIn(parentId?)` — active folders at a given level, sorted by `sortOrder`
-  - `listsIn(folderId?)` — active lists at a given level, sorted by `sortOrder`
-  - `listById(id)` — lookup in active lists only (used for trash restore-path resolution)
-  - `folderById(id)` — lookup in active folders only
-  - `trashedFolders`, `trashedLists` — read-only views
-  - `addFolder`, `addList`, `updateFolder`, `updateList`
-  - `deleteList(id)` — soft-delete (moves to `_trashedLists`)
-  - `deleteFolderDeep(id, onDeleteList)` — recursive soft-delete; `onDeleteList` is `TaskController.deleteTasksForList`
-  - `restoreList(id, targetFolderId)`, `restoreFolder(id, targetParentId)`
-  - `permanentlyDeleteList(id)`, `permanentlyDeleteFolder(id)`
-  - `permanentlyDeleteAllTrashed()` — bulk hard-delete all trashed lists and folders; used by "Empty Trash"
-  - `reorderFolders(parentId?, old, new)`, `reorderLists(folderId?, old, new)`
-
-**`RoutineController`** (`lib/src/routines/routine_controller.dart`)
-- Initialized in `main.dart`, passed through `MyApp` → `HomeShell` → `RoutinesView`
-- Key API: `todayRoutines`, `entryForToday(routineId)`, `todayProgress(routineId)`, `isTodayCompleted(Routine)`, `recordProgress(Routine)`, `addRoutine`, `updateRoutine`, `deleteRoutine`, `load`
-- `todayRoutines` filters `_routines` by schedule: `daily` checks weekday membership; `days_after_complete` shows routine when `today >= lastCompletionDate + gap`
-- `recordProgress` toggles for `achieve_all` (0↔1) and increments by `recordAmount` for `certain_amount`; creates today's entry if absent
-- `autoReset='none'`: carries over last known amount as today's starting value; for `achieve_all` shows as done if any historical completion exists (until toggled off today)
-- Weekdays stored as `List<int>` (0=Mon … 6=Sun); Dart's `DateTime.weekday` is 1=Mon, so always subtract 1 when comparing
+- Owns `_folders`, `_lists`, `_sections`, `_trashedFolders`, `_trashedLists`.
+- Folders/lists: `foldersIn(parentId?)`, `listsIn(folderId?)`, `folderById`, `listById`, `listIdsInRecursive(folderId)` (iterative walk).
+- Sections (new): `sectionsForList(listId)`, `sectionById`, `addSection`, `updateSection`, `deleteSection`, `reorderSections`, `toggleSectionCollapsed` (collapse state persisted).
+- Reorder: `reorderFolders(parentId?, old, new)`, `reorderLists(folderId?, old, new)`, plus long-press-drag variants `reorderFolderBefore` / `reorderListBefore` that can also move an item between parent folders.
+- Trash: `deleteList`, `deleteFolderDeep(id, onDeleteList)` (recursive — task controller cascades), `restoreList`, `restoreFolder`, `restoreAt(deletedDate)` (bulk), `permanentlyDeleteList`, `permanentlyDeleteFolder`, `permanentlyDeleteAllTrashed`.
 
 **`NoteController`** (`lib/src/notes/note_controller.dart`)
-- Initialized in `main.dart`, passed through `MyApp` → `HomeShell` → `NotesView`
-- Owns four in-memory lists: `_notes`, `_folders`, `_trashedNotes`, `_trashedFolders`; mirrors the `FolderController` API for the notes domain
-- Soft-delete: `deleteNote(id)`, `deleteFolderDeep(id)` (recursive — no callback needed since notes have no cross-controller dependency)
-- Restore: `restoreNote(id, targetFolderId)`, `restoreFolder(id, targetParentId)` — fall back to root if the original parent is trashed
-- `permanentlyDeleteNote(id)`, `permanentlyDeleteFolder(id)`, `permanentlyDeleteAllTrashed()` — bulk hard-delete from Trash
-- Reorder helpers mirror folder/list reorder behavior
+- Owns `_notes`, `_folders`, `_trashedNotes`, `_trashedFolders`.
+- Read: `allNotes`, `notesIn(folderId)` (sortOrder then modifiedDate desc), `foldersIn(parentId)`.
+- Mutate: `addNote`, `updateNote`, `moveNote` (preserves `modifiedDate`), `deleteNote`, `restoreNote`, `permanentlyDeleteNote`, `permanentlyDeleteAllTrashed`.
+- Folders: `addFolder`, `updateFolder`, `deleteFolderDeep(id)` (recursive — returns the shared `deletedDate`), `restoreFolder`, `restoreAt(deletedDate)`.
+- Reorder: `reorderNoteFolders`, `reorderNotes`, plus before-style `reorderNoteFolderBefore` / `reorderNoteBefore` that can also change `folderId` (note reorder preserves `modifiedDate`).
+
+**`ContactController`** (`lib/src/contacts/contact_controller.dart`)
+- Owns `_contacts`, `_trashedContacts`.
+- `contactsForList(listId)` — sorted by creation; `contactsForDate(date)` matches by month+day only (used for calendar birthday chips).
+- `addContact`, `updateContact`, `toggleCompleted`, `deleteContact`, `restoreContact(id, {targetListId})`, `restoreAt(deletedDate)`, `permanentlyDeleteContact`, `permanentlyDeleteAllTrashed`.
+- Date math: Feb 29 births fall back to Feb 28 in non-leap years (`_safeDate`).
+
+**`RoutineController`** (`lib/src/routines/routine_controller.dart`)
+- `todayRoutines` filters by schedule: `daily` checks weekday membership; `days_after_complete` shows when `today >= lastCompletionDate + gap`.
+- `recordProgress(routine)` toggles `achieve_all` (0↔1) and increments `certain_amount` by `recordAmount`; creates today's entry if absent.
+- `autoReset='none'`: for `achieve_all` shows as done if any historical completion exists (until toggled off today); for `certain_amount` carries over the last entry's amount as today's starting value.
+- Weekdays stored as `List<int>` (0=Mon … 6=Sun); Dart's `DateTime.weekday` is 1=Mon, so always `- 1` when comparing.
+
+**`EventController`** (`lib/src/calendar/event_controller.dart`)
+- Owns local `_events`; mirrors `TaskController` shape but without subtasks/tags.
+- `eventsForDate(date)`, `addEvent`, `updateEvent`, `deleteEvent` (immediate hard-delete from DB but `UndoController` lets the user revert by re-inserting).
 
 **`SettingsController`** (`lib/src/settings/settings_controller.dart`)
-- Manages `ThemeMode` (persisted via `SettingsService` → `SharedPreferences`)
-- Owns `SmartListPrefs` (visibility of Today/Upcoming/Completed/Trash smart lists + `hideTabLabels` toggle), persisted to a JSON file in the documents directory
-- Owns per-tab visibility (`_tabVisibility` map for tabs 1=Notes, 2=Calendar, 3=Routines, 4=Settings; tab 0 always on), persisted to the `app_settings` DB table so backups carry it across devices
-- Owns accent and completion colors: `_accentColor` and `_completionColor`; `loadSettings()` reads `accent_color` and `completion_color` from `app_settings` and sets `AppColors.accent` / `AppColors.systemGreen` statics accordingly
-- `updateAccentColor(Color)` / `updateCompletionColor(Color)` — mutate the `AppColors` static, persist to `app_settings`, then bump `colorRevision` (a `ValueNotifier<int>`) **instead of** `notifyListeners()`. The app content is wrapped in a `ValueListenableBuilder(colorRevision)` so color changes rebuild only the content subtree, not the whole `CupertinoApp` (theme/locale/font). `AppearanceView` listens to `Listenable.merge([controller, colorRevision])` so the selected swatch still updates.
-- `updateFontKey(String)` — validates the key (`kSystemFontKey` or a key in `GoogleFonts.asMap()`), stores in `app_settings`, calls `notifyListeners()`
-- `visibleOptionalTabCount` — number of optional tabs currently enabled; used to gray out the last toggle (UI prevents disabling all of them)
-- `importSmartListPrefs(map)` — invoked by `BackupService` during import to restore the JSON-backed prefs
+- Loads state from `app_settings` rows + `SettingsService` (`SharedPreferences` for `ThemeMode`) + `SmartListPrefs.load()` (separate JSON file in docs dir).
+- State: `themeMode`, `locale`, `fontKey` (Google Fonts key or `kSystemFontKey`), `accentColor`, `completionColor`, `smartListPrefs`, `taskFieldPrefs`, `_tabVisibility` (map 0..4), `_tabOrder` (`List<int>` of length 5, perm of [0..4]), `_defaultTab` (`'0'..'4'` or `kLastOpenedTab`), `_lastOpenedTab` (int).
+- `colorRevision` (`ValueNotifier<int>`): bumped on accent / completion color change **instead of** `notifyListeners()`. The `CupertinoApp` rebuild path is wrapped in `ValueListenableBuilder(colorRevision)` so color changes rebuild only the content subtree, not the whole app (theme/locale/font). Color-sensitive widgets (e.g. `AppearanceView`) listen to `Listenable.merge([controller, colorRevision])`.
+- `resolveInitialTab(visible)` — picks the logical tab to show on launch; falls back to the first visible tab if the configured choice is hidden.
+- Mutations (each persists + notifies/bumps): `setTabVisible(i, bool)`, `updateTabOrder(List<int>)` (validated: length 5, no dupes), `updateDefaultTab`, `setLastOpenedTab(i)` (no notify — UI doesn't react live), `updateThemeMode`, `updateLocale`, `updateFontKey`, `updateAccentColor`, `updateCompletionColor`, `updateHideTabLabels`, `updateShowAddFolderButton` / `updateShowNotesAddFolderButton`, `updateNotesUseMarkdown`, `updateTaskFieldPrefs(TaskFieldPrefs)`, `updateSmartListVisibility(key, SmartListVisibility)`, `importSmartListPrefs(map)` (used by backup import).
 
 **`BackupService`** (`lib/src/settings/backup_service.dart`)
-- Not a `ChangeNotifier`; created in `main.dart` alongside controllers and passed through `MyApp` → `HomeShell` → `SettingsView`
-- `exportBackup()` — reads all 7 tables (including trashed items), collects custom icon image bytes (base64), serialises `SettingsController.smartListPrefs` alongside the DB rows, writes a `planom_backup_YYYY-MM-DD.planom` JSON file to the temp directory, shares it via iOS share sheet. Custom iconIds are normalised to relative paths (`icons/<filename>`) in the export; image bytes are stored under a top-level `customIcons` map keyed by relative path.
-- `importBackup()` — opens the file picker, parses the JSON, writes custom icon files to `<docsDir>/icons/`, clears all DB tables, bulk-inserts all records, restores smart-list prefs from `smart_list_prefs`, then calls `load()` on each controller. Returns `true` on success, `false` if the file was invalid or the picker was cancelled.
-- Backup format: JSON with `.planom` extension, `version: 1`. Top-level keys: `version`, `exportDate`, `customIcons`, `tasks`, `folders`, `app_lists`, `note_folders`, `notes`, `routines`, `routine_entries`, `events`, `app_settings`, `smart_list_prefs`. The `app_settings` block excludes the `auth_*` passcode keys.
+- Not a `ChangeNotifier`. Created by `SpaceManager` per active space and passed through `MyApp` → `HomeShell` → `SettingsView`.
+- `buildPayloadJson()` — serialises every table (active + trashed) + custom icon bytes (base64) + `smart_list_prefs`; filters `auth_*` and `gcal_*` keys from `app_settings`. Returns the canonical payload string.
+- `exportBackup({passphrase?})` — generates the payload, optionally encrypts (`backup_crypto.encryptBackup`), writes a `planom_backup_YYYY-MM-DD.planom` file to temp, and either shares (mobile/macOS) or opens a Save-As dialog (Linux/Windows).
+- `importBackup({passphraseProvider?})` — picks a file, detects encryption via `isEncryptedBackup`, calls the provider if a passphrase is required, then `_applyImportedPayload`.
+- `importPayloadJson(plain)` — sync's entry point (no UI / file picker).
+- `_applyImportedPayload(map)` — preserves device `auth_*` and `gcal_*` keys, restores icon files, calls `replaceAllData`, reloads controllers, re-applies smart-list prefs.
+- `hardReset()` — wipes all user data via `resetUserData()` and reloads controllers (used by Settings → Data → Reset).
+- Backup format: JSON, `.planom` extension. v1 = plaintext, v2 = `BackupCrypto` envelope. Top-level keys: `version`, `exportDate`, `customIcons`, `tasks`, `tags`, `folders`, `app_lists`, `note_folders`, `notes`, `routines`, `routine_entries`, `events`, `list_sections`, `contacts`, `app_settings`, `smart_list_prefs`.
+
+**`SyncController`** (`lib/src/sync/sync_controller.dart`) — see Sync.
+
+**`GoogleCalendarController`** (`lib/src/integrations/google/google_calendar_controller.dart`) — see Google Calendar.
+
+**`PlanomMcpServer`** (`lib/src/mcp/mcp_server.dart`) — see MCP server.
 
 ### Spaces (`lib/src/spaces/`)
 
-`SpaceManager` (`ChangeNotifier`, provided via `SpaceManagerProvider` InheritedWidget) lets the user keep multiple independent data sets ("spaces"). Each space is a separate DB file; the **default** space reuses the global `planom.db` handle (created in `main.dart` and also used by `SettingsController`/`SecurityService`), while non-default spaces use `planom_<id>.db`. Space metadata (`Space` list + active id) lives in `spaces.json` in the docs dir, loaded with a corrupt-file fallback and saved atomically (temp file + rename). On `switchSpace`, the previous (non-default) DB is closed and a fresh set of controllers is built for the new space; `main.dart` re-keys `MyApp` by `activeSpaceId` to force a clean rebuild. `addSpace`, `switchSpace`, `deleteSpace` (refuses the default/last space; switches away first if active; deletes the DB file). **Global** prefs (appearance/font/locale/tab visibility) and the passcode live in the global `planom.db`'s `app_settings`, not per space.
+`SpaceManager` (`ChangeNotifier`, provided via `SpaceManagerProvider` `InheritedWidget`) lets the user keep multiple independent data sets ("spaces"). Each space is a separate DB file; the **default** space reuses the global `planom.db` handle (created in `main.dart` and also used by `SettingsController`/`SecurityService`/`GoogleCalendarController`), while non-default spaces use `planom_<id>.db`.
+
+- Metadata: `Space` list + active id stored in `spaces.json` in the docs dir; loaded with a corrupt-file fallback and saved atomically (temp file + rename).
+- On `switchSpace`, the previous (non-default) DB is closed and a fresh set of per-space controllers (`TaskController`, `FolderController`, `NoteController`, `RoutineController`, `EventController`, `ContactController`, `BackupService`) is built for the new space. `main.dart` re-keys `MyApp` by `activeSpaceId` to force a clean rebuild (fresh Navigator stacks, scroll positions, etc.).
+- `addSpace`, `renameSpace`, `switchSpace`, `deleteSpace` (refuses the default/last space; switches away first if the deleted space is active; deletes the DB file).
+- **Global** prefs (appearance/font/locale/tab visibility), the passcode, Google Calendar connection state, and sync backend selection all live in the global `planom.db`'s `app_settings`, **not** per space.
 
 ### Security / app lock (`lib/src/security/`)
 
-`SecurityService` stores an optional passcode in `app_settings` as a random-salt + iterated-HMAC-SHA256 hash (`auth_hash`/`auth_salt`/`auth_type`). Legacy unsalted SHA-256 hashes verify once then upgrade transparently. `_SecurityGate` in `app.dart` shows `LockScreen` when locked (on launch + on resume from background). `SecurityService.authSettingKeys` is the set of passcode keys that backups must exclude/preserve. (No biometric/`local_auth` dependency yet.)
+`SecurityService` (`security_service.dart`) stores an optional passcode in `app_settings`:
+- `auth_type`: `none` | `pin4` | `pin5` | `pin6` | `pin7` | `pin8` | `custom`
+- `auth_hash`: PBKDF2/HMAC-SHA256 (100 000 iterations), base64
+- `auth_salt`: 16 random bytes, base64
+- `auth_biometric`: `'true'`/`'false'` — whether Face ID / Touch ID / Windows Hello is enabled. The flag persists even if biometric becomes unavailable on the device.
+
+Legacy unsalted SHA-256 hashes verify once and are transparently upgraded to the salted PBKDF2 form on first successful verification.
+
+API: `load`, `isBiometricAvailable` (calls `local_auth`; returns false on macOS/Linux), `authenticateBiometric(reason)`, `setPassword(password, type)`, `removePassword`, `verify(password)`, `setBiometricEnabled(bool)`.
+
+`_SecurityGate` in `app.dart` shows `LockScreen` when locked: on launch + on resume from background (driven by `WidgetsBindingObserver.didChangeAppLifecycleState`).
+
+`authSettingKeys` — the set of passcode keys backups must exclude on export and never overwrite on import.
 
 ### Notifications (`lib/src/notifications/`)
 
-`NotificationService` (singleton) wraps `flutter_local_notifications` + `timezone`. Tasks/events carry `reminderOffsets` (minutes relative to the due/event time). Scheduling and cancellation **both** use the slot-based ID `_notifSlot(itemId, slotIndex)` over `0.._maxSlots-1` — they must stay in sync. `TaskController.toggleCompleted` cancels reminders on complete and reschedules on un-complete; delete cancels. `initTimezone` currently offset-matches the IANA zone (known DST limitation; `flutter_timezone` is the documented follow-up).
+`NotificationService` (singleton) wraps `flutter_local_notifications` + `timezone`. Tasks/events/contacts carry `reminderOffsets` (minutes relative to the due/event/birthday time).
+
+- Slot-based IDs: `_notifSlot(itemId, slotIndex)` over `0.._maxSlots-1` (20). Scheduling and cancellation **both** use the same slot formula — they must stay in sync.
+- `TaskController.toggleCompleted` cancels reminders on complete and reschedules on un-complete; delete cancels. Recurrence-driven advance also reschedules.
+- `initTimezone()` matches the IANA zone by current UTC offset (known DST limitation; `flutter_timezone` is the documented follow-up).
+- No-ops on platforms where `supportsLocalNotifications == false` (Android/Linux/Windows today).
+
+### Sync (`lib/src/sync/`) — new
+
+End-to-end optional backup-style sync. **No conflict resolution** — pull always replaces all local data; the UI requires explicit confirmation.
+
+`SyncController` (`sync_controller.dart`) — top-level orchestrator. Backend-agnostic; uses an abstract `SyncProvider` and `BackupService` for payload generation.
+- State: `SyncSnapshot { backend, status, lastSyncAt?, lastError? }`.
+- API: `load`, `setBackend(SyncBackend)`, `setPassphrase`, `hasPassphrase`, `clearPassphrase`, `pushNow`, `pullNow`, `disableAndWipeRemote`.
+- **Push**: `BackupService.buildPayloadJson` → optional `encryptBackup(plain, passphrase)` → `provider.push(bytes)`.
+- **Pull**: `provider.pull()` → detect encryption via `isEncryptedBackup` → optional `decryptBackup(envelope, passphrase)` → `BackupService.importPayloadJson(plain)`. Returns `false` if remote is empty.
+
+`SyncState` (`sync_state.dart`):
+- `SyncBackend { none, icloud, planom, custom }` — only `none` and `icloud` are wired today; `planom` (hosted) and `custom` (BYO server) are reserved.
+- `SyncStatus { idle, pushing, pulling, succeeded, failed, notConfigured, passphraseRequired, notAvailable }`.
+
+`SyncSecrets` (`sync_secrets.dart`) — passphrase in OS-secure storage (`flutter_secure_storage`: iOS Keychain, Android Keystore, etc.). **Not** in the DB, so it's never exported.
+
+`ICloudSyncProvider` (`icloud_sync_provider.dart`) — wraps `icloud_storage` to write a single `planom.sync.enc` file to the iCloud Documents container. Requires the iCloud capability + container `iCloud.app.planom` set up in Xcode; if entitlements are missing or the user isn't signed into iCloud, `isConfigured()` returns false and the UI shows a "setup required" state. Only on iOS / macOS — `isAvailable()` is false elsewhere.
+
+**Encryption** (`lib/src/settings/backup_crypto.dart`):
+- AES-256-GCM, PBKDF2-SHA256 (100 000 iterations), 16-byte salt, 12-byte nonce per encryption.
+- Envelope JSON (v2): `{ version, encryption, iterations, salt, nonce, ciphertext }`.
+- Same envelope is used by both backup export and sync push — `decryptBackup` accepts either.
+- Passphrase changes are independent of backend selection. Devices with no passphrase can still pull plaintext payloads; devices with a passphrase get `passphraseRequired` if the remote is plaintext or the key is wrong.
+
+### MCP server (`lib/src/mcp/`) — new
+
+Transport-agnostic JSON-RPC 2.0 server exposing the app's core data via the Model Context Protocol. The repo ships **only the protocol layer** — no stdio/websocket/HTTP transport is bundled; an embedder wires it up however it needs to.
+
+- `mcp_types.dart` — `McpRequest`, `McpResponse`, `McpError`, `McpException`, `McpTool`, `McpServerInfo`, `McpToolResult`.
+- `mcp_dispatcher.dart` — stateless JSON-RPC router; handles `initialize`, `tools/list`, `tools/call`; catches `McpException` and returns `isError: true` responses.
+- `mcp_tools.dart` — const list of ~23 `McpTool` definitions with JSON-Schema input descriptors.
+- `mcp_server.dart` — `PlanomMcpServer(SpaceManager)` facade. `handle(McpRequest) → McpResponse` or `handleJson(String) → String`. All tools route through the **active** space's controllers.
+
+Tools cover: tasks (list / create / update / complete / delete / restore with scopes `inbox | today | tomorrow | upcoming | completed | trash | list | all`), lists/folders (list / create), notes (list / create / update / delete), routines (list / record progress), events (list with date range filter), spaces (list / switch), and search (naive substring contains across task title+note and note content — **not** FTS5). All dates are ISO-8601 strings; times are minutes-since-midnight ints.
 
 ### App shell (`lib/src/home_shell.dart`)
 
-`HomeShell` is a `StatefulWidget` that wraps a `CupertinoTabScaffold` (up to **5 tabs**: Tasks(0) always-on, then Notes(1) / Calendar(2) / Routines(3) / Settings(4) — each toggleable in Settings → Tab Bar) in a `Stack` with a floating accent-colored `+` button (52×52, `AppColors.accent`) above the tab bar. `_computeVisibleIndices()` produces the logical→visual index mapping based on `SettingsController.isTabVisible`; the scaffold is keyed by `ValueKey(visibleIndices.join(','))` so a clean rebuild happens whenever the visible set changes. When the Settings tab is hidden, every other tab's root view exposes a ⋯ button (Tasks via its dropdown menu, Notes/Calendar/Routines via the nav-bar trailing icon) that pushes `SettingsView` on the current tab's navigator. Key state:
-- `_navigatorKeys`: per-tab `GlobalKey<NavigatorState>` — used to pop-to-root on same-tab re-tap
-- `_depthObservers`: per-tab `_DepthObserver extends NavigatorObserver` — tracks push/pop depth AND counts routes matching `trackedRouteName`
-- `_showPlusButton`: `ValueNotifier<bool>` toggled by `_depthObservers`; passed to `ValueListenableBuilder` that wraps the `Positioned` button
-- `_activeListId` / `_activeDueDate`: `ValueNotifier<T?>` that child views set to pre-fill the task creation sheet's list and date
-- `_calendarResetSignal`: `ValueNotifier<int>` incremented when Calendar tab is re-tapped, causing `CalendarView` to scroll back to current month
-- `_lastTabIndex`: tracks last tapped tab to detect same-tab re-tap via `CupertinoTabBar.onTap`
+`HomeShell` is a `StatefulWidget` managing up to **5 logical tabs**: Tasks(0) always-on, then Notes(1) / Calendar(2) / Routines(3) / Settings(4) — each toggleable in Settings → Tab Bar. Layout adapts:
+
+- **Wide layout** (`PlatformCapabilities.isDesktop` OR window width ≥ 700 px) → `_WideLayout` with a persistent left sidebar.
+- **Single visible tab** → no tab bar at all; just `CupertinoTabView`.
+- **Otherwise** → `CupertinoTabScaffold` + `CupertinoTabBar` at the bottom.
+
+The sidebar/tab-bar **order** is user-configurable in Settings → Tab Bar (`SettingsController.tabOrder`); visibility is independent. A "Default tab on launch" preference (`SettingsController.defaultTab`) selects one of `'0'..'4'` or `'last'` (`kLastOpenedTab` — restore the last opened tab).
+
+Key state:
+- `_navigatorKeys`: per-tab `GlobalKey<NavigatorState>` — used to pop-to-root on same-tab re-tap.
+- `_depthObservers`: per-tab `_DepthObserver extends NavigatorObserver` — tracks push/pop depth AND counts routes matching `trackedRouteName`.
+- `_showPlusButton`: `ValueNotifier<bool>` toggled by `_depthObservers`; passed to `ValueListenableBuilder` that wraps the `Positioned` button.
+- `_activeListId` / `_activeDueDate`: `ValueNotifier<T?>` that child views set to pre-fill the task creation sheet's list and date.
+- `_tasksCollapseSignal` / `_notesCollapseSignal`: `ValueNotifier<int>` bumped when the Tasks/Notes tab is re-tapped, used by views to collapse expanded folders.
+- `_calendarResetSignal`: `ValueNotifier<int>` bumped when Calendar tab is re-tapped, causing `CalendarView` to scroll back to current month.
+- `_lastTabIndex`: last tapped tab (logical index) — detects same-tab re-tap.
+- `_globalSettingsOpen` + `_globalSettingsRoute`: `ValueNotifier<bool>` + `Route?` for the **global Settings overlay** (see below).
+- `_plusDragController`: provides `PlusDragScope` so any descendant can register drop targets (see Plus-button drag pattern).
+- `_undoController`: provides `UndoScope` so any deletion site can show an Undo banner.
 
 **Plus button visibility rules:**
-- **Tab 0 (Tasks)**: shown whenever no `TaskDetailView` is on the stack — i.e. `_depthObservers[0].trackedCount == 0`. Visible on TasksView, InboxView, TodayView, CompletedView, TrashView, FolderView, ListTaskView at any nesting depth; hidden only inside the task edit screen.
-- **Tab 1 (Notes)**: always hidden — Notes manages its own UI.
-- **Tabs 2 & 3 (Calendar / Routines)**: hidden when depth > 1 (any push beyond the tab root).
-- **Tab 4 (Settings)**: always hidden.
-- `_DepthObserver` accepts an optional `trackedRouteName`; `trackedCount` increments/decrements as matching routes are pushed/popped. Tab 0's observer tracks `'task_detail'`.
-- All `TaskDetailView` pushes use `RouteSettings(name: TaskDetailView.routeName)` (`'task_detail'`) so the observer can identify them.
+- Tab 0 (Tasks): shown unless a `TaskDetailView` is on the stack (`_depthObservers[0].trackedCount == 0`). Visible on TasksView, smart lists, FolderView, ListTaskView at any nesting depth; hidden only inside the task edit screen.
+- Tab 1 (Notes): always hidden — Notes manages its own UI.
+- Tabs 2 & 3 (Calendar / Routines): hidden when depth > 1.
+- Tab 4 (Settings): always hidden.
+- `_DepthObserver` accepts an optional `trackedRouteName`; tab 0's observer tracks `'task_detail'`. All `TaskDetailView` pushes use `RouteSettings(name: TaskDetailView.routeName)`.
 
 **Plus button action (`_onPlusPressed`):**
-- `_lastTabIndex == 3` (Routines): pushes `RoutineCreationView` on the Routines tab navigator via `_navigatorKeys[3]` — this increments depth to 2, hiding the button automatically.
-- All other tabs: shows `TaskCreationSheet` modal (root navigator).
+- Tab 3 (Routines): pushes `RoutineCreationView` on the Routines tab navigator.
+- Tab 2 (Calendar) with an active selected day: opens a Task vs Event picker via `showSelectionMenu`.
+- If the active list is a Birthdays list: opens `showContactCreationSheet` instead of the task sheet.
+- Otherwise: shows `TaskCreationSheet` modal (root navigator) seeded with `_activeListId` / `_activeDueDate`.
+
+**Global Settings overlay**: when the Settings tab is hidden, every other tab's root view exposes a ⋯ button that calls `HomeShell.openGlobalSettings(context)`. This pushes `SettingsView` on the **root navigator** (above the tab bar) and flips `_globalSettingsOpen.value = true`. While open, the tab bar repaints every tab's active icon/label in `secondaryLabel` so no tab reads as "selected". `_reopenSettingsFullScreen` is the related path used when the Settings tab is **hidden while the user is in it**, so the screen stays put.
 
 ### Navigation
 
-- `MyApp.onGenerateRoute` in `app.dart` routes the root `/` to `HomeShell` (the only top-level destination) using `FastRoute`
-- In-tab navigation (e.g. Tasks → Inbox, Inbox → TaskDetail) uses `Navigator.of(context).push(FastRoute(...))` directly
-- Settings is a dedicated tab (index 4); it is no longer registered as a pushed route inside individual tab navigators
+- `MyApp.onGenerateRoute` in `app.dart` returns `FastRoute` instances. The only top-level destination is `HomeShell` (wrapped in `_SecurityGate` + `ValueListenableBuilder(colorRevision)`).
+- In-tab navigation uses `Navigator.of(context).push(FastRoute(...))` directly — never bare `CupertinoPageRoute`.
+- Settings is normally a dedicated tab (logical index 4); the **global overlay** above is the fallback when that tab is hidden.
 
 ### Tasks feature (`lib/src/tasks/`)
 
 | File | Purpose |
 |------|---------|
-| `tasks_view.dart` | Tab root; three sections: (1) smart lists top (Inbox/Today/Upcoming + separator), (2) reorderable user folders + lists, (3) smart lists bottom (Completed + Trash, each conditional) + separator |
-| `inbox_view.dart` | Active tasks with `listId = null`; swipe-to-delete sends to Trash; tap row → `TaskDetailView`, tap checkbox → toggle; no dividers |
-| `today_view.dart` | Tasks due today + overdue (`dueDate ≤ today`); sets `activeDueDate` so `+` pre-fills today; overdue tasks show date in red |
-| `upcoming_view.dart` | Tasks with `dueDate > today`, sorted by date; grouped by date header |
-| `completed_view.dart` | All non-trashed completed tasks across every scope; swipe-to-delete sends to Trash; no count badge on entry |
-| `trash_view.dart` | All trashed tasks + lists + folders, sorted by `deletedDate DESC`; **tap task row → `TaskDetailView`** (read-only context from Trash); **swipe right → Put Back** (blue, confirmation shows restore destination); **swipe left → Delete Permanently** (red, confirmation required); **`⋯` nav bar button → Empty Trash** (uses `showSelectionMenu`, only shown when trash is non-empty); no count badge on entry |
-| `task_detail_view.dart` | Edit screen; "Done" nav bar button saves via `controller.updateTask`; `routeName = 'task_detail'` used by `_DepthObserver` to hide the global `+` button |
-| `task_creation_sheet.dart` | Modal bottom sheet (root navigator); title (sentence-cap) + note + date + list picker + Add; accepts `initialListId` and `initialDueDate` |
-| `calendar_date_picker.dart` | Date+time picker dialog; `formatTaskDate(DateTime, {int? doTime})` and `formatDoTime(int)` helpers; returns `(DateTime?, int?)?` — outer null = barrier dismiss (no change), `(null,null)` = No Date, `(date, time?)` = selection |
-| `task_controller.dart` | `ChangeNotifier` wrapping `DatabaseService`; manages `_tasks` + `_trashedTasks`; `deleteTask` is soft-delete; iOS badge via `flutter_app_badger` |
-| `task_row.dart` | `TaskRow` widget + `TaskDeleteBackground` + `taskProxyDecorator` shared across list views |
+| `tasks_view.dart` | Tab root; smart-list rows + reorderable folders/lists. Smart-list visibility driven by `SmartListPrefs` (`show` / `showIfNotEmpty` / `hidden`) per list (Today, Tomorrow, Upcoming, All Tasks, Completed, Trash). Supports Plus-button drop targets on every row. Multi-select via `SelectableTaskListShell`. |
+| `inbox_view.dart` | Active tasks with `listId = null`; swipe-to-delete → Trash via `UndoController`. |
+| `today_view.dart` | Active tasks where `dueDate ≤ today` (i.e. today + overdue). Overdue tasks show date in red. Sets `activeDueDate` so `+` pre-fills today. |
+| `tomorrow_view.dart` | Active tasks where `dueDate` is exactly tomorrow. Sets `activeDueDate` so `+` pre-fills tomorrow. |
+| `upcoming_view.dart` | Tasks with `dueDate > today`, grouped by date header. |
+| `all_tasks_view.dart` | Read-only union of all incomplete active tasks across every scope. Plus button defaults to Inbox. |
+| `completed_view.dart` | All non-trashed completed tasks across every scope; swipe-to-delete → Trash. |
+| `trash_view.dart` | All trashed tasks + lists + folders, sorted by `deletedDate DESC`; tap task → `TaskDetailView` (read-only context); swipe right = Put Back (blue, shows restore destination); swipe left = Delete Permanently (red, confirms); ⋯ nav-bar → Empty Trash. |
+| `task_detail_view.dart` | Edit screen with autosave (debounced). Subtask list with inline "Add Subtask". Markdown preview/edit toggle for notes when `taskFieldPrefs.useMarkdown`. Field rows driven by `TaskFieldPrefs`. `routeName = 'task_detail'`. |
+| `task_creation_sheet.dart` | Modal bottom sheet (root navigator); hide-disabled-fields driven by `TaskFieldPrefs`. Accepts `initialListId`, `initialDueDate`, `initialSectionId`. |
+| `selectable_task_list_shell.dart` | Multi-select scaffold reused by every smart-list / list view: nav-bar ⋯ → "Select" toggles selection mode, bottom `SelectionToolbar` exposes batch delete/toggle/set-date/move-to-list. |
+| `tag_picker_sheet.dart` | Multi-select tag UI with inline "Create" on a brand-new name. |
+| `recurrence_picker.dart` | Modal picker for repeat (daily/weekly/monthly/yearly + interval; basic weekly-weekday support). |
+| `task_field_prefs.dart` | `TaskFieldPrefs` — bitfield-ish of optional fields shown in detail/creation (`showPriority`, `showDate`, `showRepeat`, `showList`, `showDuration`, `showTags`, `showReminders`, `showListCount`, `useMarkdown`, `folderCounterMode`: `hidden` / `directOnly` / `recursive`). Persisted JSON in `app_settings`. |
+| `calendar_date_picker.dart` | Date+time picker; `formatTaskDate` / `formatDoTime` helpers; returns `(DateTime?, int?)?` — outer null = barrier dismiss, `(null, null)` = No Date, `(date, time?)` = selection. |
+| `task_controller.dart` | (see Controllers above) |
+| `task_row.dart` | `TaskRow` + `TaskDeleteBackground` + `taskProxyDecorator` shared across list views. |
 
-**TaskController ordering**: `inboxTasks`, `tasksForList`, and `todayTasks` all pass through `_completedLast()` — incomplete tasks first, completed at the bottom. Unchecking a task restores it to the incomplete group (not its original position).
+**Ordering**: `inboxTasks`, `tasksForList`, `todayTasks` all pass through `_completedLast()` — incomplete first, completed at the bottom. Unchecking restores to the incomplete group, not the original position.
 
-**`todayTasks` / `todayUncompletedCount`**: includes all tasks where `dueDate` (normalized to midnight) is ≤ today — i.e. today's tasks plus any overdue tasks. `todayUncompletedCount` derives from `todayTasks`, so the iOS app badge automatically counts overdue uncompleted tasks.
+**Smart list visibility rules** in `tasks_view.dart` are driven by `SmartListVisibility` enum on each `SmartListPrefs` field: `show` always, `showIfNotEmpty` only when populated, `hidden` never.
 
-**`TaskSortOrder` enum**: `defaultOrder | creationDate | name | priority | dateTime`. Only `defaultOrder` enables drag-reorder; other sort orders disable `SliverReorderableList` (`enabled: false` on the listener).
-
-**Smart list visibility rules** in `tasks_view.dart`:
-- **Completed**: shown only when `controller.completedTasksCount > 0`
-- **Trash**: shown only when there is at least one trashed task, list, or folder
-
-**Dismissal pattern for lists/folders**: Uses `Dismissible.confirmDismiss` → `CupertinoAlertDialog` asking "Move to Trash?"; returns `false` (bounces back) on cancel. The `onDismissed` callback then calls the appropriate soft-delete on the controller.
-
-**List/folder row items** (`_ListItem` in `tasks_view.dart`, `_FolderListItem` in `folder_view.dart`): no chevron icon — rows show icon + label + optional uncompleted count only. `_ListItem` accepts either `iconAsset` (PNG path), `iconId` (SF-symbol key via `buildFolderItemIcon`), or `iconWidget` (arbitrary widget, used for Completed/Trash).
+**Dismissal pattern** for lists/folders: `Dismissible.confirmDismiss` → `confirmMoveToTrash` Cupertino dialog → `onDismissed` calls the appropriate soft-delete + `UndoController.show(...)` with a revert callback.
 
 ### Folders feature (`lib/src/folders/`)
 
 | File | Purpose |
 |------|---------|
-| `folder_view.dart` | Subfolder/list browser inside a folder; reorderable via `SliverReorderableList`; swipe-to-delete with `confirmDismiss` dialog; bottom `+` button opens `CreateFolderListSheet` scoped to this folder |
-| `list_task_view.dart` | Task list for a named list; sets `activeListId` on enter/exit so the global `+` pre-fills the list; dropdown menu for icon/color change |
-| `folder_controller.dart` | Owns `_folders`, `_lists`, `_trashedFolders`, `_trashedLists`; soft-delete and restore; recursive `deleteFolderDeep` |
-| `folder_icon_picker.dart` | Custom icon storage and rendering. `initFolderIconService()` caches docs dir at startup. `buildFolderItemIcon(iconId, isFolder)` renders a 22×22 icon (file image, SF-symbol, or default PNG). `isCustomIconId(iconId)` / `resolveCustomIconPath(iconId)` — path helpers. `showFolderIconPickerSheet` — modal picker that writes relative paths (`icons/<ts>.<ext>`). |
-| `create_folder_list_sheet.dart` | `showCreateFolderListSheet` — bottom sheet to create a new folder or list, optionally scoped to a parent folder |
-| `list_color_picker.dart` | Color swatch picker for list accent color |
+| `folder_view.dart` | Subfolder/list browser; reorderable; swipe-to-delete with confirm; Plus drop targets; long-press → `showSelectionMenu` for edit/delete/move/icon. Plus-button drop on a folder row routes to `_handleDropOnFolder`. Hovering a folder row for 1.5 s while dragging auto-expands it (drag-traversal aid). |
+| `list_task_view.dart` | Task list for a named list (or Birthdays — renders `ContactListView` instead); sets `activeListId` on enter/exit. Sections (collapsible) + implicit "Completed" virtual section at bottom. Long-press a section header → `showSelectionMenu` for rename/delete. Multi-select via `SelectableTaskListShell`. |
+| `folder_controller.dart` | (see Controllers above) |
+| `folder_icon_picker.dart` | Custom icon storage; `initFolderIconService`, `buildFolderItemIcon`, `isCustomIconId`, `resolveCustomIconPath`, `showFolderIconPickerSheet`. |
+| `create_folder_list_sheet.dart` | `showCreateFolderListSheet` — bottom sheet to create a new folder or list (with `listType` chooser), optionally scoped to a parent folder. |
+| `list_color_picker.dart` | Color swatch picker for list accent color. |
+| `list_picker_sheet.dart` | Hierarchical folder/list browser (used by Task Detail's "List" row and the multi-select Move action). |
+| `move_to_sheet.dart` | Similar picker for drag-drop destinations; excludes current and ancestor folders. |
+| `section_name_sheet.dart` | Inline name dialog for adding / renaming sections within a list. |
+
+### Notes feature (`lib/src/notes/`)
+
+| File | Purpose |
+|------|---------|
+| `notes_view.dart` | Tab root; folder tree + flat notes at root + Trash row (visibility per `SmartListPrefs.notesTrash`). Plus drop targets on every folder row and on the empty root. Multi-select (`SelectableNoteListShell`-style) for batch delete / move. Long-press a note row to drag it between folders (drop targets highlight). |
+| `note_folder_view.dart` | Inside-folder browser; same affordances as the root. |
+| `note_detail_view.dart` | Full editor; markdown preview ↔ edit toggle (driven by `SmartListPrefs.notesUseMarkdown`). Autosave (3 s debounce + on blur / disposal). `MarkdownToolbar` shown above keyboard while editing. ⋯ menu → Move, Share, Info, Delete. `routeName = NoteDetailView.routeName`. |
+| `markdown_view.dart` | Read-only markdown renderer using `flutter_markdown`; intercepts `http`, `mailto`, `tel`, and custom schemes via `url_launcher`. |
+| `markdown_toolbar.dart` | Keyboard accessory with **bold**, *italic*, ~~strike~~, `code`, [link](url) buttons — wraps selection or inserts at cursor. |
+| `note_widgets.dart` | Shared row widgets: `NoteFolderRow`, `NoteRow` (first-line preview with lightweight inline-markdown stripping). |
+| `note_share.dart` | `showNoteShareMenu` — exports current note as plain text, PDF (via `pdf` package), or PNG image (renders markdown to canvas), shares via `share_plus`. |
+| `note_trash_view.dart` | Trashed notes + folders; same swipe-right / swipe-left pattern as task Trash. |
+| `create_note_folder_sheet.dart` | Icon + name sheet for new note folders. |
+| `note_controller.dart` | (see Controllers above) |
+
+### Routines feature (`lib/src/routines/`)
+
+| File | Purpose |
+|------|---------|
+| `routine_icons.dart` | `kRoutineIconPresets` — 16 `(iconId, colorARGB)` preset combos; `routineIconData(iconId)` maps string keys to `CupertinoIcons`. |
+| `routine_controller.dart` | (see Controllers above) |
+| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; reused for editing (`existing` param). Sections: name+icon, icon preset grid, Frequency (segmented + weekday chips or days-after input + auto-reset), Goal (segmented + amount/unit/record fields). |
+| `routines_view.dart` | Tab root; `todayRoutines` list with `_RoutineRow` items; swipe-to-delete; tap → `recordProgress`; long-press → `showSelectionMenu` (edit / delete). Empty-state prompt. |
+
+**Row layout**: 40 px colored circle icon (dimmed + check overlay when `achieve_all` complete) · name (strikethrough when complete) · right-aligned `_ProgressBadge` for `certain_amount`.
+
+**Unit picker**: `_UnitPickerSheet` offers presets (`ml`, `L`, `oz`, `count`, `minute`, `hour`, `km`, `mi`, `page`, `cup`, `lap`, `step`) plus a free-text "Custom…" option.
+
+### Calendar feature (`lib/src/calendar/`)
+
+`CalendarView` uses `CustomScrollView(center: _centerKey)` for true bidirectional infinite scroll (~600 months back / forward each ≈ 50 years).
+
+- **Why `center:`** — anchors the viewport at the current month (scroll offset 0); past months build lazily only when the user scrolls up.
+- **Layout**: `CupertinoPageScaffold` + standard nav bar showing `_visibleYear` (updated by scroll listener using `_avgMonthPx ≈ 481`) + fixed `_WeekdayHeader` (Mon–Sun) + `Expanded(CustomScrollView(...))`.
+- **Reset signal**: `animateTo(0.0)` snaps back to the current month when the Calendar tab is re-tapped.
+- **Day cells**: 88 px min height, up to 3 chips + `+N` overflow. Monday-first grid.
+- **Pull-to-search**: when `db` + `noteController` are wired, the view is wrapped in `SearchPullScope` so a downward overscroll reveals a search bar that latches open at 30 % reveal and pushes `SearchView`.
+
+**Chip rendering** uses a sealed `_ChipData` union — `task | event | remoteEvent | birthday`. Render order per day cell:
+1. Local `Event` (blue)
+2. `RemoteEvent` (Google calendar color, gray if past)
+3. Birthday `Contact` (pink `0xFFFF2D55`)
+4. Incomplete `Task` (list color or accent)
+5. Completed `Task` (gray)
+
+Past events are dimmed via `_eventIsPast` / `_remoteEventIsPast`. The `_pastColor = Color(0xFF8E8E93)` is used by both `calendar_view.dart` and `day_view_sheet.dart`.
+
+**Drop targets**: each day cell is a `PlusDropTarget` that accepts `PlusDragPayload`, routing to `_handleDropOnDay` in `HomeShell` which opens a Task/Event picker.
+
+`day_view_sheet.dart` — modal sheet for the tapped day; shows tasks + events + remote events + birthdays + an inline creation picker. Receives `contactController` so it can list birthdays and route creation to `showContactCreationSheet` when the user picks "Birthday".
+
+`event_creation_sheet.dart` / `event_detail_view.dart` — local event creation + editor. Detail also supports duration / reminder offsets.
+
+### Google Calendar integration (`lib/src/integrations/google/`)
+
+Lets users view their Google Calendar events alongside Planom events and create/edit/delete events in their existing Google calendars. **No-duplication invariant:** a Google event lives only in Google (in memory + on-disk JSON cache for offline display); a Planom event lives only in SQLite. Neither store ever writes into the other. `CalendarView` and `DayViewSheet` merge the two streams in the view layer.
+
+| File | Purpose |
+|------|---------|
+| `oauth_config.dart` | `kGoogleIosClientId`, `kGoogleAndroidClientId`, `kGoogleServerClientId`, `kGoogleCalendarScopes`, `isGoogleSignInConfigured`. |
+| `google_auth_service.dart` | Wraps `google_sign_in`. `trySilentSignIn`, `signIn`, `signOut`, `authClient()`. |
+| `google_calendar_api.dart` | Thin wrapper over `googleapis` `CalendarApi`. `listCalendars`, `listEvents` (incremental via syncToken), `insertEvent`, `patchEvent`, `deleteEvent`. |
+| `remote_event.dart` | `RemoteEvent` model (in-memory only), `GoogleCalendarMeta`, `RemoteEventDraft`, Google ↔ Planom field mapping (incl. exclusive-end-date handling for multi-day all-day events). |
+| `google_calendar_cache.dart` | Best-effort JSON snapshot at `<docs>/google_calendar_cache.json` — populates the calendar on cold start before refresh completes, and used when offline. |
+| `google_calendar_controller.dart` | `ChangeNotifier`. `load`, `connect`, `disconnect`, `refreshCalendars`, `setSelectedCalendars`, `setDefaultCalendar`, `eventsForDate`, `refresh`, `createEvent`, `updateEvent`, `deleteEvent`. |
+| `lib/src/settings/google_calendar_settings_view.dart` | Connect/disconnect, calendar checklist, default-calendar picker, "Sync now", last-synced timestamp, error banner. |
+| `lib/src/calendar/remote_event_detail_view.dart` | Full-screen editor for a remote event. Read-only calendars disable the fields and expose an "Open in Google Calendar" button via `url_launcher`. |
+
+**Controller lifetime:** instantiated globally in `main.dart` alongside `SettingsController`/`SecurityService` — **NOT** inside `SpaceManager`. The Google connection is shared across every space.
+
+**Sync strategy:** on connect, Planom fetches all calendars + first window of events (6 months back, 18 months forward) and stores a `nextSyncToken` per calendar. Subsequent refreshes are incremental — on `410 Gone` the controller falls back to a full window re-fetch. `refresh()` is called on `load()` (after silent sign-in succeeds), after `setSelectedCalendars`, and from the "Sync now" row in settings.
+
+**Event creation:** `EventCreationSheet` shows a calendar-picker row when the user is signed in and has at least one writable, selected calendar. The picker contains `Planom (local)` plus each selected calendar; the default is the user-configured default. Picking Planom calls `EventController.addEvent`; picking a Google calendar calls `GoogleCalendarController.createEvent`. No event is ever written to both stores.
+
+**Read-only calendars** (subscribed holidays, shared-view) surface as `RemoteEvent.isReadOnly = true`. The detail view disables editable fields and only exposes "Open in Google Calendar".
+
+**iOS setup required:** replace placeholders in `ios/Runner/Info.plist` (`GIDClientID` + the reversed-client-ID `CFBundleURLSchemes` entry) and set `kGoogleIosClientId` in `oauth_config.dart`. Until those are filled in, `isGoogleSignInConfigured` returns false and the settings page shows a "setup required" state — no network calls attempted.
+
+### Contacts feature (`lib/src/contacts/`) — new
+
+Lists with `listType = ListType.birthdays` render contacts instead of tasks. Contacts are first-class entities split from `Task` in DB v25; the migration moves any existing birthday tasks into the new `contacts` table and recreates `tasks` without the birthday columns.
+
+| File | Purpose |
+|------|---------|
+| `contact_controller.dart` | (see Controllers above) |
+| `contact_creation_sheet.dart` | Modal sheet — name, date (with year-toggle), optional note, optional reminder offsets. |
+| `contact_detail_view.dart` | Full editor with autosave; toggle isCompletable, manage reminders. |
+| `contact_list_view.dart` | Birthday list view; grouped by celebration year (this year first, then next), age shown if `birthYear` is set. |
+| `contact_row.dart` | Row with pink gift icon (or gray checkbox if `isCompletable` + completed), name, celebration date, age, optional note snippet. |
+
+Plus-button drop on a Birthdays-type list opens `showContactCreationSheet` instead of the task sheet (handled in `HomeShell._handleDropOnList`). Birthday chips appear on the relevant day in `CalendarView` via `ContactController.contactsForDate(date)`.
+
+### Search feature (`lib/src/search/`) — new
+
+Global full-text search across tasks, notes, and events using SQLite FTS5.
+
+| File | Purpose |
+|------|---------|
+| `search_view.dart` | Full-screen search; `CupertinoSearchTextField` → debounced (200 ms) `DatabaseService.searchAll`. Results grouped by Tasks / Notes / Events. Tap task / note → detail; events are read-only previews. |
+| `search_pull_scope.dart` | Gesture detector wrapper for scroll views. On overscroll/bounce-back it animates a hidden search bar from the top; >30 % reveal on release latches it open. Tap the bar → `SearchView`. Currently wired into `CalendarView`. |
+
+Contacts are intentionally **not** indexed for search yet.
+
+### iOS widgets (`lib/src/widgets/` + `ios/PlanomWidget/`) — new
+
+Home-screen / lock-screen widgets via the `home_widget` plugin. The Flutter app
+serialises the **active space's** "Today" data to JSON and writes it into a
+shared App Group (`group.app.planom`); a WidgetKit/SwiftUI extension reads it
+back and renders. The extension never touches the DB — it's a pure view over
+the pushed snapshot. Gated to iOS via `PlatformCapabilities.supportsHomeWidgets`
+(every Flutter path is a safe no-op elsewhere).
+
+**Flutter side** (`lib/src/widgets/`):
+| File | Purpose |
+|------|---------|
+| `widget_keys.dart` | Shared constants — App Group id, payload key, iOS widget `kind`s, deep-link scheme/hosts. **Mirror of the Swift `WidgetData.swift` / `WidgetLink` constants.** |
+| `widget_data_builder.dart` | Pure builder: controllers + accent/locale → JSON map the native side decodes. Reused by both the foreground push and the headless interactivity isolate, so output is identical. Today tasks (incl. overdue), today events (timed first), today routines (+progress/done), birthdays, counts, localized labels, accent/completion colors. |
+| `home_widget_service.dart` | `HomeWidgetService.init()` (sets App Group + registers the interactivity callback) and `pushFromControllers(...)` (build → `saveWidgetData` → `updateWidget` per kind). Also the `@pragma('vm:entry-point') widgetInteractivityCallback` (iOS 17+) which opens the active DB directly, applies the mutation, and re-publishes. |
+| `widget_sync_coordinator.dart` | Listens to `SpaceManager` (re-attaches on space switch) + the active space's controllers + `SettingsController`; debounced (600 ms) `pushNow()`. Started once in `main.dart`. |
+| `widget_deep_link.dart` | Global `ValueNotifier<Uri?> widgetDeepLink` fed by `HomeWidget.initiallyLaunchedFromHomeWidget()` + `widgetClicked`. Consumed by `HomeShell._handleWidgetUri` (switches tab / opens creation sheet / toggles a task / records a routine). |
+
+**Native side** (`ios/PlanomWidget/`): `PlanomWidgetBundle.swift` (`@main`, 4 widgets), `WidgetData.swift` (Codable payload + `WidgetStore` UserDefaults loader + `WidgetLink` deep-link builder + sample data), `Provider.swift` (shared `TimelineProvider`, refreshes on the half-hour / midnight), `WidgetViews.swift` (rows + per-family layouts + lock-screen accessory views). Widgets: `PlanomTodayTasksWidget` (small/medium/large + accessory circular/rectangular/inline), `PlanomAgendaWidget` (medium/large, tasks+events merged chronologically), `PlanomRoutinesWidget` (small ring / medium / large), `PlanomStatsWidget` (small counts). See `ios/PlanomWidget/README.md` for the one-time App Group / signing setup.
+
+**Key invariants**: the App Group id and `kind` strings must stay in sync between `widget_keys.dart` and the Swift files; deep-link URLs must carry a `homeWidget` query item or the plugin won't forward them; the extension's deployment target is iOS 14 (lock-screen accessories need 16, interactive controls need 17). Tested via `test/widget_data_builder_test.dart` (the only device-independent slice).
 
 ### Settings feature (`lib/src/settings/`)
 
 | File | Purpose |
 |------|---------|
-| `settings_controller.dart` | `ChangeNotifier` managing `ThemeMode`, accent color, completion color, font, per-tab visibility, and smart list prefs. Color/font changes mutate `AppColors` statics and call `notifyListeners()` to trigger a full `CupertinoApp` rebuild. |
-| `settings_service.dart` | Persists `ThemeMode` to `SharedPreferences` |
-| `settings_view.dart` | Settings tab root (`StatefulWidget`); **Appearance** section (taps → `AppearanceView`); **Font** row (taps → `FontPickerView`); **Tab Bar** section; **Data** section with Export/Import Backup. Loading spinner shown in place of chevron while operation is in progress. |
-| `appearance_view.dart` | Full-screen settings sub-page pushed from Settings → Appearance. Three sections: **Theme** (Light/System/Dark segmented control), **Accent Color** (12 swatches via `_ColorSwatchRow`), **Completion Color** (7 swatches). Each swatch is a 36×36 circle; selected swatch shows a border + checkmark. Color changes call `settingsController.updateAccentColor` / `updateCompletionColor`. |
-| `font_picker_view.dart` | Full-screen Google Fonts browser. Shows all ~1500 fonts in a lazy `ListView.builder`; `CupertinoSearchTextField` filters by key or display name. Connectivity is checked on init via `InternetAddress.lookup('fonts.gstatic.com')`; offline shows a warning banner. Offline + uncached fonts are grayed out (no preview, no tap). When online, each rendered row is marked cached in `FontCache`. `⋯` nav-bar button (anchored `topRight`) → "Edit Preview Text" dialog. Selection calls `settingsController.updateFontKey(key)`. |
-| `font_cache.dart` | `FontCache` singleton. Persists `Set<String>` of seen font keys + custom preview text to `<docsDir>/font_cache.json`. Key methods: `load()`, `isCached(key)`, `markCached(key)`, `setPreviewText(text)`, `previewText` getter. Used by `FontPickerView` to determine which fonts are available offline. |
-| `backup_service.dart` | `exportBackup()` — serialises all data + custom icon image bytes to `.planom` JSON, shares via share sheet. `importBackup()` — picks a file, validates, restores icon files, clears DB, re-inserts data, reloads all controllers. |
+| `settings_controller.dart` | (see Controllers above) |
+| `settings_service.dart` | Persists `ThemeMode` to `SharedPreferences`. |
+| `settings_view.dart` | Settings tab root — sections: Appearance, Font, Tab Bar, Tasks (field prefs), Notes, Notifications, Security, Sync, Data, Storage, Spaces, Google Calendar, About. |
+| `settings_menu.dart` / `settings_widgets.dart` | Reusable row/section building blocks (link rows, switch rows, info rows). |
+| `appearance_view.dart` | Theme (Light/System/Dark), 12-swatch accent, 7-swatch completion color. |
+| `font_picker_view.dart` | Browses all ~1500 Google Fonts. `CupertinoSearchTextField` filters. Connectivity check (`InternetAddress.lookup('fonts.gstatic.com')`); offline + uncached fonts grayed out. ⋯ → "Edit Preview Text". |
+| `font_cache.dart` | `FontCache` singleton; persists `Set<String>` of seen keys + custom preview text to `<docsDir>/font_cache.json`. |
+| `module_settings_views.dart` | Per-module setting screens (Tasks field visibility, Notes markdown toggle, etc.). |
+| `tasks_settings_view.dart` | Tasks-module screen — toggles for individual `TaskFieldPrefs` fields, folder-count mode, hide-tab-labels, show-add-folder-button. |
+| `notifications_view.dart` | Permission gate + per-feature toggles (badge, reminders). |
+| `security_view.dart` | PIN/password setup, biometric toggle (gated by `supportsBiometricAuth`), change-password flow. |
+| `sync_settings_view.dart` | Backend picker (iCloud / disabled), passphrase setup, manual "Push now" / "Pull now", last-synced timestamp. |
+| `spaces_view.dart` | Add / rename / delete / switch space; refuses to delete default or last remaining space. |
+| `storage_view.dart` | Per-space storage breakdown + "Clear Fonts Cache" / "Clear Temp" / "Clear Orphan Icons" actions. |
+| `storage_analyzer.dart` | `analyzeSpace(...)`, `analyzeCustomIcons`, `analyzeFontsCache`, `analyzeTempCache`, `clearFontsCache`, `clearTempCache`, `clearOrphanIcons(referenced)`. DB-bucket sizes are estimated via `utf8.encode(jsonEncode(rows)).length`; file buckets are actual sizes. |
+| `data_view.dart` | Export Backup, Import Backup, Reset User Data (confirms hard, then `BackupService.hardReset`). |
+| `backup_service.dart` | (see Controllers above) |
+| `backup_crypto.dart` | AES-256-GCM + PBKDF2 envelope encryption (see Sync). |
+| `smart_list_prefs.dart` | `SmartListPrefs` — `today` / `tomorrow` / `upcoming` / `allTasks` / `completed` / `trash` / `notesTrash` visibility (`show` / `showIfNotEmpty` / `hidden`), `hideTabLabels`, `showAddFolderButton`, `showNotesAddFolderButton`, `notesUseMarkdown`. Stored as `<docsDir>/smart_list_prefs.json`; included in backup payloads. |
+| `google_calendar_settings_view.dart` | (see Google Calendar) |
 
 **Appearance color presets:**
 ```dart
@@ -363,77 +617,102 @@ Routine DB schema:
 
 ### Font system (`lib/src/theme/app_fonts.dart`)
 
-- `kSystemFontKey = '__system__'` — sentinel for the platform default font
-- `fontDisplayName(key)` — converts a camelCase Google Fonts key to a human-readable name (e.g. `'playfairDisplay'` → `'Playfair Display'`); handles numeric suffixes
-- `_applyFont(key, base)` — looks up the key in `GoogleFonts.asMap()` and applies it to a `TextStyle`; falls back to `base` for `kSystemFontKey` or unknown keys
-- Font is stored as `fontKey` in `SettingsController` and applied via the `CupertinoTheme`'s `textTheme` — the `ListenableBuilder` wrapping `CupertinoApp` rebuilds when the font changes
+- `kSystemFontKey = '__system__'` — sentinel for the platform default font.
+- `fontDisplayName(key)` — converts camelCase Google Fonts key to a human-readable name (handles numeric suffixes like `'sourceSans3'` → `'Source Sans 3'`).
+- `buildCupertinoTextTheme(fontKey)` — builds a `CupertinoTextThemeData` with the font applied to every Cupertino text role; returns defaults for `kSystemFontKey` or unknown keys.
 
-### Routines feature (`lib/src/routines/`)
+### Design tokens (`lib/src/theme/app_theme.dart`)
 
-| File | Purpose |
-|------|---------|
-| `routine_icons.dart` | `kRoutineIconPresets` — 16 `(iconId, colorARGB)` preset combos; `routineIconData(iconId)` maps string keys to `CupertinoIcons` constants |
-| `routine_controller.dart` | `ChangeNotifier`; owns `_routines` + `_entries` lists; computes `todayRoutines`, progress, completion state |
-| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; also used for editing (`existing` param). Sections: name+icon row, icon picker grid, Frequency (segmented + weekday chips or days-after input + auto-reset), Goal (segmented + amount/unit/record fields) |
-| `routines_view.dart` | Tab root; `todayRoutines` list with `_RoutineRow` items; swipe-to-delete (`Dismissible`); tap → `recordProgress`; long-press → `showSelectionMenu` with edit/delete options; empty state with prompt |
+Use the statics — never hard-code these values at call sites.
+- `AppColors.accent` — mutable `static Color` (default `0xFFFF4D00`); user-configurable via Settings → Appearance → Accent Color; **not `const`** — do not use in `const` widget constructors.
+- `AppColors.systemGreen` — mutable `static Color` (default `0xFF34C759`); user-configurable via Settings → Appearance → Completion Color; **not `const`**.
+- `AppColors.shadow` — `static const Color(0x30000000)` — dropdown / panel drop-shadow (still const).
+- `AppDurations.transition` — `Duration(milliseconds: 180)` — standard page transition; baked into `FastRoute`.
+- Active tab label/icon: `CupertinoColors.label`; inactive: `CupertinoColors.secondaryLabel` (dynamic — resolve correctly in light/dark).
+- Checkbox: 22×22 rounded rect (radius 6), filled accent when checked. Top-aligned with the first line of the task title.
 
-**Routine row layout**: 40px colored circle icon (dimmed + checkmark overlay when `achieve_all` complete) · name (strikethrough when complete) · right-aligned `_ProgressBadge` showing `"progress/goal unit"` (only for `certain_amount`)
-
-**Icon system**: `iconId` is a string key (e.g. `'drop.fill'`, `'heart.fill'`) stored in `Routine.iconId` (inherited from `AppItem`). `iconColor` is a separate ARGB int field on `Routine`. Together they describe a filled colored circle with a white icon inside. The 16 presets in `kRoutineIconPresets` are shown as a `Wrap` grid in the creation view.
-
-**Unit picker**: `_UnitPickerSheet` (modal bottom sheet) offers preset units (`ml`, `L`, `oz`, `count`, `minute`, `hour`, `km`, `mi`, `page`, `cup`, `lap`, `step`) plus a "Custom…" option with a free-text field.
-
-**`autoReset` semantics**:
-- `'everyday'`: each new day's entry starts at 0 (default behavior since entries are per-day)
-- `'none'`: for `achieve_all` — shows as completed if any historical completion exists (persists across days until toggled off); for `certain_amount` — carries over the last entry's amount as today's starting value
-
-### Calendar feature (`lib/src/calendar/`)
-
-`CalendarView` uses `CustomScrollView(center: _centerKey)` for true bidirectional infinite scroll (600 months back + current + 600 forward ≈ 50 years each way):
-
-- **Why `center:`**: `SliverList` with variable-height items must build all preceding items before showing any given offset. With a large `initialScrollOffset`, Flutter would need to pre-build hundreds of off-screen months. Using `CustomScrollView(center: _centerKey)` anchors the viewport at the current month (scroll offset 0) — past months build lazily only when the user scrolls up.
-- **Layout**: `CupertinoPageScaffold` with standard `CupertinoNavigationBar` (shows `_visibleYear`, updated by scroll listener using `_avgMonthPx ≈ 481` approximation) + a fixed `_WeekdayHeader` row (Mon–Sun) + `Expanded(CustomScrollView(...))`.
-- **Past SliverList**: laid out bottom-to-top by Flutter. Index 0 = last month (sits just above current), index N = N+1 months ago (further up).
-- **Reset signal**: `animateTo(0.0)` snaps/animates back to the current month.
-- **Day cells**: 88px min height, up to 3 task/event chips (uncompleted tasks only, plus events) + `+N` overflow label. Monday-first grid.
-
-**Past event visual treatment** in both `calendar_view.dart` and `day_view_sheet.dart`:
-- `_eventIsPast(Event event)` — returns `true` when the event's end moment is before `DateTime.now()`. For timed events: `event.date + Duration(minutes: event.doTime! + (event.duration ?? 0)) < now`. For all-day events: `event.date (midnight) < today (midnight)`.
-- In `calendar_view.dart`: past `_EventChip` uses `_pastColor = Color(0xFF8E8E93)` (gray) instead of the active blue.
-- In `day_view_sheet.dart`: past `_EventCard` uses `_pastAccent = Color(0xFF8E8E93)` for the left border/dot; title uses `secondaryLabel` color.
-
-### Design tokens
-
-All colors and durations live in `lib/src/theme/app_theme.dart`. Use the statics — never hard-code these values at call sites.
-- `AppColors.accent` — mutable `static Color` (default `Color(0xFFFF4D00)`); user-configurable via Settings → Appearance → Accent Color; **not `const`** — do not use in `const` widget constructors
-- `AppColors.systemGreen` — mutable `static Color` (default `Color(0xFF34C759)`); user-configurable via Settings → Appearance → Completion Color; **not `const`**
-- `AppColors.shadow` — `static const Color(0x30000000)` — dropdown / panel drop-shadow (still const)
-- `AppDurations.transition` (180 ms) — standard page transition; baked into `FastRoute`
-- Active tab label/icon: `CupertinoColors.label`; inactive: `CupertinoColors.secondaryLabel` (dynamic — resolve correctly in light/dark)
-- Checkbox: 22×22 rounded rect (radius 6), filled accent when checked
-
-**`const` warning**: Because `AppColors.accent` and `AppColors.systemGreen` are mutable statics, any widget tree that references them cannot use `const`. Remove `const` from the nearest enclosing constructor whenever you add a reference to these colors.
+**`const` warning**: because `AppColors.accent` / `AppColors.systemGreen` are mutable statics, any widget tree referencing them cannot be `const`. Remove `const` from the nearest enclosing constructor whenever you add a reference.
 
 ### Shared utilities (`lib/src/utils/`)
 
-- `fast_route.dart` — `FastRoute<T>` `CupertinoPageRoute` subclass with 180 ms transition. **Always use FastRoute, never bare `CupertinoPageRoute`.**
-- `dropdown_overlay.dart` — `DropdownOverlayMixin` on `State<T>`: provides `showDropdown(context, builder)` that inserts an `OverlayEntry`, exposes a `dismiss()` callback to the builder, and auto-removes the entry in `dispose()` so the overlay can't leak when the host route is popped while the menu is open.
-- `selection_menu.dart` — **unified selection menu** replacing all `CupertinoActionSheet` usage. `showSelectionMenu<T>({context, options, current?, title?, anchor})` returns `Future<T?>` (null = dismissed). Options are `SelectionMenuOption<T>(value, label, icon?, isDestructive)`. Two anchor modes:
-  - `SelectionMenuAnchor.center` (default) — centered overlay with max width 280; used for row-triggered pickers (sort order, font, language, duration)
-  - `SelectionMenuAnchor.topRight` — pinned `top: safeTop + 44 + 4, right: 8, width: 220`; used for nav-bar `⋯` button menus (trash, notes trash, font picker)
-  - No backdrop dimming; full-screen `GestureDetector(HitTestBehavior.opaque)` dismisses on outside tap. Uses `Completer<T?>` internally.
-- `confirm_dialogs.dart` — `confirmMoveToTrash(context, name:, body:, isFolder:)` returns `Future<bool>`; the canonical "Move to Trash?" Cupertino dialog used by every soft-delete site.
-- `item_info_sheet.dart` — `showItemInfoSheet(context, ...)` modal showing creation/modified/completion dates for a task/note/folder.
+- `fast_route.dart` — `FastRoute<T> extends CupertinoPageRoute<T>` with 180 ms transition. **Always use FastRoute, never bare `CupertinoPageRoute`.**
+- `platform_capabilities.dart` — `PlatformCapabilities` predicates (see Platforms).
+- `dropdown_overlay.dart` — `DropdownOverlayMixin` on `State<T>`: provides `showDropdown(context, builder)` that inserts an `OverlayEntry`, exposes a `dismiss()` callback, and auto-removes the entry in `dispose()` so the overlay can't leak when the host route is popped.
+- `dropdown_row.dart` — `DropdownRow` widget (leading icon + label + optional destructive color); used inside dropdown overlays and ⋯ menus.
+- `selection_menu.dart` — **unified selection menu** replacing all `CupertinoActionSheet` usage. `showSelectionMenu<T>({context, options, current?, title?, anchor})` returns `Future<T?>`. Anchors:
+  - `SelectionMenuAnchor.center` (default) — centered overlay with max width 280; used for row-triggered pickers.
+  - `SelectionMenuAnchor.topRight` — pinned `top: safeTop + 44 + 4, right: 8, width: 220`; used for nav-bar ⋯ menus.
+- `confirm_dialogs.dart` — `confirmMoveToTrash(context, {name, body?, isFolder})` and `confirmHardDelete(context, {title, body, confirmLabel?})` — canonical Cupertino confirmation dialogs.
+- `item_info_sheet.dart` — `showItemInfoSheet(context, {creationDate, modifiedDate?, completionDate?})` — small modal showing the relevant timestamps.
+- `duration_picker.dart` — `showDurationPicker(context, current?)` returns `Future<int?>` (null = cleared / no change). Presets 15m, 30m, 45m, 60m, 90m, 120m, 180m, 240m, plus Custom (CupertinoTimerPicker). `formatDuration(int minutes)` → human-readable string.
+- `reminder_picker.dart` — `showReminderPicker(context, current)` returns `Future<List<int>?>` (null = cancelled). Sections: "Before" (at time / 5/10/15/30 min / 1/2 h / 1 d before / custom) and "After" (1 h / 1 d / custom). `formatReminderOffsets(offsets, S)` — summary string.
+- `reorder_drag.dart` — standardised long-press reorder UI:
+  - `ReorderDragData<T>` — typed payload (`folder`, `list`, `noteFolder`, `note`) so folder drags can't accidentally hit note targets.
+  - `ReorderableRow` — wraps a row in a 400 ms `LongPressDraggable`; lifted feedback is a rounded card with shadow; original fades to 30 % opacity.
+  - `ReorderableDropZone` — `DragTarget` paired with a row; shows a 2 px accent line at the top of the target on valid hover.
+  - `ReorderableTrailingSlot` — invisible 12 px end-of-list drop zone; shows the accent bar on hover.
+- `selection_controller.dart` — multi-select state. `SelectionController` extends `ChangeNotifier`; tracks `active`, `selectedIds`, `kind` (`SelectionItemKind { task, note, folder, list, contact, mixed }`). Kind locks to the first item; mismatched toggles are ignored so the UI stays consistent.
+- `selection_toolbar.dart` — bottom toolbar shown while selection is active. `SelectionAction { label, icon, onTap, isDestructive }`. Sized to clear the tab bar via `bottomInset`.
+- `selection_checkbox.dart` — iOS Reminders/Mail-style filled-circle checkbox; uses `AppColors.accent`.
+- `plus_drag_controller.dart` / `plus_drag_payload.dart` — `PlusDragController` carries optional callbacks (`onDropOnList`, `onDropOnFolder`, `onDropOnSection`, `onDropOnDay`, `onDropOnNoteFolder`, `onDropOnNotesRoot`, `onDropOnSmartList`, `onDropOnAddFolderButton`, `onDropOnNotesAddFolderButton`) exposed through `PlusDragScope` (InheritedWidget). `PlusDropTarget` wraps a widget in a `DragTarget<PlusDragPayload>` that highlights on hover (orange-tinted box) and calls `onAccept` on drop. `PlusDropSmartList` enum identifies smart-list drop variants.
+- `undo_controller.dart` — `UndoController` (`ChangeNotifier`) + `UndoScope` (InheritedWidget) + `UndoBanner` widget. `controller.show({label, onUndo})` schedules a 5-second banner with a Revert button; latest call wins (rapid-fire deletes don't pile up — only the most recent banner counts down). Used by every soft-delete site (`UndoScope.of(context).show(...)`) and by event delete (which doesn't soft-delete but still wants revert).
 
-**Duration picker pattern** (used in task detail, task creation, event detail, event creation): `showSelectionMenu<int>` with preset minute values plus a sentinel `value: -1, isDestructive: true` for "No Duration / Clear". Callers: `if (result == null) return currentValue; if (result == -1) return null; return result;`
+**Duration picker pattern** (task detail, task creation, event detail, event creation): `showSelectionMenu<int>` with preset minutes plus a sentinel `value: -1, isDestructive: true` for "No Duration / Clear". Callers: `if (result == null) return currentValue; if (result == -1) return null; return result;`.
+
+### Selection mode (multi-select) pattern
+
+Selection mode is the canonical batch-action UX, available on Inbox, Today, Tomorrow, Upcoming, All Tasks, Completed, every user list/section, the Tasks root (folders + lists), Notes root, and every note folder.
+
+1. User taps "Select" in the nav-bar ⋯ menu.
+2. View instantiates a `SelectionController` (kind-locked on first toggle) and rebuilds with a checkbox in front of every row + a `SelectionToolbar` at the bottom.
+3. Rows tap to toggle (also the checkbox itself toggles); mismatched-kind rows are ignored silently.
+4. Batch actions on the toolbar iterate `controller.selectedIds`; common operations are delete (with `UndoController.show` covering the bulk), toggle complete, set due date, and move to list/folder.
+5. "Cancel" in the nav bar clears the selection and exits the mode.
+
+`SelectableTaskListShell` is the shared shell used by every smart task list; it takes a `tasks()` lambda so it always renders the current state of the controller.
+
+### Plus-button drag pattern
+
+The floating accent-colored `+` button can be **dragged** instead of tapped. Drop it on:
+- A list row → opens task creation scoped to that list (or contact creation if it's a Birthdays list).
+- A folder row → opens task creation (the user can still pick a list inside that folder from the sheet).
+- A section header → opens task creation pre-filled with that section.
+- A calendar day cell → opens a Task/Event picker, then routes to the appropriate sheet pre-filled with that date.
+- A note folder row → pushes a new blank `NoteDetailView` scoped to that folder.
+- The Notes root area → pushes a new root-level `NoteDetailView`.
+- A smart list (Inbox / Today / Tomorrow / Upcoming / All Tasks) → opens task creation with the smart-list defaults (Today/Tomorrow stamp `dueDate`; Upcoming defaults to today+2; All Tasks falls back to Inbox).
+- The "+ Folder" button at the bottom of Tasks/Notes → opens the create-folder sheet.
+
+The drop targets are `PlusDropTarget` widgets wired through `PlusDragScope`; the callbacks live in `HomeShell._handleDrop*` and route to the correct sheet/navigator.
+
+### Undo banner
+
+Every destructive action shows an `UndoBanner` for 5 seconds with a "Revert" button:
+- Soft-delete (task, note, contact, list, folder, section).
+- Bulk deep-delete (folder with subfolders + lists + tasks all share one `deletedDate`; the banner reverts via `restoreAt(deletedDate)`).
+- Event delete (hard-delete; banner's revert callback re-inserts the same Event).
+- Selection-mode batch delete.
+
+The banner sits inside the home shell's `Stack` (above the tab bar / sidebar) so it's visible from anywhere in the tree. Only the latest action counts — a fresh `show` cancels the previous timer.
 
 ### Localization
 
-String resources in `lib/src/localization/app_en.arb`. Run `flutter gen-l10n` after editing. Both `GlobalMaterialLocalizations.delegate` and `GlobalCupertinoLocalizations.delegate` are registered (Material delegate is needed for `showModalBottomSheet`).
+**Hand-rolled** — no `gen-l10n`, no `.arb` codegen, no `l10n.yaml`. Strings live in `lib/src/localization/strings.dart` as a nested `_translations: Map<String, Map<String, String>>` (locale code → key → translation). The `S` class exposes named getters (e.g. `s.appTitle`, `s.tabTasks`) and falls back to English for any missing key. The legacy `lib/src/localization/app_en.arb` file is **stale and unused**.
 
-**Curly-quote hazard**: The Edit tool can silently introduce Unicode curly apostrophes (U+2018/U+2019) into `.arb` or `strings.dart` files, which breaks Dart string parsing. If you see `Error: The non-ASCII character ''' (U+2018) can't be used in identifiers`, fix via Python byte replacement rather than a text editor:
+Adding a new string:
+1. Add the English entry to the `'en'` table inside `_translations`.
+2. Add a named getter on `S` (e.g. `String get newKey => t('newKey');`).
+3. Add translations to the other 9 locales — debug builds will log any missing keys via `_debugReportMissingKeys()`.
+
+Adding a new locale: extend `kSupportedLocales` and `kLanguageNames`, then provide a full table in `_translations`.
+
+`AppLocalizations.delegate` is registered alongside `GlobalMaterialLocalizations`, `GlobalCupertinoLocalizations`, and `GlobalWidgetsLocalizations` in `app.dart`. Both Material delegates are needed because `showModalBottomSheet` (used for sheets) is a Material widget.
+
+**Supported locales** (10): `en`, `uk`, `es`, `fr`, `de`, `it`, `pt`, `ru`, `zh`, `ja`.
+
+**Curly-quote hazard**: the Edit tool can silently introduce Unicode curly apostrophes (U+2018 / U+2019) into `strings.dart`, which breaks Dart string parsing. If you see `Error: The non-ASCII character '‘' can't be used in identifiers`, fix via Python byte replacement rather than a text editor:
 ```python
-content = open('path/to/strings.dart', 'rb').read()
+content = open('lib/src/localization/strings.dart', 'rb').read()
 fixed = content.replace(b'\xe2\x80\x98', b"'").replace(b'\xe2\x80\x99', b"'")
-open('path/to/strings.dart', 'wb').write(fixed)
+open('lib/src/localization/strings.dart', 'wb').write(fixed)
 ```

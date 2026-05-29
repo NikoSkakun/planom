@@ -3,7 +3,9 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'calendar/event_controller.dart';
+import 'contacts/contact_controller.dart';
 import 'folders/folder_controller.dart';
+import 'integrations/google/google_calendar_controller.dart';
 import 'localization/app_localizations.dart';
 import 'home_shell.dart';
 import 'notes/note_controller.dart';
@@ -25,8 +27,10 @@ class MyApp extends StatelessWidget {
     required this.noteController,
     required this.routineController,
     required this.eventController,
+    required this.contactController,
     required this.backupService,
     this.securityService,
+    required this.googleCalendarController,
   });
 
   final SettingsController settingsController;
@@ -35,8 +39,10 @@ class MyApp extends StatelessWidget {
   final NoteController noteController;
   final RoutineController routineController;
   final EventController eventController;
+  final ContactController contactController;
   final BackupService backupService;
   final SecurityService? securityService;
+  final GoogleCalendarController googleCalendarController;
 
   @override
   Widget build(BuildContext context) {
@@ -71,19 +77,37 @@ class MyApp extends StatelessWidget {
             // instead of the whole CupertinoApp above.
             builder: (context) => ValueListenableBuilder<int>(
               valueListenable: settingsController.colorRevision,
-              builder: (context, _, __) => _SecurityGate(
-                securityService: securityService,
-                child: HomeShell(
-                  settingsController: settingsController,
-                  taskController: taskController,
-                  folderController: folderController,
-                  noteController: noteController,
-                  routineController: routineController,
-                  eventController: eventController,
-                  backupService: backupService,
-                  securityService: securityService,
-                ),
-              ),
+              builder: (context, _, __) {
+                // Apply the user-selected text scale to the whole content
+                // subtree. When useSystemTextScale is true we honour the OS
+                // value (TextScaler.noScaling falls through to whatever the
+                // platform passed in via MediaQuery).
+                final base = MediaQuery.of(context);
+                final mq = settingsController.useSystemTextScale
+                    ? base
+                    : base.copyWith(
+                        textScaler:
+                            TextScaler.linear(settingsController.textScale),
+                      );
+                return MediaQuery(
+                  data: mq,
+                  child: _SecurityGate(
+                    securityService: securityService,
+                    child: HomeShell(
+                      settingsController: settingsController,
+                      taskController: taskController,
+                      folderController: folderController,
+                      noteController: noteController,
+                      routineController: routineController,
+                      eventController: eventController,
+                      contactController: contactController,
+                      backupService: backupService,
+                      securityService: securityService,
+                      googleCalendarController: googleCalendarController,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         );

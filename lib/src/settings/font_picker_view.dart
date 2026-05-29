@@ -142,10 +142,14 @@ class _FontPickerViewState extends State<FontPickerView> {
       navigationBar: CupertinoNavigationBar(
         border: null,
         middle: Text(s.font),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => _showMenu(context),
-          child: const Icon(CupertinoIcons.ellipsis, size: 26),
+        trailing: Semantics(
+          label: s.editPreviewText,
+          button: true,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => _showMenu(context),
+            child: const Icon(CupertinoIcons.ellipsis, size: 26),
+          ),
         ),
       ),
       child: SafeArea(

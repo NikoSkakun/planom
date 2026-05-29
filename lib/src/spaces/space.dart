@@ -9,6 +9,12 @@ class Space {
   final String name;
   final DateTime creationDate;
 
+  Space copyWith({String? name}) => Space(
+        id: id,
+        name: name ?? this.name,
+        creationDate: creationDate,
+      );
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,

@@ -16,6 +16,10 @@ class NoteController with ChangeNotifier {
   List<NoteFolder> get trashedFolders => List.unmodifiable(_trashedFolders);
   List<Note> get trashedNotes => List.unmodifiable(_trashedNotes);
 
+  /// Flat list of all non-trashed folders. Used by surfaces that need to
+  /// enumerate every folder regardless of nesting (e.g. tab-bar shortcuts).
+  List<NoteFolder> get folders => List.unmodifiable(_folders);
+
   List<NoteFolder> foldersIn(String? parentId) {
     final result =
         _folders.where((f) => f.parentFolderId == parentId).toList();
@@ -37,6 +41,15 @@ class NoteController with ChangeNotifier {
     }
   }
 
+  Note? noteById(String id) {
+    for (final n in _notes) {
+      if (n.id == id) return n;
+    }
+    return null;
+  }
+
+  List<Note> get allNotes => List.unmodifiable(_notes);
+
   Future<void> load() async {
     _folders = await _db.getNoteFolders();
     _notes = await _db.getNotes();
@@ -55,6 +68,24 @@ class NoteController with ChangeNotifier {
     await _db.updateNote(updated);
     final i = _notes.indexWhere((n) => n.id == updated.id);
     if (i == -1) return;
+    _notes = [..._notes]..[i] = updated;
+    notifyListeners();
+  }
+
+  /// Moves a note to [targetFolderId] (or to the root when null). Preserves
+  /// the modified-date stamp so re-parenting doesn't bump the note to the
+  /// top of recently-edited lists.
+  Future<void> moveNote(String noteId, String? targetFolderId) async {
+    final i = _notes.indexWhere((n) => n.id == noteId);
+    if (i == -1) return;
+    final orig = _notes[i];
+    if (orig.folderId == targetFolderId) return;
+    final updated = orig.copyWith(
+      folderId: targetFolderId,
+      clearFolderId: targetFolderId == null,
+      preserveModifiedDate: true,
+    );
+    await _db.updateNote(updated);
     _notes = [..._notes]..[i] = updated;
     notifyListeners();
   }
@@ -162,9 +193,49 @@ class NoteController with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> deleteFolderDeep(String id) async {
+  /// Recursively soft-deletes a folder and all nested notes/folders. Returns
+  /// the shared deletedDate so callers can pass it to [restoreAt] for undo.
+  Future<DateTime> deleteFolderDeep(String id) async {
     final now = DateTime.now();
     await _softDeleteFolderRecursive(id, now);
+    notifyListeners();
+    return now;
+  }
+
+  /// Restores every note + note-folder soft-deleted at exactly [deletedDate].
+  Future<void> restoreAt(DateTime deletedDate) async {
+    final ts = deletedDate.millisecondsSinceEpoch;
+    final notes = _trashedNotes
+        .where((n) => n.deletedDate?.millisecondsSinceEpoch == ts)
+        .toList();
+    final folders = _trashedFolders
+        .where((f) => f.deletedDate?.millisecondsSinceEpoch == ts)
+        .toList();
+    for (final f in folders) {
+      await _db.restoreNoteFolder(f.id);
+    }
+    for (final n in notes) {
+      await _db.restoreNote(n.id);
+    }
+    _trashedFolders = _trashedFolders
+        .where((f) => f.deletedDate?.millisecondsSinceEpoch != ts)
+        .toList();
+    _trashedNotes = _trashedNotes
+        .where((n) => n.deletedDate?.millisecondsSinceEpoch != ts)
+        .toList();
+    _folders = [
+      ..._folders,
+      ...folders.map((f) =>
+          f.copyWith(isDeleted: false, clearDeletedDate: true)),
+    ];
+    _notes = [
+      ..._notes,
+      ...notes.map((n) => n.copyWith(
+            isDeleted: false,
+            clearDeletedDate: true,
+            preserveModifiedDate: true,
+          )),
+    ];
     notifyListeners();
   }
 
@@ -229,6 +300,77 @@ class NoteController with ChangeNotifier {
 
     for (int i = 0; i < scope.length; i++) {
       scope[i] = scope[i].copyWith(sortOrder: i + 1, preserveModifiedDate: true);
+    }
+    for (final updated in scope) {
+      final idx = _notes.indexWhere((n) => n.id == updated.id);
+      if (idx != -1) _notes[idx] = updated;
+    }
+    notifyListeners();
+    await _db.updateNoteSortOrders(scope);
+  }
+
+  /// Long-press-drag insertion: move [movedId] to come right before
+  /// [beforeId] within [parentFolderId]. Null [beforeId] = end of list.
+  Future<void> reorderNoteFolderBefore({
+    required String movedId,
+    String? beforeId,
+    required String? parentFolderId,
+  }) async {
+    final scope = _folders
+        .where((f) =>
+            f.parentFolderId == parentFolderId && f.id != movedId)
+        .toList();
+    _sortFoldersByDefault(scope);
+
+    final moved = _folders.firstWhere((f) => f.id == movedId,
+        orElse: () => NoteFolder(id: movedId, name: ''));
+    if (moved.name.isEmpty &&
+        _folders.indexWhere((f) => f.id == movedId) == -1) return;
+
+    int insertAt = beforeId == null
+        ? scope.length
+        : scope.indexWhere((f) => f.id == beforeId);
+    if (insertAt < 0) insertAt = scope.length;
+    scope.insert(insertAt, moved);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i].copyWith(sortOrder: i + 1);
+    }
+    for (final updated in scope) {
+      final idx = _folders.indexWhere((f) => f.id == updated.id);
+      if (idx != -1) _folders[idx] = updated;
+    }
+    notifyListeners();
+    await _db.updateNoteFolderSortOrders(scope);
+  }
+
+  /// Same as [reorderNoteFolderBefore] but for note rows. Preserves
+  /// modifiedDate so reordering doesn't bump notes to the top.
+  Future<void> reorderNoteBefore({
+    required String movedId,
+    String? beforeId,
+    required String? folderId,
+  }) async {
+    final scope = _notes
+        .where((n) => n.folderId == folderId && n.id != movedId)
+        .toList();
+    _sortNotesByDefault(scope);
+
+    final moved = _notes.firstWhere((n) => n.id == movedId,
+        orElse: () => Note(id: movedId, title: '', content: ''));
+    if (moved.title.isEmpty &&
+        moved.content.isEmpty &&
+        _notes.indexWhere((n) => n.id == movedId) == -1) return;
+
+    int insertAt = beforeId == null
+        ? scope.length
+        : scope.indexWhere((n) => n.id == beforeId);
+    if (insertAt < 0) insertAt = scope.length;
+    scope.insert(insertAt, moved);
+
+    for (int i = 0; i < scope.length; i++) {
+      scope[i] = scope[i]
+          .copyWith(sortOrder: i + 1, preserveModifiedDate: true);
     }
     for (final updated in scope) {
       final idx = _notes.indexWhere((n) => n.id == updated.id);

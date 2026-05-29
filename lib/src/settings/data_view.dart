@@ -2,17 +2,22 @@ import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
 import '../security/security_service.dart';
+import '../spaces/space_manager.dart';
 import '../theme/app_theme.dart';
+import '../utils/fast_route.dart';
 import 'backup_service.dart';
+import 'storage_view.dart';
 
 class DataView extends StatefulWidget {
   const DataView({
     super.key,
     required this.backupService,
+    this.spaceManager,
     this.securityService,
   });
 
   final BackupService backupService;
+  final SpaceManager? spaceManager;
   final SecurityService? securityService;
 
   @override
@@ -25,15 +30,118 @@ class _DataViewState extends State<DataView> {
   bool _resetting = false;
 
   Future<void> _export() async {
+    final s = S.of(context);
+    // Offer plain vs encrypted up front so the user can airdrop a quick local
+    // backup without typing a passphrase, or pick "Encrypt…" for off-device.
+    final mode = await showCupertinoModalPopup<String>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: Text(s.exportBackup),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(ctx).pop('plain'),
+            child: Text(s.exportPlain),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(ctx).pop('encrypted'),
+            child: Text(s.exportEncrypted),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: Text(s.cancel),
+        ),
+      ),
+    );
+    if (mode == null || !mounted) return;
+
+    String? passphrase;
+    if (mode == 'encrypted') {
+      passphrase = await _promptPassphrase(s.setPassphrase, confirm: true);
+      if (passphrase == null) return;
+    }
+
     setState(() => _exporting = true);
     try {
-      await widget.backupService.exportBackup();
+      await widget.backupService.exportBackup(passphrase: passphrase);
     } catch (_) {
       if (!mounted) return;
       _showError(S.of(context).exportFailed, S.of(context).exportFailedBody);
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
+  }
+
+  Future<String?> _promptPassphrase(String title, {bool confirm = false}) async {
+    final ctrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    final s = S.of(context);
+    String? result;
+    String? error;
+
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          return CupertinoAlertDialog(
+            title: Text(title),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                CupertinoTextField(
+                  controller: ctrl,
+                  placeholder: s.enterPassword,
+                  obscureText: true,
+                  autofocus: true,
+                ),
+                if (confirm) ...[
+                  const SizedBox(height: 8),
+                  CupertinoTextField(
+                    controller: confirmCtrl,
+                    placeholder: s.confirmPassword,
+                    obscureText: true,
+                  ),
+                ],
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!,
+                      style: const TextStyle(
+                          color: CupertinoColors.destructiveRed,
+                          fontSize: 13)),
+                ],
+              ],
+            ),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(s.cancel),
+              ),
+              CupertinoDialogAction(
+                isDefaultAction: true,
+                onPressed: () {
+                  final pass = ctrl.text;
+                  if (pass.isEmpty) {
+                    setLocal(() => error = s.passwordRequired);
+                    return;
+                  }
+                  if (confirm && pass != confirmCtrl.text) {
+                    setLocal(() => error = s.passwordsDoNotMatch);
+                    return;
+                  }
+                  result = pass;
+                  Navigator.of(ctx).pop();
+                },
+                child: Text(s.ok),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    ctrl.dispose();
+    confirmCtrl.dispose();
+    return result;
   }
 
   Future<void> _import() async {
@@ -61,7 +169,9 @@ class _DataViewState extends State<DataView> {
 
     setState(() => _importing = true);
     try {
-      final success = await widget.backupService.importBackup();
+      final success = await widget.backupService.importBackup(
+        passphraseProvider: () => _promptPassphrase(s.enterPassphrase),
+      );
       if (!mounted) return;
       if (success) {
         await showCupertinoDialog<void>(
@@ -219,6 +329,21 @@ class _DataViewState extends State<DataView> {
               loading: _importing,
               onTap: _exporting || _importing || _resetting ? null : _import,
             ),
+
+            if (widget.spaceManager != null) ...[
+              const SizedBox(height: 1),
+              _DataRow(
+                label: s.storage,
+                sublabel: s.storageSublabel,
+                loading: false,
+                onTap: () => Navigator.of(context).push(
+                  FastRoute<void>(
+                    builder: (_) =>
+                        StorageView(spaceManager: widget.spaceManager!),
+                  ),
+                ),
+              ),
+            ],
 
             // ── Danger zone ─────────────────────────────────────────────
             const SizedBox(height: 32),

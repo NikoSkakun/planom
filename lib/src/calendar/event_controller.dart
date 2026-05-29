@@ -12,6 +12,13 @@ class EventController with ChangeNotifier {
 
   List<Event> get events => List.unmodifiable(_events);
 
+  Event? eventById(String id) {
+    for (final e in _events) {
+      if (e.id == id) return e;
+    }
+    return null;
+  }
+
   List<Event> eventsForDate(DateTime date) => _events
       .where((e) =>
           e.date.year == date.year &&
