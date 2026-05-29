@@ -71,5 +71,12 @@ jobs:
           MATCH_PASSWORD:                      ${{ secrets.MATCH_PASSWORD }}
           MATCH_GITHUB_USER:                   ${{ secrets.MATCH_GITHUB_USER }}
           MATCH_GITHUB_TOKEN:                  ${{ secrets.MATCH_GITHUB_TOKEN }}
+          # Optional Apple-ID credentials. If set, fastlane auto-creates and
+          # assigns the `group.app.planom` App Group in the Developer Portal
+          # (the App Store Connect API key alone cannot manage App Groups). Use
+          # an app-specific password for FASTLANE_PASSWORD. Leave unset to do
+          # the one-time App Group setup manually in the portal instead.
+          FASTLANE_USER:                       ${{ secrets.FASTLANE_USER }}
+          FASTLANE_PASSWORD:                   ${{ secrets.FASTLANE_PASSWORD }}
 
         run: bundle exec fastlane beta

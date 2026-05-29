@@ -46,18 +46,31 @@ through `HomeWidgetBackgroundWorker` (`AppDelegate` + the Dart
 `AppIntent` that calls the worker and link `home_widget` into this extension's
 Podfile target.
 
-## One-time Xcode / Apple Developer setup
+## CI signing (fastlane)
 
-The target, Info.plist, entitlements and build settings are already committed.
-Before archiving you must, in Xcode (Signing & Capabilities) / the developer
-portal:
+`fastlane/Fastfile` automates the signing for both targets:
 
-1. Enable the **App Groups** capability on **both** the `Runner` and
-   `PlanomWidgetExtension` targets and ensure `group.app.planom` is checked.
-   (The entitlement files already declare it; the App ID must allow it.)
-2. Confirm automatic signing resolves the new bundle id
-   `app.planom.PlanomWidget` for your team (`GH6HRY4EWZ`).
-3. Run `pod install` (the `home_widget` pod is added to `Runner` automatically).
+- `match` provisions **both** `app.planom` and `app.planom.PlanomWidget`
+  (`force: true` so profiles pick up the App Groups entitlement).
+- `ensure_signing_prereqs` (App Store Connect API key) creates the widget App
+  ID and enables the **App Groups capability** on both App IDs.
+- `update_code_signing_settings` assigns each target its own match profile.
+
+**App Group creation/assignment is the one piece the ASC API key cannot do** —
+Apple only exposes App Groups over the Developer Portal (Apple-ID) API. Two ways
+to satisfy it:
+
+1. **Automated** — set `FASTLANE_USER` + `FASTLANE_PASSWORD` (an app-specific
+   password) repo secrets. The Fastfile then creates `group.app.planom` and
+   assigns it to both App IDs automatically.
+2. **Manual (once)** — in the Developer Portal, create an App Group
+   `group.app.planom` and tick it on the `app.planom` and
+   `app.planom.PlanomWidget` App IDs. After that the API-key path keeps it
+   in sync on its own.
+
+The entitlement files (`Runner.entitlements`, `PlanomWidget.entitlements`)
+already declare the group, and `home_widget` is added to the `Runner` pod
+target automatically by `pod install`.
 
 The App Group id is defined once in `WidgetData.swift`
 (`WidgetStore.appGroup`), `Runner.entitlements`, `PlanomWidget.entitlements`,
