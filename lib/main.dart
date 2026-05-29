@@ -13,6 +13,9 @@ import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
 import 'src/spaces/space_manager.dart';
 import 'src/utils/platform_capabilities.dart';
+import 'src/widgets/home_widget_service.dart';
+import 'src/widgets/widget_deep_link.dart';
+import 'src/widgets/widget_sync_coordinator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,6 +66,15 @@ void main() async {
   final spaceManager =
       SpaceManager(settingsController: settingsController, globalDb: globalDb);
   await spaceManager.load();
+
+  // iOS home-screen / lock-screen widgets. Best-effort: the service no-ops on
+  // unsupported platforms, and the coordinator pushes an initial "Today"
+  // payload then keeps it live as the active space's data changes. Deep links
+  // (widget taps) flow through `widgetDeepLink`, consumed by HomeShell.
+  await HomeWidgetService.instance.init();
+  await initWidgetDeepLinks();
+  WidgetSyncCoordinator(spaceManager: spaceManager, settings: settingsController)
+      .start();
 
   runApp(
     ListenableBuilder(

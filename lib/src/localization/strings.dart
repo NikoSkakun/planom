@@ -117,6 +117,17 @@ class S {
   String get completed => t('completed');
   String get trash => t('trash');
 
+  // ── Home-screen widgets ─────────────────────────────────────────────────────
+  String get widgetNoTasks => t('widgetNoTasks');
+  String get widgetAllDone => t('widgetAllDone');
+  String get widgetNoEvents => t('widgetNoEvents');
+  String get widgetNoRoutines => t('widgetNoRoutines');
+  String get widgetAgendaTitle => t('widgetAgendaTitle');
+  String get widgetAddTask => t('widgetAddTask');
+  String get widgetRemaining => t('widgetRemaining');
+  String get widgetAllDay => t('widgetAllDay');
+  String get widgetBirthday => t('widgetBirthday');
+
   // ── Settings ──────────────────────────────────────────────────────────────
   String get settings => t('settings');
   String get sectionAppearance => t('sectionAppearance');
@@ -698,6 +709,11 @@ const Map<String, String> _en = {
   'tabRoutines': 'Routines', 'tabSettings': 'Settings',
   'inbox': 'Inbox', 'today': 'Today', 'yesterday': 'Yesterday', 'tomorrow': 'Tomorrow', 'upcoming': 'Upcoming',
   'allTasks': 'All Tasks',
+  'widgetNoTasks': 'No tasks today', 'widgetAllDone': 'All done!',
+  'widgetNoEvents': 'No events', 'widgetNoRoutines': 'No routines today',
+  'widgetAgendaTitle': 'Today', 'widgetAddTask': 'Add Task',
+  'widgetRemaining': 'remaining', 'widgetAllDay': 'All-day',
+  'widgetBirthday': 'Birthday',
   'completed': 'Completed', 'trash': 'Trash',
   'settings': 'Settings',
   'sectionAppearance': 'Appearance', 'themeLight': 'Light',
@@ -1047,6 +1063,11 @@ const Map<String, String> _uk = {
   'tabRoutines': 'Звички', 'tabSettings': 'Налаштування',
   'inbox': 'Вхідні', 'today': 'Сьогодні', 'yesterday': 'Вчора', 'tomorrow': 'Завтра', 'upcoming': 'Майбутні',
   'allTasks': 'Всі завдання',
+  'widgetNoTasks': 'Немає завдань сьогодні', 'widgetAllDone': 'Усе виконано!',
+  'widgetNoEvents': 'Немає подій', 'widgetNoRoutines': 'Немає звичок сьогодні',
+  'widgetAgendaTitle': 'Сьогодні', 'widgetAddTask': 'Додати завдання',
+  'widgetRemaining': 'залишилось', 'widgetAllDay': 'Весь день',
+  'widgetBirthday': 'День народження',
   'completed': 'Виконані', 'trash': 'Кошик',
   'settings': 'Налаштування',
   'sectionAppearance': 'Зовнішній вигляд', 'themeLight': 'Світла',
@@ -1183,6 +1204,11 @@ const Map<String, String> _es = {
   'tabRoutines': 'Rutinas', 'tabSettings': 'Ajustes',
   'inbox': 'Bandeja', 'today': 'Hoy', 'yesterday': 'Ayer', 'tomorrow': 'Mañana', 'upcoming': 'Próximas',
   'allTasks': 'Todas las tareas',
+  'widgetNoTasks': 'Sin tareas hoy', 'widgetAllDone': '¡Todo hecho!',
+  'widgetNoEvents': 'Sin eventos', 'widgetNoRoutines': 'Sin rutinas hoy',
+  'widgetAgendaTitle': 'Hoy', 'widgetAddTask': 'Añadir tarea',
+  'widgetRemaining': 'restantes', 'widgetAllDay': 'Todo el día',
+  'widgetBirthday': 'Cumpleaños',
   'completed': 'Completadas', 'trash': 'Papelera',
   'settings': 'Ajustes',
   'sectionAppearance': 'Apariencia', 'themeLight': 'Claro',
@@ -1319,6 +1345,11 @@ const Map<String, String> _fr = {
   'tabRoutines': 'Routines', 'tabSettings': 'Réglages',
   'inbox': 'Boîte', 'today': "Aujourd'hui", 'yesterday': 'Hier', 'tomorrow': 'Demain', 'upcoming': 'À venir',
   'allTasks': 'Toutes les tâches',
+  'widgetNoTasks': "Aucune tâche aujourd'hui", 'widgetAllDone': 'Tout est fait !',
+  'widgetNoEvents': 'Aucun événement', 'widgetNoRoutines': "Aucune routine aujourd'hui",
+  'widgetAgendaTitle': "Aujourd'hui", 'widgetAddTask': 'Ajouter une tâche',
+  'widgetRemaining': 'restantes', 'widgetAllDay': 'Toute la journée',
+  'widgetBirthday': 'Anniversaire',
   'completed': 'Terminé', 'trash': 'Corbeille',
   'settings': 'Réglages',
   'sectionAppearance': 'Apparence', 'themeLight': 'Clair',
@@ -1455,6 +1486,11 @@ const Map<String, String> _de = {
   'tabRoutines': 'Routinen', 'tabSettings': 'Einstellungen',
   'inbox': 'Eingang', 'today': 'Heute', 'yesterday': 'Gestern', 'tomorrow': 'Morgen', 'upcoming': 'Anstehend',
   'allTasks': 'Alle Aufgaben',
+  'widgetNoTasks': 'Keine Aufgaben heute', 'widgetAllDone': 'Alles erledigt!',
+  'widgetNoEvents': 'Keine Termine', 'widgetNoRoutines': 'Keine Routinen heute',
+  'widgetAgendaTitle': 'Heute', 'widgetAddTask': 'Aufgabe hinzufügen',
+  'widgetRemaining': 'verbleibend', 'widgetAllDay': 'Ganztägig',
+  'widgetBirthday': 'Geburtstag',
   'completed': 'Erledigt', 'trash': 'Papierkorb',
   'settings': 'Einstellungen',
   'sectionAppearance': 'Erscheinungsbild', 'themeLight': 'Hell',
@@ -1591,6 +1627,11 @@ const Map<String, String> _it = {
   'tabRoutines': 'Abitudini', 'tabSettings': 'Impostazioni',
   'inbox': 'In arrivo', 'today': 'Oggi', 'yesterday': 'Ieri', 'tomorrow': 'Domani', 'upcoming': 'In arrivo',
   'allTasks': 'Tutte le attività',
+  'widgetNoTasks': 'Nessuna attività oggi', 'widgetAllDone': 'Tutto fatto!',
+  'widgetNoEvents': 'Nessun evento', 'widgetNoRoutines': 'Nessuna routine oggi',
+  'widgetAgendaTitle': 'Oggi', 'widgetAddTask': 'Aggiungi attività',
+  'widgetRemaining': 'rimanenti', 'widgetAllDay': 'Tutto il giorno',
+  'widgetBirthday': 'Compleanno',
   'completed': 'Completate', 'trash': 'Cestino',
   'settings': 'Impostazioni',
   'sectionAppearance': 'Aspetto', 'themeLight': 'Chiaro',
@@ -1727,6 +1768,11 @@ const Map<String, String> _pt = {
   'tabRoutines': 'Rotinas', 'tabSettings': 'Ajustes',
   'inbox': 'Caixa', 'today': 'Hoje', 'yesterday': 'Ontem', 'tomorrow': 'Amanhã', 'upcoming': 'Próximas',
   'allTasks': 'Todas as tarefas',
+  'widgetNoTasks': 'Sem tarefas hoje', 'widgetAllDone': 'Tudo feito!',
+  'widgetNoEvents': 'Sem eventos', 'widgetNoRoutines': 'Sem rotinas hoje',
+  'widgetAgendaTitle': 'Hoje', 'widgetAddTask': 'Adicionar tarefa',
+  'widgetRemaining': 'restantes', 'widgetAllDay': 'Dia inteiro',
+  'widgetBirthday': 'Aniversário',
   'completed': 'Concluídas', 'trash': 'Lixeira',
   'settings': 'Ajustes',
   'sectionAppearance': 'Aparência', 'themeLight': 'Claro',
@@ -1863,6 +1909,11 @@ const Map<String, String> _ru = {
   'tabRoutines': 'Привычки', 'tabSettings': 'Настройки',
   'inbox': 'Входящие', 'today': 'Сегодня', 'yesterday': 'Вчера', 'tomorrow': 'Завтра', 'upcoming': 'Предстоящие',
   'allTasks': 'Все задачи',
+  'widgetNoTasks': 'Нет задач сегодня', 'widgetAllDone': 'Всё выполнено!',
+  'widgetNoEvents': 'Нет событий', 'widgetNoRoutines': 'Нет привычек сегодня',
+  'widgetAgendaTitle': 'Сегодня', 'widgetAddTask': 'Добавить задачу',
+  'widgetRemaining': 'осталось', 'widgetAllDay': 'Весь день',
+  'widgetBirthday': 'День рождения',
   'completed': 'Выполненные', 'trash': 'Корзина',
   'settings': 'Настройки',
   'sectionAppearance': 'Внешний вид', 'themeLight': 'Светлая',
@@ -1998,6 +2049,11 @@ const Map<String, String> _zh = {
   'tabRoutines': '习惯', 'tabSettings': '设置',
   'inbox': '收件箱', 'today': '今天', 'yesterday': '昨天', 'tomorrow': '明天', 'upcoming': '即将',
   'allTasks': '所有任务',
+  'widgetNoTasks': '今天没有任务', 'widgetAllDone': '全部完成！',
+  'widgetNoEvents': '没有事件', 'widgetNoRoutines': '今天没有习惯',
+  'widgetAgendaTitle': '今天', 'widgetAddTask': '添加任务',
+  'widgetRemaining': '剩余', 'widgetAllDay': '全天',
+  'widgetBirthday': '生日',
   'completed': '已完成', 'trash': '垃圾箱',
   'settings': '设置',
   'sectionAppearance': '外观', 'themeLight': '浅色',
@@ -2133,6 +2189,11 @@ const Map<String, String> _ja = {
   'tabRoutines': '習慣', 'tabSettings': '設定',
   'inbox': '受信箱', 'today': '今日', 'yesterday': '昨日', 'tomorrow': '明日', 'upcoming': '今後',
   'allTasks': 'すべてのタスク',
+  'widgetNoTasks': '今日のタスクはありません', 'widgetAllDone': 'すべて完了！',
+  'widgetNoEvents': 'イベントなし', 'widgetNoRoutines': '今日の習慣はありません',
+  'widgetAgendaTitle': '今日', 'widgetAddTask': 'タスクを追加',
+  'widgetRemaining': '残り', 'widgetAllDay': '終日',
+  'widgetBirthday': '誕生日',
   'completed': '完了済み', 'trash': 'ゴミ箱',
   'settings': '設定',
   'sectionAppearance': '外観', 'themeLight': 'ライト',
