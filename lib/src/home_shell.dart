@@ -809,18 +809,9 @@ class _HomeShellState extends State<HomeShell> {
         return BottomNavigationBarItem(
           icon: const Padding(
             padding: EdgeInsets.only(top: 8),
-            child: Icon(CupertinoIcons.gear_alt, size: 24),
+            child: ImageIcon(AssetImage('assets/icons/tab_bar/settings.png')),
           ),
-          activeIcon: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Icon(
-              deselectAll
-                  ? CupertinoIcons.gear_alt
-                  : CupertinoIcons.gear_alt_fill,
-              size: 24,
-              color: deselectAll ? null : AppColors.accent,
-            ),
-          ),
+          activeIcon: activeIcon('assets/icons/tab_bar/settings.png'),
           label: hideLabels ? null : s.tabSettings,
         );
     }
