@@ -21,7 +21,7 @@ void main() {
 
   Note note(String id, String title,
           {String? folderId,
-          int? sortOrder,
+          int sortOrder = 0,
           DateTime? modified,
           DateTime? created}) =>
       Note(
@@ -35,7 +35,7 @@ void main() {
       );
 
   NoteFolder folder(String id, String name,
-          {String? parent, int? sortOrder, DateTime? created}) =>
+          {String? parent, int sortOrder = 0, DateTime? created}) =>
       NoteFolder(
         id: id,
         name: name,
@@ -87,12 +87,10 @@ void main() {
 
     test('notes sort: sortOrder then modifiedDate DESC', () async {
       final base = DateTime(2024, 1, 1);
-      // Same sortOrder => newer modifiedDate first.
       await c.addNote(note('older', 'Older',
           sortOrder: 0, modified: base.add(const Duration(days: 1))));
       await c.addNote(note('newer', 'Newer',
           sortOrder: 0, modified: base.add(const Duration(days: 5))));
-      // Higher sortOrder, very new modified => still last by sortOrder.
       await c.addNote(note('z', 'Z',
           sortOrder: 9, modified: base.add(const Duration(days: 99))));
 
@@ -104,8 +102,8 @@ void main() {
       await c.addFolder(folder('a', 'A',
           sortOrder: 0, created: base.add(const Duration(days: 2))));
       await c.addFolder(folder('b', 'B', sortOrder: 0, created: base));
-      await c.addFolder(folder('c', 'C', sortOrder: 5, created: base));
-      expect(c.foldersIn(null).map((f) => f.id), ['b', 'a', 'c']);
+      await c.addFolder(folder('cc', 'C', sortOrder: 5, created: base));
+      expect(c.foldersIn(null).map((f) => f.id), ['b', 'a', 'cc']);
     });
   });
 
@@ -209,8 +207,7 @@ void main() {
       }
       for (final n in c.trashedNotes) {
         expect(n.deletedDate, deletedDate);
-        // modifiedDate preserved through soft-delete.
-        expect(n.modifiedDate, oldModified);
+        expect(n.modifiedDate, oldModified); // preserved
       }
 
       await c.restoreAt(deletedDate);
@@ -234,8 +231,7 @@ void main() {
 
       expect(c.notesIn(null).map((n) => n.id), ['b', 'cc', 'a']);
       expect(c.noteById('b')!.sortOrder, 1);
-      // modifiedDate preserved.
-      expect(c.noteById('a')!.modifiedDate, m);
+      expect(c.noteById('a')!.modifiedDate, m); // preserved
 
       final c2 = NoteController(db);
       await c2.load();
@@ -256,34 +252,36 @@ void main() {
       expect(c2.foldersIn(null).map((f) => f.id), ['cc', 'a', 'b']);
     });
 
-    test('reorderNoteBefore moves note before target + reparents', () async {
+    // NOTE: reorderNoteBefore only reorders within the SAME folder scope; it
+    // does NOT change folderId (unlike the folder controller's variants).
+    test('reorderNoteBefore moves note before target within scope', () async {
       final m = DateTime(2020, 1, 1);
-      await c.addFolder(folder('dest', 'Dest'));
       await c.addNote(note('a', 'A', sortOrder: 1, modified: m));
       await c.addNote(note('b', 'B', sortOrder: 2, modified: m));
-      await c.reorderNoteBefore(movedId: 'b', beforeId: 'a', folderId: null);
-      expect(c.notesIn(null).map((n) => n.id), ['b', 'a']);
-      expect(c.noteById('b')!.modifiedDate, m);
+      await c.addNote(note('cc', 'C', sortOrder: 3, modified: m));
+      await c.reorderNoteBefore(movedId: 'cc', beforeId: 'a', folderId: null);
+      expect(c.notesIn(null).map((n) => n.id), ['cc', 'a', 'b']);
+      expect(c.noteById('cc')!.modifiedDate, m); // preserved
+      expect(c.noteById('cc')!.folderId, isNull); // scope unchanged
 
-      await c.reorderNoteBefore(
-          movedId: 'b', beforeId: null, folderId: 'dest');
-      expect(c.noteById('b')!.folderId, 'dest');
-      expect(c.notesIn('dest').map((n) => n.id), ['b']);
+      // beforeId == null => moves to end.
+      await c.reorderNoteBefore(movedId: 'cc', beforeId: null, folderId: null);
+      expect(c.notesIn(null).map((n) => n.id), ['a', 'b', 'cc']);
     });
 
-    test('reorderNoteFolderBefore moves folder before target + reparents',
+    test('reorderNoteFolderBefore moves folder before target within scope',
         () async {
       await c.addFolder(folder('a', 'A', sortOrder: 1));
       await c.addFolder(folder('b', 'B', sortOrder: 2));
+      await c.addFolder(folder('cc', 'C', sortOrder: 3));
       await c.reorderNoteFolderBefore(
-          movedId: 'b', beforeId: 'a', parentFolderId: null);
-      expect(c.foldersIn(null).map((f) => f.id), ['b', 'a']);
+          movedId: 'cc', beforeId: 'a', parentFolderId: null);
+      expect(c.foldersIn(null).map((f) => f.id), ['cc', 'a', 'b']);
+      expect(c.folderById('cc')!.parentFolderId, isNull); // scope unchanged
 
-      await c.addFolder(folder('parent', 'P'));
       await c.reorderNoteFolderBefore(
-          movedId: 'b', beforeId: null, parentFolderId: 'parent');
-      expect(c.folderById('b')!.parentFolderId, 'parent');
-      expect(c.foldersIn('parent').map((f) => f.id), ['b']);
+          movedId: 'cc', beforeId: null, parentFolderId: null);
+      expect(c.foldersIn(null).map((f) => f.id), ['a', 'b', 'cc']);
     });
   });
 }
