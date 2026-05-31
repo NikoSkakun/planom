@@ -34,6 +34,7 @@ import 'completed_view.dart';
 import 'inbox_view.dart';
 import 'task_controller.dart';
 import 'task_field_prefs.dart';
+import '../routines/routine_controller.dart';
 import 'today_view.dart';
 import 'tomorrow_view.dart';
 import 'trash_view.dart';
@@ -49,6 +50,7 @@ class TasksView extends StatefulWidget {
     required this.activeListId,
     required this.activeDueDate,
     required this.collapseSignal,
+    this.routineController,
     this.backupService,
     this.db,
     this.noteController,
@@ -59,6 +61,7 @@ class TasksView extends StatefulWidget {
   final FolderController folderController;
   final ContactController contactController;
   final SettingsController settingsController;
+  final RoutineController? routineController;
   final ValueNotifier<String?> activeListId;
   final ValueNotifier<DateTime?> activeDueDate;
   final ValueNotifier<int> collapseSignal;
@@ -535,6 +538,10 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                     folderController:
                                         widget.folderController,
                                     activeDueDate: widget.activeDueDate,
+                                    routineController:
+                                        widget.routineController,
+                                    settingsController:
+                                        widget.settingsController,
                                   ),
                                 ),
                               ),

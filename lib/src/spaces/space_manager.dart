@@ -177,10 +177,12 @@ class SpaceManager with ChangeNotifier {
           return start.isAfter(now);
         }).length;
       },
+      routineCountToday: () => _routineController.todayUncompletedCount,
     );
-    // EventController changes don't drive the badge automatically — pump it
-    // when events change so the count stays current.
+    // EventController / RoutineController changes don't drive the badge
+    // automatically — pump it when they change so the count stays current.
     _eventController.addListener(_taskController.refreshBadge);
+    _routineController.addListener(_taskController.refreshBadge);
 
     _backupService = BackupService(
       db: _db,

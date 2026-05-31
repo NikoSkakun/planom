@@ -8,41 +8,6 @@ import 'settings_controller.dart';
 import 'settings_widgets.dart';
 import 'smart_list_prefs.dart';
 
-/// Per-tab settings sub-pages reached from Settings → (Notes / Calendar /
-/// Routines). They currently host no settings; the page exists so that
-/// per-tab options have a stable home as features grow.
-class _EmptySettingsView extends StatelessWidget {
-  const _EmptySettingsView({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.of(context);
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        border: null,
-        middle: Text(title),
-      ),
-      child: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              s.noOptionsYet,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 15,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class NotesSettingsView extends StatelessWidget {
   const NotesSettingsView({super.key, required this.controller});
 
@@ -280,6 +245,13 @@ class CalendarSettingsView extends StatelessWidget {
                       onTap: () => _pickDefaultContainer(context),
                     ),
                   ],
+                  const SizedBox(height: 18),
+                  SettingsSectionHeader(s.tabRoutines),
+                  SettingsToggleRow(
+                    label: s.showRoutinesInCalendar,
+                    value: controller.showRoutinesInCalendar,
+                    onChanged: controller.updateShowRoutinesInCalendar,
+                  ),
                 ],
               ),
             );
@@ -294,8 +266,58 @@ class CalendarSettingsView extends StatelessWidget {
 const String _localContainerKey = '__planom_local__';
 
 class RoutinesSettingsView extends StatelessWidget {
-  const RoutinesSettingsView({super.key});
+  const RoutinesSettingsView({super.key, required this.controller});
+
+  final SettingsController controller;
+
   @override
-  Widget build(BuildContext context) =>
-      _EmptySettingsView(title: S.of(context).tabRoutines);
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        middle: Text(s.tabRoutines),
+      ),
+      child: SafeArea(
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) {
+            return SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SettingsSectionHeader(s.sectionShowRoutines),
+                  SettingsToggleRow(
+                    label: s.showRoutinesInToday,
+                    value: controller.showRoutinesInToday,
+                    onChanged: controller.updateShowRoutinesInToday,
+                  ),
+                  const SizedBox(height: 1),
+                  SettingsToggleRow(
+                    label: s.showRoutinesInCalendar,
+                    value: controller.showRoutinesInCalendar,
+                    onChanged: controller.updateShowRoutinesInCalendar,
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      s.showRoutinesHint,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 }

@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 
 import '../contacts/contact_controller.dart';
 import '../database/database_service.dart';
+import '../routines/routine_controller.dart';
 import '../folders/folder_controller.dart';
 import '../home_shell.dart';
 import '../integrations/google/google_calendar_controller.dart';
@@ -38,6 +39,7 @@ class CalendarView extends StatefulWidget {
     this.onDaySelected,
     this.db,
     this.noteController,
+    this.routineController,
     this.googleCalendarController,
   });
 
@@ -51,6 +53,7 @@ class CalendarView extends StatefulWidget {
   final ValueChanged<DateTime?>? onDaySelected;
   final DatabaseService? db;
   final NoteController? noteController;
+  final RoutineController? routineController;
   final GoogleCalendarController? googleCalendarController;
 
   @override
@@ -241,6 +244,7 @@ class _CalendarViewState extends State<CalendarView> {
       folderController: widget.folderController,
       contactController: widget.contactController,
       settingsController: widget.settingsController,
+      routineController: widget.routineController,
       googleCalendarController: widget.googleCalendarController,
     );
     if (!mounted) return;

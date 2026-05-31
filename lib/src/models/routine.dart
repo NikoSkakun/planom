@@ -44,6 +44,9 @@ class Routine extends AppItem {
   /// Reminders for this routine (see [RoutineReminder]).
   final List<RoutineReminder> reminders;
 
+  /// Manual display order (ascending). Ties break on creation date.
+  final int sortOrder;
+
   Routine({
     String? id,
     DateTime? creationDate,
@@ -60,6 +63,7 @@ class Routine extends AppItem {
     this.intervalDays,
     this.waitForCompletion = false,
     this.reminders = const [],
+    this.sortOrder = 0,
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -86,6 +90,7 @@ class Routine extends AppItem {
     bool clearIntervalDays = false,
     bool? waitForCompletion,
     List<RoutineReminder>? reminders,
+    int? sortOrder,
   }) {
     return Routine(
       id: id,
@@ -105,6 +110,7 @@ class Routine extends AppItem {
           clearIntervalDays ? null : (intervalDays ?? this.intervalDays),
       waitForCompletion: waitForCompletion ?? this.waitForCompletion,
       reminders: reminders ?? this.reminders,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 
@@ -124,6 +130,7 @@ class Routine extends AppItem {
         'intervalDays': intervalDays,
         'waitForCompletion': waitForCompletion ? 1 : 0,
         'reminders': RoutineReminder.encode(reminders),
+        'sortOrder': sortOrder,
       };
 
   factory Routine.fromMap(Map<String, dynamic> map) => Routine(
@@ -146,6 +153,7 @@ class Routine extends AppItem {
         intervalDays: map['intervalDays'] as int?,
         waitForCompletion: (map['waitForCompletion'] as int? ?? 0) == 1,
         reminders: RoutineReminder.decode(map['reminders'] as String?),
+        sortOrder: map['sortOrder'] as int? ?? 0,
       );
 
   // Empty strings round-trip as `null` so an empty list does not crash

@@ -824,6 +824,7 @@ class _HomeShellState extends State<HomeShell> {
           folderController: widget.folderController,
           contactController: widget.contactController,
           settingsController: widget.settingsController,
+          routineController: widget.routineController,
           activeListId: _activeListId,
           activeDueDate: _activeDueDate,
           collapseSignal: _tasksCollapseSignal,
@@ -853,6 +854,7 @@ class _HomeShellState extends State<HomeShell> {
           onDaySelected: (d) => _activeDueDate.value = d,
           db: SpaceManagerProvider.of(context).db,
           noteController: widget.noteController,
+          routineController: widget.routineController,
           googleCalendarController: widget.googleCalendarController,
         ),
       3 => RoutinesView(

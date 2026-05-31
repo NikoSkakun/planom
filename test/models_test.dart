@@ -284,6 +284,7 @@ void main() {
         intervalDays: 3,
         waitForCompletion: true,
         startDate: DateTime(2026, 5, 10),
+        sortOrder: 7,
         reminders: const [
           RoutineReminder.time(540),
           RoutineReminder.spread(startMinute: 480, every: 120),
@@ -295,6 +296,7 @@ void main() {
       expect(back.intervalDays, 3);
       expect(back.waitForCompletion, isTrue);
       expect(back.startDate, DateTime(2026, 5, 10));
+      expect(back.sortOrder, 7);
       expect(back.reminders.length, 3);
       expect(back.reminders[0].type, RoutineReminder.typeTime);
       expect(back.reminders[0].value, 540);

@@ -135,6 +135,20 @@ class SettingsController with ChangeNotifier {
   BadgeMode _badgeMode = BadgeMode.todayTasks;
   BadgeMode get badgeMode => _badgeMode;
 
+  // When true, today's uncompleted routines are added to the app icon badge
+  // count (on top of whatever [badgeMode] counts). Ignored when the badge is
+  // off ([BadgeMode.none]).
+  bool _badgeIncludeRoutines = false;
+  bool get badgeIncludeRoutines => _badgeIncludeRoutines;
+
+  // Surface today's routines as a collapsible section in Tasks → Today, and in
+  // the Calendar day view. Both default off and are mirrored between the
+  // Routines / Tasks / Calendar settings pages.
+  bool _showRoutinesInToday = false;
+  bool get showRoutinesInToday => _showRoutinesInToday;
+  bool _showRoutinesInCalendar = false;
+  bool get showRoutinesInCalendar => _showRoutinesInCalendar;
+
   AnimationSpeed _animationSpeed = AnimationSpeed.normal;
   AnimationSpeed get animationSpeed => _animationSpeed;
 
@@ -277,6 +291,12 @@ class SettingsController with ChangeNotifier {
         _calendarAllowCreatingEvents = value != 'false';
       } else if (key == 'badge_mode') {
         _badgeMode = _decodeBadgeMode(value);
+      } else if (key == 'badge_include_routines') {
+        _badgeIncludeRoutines = value == 'true';
+      } else if (key == 'show_routines_in_today') {
+        _showRoutinesInToday = value == 'true';
+      } else if (key == 'show_routines_in_calendar') {
+        _showRoutinesInCalendar = value == 'true';
       } else if (key == 'animation_speed') {
         _animationSpeed = _decodeAnimationSpeed(value);
       } else if (key == 'default_task_icon') {
@@ -405,6 +425,27 @@ class SettingsController with ChangeNotifier {
     _badgeMode = mode;
     notifyListeners();
     await _db.setAppSetting('badge_mode', _encodeBadgeMode(mode));
+  }
+
+  Future<void> updateBadgeIncludeRoutines(bool value) async {
+    if (value == _badgeIncludeRoutines) return;
+    _badgeIncludeRoutines = value;
+    notifyListeners();
+    await _db.setAppSetting('badge_include_routines', value.toString());
+  }
+
+  Future<void> updateShowRoutinesInToday(bool value) async {
+    if (value == _showRoutinesInToday) return;
+    _showRoutinesInToday = value;
+    notifyListeners();
+    await _db.setAppSetting('show_routines_in_today', value.toString());
+  }
+
+  Future<void> updateShowRoutinesInCalendar(bool value) async {
+    if (value == _showRoutinesInCalendar) return;
+    _showRoutinesInCalendar = value;
+    notifyListeners();
+    await _db.setAppSetting('show_routines_in_calendar', value.toString());
   }
 
   Future<void> updateAnimationSpeed(AnimationSpeed speed) async {

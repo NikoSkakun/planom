@@ -77,6 +77,11 @@ class RoutineController with ChangeNotifier {
   /// Convenience for the default "today" view.
   List<Routine> get todayRoutines => routinesForDate(DateTime.now());
 
+  /// Count of today's routines that aren't completed yet (used by the app
+  /// icon badge when routines are included).
+  int get todayUncompletedCount =>
+      todayRoutines.where((r) => !isTodayCompleted(r)).length;
+
   bool _appearsOn(Routine r, DateTime day) {
     if (_epochDay(day) < _epochDay(startFloor(r))) return false;
     switch (r.frequencyType) {
@@ -224,10 +229,33 @@ class RoutineController with ChangeNotifier {
   // ── CRUD ───────────────────────────────────────────────────────────────────
 
   Future<void> addRoutine(Routine routine) async {
-    await _db.insertRoutine(routine);
-    _routines.add(routine);
+    // New routines go to the end of the manual order.
+    final maxOrder = _routines.fold<int>(
+        -1, (m, r) => r.sortOrder > m ? r.sortOrder : m);
+    final ordered = routine.sortOrder == 0
+        ? routine.copyWith(sortOrder: maxOrder + 1)
+        : routine;
+    await _db.insertRoutine(ordered);
+    _routines.add(ordered);
     notifyListeners();
-    _syncReminders(routine);
+    _syncReminders(ordered);
+  }
+
+  /// Moves the routine at [oldIndex] to [newIndex] within the full ordered
+  /// list and persists the new manual order.
+  Future<void> reorderRoutines(int oldIndex, int newIndex) async {
+    if (oldIndex < 0 || oldIndex >= _routines.length) return;
+    var target = newIndex;
+    if (target > oldIndex) target -= 1;
+    if (target < 0) target = 0;
+    if (target > _routines.length - 1) target = _routines.length - 1;
+    final moved = _routines.removeAt(oldIndex);
+    _routines.insert(target, moved);
+    for (var i = 0; i < _routines.length; i++) {
+      _routines[i] = _routines[i].copyWith(sortOrder: i);
+    }
+    notifyListeners();
+    await _db.updateRoutineSortOrders(_routines);
   }
 
   Future<void> updateRoutine(Routine updated) async {

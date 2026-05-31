@@ -30,6 +30,16 @@ void main() {
       expect(controller.routines.single.name, 'Water');
     });
 
+    test('todayUncompletedCount reflects completion', () async {
+      final a = achieveAll('A');
+      final b = achieveAll('B');
+      await controller.addRoutine(a);
+      await controller.addRoutine(b);
+      expect(controller.todayUncompletedCount, 2);
+      await controller.recordProgress(a);
+      expect(controller.todayUncompletedCount, 1);
+    });
+
     test('updateRoutine mutates record', () async {
       final r = achieveAll('Water');
       await controller.addRoutine(r);
@@ -196,6 +206,33 @@ void main() {
       final reloaded = fresh.routines.firstWhere((x) => x.id == r.id);
       expect(fresh.progressForDate(r.id, day), 3);
       expect(fresh.isCompletedOnDate(reloaded, day), isTrue);
+    });
+  });
+
+  group('reordering', () {
+    test('addRoutine assigns increasing sortOrder; order persists', () async {
+      await controller.addRoutine(achieveAll('A'));
+      await controller.addRoutine(achieveAll('B'));
+      await controller.addRoutine(achieveAll('C'));
+      expect(controller.routines.map((r) => r.name), ['A', 'B', 'C']);
+
+      // Move C (index 2) to the front (ReorderableListView semantics).
+      await controller.reorderRoutines(2, 0);
+      expect(controller.routines.map((r) => r.name), ['C', 'A', 'B']);
+
+      // Persisted: a fresh controller loads the same order.
+      final fresh = RoutineController(db);
+      await fresh.load();
+      expect(fresh.routines.map((r) => r.name), ['C', 'A', 'B']);
+    });
+
+    test('moving an item down lands after the target', () async {
+      await controller.addRoutine(achieveAll('A'));
+      await controller.addRoutine(achieveAll('B'));
+      await controller.addRoutine(achieveAll('C'));
+      // Move A down to index 2 (between/after B, C per ListView convention).
+      await controller.reorderRoutines(0, 2);
+      expect(controller.routines.map((r) => r.name), ['B', 'A', 'C']);
     });
   });
 

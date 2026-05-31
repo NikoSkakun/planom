@@ -10,6 +10,8 @@ import '../localization/strings.dart';
 import '../models/contact.dart';
 import '../models/event.dart';
 import '../models/task.dart';
+import '../routines/routine_controller.dart';
+import '../routines/routines_today_section.dart';
 import '../settings/settings_controller.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../tasks/task_controller.dart';
@@ -30,6 +32,7 @@ Future<void> showDayViewSheet(
   required FolderController folderController,
   required ContactController contactController,
   SettingsController? settingsController,
+  RoutineController? routineController,
   GoogleCalendarController? googleCalendarController,
 }) {
   return showModalBottomSheet<void>(
@@ -44,6 +47,7 @@ Future<void> showDayViewSheet(
       folderController: folderController,
       contactController: contactController,
       settingsController: settingsController,
+      routineController: routineController,
       googleCalendarController: googleCalendarController,
     ),
   );
@@ -58,6 +62,7 @@ class DayViewSheet extends StatefulWidget {
     required this.folderController,
     required this.contactController,
     this.settingsController,
+    this.routineController,
     this.googleCalendarController,
   });
 
@@ -67,6 +72,7 @@ class DayViewSheet extends StatefulWidget {
   final FolderController folderController;
   final ContactController contactController;
   final SettingsController? settingsController;
+  final RoutineController? routineController;
   final GoogleCalendarController? googleCalendarController;
 
   @override
@@ -277,6 +283,10 @@ class _DayViewSheetState extends State<DayViewSheet> {
                     widget.taskController,
                     widget.eventController,
                     widget.folderController,
+                    if (widget.routineController != null)
+                      widget.routineController!,
+                    if (widget.settingsController != null)
+                      widget.settingsController!,
                     if (widget.googleCalendarController != null)
                       widget.googleCalendarController!,
                   ]),
@@ -330,10 +340,17 @@ class _DayViewSheetState extends State<DayViewSheet> {
             ?.eventsForDate(widget.date) ??
         const <RemoteEvent>[];
 
+    final rc = widget.routineController;
+    final showRoutines =
+        (widget.settingsController?.showRoutinesInCalendar ?? false) &&
+            rc != null &&
+            rc.routinesForDate(widget.date).isNotEmpty;
+
     final isEmpty = tasks.isEmpty &&
         events.isEmpty &&
         remoteEvents.isEmpty &&
-        birthdays.isEmpty;
+        birthdays.isEmpty &&
+        !showRoutines;
 
     if (isEmpty) {
       return Center(
@@ -375,6 +392,19 @@ class _DayViewSheetState extends State<DayViewSheet> {
         ],
         ...activeChildren,
         ...pastChildren,
+        if (showRoutines)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            // The section uses 16px horizontal padding internally; offset the
+            // list's 20px padding so it lines up with the day's cards.
+            child: Transform.translate(
+              offset: const Offset(-4, 0),
+              child: RoutinesTodaySection(
+                controller: rc,
+                date: widget.date,
+              ),
+            ),
+          ),
       ],
     );
   }

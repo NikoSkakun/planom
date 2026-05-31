@@ -211,7 +211,9 @@ class _SettingsViewState extends State<SettingsView> {
               icon: CupertinoIcons.repeat,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
-                  builder: (_) => const RoutinesSettingsView(),
+                  builder: (_) => RoutinesSettingsView(
+                    controller: widget.controller,
+                  ),
                 ),
               ),
             ),

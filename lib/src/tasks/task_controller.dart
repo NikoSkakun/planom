@@ -39,6 +39,7 @@ class TaskController with ChangeNotifier {
   // the host (SpaceManager / main wiring) via [_eventCountToday].
   SettingsController? _settings;
   int Function()? _eventCountToday;
+  int Function()? _routineCountToday;
   VoidCallback? _settingsListener;
 
   /// Wires the data the badge needs from outside the controller. Pass the
@@ -48,12 +49,14 @@ class TaskController with ChangeNotifier {
   void attachBadgeContext({
     SettingsController? settings,
     int Function()? eventCountToday,
+    int Function()? routineCountToday,
   }) {
     if (_settings != null && _settingsListener != null) {
       _settings!.removeListener(_settingsListener!);
     }
     _settings = settings;
     _eventCountToday = eventCountToday;
+    _routineCountToday = routineCountToday;
     if (_settings != null) {
       _settingsListener = _updateBadge;
       _settings!.addListener(_settingsListener!);
@@ -640,6 +643,12 @@ class TaskController with ChangeNotifier {
         count = inboxUncompletedCount;
       case BadgeMode.allUncompleted:
         count = _topLevel.where((t) => !t.isCompleted).length;
+    }
+    // Optionally fold in today's uncompleted routines (not when the badge is
+    // off entirely).
+    if (mode != BadgeMode.none &&
+        (_settings?.badgeIncludeRoutines ?? false)) {
+      count += _routineCountToday?.call() ?? 0;
     }
     try {
       if (count > 0) {

@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart'
+    show ReorderableListView, ReorderableDelayedDragStartListener;
 
 import '../calendar/event_controller.dart';
 import '../database/database_service.dart';
@@ -276,12 +278,42 @@ class _AllContent extends StatelessWidget {
         hint: s.tapPlusFirstCreate,
       );
     }
-    return ListView.builder(
+    // Long-press a row to drag it into a new position; the order is shared by
+    // the Day view and persisted.
+    return ReorderableListView.builder(
+      padding: EdgeInsets.zero,
+      buildDefaultDragHandles: false,
+      onReorder: controller.reorderRoutines,
+      proxyDecorator: (child, index, animation) => _DragProxy(child: child),
       itemCount: routines.length,
-      itemBuilder: (context, index) => _AllRoutineRow(
-        routine: routines[index],
-        controller: controller,
+      itemBuilder: (context, index) {
+        final r = routines[index];
+        return ReorderableDelayedDragStartListener(
+          key: ValueKey(r.id),
+          index: index,
+          child: _AllRoutineRow(routine: r, controller: controller),
+        );
+      },
+    );
+  }
+}
+
+/// Cupertino-style lift visual for a dragged routine row (avoids the default
+/// Material elevation/decorator).
+class _DragProxy extends StatelessWidget {
+  const _DragProxy({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: CupertinoColors.secondarySystemBackground.resolveFrom(context),
+        boxShadow: const [
+          BoxShadow(color: AppColors.shadow, blurRadius: 16, offset: Offset(0, 6)),
+        ],
       ),
+      child: child,
     );
   }
 }

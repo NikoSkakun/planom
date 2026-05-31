@@ -131,13 +131,26 @@ class _NotificationsSettingsViewState
               const SizedBox(height: 8),
               ListenableBuilder(
                 listenable: widget.settingsController!,
-                builder: (ctx, _) => SettingsNavRow(
-                  label: s.appBadgeMode,
-                  trailingLabel: _badgeModeLabel(
-                      s, widget.settingsController!.badgeMode),
-                  onTap: () => _pickBadgeMode(
-                      ctx, widget.settingsController!),
-                ),
+                builder: (ctx, _) {
+                  final sc = widget.settingsController!;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SettingsNavRow(
+                        label: s.appBadgeMode,
+                        trailingLabel: _badgeModeLabel(s, sc.badgeMode),
+                        onTap: () => _pickBadgeMode(ctx, sc),
+                      ),
+                      const SizedBox(height: 1),
+                      SettingsToggleRow(
+                        label: s.appBadgeIncludeRoutines,
+                        value: sc.badgeIncludeRoutines,
+                        enabled: sc.badgeMode != BadgeMode.none,
+                        onChanged: sc.updateBadgeIncludeRoutines,
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 6),
               Padding(

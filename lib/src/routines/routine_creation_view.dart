@@ -83,7 +83,8 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
     _iconId = r?.iconId ?? kRoutineIconPresets[0].$1;
     _iconColor = r?.iconColor ?? kRoutineIconPresets[0].$2;
     _goalType = r?.goalType ?? 'achieve_all';
-    final unit = r?.goalUnit ?? 'ml';
+    // Default measurement unit is "count" for new routines.
+    final unit = r?.goalUnit ?? 'count';
     _useCustomUnit = !_kUnits.contains(unit);
     _goalUnit = _useCustomUnit ? 'count' : unit;
     _frequencyType = r?.frequencyType ?? 'daily';
@@ -680,7 +681,13 @@ class _SegmentedRow extends StatelessWidget {
           for (int i = 0; i < options.length; i++)
             i: Text(
               options[i],
-              style: const TextStyle(fontSize: 13),
+              // Explicit dynamic color: the control inherits the ambient
+              // DefaultTextStyle, which in the page body falls back to black
+              // and is invisible in dark mode.
+              style: TextStyle(
+                fontSize: 13,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
             ),
         },
         onValueChanged: (v) {

@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 28;
+  static const _dbVersion = 29;
 
   Database? _db;
 
@@ -148,7 +148,8 @@ class DatabaseService {
             startDate INTEGER,
             intervalDays INTEGER,
             waitForCompletion INTEGER NOT NULL DEFAULT 0,
-            reminders TEXT
+            reminders TEXT,
+            sortOrder INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -538,6 +539,18 @@ class DatabaseService {
               'ALTER TABLE routines ADD COLUMN waitForCompletion INTEGER NOT NULL DEFAULT 0');
           await db.execute('ALTER TABLE routines ADD COLUMN reminders TEXT');
         }
+        if (oldVersion < 29) {
+          // Manual routine ordering. Seed sortOrder from the existing
+          // creation-date order so the first reorder doesn't reshuffle.
+          await db.execute(
+              'ALTER TABLE routines ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0');
+          final rows =
+              await db.query('routines', orderBy: 'creationDate ASC');
+          for (var i = 0; i < rows.length; i++) {
+            await db.update('routines', {'sortOrder': i},
+                where: 'id = ?', whereArgs: [rows[i]['id']]);
+          }
+        }
       },
     );
   }
@@ -905,8 +918,19 @@ class DatabaseService {
   // Routines
   Future<List<Routine>> getRoutines() async {
     final db = await _database;
-    final rows = await db.query('routines', orderBy: 'creationDate ASC');
+    final rows = await db.query('routines',
+        orderBy: 'sortOrder ASC, creationDate ASC');
     return rows.map(Routine.fromMap).toList();
+  }
+
+  Future<void> updateRoutineSortOrders(List<Routine> routines) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final r in routines) {
+      batch.update('routines', {'sortOrder': r.sortOrder},
+          where: 'id = ?', whereArgs: [r.id]);
+    }
+    await batch.commit(noResult: true);
   }
 
   Future<void> insertRoutine(Routine routine) async {

@@ -36,6 +36,7 @@ class SelectableTaskListShell extends StatefulWidget {
     required this.tasks,
     this.emptyText,
     this.beforeContent,
+    this.betweenContent,
     this.showCompletedSection = true,
   });
 
@@ -54,6 +55,11 @@ class SelectableTaskListShell extends StatefulWidget {
   /// Optional widget inserted before the task list — used by views that
   /// want to render extra context (e.g. a date header).
   final Widget? beforeContent;
+
+  /// Optional widget inserted between the incomplete tasks and the Completed
+  /// section — used by Today to show a routines section. Hidden while in
+  /// selection mode.
+  final Widget? betweenContent;
 
   /// When true, completed tasks are tucked into a collapsible "Completed"
   /// section at the bottom (mirroring user lists) instead of trailing inline.
@@ -310,7 +316,17 @@ class _SelectableTaskListShellState extends State<SelectableTaskListShell>
   }
 
   Widget _buildBody(BuildContext context, List<Task> tasks, S s) {
+    // The routines section (if any) is shown outside selection mode.
+    final between =
+        (!_selection.active) ? widget.betweenContent : null;
+
     if (tasks.isEmpty) {
+      if (between != null) {
+        return ListView(
+          padding: const EdgeInsets.only(top: 4, bottom: 80),
+          children: [between],
+        );
+      }
       return Center(
         child: Text(
           widget.emptyText ?? s.noTasks,
@@ -346,6 +362,7 @@ class _SelectableTaskListShellState extends State<SelectableTaskListShell>
         physics: const NeverScrollableScrollPhysics(),
       ));
     }
+    if (between != null) children.add(between);
     if (completed.isNotEmpty) {
       children.add(CompletedSectionHeader(
         count: completed.length,
