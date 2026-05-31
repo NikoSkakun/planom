@@ -63,8 +63,15 @@ class _TaskDetailViewState extends State<TaskDetailView>
   late String? _listId;
   late int _priority;
   bool _deleted = false;
+  bool _disposed = false;
   bool _isEditingNote = false;
   Timer? _autosaveTimer;
+
+  // Single-flight guard for the async save: only one write runs at a time,
+  // and any change arriving mid-write queues exactly one more pass with the
+  // latest text, so writes stay ordered and trailing edits are never dropped.
+  bool _saving = false;
+  bool _resaveRequested = false;
 
   @override
   void initState() {
@@ -88,6 +95,10 @@ class _TaskDetailViewState extends State<TaskDetailView>
 
   void _onNoteFocusChanged() {
     if (!mounted) return;
+    // Losing note focus (keyboard dismissed, tab switch, tapping elsewhere)
+    // must persist immediately — the debounce might not fire before the view
+    // is torn down or the process is killed.
+    if (!_noteFocus.hasFocus) _flushSave();
     setState(() {
       if (!_noteFocus.hasFocus) _isEditingNote = false;
     });
@@ -111,13 +122,49 @@ class _TaskDetailViewState extends State<TaskDetailView>
     _autosaveTimer = Timer(const Duration(seconds: 3), _save);
   }
 
-  void _save() {
+  /// Cancels any pending debounce and saves now. Awaitable so callers that
+  /// can wait (lifecycle/pop) give the write a chance to land first.
+  Future<void> _flushSave() {
+    _autosaveTimer?.cancel();
+    return _save();
+  }
+
+  /// Serializes saves so only one write runs at a time and the newest text
+  /// always wins, even when several triggers (debounce, focus loss, pop,
+  /// lifecycle) fire close together.
+  Future<void> _save() async {
+    if (_deleted) return;
+    if (_saving) {
+      _resaveRequested = true;
+      return;
+    }
+    _saving = true;
+    try {
+      do {
+        _resaveRequested = false;
+        await _persistOnce();
+      } while (_resaveRequested && !_deleted && !_disposed);
+    } finally {
+      _saving = false;
+    }
+  }
+
+  Future<void> _persistOnce() async {
     if (_deleted) return;
     final title = _title.text.trim();
-    if (title.isEmpty) return;
-    widget.controller.updateTask(widget.task.copyWith(
+    // Persist the note body exactly as typed — trimming would silently drop
+    // leading indentation (meaningful in markdown) and trailing blank lines.
+    // Only a completely empty field maps to "no note". Captured before any
+    // await so it stays valid even when the final save fires from dispose().
+    final noteText = _note.text;
+    final note = noteText.isEmpty ? null : noteText;
+    // Don't drop a non-empty note just because the title was momentarily
+    // cleared — only skip the write when there's genuinely nothing to save.
+    if (title.isEmpty && noteText.trim().isEmpty) return;
+    await widget.controller.updateTask(widget.task.copyWith(
       title: title,
-      note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+      note: note,
+      clearNote: note == null,
       dueDate: _dueDate,
       clearDueDate: _dueDate == null,
       doTime: _doTime,
@@ -162,17 +209,24 @@ class _TaskDetailViewState extends State<TaskDetailView>
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
-      _autosaveTimer?.cancel();
-      _save();
+      _flushSave();
     }
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _autosaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
-    _save();
+    // Detach the change/focus listeners first so disposing the controllers
+    // and focus node below can't re-enter the save path.
+    _title.removeListener(_scheduleAutosave);
+    _note.removeListener(_scheduleAutosave);
     _noteFocus.removeListener(_onNoteFocusChanged);
+    // Best-effort final save. `_persistOnce` reads the controllers
+    // synchronously before its first await, so the in-flight write stays
+    // valid even though we dispose them on the next lines.
+    _save();
     _noteFocus.dispose();
     _title.dispose();
     _note.dispose();
@@ -443,18 +497,29 @@ class _TaskDetailViewState extends State<TaskDetailView>
         final showTags = fields?.showTags ?? true;
         final showReminders = fields?.showReminders ?? true;
         final useMarkdown = fields?.useMarkdown ?? true;
-        return _buildScaffold(
-          context,
-          s,
-          showToolbar && useMarkdown,
-          showPriority: showPriority,
-          showDate: showDate,
-          showRepeat: showRepeat,
-          showList: showList,
-          showDuration: showDuration,
-          showTags: showTags,
-          showReminders: showReminders,
-          useMarkdown: useMarkdown,
+        return PopScope(
+          // The pop completes immediately for iOS swipe-back; unfocusing here
+          // commits any in-flight IME composition into the controllers before
+          // dispose() runs the final save, so the last typed word isn't lost.
+          canPop: true,
+          onPopInvokedWithResult: (didPop, _) {
+            _noteFocus.unfocus();
+            FocusManager.instance.primaryFocus?.unfocus();
+            _flushSave();
+          },
+          child: _buildScaffold(
+            context,
+            s,
+            showToolbar && useMarkdown,
+            showPriority: showPriority,
+            showDate: showDate,
+            showRepeat: showRepeat,
+            showList: showList,
+            showDuration: showDuration,
+            showTags: showTags,
+            showReminders: showReminders,
+            useMarkdown: useMarkdown,
+          ),
         );
       },
     );
