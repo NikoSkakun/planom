@@ -283,6 +283,7 @@ class _CalendarViewState extends State<CalendarView> {
           ],
           today: _now,
           continuous: true,
+          firstDayOfWeek: _firstDay,
           controller: widget.controller,
           folderController: widget.folderController,
           eventController: widget.eventController,
@@ -596,6 +597,7 @@ class _WeekRow extends StatelessWidget {
     required this.googleCalendarController,
     required this.onDayTap,
     this.continuous = false,
+    this.firstDayOfWeek = DateTime.monday,
   });
 
   final List<DateTime?> days;
@@ -608,8 +610,10 @@ class _WeekRow extends StatelessWidget {
   final ValueChanged<DateTime> onDayTap;
 
   /// In the continuous (gap-free) view, day cells mark the 1st of each month
-  /// with an inline month label instead of relying on per-month headers.
+  /// with an inline month label and draw a semi-bold divider where one month
+  /// ends and the next begins.
   final bool continuous;
+  final int firstDayOfWeek;
 
   @override
   Widget build(BuildContext context) {
@@ -622,6 +626,7 @@ class _WeekRow extends StatelessWidget {
                     date: day,
                     today: today,
                     continuous: continuous,
+                    firstDayOfWeek: firstDayOfWeek,
                     controller: controller,
                     folderController: folderController,
                     eventController: eventController,
@@ -649,11 +654,13 @@ class _DayCell extends StatelessWidget {
     required this.googleCalendarController,
     required this.onTap,
     this.continuous = false,
+    this.firstDayOfWeek = DateTime.monday,
   });
 
   final DateTime? date;
   final DateTime today;
   final bool continuous;
+  final int firstDayOfWeek;
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
@@ -666,6 +673,32 @@ class _DayCell extends StatelessWidget {
       date!.year == today.year &&
       date!.month == today.month &&
       date!.day == today.day;
+
+  /// Cell border. In the continuous view a semi-bold line marks the month
+  /// boundary: the new month's first-week cells get a heavier top edge (the
+  /// cell directly above them, 7 days earlier, belongs to the previous month),
+  /// and the 1st itself gets a heavier left edge so the stepped divider stays
+  /// connected where the boundary falls mid-row.
+  Border _cellBorder(BuildContext context) {
+    final faint = BorderSide(
+      color: CupertinoColors.separator.resolveFrom(context),
+      width: 0.5,
+    );
+    if (!continuous || date == null) return Border(top: faint);
+
+    final divider = BorderSide(
+      color: CupertinoColors.systemGrey2.resolveFrom(context),
+      width: 1.5,
+    );
+    // day <= 7 ⟺ the cell 7 days earlier is in the previous month.
+    final isMonthStartRow = date!.day <= 7;
+    final needsLeftConnector =
+        date!.day == 1 && weekdayColumn(date!, firstDayOfWeek) != 0;
+    return Border(
+      top: isMonthStartRow ? divider : faint,
+      left: needsLeftConnector ? divider : BorderSide.none,
+    );
+  }
 
   /// The day number, wrapped in the "today" accent pill when applicable. In the
   /// continuous view, the 1st of each month is prefixed with the month's short
@@ -724,14 +757,7 @@ class _DayCell extends StatelessWidget {
     if (date == null) {
       return Container(
         constraints: const BoxConstraints(minHeight: 88),
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: CupertinoColors.separator.resolveFrom(context),
-              width: 0.5,
-            ),
-          ),
-        ),
+        decoration: BoxDecoration(border: _cellBorder(context)),
       );
     }
 
@@ -767,12 +793,7 @@ class _DayCell extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 88),
         decoration: BoxDecoration(
           color: highlighted ? AppColors.accent.withOpacity(0.15) : null,
-          border: Border(
-            top: BorderSide(
-              color: CupertinoColors.separator.resolveFrom(context),
-              width: 0.5,
-            ),
-          ),
+          border: _cellBorder(context),
         ),
         padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
         child: Column(
