@@ -214,6 +214,9 @@ class S {
   String get undoOnComplete => t('undoOnComplete');
   String get undoOnCompleteHint => t('undoOnCompleteHint');
   String get firstDayOfWeek => t('firstDayOfWeek');
+  String get calendarView => t('calendarView');
+  String get calendarViewMonths => t('calendarViewMonths');
+  String get calendarViewContinuous => t('calendarViewContinuous');
   String get appBadge => t('appBadge');
   String get appBadgeMode => t('appBadgeMode');
   String get appBadgeHint => t('appBadgeHint');
@@ -772,6 +775,9 @@ const Map<String, String> _en = {
   'undoOnCompleteHint':
       'Show a brief Undo banner when you check a task off, so an accidental tap is easy to reverse.',
   'firstDayOfWeek': 'First day of week',
+  'calendarView': 'View',
+  'calendarViewMonths': 'Months',
+  'calendarViewContinuous': 'Continuous',
   'appBadge': 'APP ICON BADGE',
   'appBadgeMode': 'Show as badge',
   'appBadgeHint': 'The number shown on the app icon on your home screen.',
@@ -1045,6 +1051,7 @@ const Map<String, String> _uk = {
   'confirm': 'Підтвердити', 'insert': 'Вставити', 'move': 'Перемістити',
   'putBack': 'Відновити', 'clear': 'Очистити', 'untitled': 'Без назви',
   'tabTasks': 'Завдання', 'tabNotes': 'Нотатки', 'tabCalendar': 'Календар',
+  'calendarView': 'Вигляд', 'calendarViewMonths': 'Місяці', 'calendarViewContinuous': 'Безперервний',
   'tabRoutines': 'Звички', 'tabSettings': 'Налаштування',
   'inbox': 'Вхідні', 'today': 'Сьогодні', 'yesterday': 'Вчора', 'tomorrow': 'Завтра', 'upcoming': 'Майбутні',
   'allTasks': 'Всі завдання',
@@ -1181,6 +1188,7 @@ const Map<String, String> _es = {
   'confirm': 'Confirmar', 'insert': 'Insertar', 'move': 'Mover',
   'putBack': 'Restaurar', 'clear': 'Borrar', 'untitled': 'Sin título',
   'tabTasks': 'Tareas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendario',
+  'calendarView': 'Vista', 'calendarViewMonths': 'Meses', 'calendarViewContinuous': 'Continuo',
   'tabRoutines': 'Rutinas', 'tabSettings': 'Ajustes',
   'inbox': 'Bandeja', 'today': 'Hoy', 'yesterday': 'Ayer', 'tomorrow': 'Mañana', 'upcoming': 'Próximas',
   'allTasks': 'Todas las tareas',
@@ -1317,6 +1325,7 @@ const Map<String, String> _fr = {
   'confirm': 'Confirmer', 'insert': 'Insérer', 'move': 'Déplacer',
   'putBack': 'Restaurer', 'clear': 'Effacer', 'untitled': 'Sans titre',
   'tabTasks': 'Tâches', 'tabNotes': 'Notes', 'tabCalendar': 'Calendrier',
+  'calendarView': 'Affichage', 'calendarViewMonths': 'Mois', 'calendarViewContinuous': 'Continu',
   'tabRoutines': 'Routines', 'tabSettings': 'Réglages',
   'inbox': 'Boîte', 'today': "Aujourd'hui", 'yesterday': 'Hier', 'tomorrow': 'Demain', 'upcoming': 'À venir',
   'allTasks': 'Toutes les tâches',
@@ -1453,6 +1462,7 @@ const Map<String, String> _de = {
   'confirm': 'Bestätigen', 'insert': 'Einfügen', 'move': 'Verschieben',
   'putBack': 'Wiederherstellen', 'clear': 'Löschen', 'untitled': 'Ohne Titel',
   'tabTasks': 'Aufgaben', 'tabNotes': 'Notizen', 'tabCalendar': 'Kalender',
+  'calendarView': 'Ansicht', 'calendarViewMonths': 'Monate', 'calendarViewContinuous': 'Fortlaufend',
   'tabRoutines': 'Routinen', 'tabSettings': 'Einstellungen',
   'inbox': 'Eingang', 'today': 'Heute', 'yesterday': 'Gestern', 'tomorrow': 'Morgen', 'upcoming': 'Anstehend',
   'allTasks': 'Alle Aufgaben',
@@ -1589,6 +1599,7 @@ const Map<String, String> _it = {
   'confirm': 'Conferma', 'insert': 'Inserisci', 'move': 'Sposta',
   'putBack': 'Ripristina', 'clear': 'Cancella', 'untitled': 'Senza titolo',
   'tabTasks': 'Attività', 'tabNotes': 'Note', 'tabCalendar': 'Calendario',
+  'calendarView': 'Vista', 'calendarViewMonths': 'Mesi', 'calendarViewContinuous': 'Continuo',
   'tabRoutines': 'Abitudini', 'tabSettings': 'Impostazioni',
   'inbox': 'In arrivo', 'today': 'Oggi', 'yesterday': 'Ieri', 'tomorrow': 'Domani', 'upcoming': 'In arrivo',
   'allTasks': 'Tutte le attività',
@@ -1725,6 +1736,7 @@ const Map<String, String> _pt = {
   'confirm': 'Confirmar', 'insert': 'Inserir', 'move': 'Mover',
   'putBack': 'Restaurar', 'clear': 'Limpar', 'untitled': 'Sem título',
   'tabTasks': 'Tarefas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendário',
+  'calendarView': 'Visualização', 'calendarViewMonths': 'Meses', 'calendarViewContinuous': 'Contínuo',
   'tabRoutines': 'Rotinas', 'tabSettings': 'Ajustes',
   'inbox': 'Caixa', 'today': 'Hoje', 'yesterday': 'Ontem', 'tomorrow': 'Amanhã', 'upcoming': 'Próximas',
   'allTasks': 'Todas as tarefas',
@@ -1861,6 +1873,7 @@ const Map<String, String> _ru = {
   'confirm': 'Подтвердить', 'insert': 'Вставить', 'move': 'Переместить',
   'putBack': 'Восстановить', 'clear': 'Очистить', 'untitled': 'Без названия',
   'tabTasks': 'Задачи', 'tabNotes': 'Заметки', 'tabCalendar': 'Календарь',
+  'calendarView': 'Вид', 'calendarViewMonths': 'Месяцы', 'calendarViewContinuous': 'Непрерывный',
   'tabRoutines': 'Привычки', 'tabSettings': 'Настройки',
   'inbox': 'Входящие', 'today': 'Сегодня', 'yesterday': 'Вчера', 'tomorrow': 'Завтра', 'upcoming': 'Предстоящие',
   'allTasks': 'Все задачи',
@@ -1996,6 +2009,7 @@ const Map<String, String> _zh = {
   'confirm': '确认', 'insert': '插入', 'move': '移动',
   'putBack': '恢复', 'clear': '清除', 'untitled': '无标题',
   'tabTasks': '任务', 'tabNotes': '笔记', 'tabCalendar': '日历',
+  'calendarView': '视图', 'calendarViewMonths': '按月', 'calendarViewContinuous': '连续',
   'tabRoutines': '习惯', 'tabSettings': '设置',
   'inbox': '收件箱', 'today': '今天', 'yesterday': '昨天', 'tomorrow': '明天', 'upcoming': '即将',
   'allTasks': '所有任务',
@@ -2131,6 +2145,7 @@ const Map<String, String> _ja = {
   'confirm': '確認', 'insert': '挿入', 'move': '移動',
   'putBack': '戻す', 'clear': 'クリア', 'untitled': '無題',
   'tabTasks': 'タスク', 'tabNotes': 'ノート', 'tabCalendar': 'カレンダー',
+  'calendarView': '表示', 'calendarViewMonths': '月別', 'calendarViewContinuous': '連続',
   'tabRoutines': '習慣', 'tabSettings': '設定',
   'inbox': '受信箱', 'today': '今日', 'yesterday': '昨日', 'tomorrow': '明日', 'upcoming': '今後',
   'allTasks': 'すべてのタスク',

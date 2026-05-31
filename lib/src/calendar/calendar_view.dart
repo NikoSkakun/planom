@@ -18,9 +18,8 @@ import '../notes/note_controller.dart';
 import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
-import '../settings/settings_menu.dart';
 import '../tasks/task_controller.dart';
-import '../utils/dropdown_overlay.dart';
+import '../utils/selection_menu.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
 import 'day_view_sheet.dart';
@@ -58,11 +57,16 @@ class CalendarView extends StatefulWidget {
   State<CalendarView> createState() => _CalendarViewState();
 }
 
-class _CalendarViewState extends State<CalendarView>
-    with DropdownOverlayMixin {
+class _CalendarViewState extends State<CalendarView> {
   static const _pastMonths = 600;
   static const _futureMonths = 600;
   static const _avgMonthPx = 481.0;
+
+  // Continuous (gap-free) view counts weeks instead of months. ~52 years each
+  // way. Each week row is ~88px tall (the day-cell min height).
+  static const _pastWeeks = 2700;
+  static const _futureWeeks = 2700;
+  static const _weekPx = 88.0;
 
   late final DateTime _now;
   late final DateTime _currentMonth;
@@ -71,6 +75,11 @@ class _CalendarViewState extends State<CalendarView>
   late int _visibleYear;
   int _visibleMonthEpoch = 0;
   Timer? _prefetchDebounce;
+
+  // Mirrored from the settings controller so the sliver structure rebuilds
+  // when the user switches view mode or first-day-of-week.
+  late CalendarViewMode _viewMode;
+  late int _firstDay;
 
   /// Months on either side of the visible month we eagerly pull from Google.
   /// Sized so a fast scroll has data ready by the time the cells appear.
@@ -83,9 +92,13 @@ class _CalendarViewState extends State<CalendarView>
     _currentMonth = DateTime(_now.year, _now.month, 1);
     _visibleYear = _now.year;
     _visibleMonthEpoch = _now.year * 12 + _now.month - 1;
+    _viewMode =
+        widget.settingsController?.calendarViewMode ?? CalendarViewMode.months;
+    _firstDay = widget.settingsController?.firstDayOfWeek ?? DateTime.monday;
     _scrollCtrl = ScrollController();
     _scrollCtrl.addListener(_onScroll);
     widget.resetSignal.addListener(_scrollToCurrentMonth);
+    widget.settingsController?.addListener(_onSettingsChanged);
     // Pre-warm Google Calendar around the current month so the user sees
     // events immediately when they open the tab.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -96,18 +109,53 @@ class _CalendarViewState extends State<CalendarView>
   @override
   void dispose() {
     widget.resetSignal.removeListener(_scrollToCurrentMonth);
+    widget.settingsController?.removeListener(_onSettingsChanged);
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
     _prefetchDebounce?.cancel();
     super.dispose();
   }
 
+  /// Switching view mode or first-day-of-week changes the whole sliver layout
+  /// (month grids vs. continuous weeks), so rebuild and re-anchor to today.
+  void _onSettingsChanged() {
+    final sc = widget.settingsController;
+    if (sc == null) return;
+    if (sc.calendarViewMode == _viewMode && sc.firstDayOfWeek == _firstDay) {
+      return;
+    }
+    setState(() {
+      _viewMode = sc.calendarViewMode;
+      _firstDay = sc.firstDayOfWeek;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients) _scrollCtrl.jumpTo(0.0);
+    });
+  }
+
+  /// Start of the week (aligned to [_firstDay]) that contains today. Anchor for
+  /// the continuous view's bidirectional scroll.
+  DateTime get _anchorWeekStart {
+    final col = weekdayColumn(_now, _firstDay);
+    return DateTime(_now.year, _now.month, _now.day - col);
+  }
+
   void _onScroll() {
     if (!_scrollCtrl.hasClients) return;
-    final monthsFromNow = (_scrollCtrl.offset / _avgMonthPx).round();
-    final epochMonths = _now.year * 12 + _now.month - 1 + monthsFromNow;
-    final year = epochMonths ~/ 12;
-    if (year != _visibleYear) setState(() => _visibleYear = year);
+    final int epochMonths;
+    if (_viewMode == CalendarViewMode.continuous) {
+      final weeksFromNow = (_scrollCtrl.offset / _weekPx).round();
+      final a = _anchorWeekStart;
+      // Pick mid-week so the reported month/year matches what's centred.
+      final mid = DateTime(a.year, a.month, a.day + weeksFromNow * 7 + 3);
+      epochMonths = mid.year * 12 + mid.month - 1;
+      if (mid.year != _visibleYear) setState(() => _visibleYear = mid.year);
+    } else {
+      final monthsFromNow = (_scrollCtrl.offset / _avgMonthPx).round();
+      epochMonths = _now.year * 12 + _now.month - 1 + monthsFromNow;
+      final year = epochMonths ~/ 12;
+      if (year != _visibleYear) setState(() => _visibleYear = year);
+    }
     if (epochMonths != _visibleMonthEpoch) {
       _visibleMonthEpoch = epochMonths;
       _requestPrefetch(epochMonths);
@@ -152,17 +200,24 @@ class _CalendarViewState extends State<CalendarView>
   /// Scrolls so that the row containing [date] sits near the top of the
   /// visible calendar area, then opens the day sheet.
   Future<void> _openDay(DateTime date) async {
-    final monthsFromNow =
-        (date.year - _now.year) * 12 + (date.month - _now.month);
-    final firstDay = widget.settingsController?.firstDayOfWeek ?? DateTime.monday;
-    final firstWeekday =
-        weekdayColumn(DateTime(date.year, date.month, 1), firstDay);
-    final weekIndex = (firstWeekday + date.day - 1) ~/ 7;
-
-    // Approximate: month header ~30px, each week row ~88px.
-    const headerPx = 30.0;
-    const weekPx = 88.0;
-    final target = monthsFromNow * _avgMonthPx + headerPx + weekIndex * weekPx;
+    final double target;
+    if (_viewMode == CalendarViewMode.continuous) {
+      final weekStart = DateTime(
+          date.year, date.month, date.day - weekdayColumn(date, _firstDay));
+      // Round to absorb DST hour drift in the day difference.
+      final weeks =
+          (weekStart.difference(_anchorWeekStart).inDays / 7).round();
+      target = weeks * _weekPx;
+    } else {
+      final monthsFromNow =
+          (date.year - _now.year) * 12 + (date.month - _now.month);
+      final firstWeekday =
+          weekdayColumn(DateTime(date.year, date.month, 1), _firstDay);
+      final weekIndex = (firstWeekday + date.day - 1) ~/ 7;
+      // Approximate: month header ~30px, each week row ~88px.
+      const headerPx = 30.0;
+      target = monthsFromNow * _avgMonthPx + headerPx + weekIndex * _weekPx;
+    }
 
     if (_scrollCtrl.hasClients) {
       final maxExtent = _scrollCtrl.position.maxScrollExtent;
@@ -192,21 +247,22 @@ class _CalendarViewState extends State<CalendarView>
     widget.onDaySelected?.call(null);
   }
 
+  Listenable get _dataListenable => Listenable.merge([
+        widget.controller,
+        widget.folderController,
+        widget.eventController,
+        widget.contactController,
+        if (widget.googleCalendarController != null)
+          widget.googleCalendarController!,
+        if (widget.settingsController != null) widget.settingsController!,
+      ]);
+
   Widget _buildMonth(DateTime month) => ListenableBuilder(
-        listenable: Listenable.merge([
-          widget.controller,
-          widget.folderController,
-          widget.eventController,
-          widget.contactController,
-          if (widget.googleCalendarController != null)
-            widget.googleCalendarController!,
-          if (widget.settingsController != null) widget.settingsController!,
-        ]),
+        listenable: _dataListenable,
         builder: (context, _) => _MonthSection(
           month: month,
           today: _now,
-          firstDayOfWeek:
-              widget.settingsController?.firstDayOfWeek ?? DateTime.monday,
+          firstDayOfWeek: _firstDay,
           controller: widget.controller,
           folderController: widget.folderController,
           eventController: widget.eventController,
@@ -216,42 +272,117 @@ class _CalendarViewState extends State<CalendarView>
         ),
       );
 
+  /// One continuous-view week row of 7 consecutive days, [weekStart] aligned
+  /// to [_firstDay].
+  Widget _buildWeek(DateTime weekStart) => ListenableBuilder(
+        listenable: _dataListenable,
+        builder: (context, _) => _WeekRow(
+          days: [
+            for (var i = 0; i < 7; i++)
+              DateTime(weekStart.year, weekStart.month, weekStart.day + i),
+          ],
+          today: _now,
+          continuous: true,
+          controller: widget.controller,
+          folderController: widget.folderController,
+          eventController: widget.eventController,
+          contactController: widget.contactController,
+          googleCalendarController: widget.googleCalendarController,
+          onDayTap: _openDay,
+        ),
+      );
+
+  DateTime _weekStartBefore(int n) {
+    final a = _anchorWeekStart;
+    return DateTime(a.year, a.month, a.day - n * 7);
+  }
+
+  DateTime _weekStartAfter(int n) {
+    final a = _anchorWeekStart;
+    return DateTime(a.year, a.month, a.day + n * 7);
+  }
+
   void _openSettings(BuildContext context) {
     HomeShell.openGlobalSettings(context);
   }
 
-  void _showSettingsMenu(BuildContext context) {
-    showDropdown(
-      context,
-      (dismiss) => SettingsMenuOverlay(
-        onDismiss: dismiss,
-        onSettings: () {
-          dismiss();
-          _openSettings(context);
-        },
-      ),
+  Future<void> _showCalendarMenu(BuildContext context) async {
+    final sc = widget.settingsController;
+    final settingsHidden = sc != null && !sc.isTabVisible(4);
+    final s = S.of(context);
+    final action = await showSelectionMenu<String>(
+      context: context,
+      anchor: SelectionMenuAnchor.topRight,
+      options: [
+        SelectionMenuOption(
+          value: 'view',
+          label: s.calendarView,
+          icon: CupertinoIcons.calendar,
+        ),
+        if (settingsHidden)
+          SelectionMenuOption(
+            value: 'settings',
+            label: s.settings,
+            icon: CupertinoIcons.gear_alt,
+          ),
+      ],
     );
+    if (!context.mounted) return;
+    if (action == 'view') {
+      await _showViewModeMenu(context);
+    } else if (action == 'settings') {
+      _openSettings(context);
+    }
+  }
+
+  Future<void> _showViewModeMenu(BuildContext context) async {
+    final sc = widget.settingsController;
+    final s = S.of(context);
+    final mode = await showSelectionMenu<CalendarViewMode>(
+      context: context,
+      anchor: SelectionMenuAnchor.topRight,
+      title: s.calendarView,
+      current: _viewMode,
+      options: [
+        SelectionMenuOption(
+          value: CalendarViewMode.months,
+          label: s.calendarViewMonths,
+          icon: CupertinoIcons.calendar,
+        ),
+        SelectionMenuOption(
+          value: CalendarViewMode.continuous,
+          label: s.calendarViewContinuous,
+          icon: CupertinoIcons.list_bullet,
+        ),
+      ],
+    );
+    if (mode == null) return;
+    if (sc != null) {
+      // Persists + notifies → _onSettingsChanged rebuilds and re-anchors.
+      await sc.updateCalendarViewMode(mode);
+    } else if (mode != _viewMode) {
+      setState(() => _viewMode = mode);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollCtrl.hasClients) _scrollCtrl.jumpTo(0.0);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final sc = widget.settingsController;
-    final settingsHidden = sc != null && !sc.isTabVisible(4);
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
         middle: Text('$_visibleYear'),
-        trailing: settingsHidden
-            ? Semantics(
-                label: S.of(context).settings,
-                button: true,
-                child: CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () => _showSettingsMenu(context),
-                  child: const Icon(CupertinoIcons.ellipsis, size: 26),
-                ),
-              )
-            : null,
+        trailing: Semantics(
+          label: S.of(context).calendarView,
+          button: true,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => _showCalendarMenu(context),
+            child: const Icon(CupertinoIcons.ellipsis, size: 26),
+          ),
+        ),
       ),
       child: SafeArea(
         child: _maybeWrapWithSearchPull(
@@ -267,27 +398,15 @@ class _CalendarViewState extends State<CalendarView>
             ),
             Expanded(
               child: CustomScrollView(
+                // Re-key per mode so switching layouts rebuilds the scroll
+                // structure cleanly (the controller re-attaches and we jump
+                // back to the current anchor post-frame).
+                key: ValueKey(_viewMode),
                 center: _centerKey,
                 controller: _scrollCtrl,
-                slivers: [
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (_, i) => _buildMonth(_monthBefore(i + 1)),
-                      childCount: _pastMonths,
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    key: _centerKey,
-                    child: _buildMonth(_currentMonth),
-                  ),
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (_, i) => _buildMonth(_monthAfter(i + 1)),
-                      childCount: _futureMonths,
-                    ),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 120)),
-                ],
+                slivers: _viewMode == CalendarViewMode.continuous
+                    ? _continuousSlivers()
+                    : _monthSlivers(),
               ),
             ),
           ],
@@ -296,6 +415,46 @@ class _CalendarViewState extends State<CalendarView>
       ),
     );
   }
+
+  List<Widget> _monthSlivers() => [
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (_, i) => _buildMonth(_monthBefore(i + 1)),
+            childCount: _pastMonths,
+          ),
+        ),
+        SliverToBoxAdapter(
+          key: _centerKey,
+          child: _buildMonth(_currentMonth),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (_, i) => _buildMonth(_monthAfter(i + 1)),
+            childCount: _futureMonths,
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 120)),
+      ];
+
+  List<Widget> _continuousSlivers() => [
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (_, i) => _buildWeek(_weekStartBefore(i + 1)),
+            childCount: _pastWeeks,
+          ),
+        ),
+        SliverToBoxAdapter(
+          key: _centerKey,
+          child: _buildWeek(_anchorWeekStart),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (_, i) => _buildWeek(_weekStartAfter(i + 1)),
+            childCount: _futureWeeks,
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 120)),
+      ];
 
   Widget _maybeWrapWithSearchPull({required Widget child}) {
     if (widget.db == null || widget.noteController == null) return child;
@@ -436,6 +595,7 @@ class _WeekRow extends StatelessWidget {
     required this.contactController,
     required this.googleCalendarController,
     required this.onDayTap,
+    this.continuous = false,
   });
 
   final List<DateTime?> days;
@@ -447,6 +607,10 @@ class _WeekRow extends StatelessWidget {
   final GoogleCalendarController? googleCalendarController;
   final ValueChanged<DateTime> onDayTap;
 
+  /// In the continuous (gap-free) view, day cells mark the 1st of each month
+  /// with an inline month label instead of relying on per-month headers.
+  final bool continuous;
+
   @override
   Widget build(BuildContext context) {
     return IntrinsicHeight(
@@ -457,6 +621,7 @@ class _WeekRow extends StatelessWidget {
                   child: _DayCell(
                     date: day,
                     today: today,
+                    continuous: continuous,
                     controller: controller,
                     folderController: folderController,
                     eventController: eventController,
@@ -483,10 +648,12 @@ class _DayCell extends StatelessWidget {
     required this.contactController,
     required this.googleCalendarController,
     required this.onTap,
+    this.continuous = false,
   });
 
   final DateTime? date;
   final DateTime today;
+  final bool continuous;
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
@@ -499,6 +666,58 @@ class _DayCell extends StatelessWidget {
       date!.year == today.year &&
       date!.month == today.month &&
       date!.day == today.day;
+
+  /// The day number, wrapped in the "today" accent pill when applicable. In the
+  /// continuous view, the 1st of each month is prefixed with the month's short
+  /// name so month boundaries read clearly without a separating header.
+  Widget _buildDayLabel(BuildContext context) {
+    final numberPill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: _isToday
+          ? BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(20),
+            )
+          : null,
+      child: Text(
+        '${date!.day}',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: _isToday ? FontWeight.w700 : FontWeight.normal,
+          color: _isToday
+              ? CupertinoColors.white
+              : CupertinoColors.label.resolveFrom(context),
+        ),
+      ),
+    );
+
+    if (continuous && date!.day == 1) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                monthsShort(context)[date!.month - 1],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+            const SizedBox(width: 3),
+            numberPill,
+          ],
+        ),
+      );
+    }
+
+    return Align(alignment: Alignment.topCenter, child: numberPill);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -559,29 +778,7 @@ class _DayCell extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Align(
-              alignment: Alignment.topCenter,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: _isToday
-                    ? BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(20),
-                      )
-                    : null,
-                child: Text(
-                  '${date!.day}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight:
-                        _isToday ? FontWeight.w700 : FontWeight.normal,
-                    color: _isToday
-                        ? CupertinoColors.white
-                        : CupertinoColors.label.resolveFrom(context),
-                  ),
-                ),
-              ),
-            ),
+            _buildDayLabel(context),
             const SizedBox(height: 2),
             ...chips.take(3).map((c) {
               if (c.isEvent) {
