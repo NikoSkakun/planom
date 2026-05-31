@@ -201,34 +201,28 @@ void main() {
   });
 
   group('Routine', () {
-    test('round-trips with weekdays', () {
+    test('round-trips certain_amount fields', () {
       final r = Routine(
         name: 'Water',
         goalType: 'certain_amount',
         goalAmount: 8,
         goalUnit: 'cup',
         recordAmount: 1,
-        frequencyType: 'daily',
-        weekdays: const [0, 1, 2],
-        autoReset: 'everyday',
       );
       final back = Routine.fromMap(r.toMap());
       expect(back.name, 'Water');
       expect(back.goalType, 'certain_amount');
       expect(back.goalAmount, 8);
       expect(back.goalUnit, 'cup');
-      expect(back.weekdays, const [0, 1, 2]);
+      expect(back.recordAmount, 1);
+      expect(back.frequencyType, 'daily');
     });
 
-    test('null weekdays round-trip stays null (no parse crash)', () {
-      final r = Routine(
-        name: 'R',
-        goalType: 'achieve_all',
-        frequencyType: 'daily',
-        autoReset: 'everyday',
-      );
-      final back = Routine.fromMap(r.toMap());
-      expect(back.weekdays, isNull);
+    test('frequencyType defaults to daily when absent in map', () {
+      final r = Routine(name: 'R', goalType: 'achieve_all');
+      final map = r.toMap()..remove('frequencyType');
+      final back = Routine.fromMap(map);
+      expect(back.frequencyType, 'daily');
     });
 
     test('copyWith clear flags', () {
@@ -238,22 +232,25 @@ void main() {
         goalAmount: 5,
         goalUnit: 'x',
         recordAmount: 2,
-        frequencyType: 'days_after_complete',
-        daysAfterComplete: 3,
-        autoReset: 'none',
       );
       final c = r.copyWith(
         clearGoalAmount: true,
         clearGoalUnit: true,
         clearRecordAmount: true,
-        clearDaysAfterComplete: true,
-        clearWeekdays: true,
       );
       expect(c.goalAmount, isNull);
       expect(c.goalUnit, isNull);
       expect(c.recordAmount, isNull);
-      expect(c.daysAfterComplete, isNull);
-      expect(c.weekdays, isNull);
+    });
+
+    test('preserves a custom photo iconId', () {
+      final r = Routine(
+        name: 'Yoga',
+        goalType: 'achieve_all',
+        iconId: 'icons/1234.png',
+      );
+      final back = Routine.fromMap(r.toMap());
+      expect(back.iconId, 'icons/1234.png');
     });
   });
 

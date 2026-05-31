@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../folders/folder_icon_picker.dart'
+    show pickCustomIcon, isCustomIconId;
 import '../localization/strings.dart';
 import '../models/routine.dart';
 import '../theme/app_theme.dart';
@@ -23,7 +25,6 @@ const _kUnits = [
   'lap',
   'step',
 ];
-
 
 void showRoutineCreationView(
   BuildContext context,
@@ -52,7 +53,6 @@ class RoutineCreationView extends StatefulWidget {
 class _RoutineCreationViewState extends State<RoutineCreationView> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _customUnitCtrl;
-  late final TextEditingController _daysAfterCtrl;
   late final TextEditingController _goalAmountCtrl;
   late final TextEditingController _recordAmountCtrl;
 
@@ -61,12 +61,14 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
   late String _goalType; // 'achieve_all' | 'certain_amount'
   late String _goalUnit;
   late bool _useCustomUnit;
-  late String _frequencyType; // 'daily' | 'days_after_complete'
-  late List<int> _weekdays; // 0=Mon … 6=Sun
-  late String _autoReset; // 'everyday' | 'none'
+
+  // Frequency is always daily for now. Weekly / "days after completion"
+  // scheduling and the auto-reset options were removed in the routines
+  // refactor and will be reintroduced later.
 
   bool _nameEmpty = true;
   bool _showIconPicker = false;
+  bool _pickingPhoto = false;
 
   @override
   void initState() {
@@ -78,15 +80,10 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
     final unit = r?.goalUnit ?? 'ml';
     _useCustomUnit = !_kUnits.contains(unit);
     _goalUnit = _useCustomUnit ? 'count' : unit;
-    _frequencyType = r?.frequencyType ?? 'daily';
-    _weekdays = r?.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
-    _autoReset = r?.autoReset ?? 'everyday';
 
     _nameCtrl = TextEditingController(text: r?.name ?? '');
     _customUnitCtrl =
         TextEditingController(text: _useCustomUnit ? unit : '');
-    _daysAfterCtrl = TextEditingController(
-        text: r?.daysAfterComplete?.toString() ?? '1');
     _goalAmountCtrl =
         TextEditingController(text: r?.goalAmount?.toString() ?? '');
     _recordAmountCtrl =
@@ -103,7 +100,6 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
   void dispose() {
     _nameCtrl.dispose();
     _customUnitCtrl.dispose();
-    _daysAfterCtrl.dispose();
     _goalAmountCtrl.dispose();
     _recordAmountCtrl.dispose();
     super.dispose();
@@ -115,7 +111,6 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
 
     final goalAmount = int.tryParse(_goalAmountCtrl.text.trim());
     final recordAmount = int.tryParse(_recordAmountCtrl.text.trim());
-    final daysAfter = int.tryParse(_daysAfterCtrl.text.trim()) ?? 1;
     final unit = _useCustomUnit
         ? _customUnitCtrl.text.trim().isEmpty
             ? 'count'
@@ -132,11 +127,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
       goalAmount: _goalType == 'certain_amount' ? goalAmount : null,
       goalUnit: _goalType == 'certain_amount' ? unit : null,
       recordAmount: _goalType == 'certain_amount' ? recordAmount : null,
-      frequencyType: _frequencyType,
-      weekdays: _frequencyType == 'daily' ? _weekdays : null,
-      daysAfterComplete:
-          _frequencyType == 'days_after_complete' ? daysAfter : null,
-      autoReset: _autoReset,
+      frequencyType: 'daily',
     );
 
     if (widget.existing != null) {
@@ -145,6 +136,18 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
       await widget.controller.addRoutine(routine);
     }
     if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _pickPhoto() async {
+    if (_pickingPhoto) return;
+    setState(() => _pickingPhoto = true);
+    try {
+      final path = await pickCustomIcon();
+      if (!mounted) return;
+      if (path != null) setState(() => _iconId = path);
+    } finally {
+      if (mounted) setState(() => _pickingPhoto = false);
+    }
   }
 
   Future<void> _pickUnit() async {
@@ -228,10 +231,12 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
                     child: _IconPicker(
                       selectedIconId: _iconId,
                       selectedColor: _iconColor,
+                      picking: _pickingPhoto,
                       onChanged: (iconId, color) => setState(() {
                         _iconId = iconId;
                         _iconColor = color;
                       }),
+                      onPickPhoto: _pickPhoto,
                     ),
                   ),
                 ],
@@ -239,33 +244,11 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
             ),
 
             // ── Frequency ────────────────────────────────────────────────
-            _SectionHeader(s.sectionFrequency),
-            _Section(children: [
-              _SegmentedRow(
-                options: [s.freqDaily, s.freqDaysAfter],
-                selected: _frequencyType == 'daily' ? 0 : 1,
-                onChanged: (i) => setState(() =>
-                    _frequencyType = i == 0 ? 'daily' : 'days_after_complete'),
-              ),
-              if (_frequencyType == 'daily') ...[
-                const _Divider(),
-                _WeekdayPicker(
-                  selected: _weekdays,
-                  onChanged: (days) => setState(() => _weekdays = days),
-                ),
-              ] else ...[
-                const _Divider(),
-                _DaysAfterRow(controller: _daysAfterCtrl),
-              ],
-              const _Divider(),
-              _SwitchRow(
-                label: s.autoReset,
-                sublabel: _autoReset == 'everyday'
-                    ? s.autoResetEveryDay
-                    : s.autoResetNone,
-                onTap: () => _showAutoResetPicker(),
-              ),
-            ]),
+            // Only daily frequency is supported for now, so there's no
+            // selector here. The weekly / "days after completion" schedules
+            // and the auto-reset options were removed in the routines refactor
+            // and will be reintroduced later (model field `frequencyType` is
+            // retained for that future work).
 
             // ── Goal ─────────────────────────────────────────────────────
             _SectionHeader(s.sectionGoal),
@@ -335,19 +318,6 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
     );
   }
 
-  Future<void> _showAutoResetPicker() async {
-    await showCupertinoDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => _AutoResetPopup(
-        current: _autoReset,
-        onChanged: (v) {
-          setState(() => _autoReset = v);
-          Navigator.of(context, rootNavigator: true).pop();
-        },
-      ),
-    );
-  }
 }
 
 // ── Sub-widgets ──────────────────────────────────────────────────────────────
@@ -427,18 +397,10 @@ class _NameRow extends StatelessWidget {
         children: [
           GestureDetector(
             onTap: onIconTap,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Color(iconColor),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                routineIconData(iconId),
-                color: CupertinoColors.white,
-                size: 18,
-              ),
+            child: RoutineCircleIcon(
+              iconId: iconId,
+              iconColor: iconColor,
+              size: 36,
             ),
           ),
           const SizedBox(width: 12),
@@ -462,45 +424,85 @@ class _IconPicker extends StatelessWidget {
   const _IconPicker({
     required this.selectedIconId,
     required this.selectedColor,
+    required this.picking,
     required this.onChanged,
+    required this.onPickPhoto,
   });
 
   final String selectedIconId;
   final int selectedColor;
+  final bool picking;
   final void Function(String iconId, int color) onChanged;
+  final VoidCallback onPickPhoto;
 
   @override
   Widget build(BuildContext context) {
+    final customSelected = isCustomIconId(selectedIconId);
     return Wrap(
       spacing: 10,
       runSpacing: 10,
-      children: kRoutineIconPresets.map((preset) {
-        final (iconId, color) = preset;
-        final isSelected =
-            iconId == selectedIconId && color == selectedColor;
-        return GestureDetector(
-          onTap: () => onChanged(iconId, color),
+      children: [
+        ...kRoutineIconPresets.map((preset) {
+          final (iconId, color) = preset;
+          final isSelected =
+              !customSelected && iconId == selectedIconId && color == selectedColor;
+          return GestureDetector(
+            onTap: () => onChanged(iconId, color),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Color(color),
+                shape: BoxShape.circle,
+                border: isSelected
+                    ? Border.all(
+                        color: CupertinoColors.label.resolveFrom(context),
+                        width: 3,
+                      )
+                    : null,
+              ),
+              child: Icon(
+                routineIconData(iconId),
+                color: CupertinoColors.white,
+                size: 22,
+              ),
+            ),
+          );
+        }),
+        // Custom-photo tile: shows the chosen photo when selected, otherwise a
+        // dashed "add photo" affordance.
+        GestureDetector(
+          onTap: picking ? null : onPickPhoto,
           child: Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Color(color),
               shape: BoxShape.circle,
-              border: isSelected
+              color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+              border: customSelected
                   ? Border.all(
                       color: CupertinoColors.label.resolveFrom(context),
                       width: 3,
                     )
-                  : null,
+                  : Border.all(
+                      color: CupertinoColors.separator.resolveFrom(context),
+                      width: 1,
+                    ),
             ),
-            child: Icon(
-              routineIconData(iconId),
-              color: CupertinoColors.white,
-              size: 22,
-            ),
+            child: customSelected
+                ? RoutineCircleIcon(
+                    iconId: selectedIconId,
+                    iconColor: selectedColor,
+                    size: 44,
+                  )
+                : Icon(
+                    picking ? CupertinoIcons.hourglass : CupertinoIcons.photo,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                    size: 20,
+                  ),
           ),
-        );
-      }).toList(),
+        ),
+      ],
     );
   }
 }
@@ -532,139 +534,6 @@ class _SegmentedRow extends StatelessWidget {
         onValueChanged: (v) {
           if (v != null) onChanged(v);
         },
-      ),
-    );
-  }
-}
-
-class _WeekdayPicker extends StatelessWidget {
-  const _WeekdayPicker({required this.selected, required this.onChanged});
-
-  final List<int> selected;
-  final void Function(List<int>) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = AppColors.accent;
-    final labels = weekdaysShort(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(7, (i) {
-          final isOn = selected.contains(i);
-          return GestureDetector(
-            onTap: () {
-              final next = List<int>.from(selected);
-              if (isOn) {
-                if (next.length > 1) next.remove(i);
-              } else {
-                next.add(i);
-              }
-              onChanged(next);
-            },
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: isOn ? accent : CupertinoColors.tertiarySystemFill.resolveFrom(context),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  labels[i].substring(0, 1),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isOn
-                        ? CupertinoColors.white
-                        : CupertinoColors.secondaryLabel.resolveFrom(context),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-class _DaysAfterRow extends StatelessWidget {
-  const _DaysAfterRow({required this.controller});
-  final TextEditingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 60,
-            child: CupertinoTextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 15),
-              decoration: BoxDecoration(
-                color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            S.of(context).daysAfterCompletion,
-            style: TextStyle(
-              fontSize: 15,
-              color: CupertinoColors.label.resolveFrom(context),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SwitchRow extends StatelessWidget {
-  const _SwitchRow({
-    required this.label,
-    required this.sublabel,
-    required this.onTap,
-  });
-
-  final String label;
-  final String sublabel;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        child: Row(
-          children: [
-            Text(label,
-                style: const TextStyle(fontSize: 15)),
-            const Spacer(),
-            Text(
-              sublabel,
-              style: TextStyle(
-                fontSize: 15,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              CupertinoIcons.chevron_right,
-              size: 13,
-              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -745,85 +614,6 @@ class _TextRow extends StatelessWidget {
 }
 
 // ── Auto-reset popup ─────────────────────────────────────────────────────────
-
-class _AutoResetPopup extends StatelessWidget {
-  const _AutoResetPopup({required this.current, required this.onChanged});
-
-  final String current;
-  final void Function(String) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = CupertinoColors.systemBackground.resolveFrom(context);
-    final sep = CupertinoColors.separator.resolveFrom(context);
-
-    return Center(
-      child: Container(
-        width: 260,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [
-            BoxShadow(color: Color(0x29000000), blurRadius: 24, offset: Offset(0, 8)),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-              child: Text(
-                S.of(context).autoReset,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-            ),
-            Container(height: 0.5, color: sep),
-            _Option(label: S.of(context).autoResetEveryDay, value: 'everyday', current: current, onChanged: onChanged),
-            Container(height: 0.5, color: sep),
-            _Option(label: S.of(context).autoResetNone, value: 'none', current: current, onChanged: onChanged),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Option extends StatelessWidget {
-  const _Option({
-    required this.label,
-    required this.value,
-    required this.current,
-    required this.onChanged,
-  });
-
-  final String label;
-  final String value;
-  final String current;
-  final void Function(String) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = current == value;
-    return GestureDetector(
-      onTap: () => onChanged(value),
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Text(label, style: const TextStyle(fontSize: 15)),
-            const Spacer(),
-            if (selected)
-              Icon(CupertinoIcons.checkmark,
-                  size: 16, color: AppColors.accent),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Unit picker sheet ────────────────────────────────────────────────────────
 
 class _UnitPickerSheet extends StatefulWidget {
   const _UnitPickerSheet({

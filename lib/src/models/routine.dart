@@ -2,20 +2,25 @@ import 'package:uuid/uuid.dart';
 
 import 'item.dart';
 
+/// A daily habit. Each calendar day is tracked independently via
+/// [RoutineEntry] rows, so history is preserved and the routine "resets"
+/// automatically every day (no entry for a day = not done that day).
+///
+/// NOTE: only daily frequency is supported right now. The weekly /
+/// "days after completion" schedules and the auto-reset / carry-over options
+/// were removed in the routines refactor and will be reintroduced later — see
+/// the commented-out UI in `routine_creation_view.dart`.
 class Routine extends AppItem {
   final String name;
-  final int iconColor; // ARGB
+  final int iconColor; // ARGB tint for SF-symbol icons (ignored for photos)
 
   final String goalType; // 'achieve_all' | 'certain_amount'
   final int? goalAmount;
   final String? goalUnit;
   final int? recordAmount;
 
-  final String frequencyType; // 'daily' | 'days_after_complete'
-  final List<int>? weekdays; // 0=Mon … 6=Sun; null means all days
-  final int? daysAfterComplete;
-
-  final String autoReset; // 'everyday' | 'none'
+  /// Reserved for future schedule types. Always 'daily' today.
+  final String frequencyType;
 
   Routine({
     String? id,
@@ -27,10 +32,7 @@ class Routine extends AppItem {
     this.goalAmount,
     this.goalUnit,
     this.recordAmount,
-    required this.frequencyType,
-    this.weekdays,
-    this.daysAfterComplete,
-    required this.autoReset,
+    this.frequencyType = 'daily',
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -49,11 +51,6 @@ class Routine extends AppItem {
     int? recordAmount,
     bool clearRecordAmount = false,
     String? frequencyType,
-    List<int>? weekdays,
-    bool clearWeekdays = false,
-    int? daysAfterComplete,
-    bool clearDaysAfterComplete = false,
-    String? autoReset,
   }) {
     return Routine(
       id: id,
@@ -67,11 +64,6 @@ class Routine extends AppItem {
       recordAmount:
           clearRecordAmount ? null : (recordAmount ?? this.recordAmount),
       frequencyType: frequencyType ?? this.frequencyType,
-      weekdays: clearWeekdays ? null : (weekdays ?? this.weekdays),
-      daysAfterComplete: clearDaysAfterComplete
-          ? null
-          : (daysAfterComplete ?? this.daysAfterComplete),
-      autoReset: autoReset ?? this.autoReset,
     );
   }
 
@@ -86,9 +78,6 @@ class Routine extends AppItem {
         'goalUnit': goalUnit,
         'recordAmount': recordAmount,
         'frequencyType': frequencyType,
-        'weekdays': weekdays?.join(','),
-        'daysAfterComplete': daysAfterComplete,
-        'autoReset': autoReset,
       };
 
   factory Routine.fromMap(Map<String, dynamic> map) => Routine(
@@ -102,16 +91,7 @@ class Routine extends AppItem {
         goalAmount: map['goalAmount'] as int?,
         goalUnit: map['goalUnit'] as String?,
         recordAmount: map['recordAmount'] as int?,
-        frequencyType: map['frequencyType'] as String,
-        weekdays: _parseWeekdays(map['weekdays'] as String?),
-        daysAfterComplete: map['daysAfterComplete'] as int?,
-        autoReset: map['autoReset'] as String,
+        // Tolerate legacy rows / backups where this is absent.
+        frequencyType: (map['frequencyType'] as String?) ?? 'daily',
       );
-
-  // Empty strings round-trip as `null` so an empty weekday list does not crash
-  // `int.parse('')` on the next load.
-  static List<int>? _parseWeekdays(String? raw) {
-    if (raw == null || raw.isEmpty) return null;
-    return raw.split(',').map(int.parse).toList();
-  }
 }
