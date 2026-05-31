@@ -19,7 +19,7 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 ## Tech stack
 
 - **Framework**: Flutter / Dart, Cupertino (iOS-native) widgets throughout — no Material widgets in UI except `showModalBottomSheet` (which requires `GlobalMaterialLocalizations.delegate` already registered)
-- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **27**. FTS5 virtual tables for search.
+- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **28**. FTS5 virtual tables for search.
 - **Multi-space**: `SpaceManager` (`lib/src/spaces/`) owns a list of `Space`s and swaps the active space's controllers; the default space shares the global `planom.db` handle.
 - **App lock**: `SecurityService` (`lib/src/security/`) — optional PIN (4–8 digit) / custom password + optional biometric (Face ID, Touch ID, Windows Hello via `local_auth`); salted + key-stretched PBKDF2/HMAC-SHA256 hash in `app_settings` (`auth_*` keys), excluded from backups.
 - **Local notifications**: `NotificationService` (`lib/src/notifications/`) — `flutter_local_notifications` + `timezone`; per-task / per-event reminder scheduling via slot-based IDs. iOS + macOS only today.
@@ -84,11 +84,25 @@ Routine extends AppItem (lib/src/models/routine.dart)
                    — `icons/…`, same storage as folders/lists)
   goalType ('achieve_all' | 'certain_amount')
   goalAmount?, goalUnit?, recordAmount?   ← certain_amount only
-  frequencyType ('daily' | 'specific_days')
-  weekdays?: List<int>               ← specific_days only: 0=Mon … 6=Sun, ≥1 day;
-                                       null for daily. ("days after completion"
-                                       scheduling + auto-reset were removed in the
-                                       routines refactor and may return later.)
+  frequencyType ('daily' | 'specific_days' | 'interval')
+  weekdays?: List<int>               ← specific_days only: 0=Mon … 6=Sun, ≥1 day
+  startDate?: DateTime               ← day the routine starts (falls back to
+                                       creationDate when null)
+  intervalDays?: int                 ← interval only: appears every N days
+  waitForCompletion: bool            ← interval only: next occurrence is anchored
+                                       to the completion date; a missed occurrence
+                                       stays overdue and shifts future ones
+  reminders: List<RoutineReminder>   ← per-routine reminders (see below)
+
+RoutineReminder (lib/src/models/routine_reminder.dart)  ← NOT an AppItem
+  type ('time' | 'spread' | 'afterEach'), value (minute-of-day or delay mins),
+       interval? (spread: minutes between reminders)
+  time      = fixed clock time, fires once per active day
+  spread    = amount goals: from `value`, one reminder every `interval` mins,
+              one per planned iteration through the day
+  afterEach = amount goals: `value` mins after each logged unit (scheduled
+              reactively in RoutineController.recordProgress)
+  JSON-encoded into Routine.reminders
 
 AppFolder (lib/src/models/app_folder.dart)
   name, parentFolderId?, sortOrder, iconId?, iconColor? (ARGB override)
@@ -205,6 +219,7 @@ Migration history:
 | v25 | Migrates birthday rows out of `tasks` into a new `contacts` table; recreates `tasks` without birthday columns (SQLite < 3.35 can't drop columns); re-creates `tasks_*` FTS triggers after the rename |
 | v26 | Routines refactor: drops + recreates `routines` (now `daysAfterComplete` / `autoReset`-free; `frequencyType` defaults `'daily'`) and `routine_entries` clean. Old routine data is intentionally discarded (sanctioned by the refactor). Legacy backups still import — `BackupService` normalises routine rows through `Routine.fromMap`/`toMap` to drop the removed columns |
 | v27 | `routines.weekdays TEXT` — re-introduces a weekday schedule: `specific_days` routines store selected weekdays (0=Mon … 6=Sun) as a comma-joined string; `daily` leaves it null |
+| v28 | `routines.startDate INTEGER`, `routines.intervalDays INTEGER`, `routines.waitForCompletion INTEGER NOT NULL DEFAULT 0`, `routines.reminders TEXT` — start date, `interval` ("every N days") scheduling with optional wait-for-completion, and per-routine reminders (JSON) |
 
 When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 
@@ -271,9 +286,11 @@ Every controller is a `ChangeNotifier`. They're constructed in `main.dart` (glob
 
 **`RoutineController`** (`lib/src/routines/routine_controller.dart`)
 - **Per-day history.** Each calendar day is tracked independently by a `RoutineEntry` row, so a routine auto-resets every day and the full history is preserved (revisit/edit any past day; future days are blocked). All progress queries take an explicit `date`.
-- `routinesForDate(date)` — routines from their creation day onward (never before they existed, so past-day history stays accurate); `specific_days` routines additionally only show on their selected weekdays (Dart `weekday - 1` → 0=Mon … 6=Sun). `todayRoutines` = `routinesForDate(now)`.
+- `routinesForDate(date)` — routines from their `startFloor` (`startDate ?? creationDate`) onward, filtered by schedule: `daily` always, `specific_days` on its weekdays (Dart `weekday - 1` → 0=Mon … 6=Sun), `interval` per the rules below. Day arithmetic uses `_epochDay` (UTC midnight) to stay DST-safe. `todayRoutines` = `routinesForDate(now)`.
+- **Interval scheduling.** Fixed-grid (`waitForCompletion = false`): appears when `(epochDay(day) - epochDay(start)) % intervalDays == 0`. Wait-for-completion: `intervalOccurrences(r)` reconstructs the occurrence sequence from completion history (each completion opens the next occurrence at `completionDate + intervalDays`); the open occurrence shows from its scheduled date **through today** (overdue carry-forward), and `openOccurrenceDate` / `isOverdueOn(r, date)` drive the UI. Completing an overdue occurrence on its original day vs the viewed day is the "record original vs shift" choice (the UI prompts for `achieve_all`).
 - `entryForDate` / `progressForDate` / `isCompletedOnDate(routine, date)` (+ `entryForToday` / `todayProgress` / `isTodayCompleted` convenience wrappers). `goalFor(routine)` = `1` for `achieve_all`, else `goalAmount`.
-- `recordProgress(routine, [date])` — `achieve_all` toggles 0↔1; `certain_amount` adds `recordAmount` and wraps back to 0 once the goal is reached (so a day can be un-completed/corrected). Defaults to today when `date` omitted.
+- `recordProgress(routine, [date])` — `achieve_all` toggles 0↔1; `certain_amount` adds `recordAmount` and wraps back to 0 once the goal is reached (so a day can be un-completed/corrected). Defaults to today when `date` omitted. Also (re)schedules reminders; `afterEach` reminders are anchored to the tap.
+- **Reminders.** `reminderFireTimes(r)` computes concrete future fire times for `time` / `spread` reminders across a rolling horizon of active days; `_syncReminders` hands them to `NotificationService.scheduleRoutineReminders`. Called on `load`/`add`/`update`/`recordProgress`; `delete` cancels.
 
 **`EventController`** (`lib/src/calendar/event_controller.dart`)
 - Owns local `_events`; mirrors `TaskController` shape but without subtasks/tags.
@@ -329,7 +346,7 @@ API: `load`, `isBiometricAvailable` (calls `local_auth`; returns false on macOS/
 
 ### Notifications (`lib/src/notifications/`)
 
-`NotificationService` (singleton) wraps `flutter_local_notifications` + `timezone`. Tasks/events/contacts carry `reminderOffsets` (minutes relative to the due/event/birthday time).
+`NotificationService` (singleton) wraps `flutter_local_notifications` + `timezone`. Tasks/events/contacts carry `reminderOffsets` (minutes relative to the due/event/birthday time). Routines instead carry `RoutineReminder`s (clock times / spreads / after-each delays); `RoutineController` resolves them to absolute fire times and calls `scheduleRoutineReminders(routineId, title, fireTimes)` / `cancelRoutineReminders(routineId)`.
 
 - Slot-based IDs: `_notifSlot(itemId, slotIndex)` over `0.._maxSlots-1` (20). Scheduling and cancellation **both** use the same slot formula — they must stay in sync.
 - `TaskController.toggleCompleted` cancels reminders on complete and reschedules on un-complete; delete cancels. Recurrence-driven advance also reschedules.
@@ -477,8 +494,8 @@ Key state:
 |------|---------|
 | `routine_icons.dart` | `kRoutineIconPresets` — 16 `(iconId, colorARGB)` preset combos; `routineIconData(iconId)` maps string keys to `CupertinoIcons`; `RoutineCircleIcon` renders a circular icon (custom photo clipped to circle, or tinted SF-symbol) with optional `dimmed` / `showCheck`. |
 | `routine_controller.dart` | (see Controllers above) |
-| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; reused for editing (`existing` param). Sections: name+icon, inline icon picker (preset grid + "choose photo" tile via `pickCustomIcon`), Frequency (segmented `Daily` / `Specific Days`; the latter reveals a Mon-first `_WeekdayPicker` that won't let you deselect the last day), Goal (segmented + amount/unit/record fields). |
-| `routines_view.dart` | Tab root with two segments. **Day** segment: a `_DayNavigator` (‹ date ›, future blocked) over the routines for the selected day — tap a row to record progress for *that* day (history-editable); swipe-to-delete; long-press → edit/delete. **All** segment: every routine with a schedule subtitle (`Every day` or the weekday list) + goal; tap → edit. Custom photos render via `RoutineCircleIcon`. |
+| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; reused for editing (`existing` param). Sections: name+icon, inline icon picker (preset grid + "choose photo" tile via `pickCustomIcon`), Frequency (segmented `Daily` / `Specific Days` / `Interval`; Specific Days reveals a Mon-first `_WeekdayPicker` that won't let you deselect the last day, Interval reveals an "Every N days" stepper + a "Wait for completion" switch) with a Start Date row, Goal (segmented + amount/unit/record fields), Reminders (add `time` / `spread` / `afterEach` reminders via clock/duration pickers; spread + afterEach are amount-goal only). |
+| `routines_view.dart` | Tab root with two segments. **Day** segment: a `_DayNavigator` (‹ date ›, future blocked) over the routines for the selected day — tap a row to record progress for *that* day (history-editable); overdue interval+wait occurrences show a red "Overdue · date" subtitle and tapping prompts (record on original day vs complete now and shift); swipe-to-delete; long-press → edit/delete. **All** segment: every routine with a schedule subtitle (`Every day`, the weekday list, or `Every N days`) + goal; tap → edit. Custom photos render via `RoutineCircleIcon`. |
 
 **Row layout**: 40 px circle icon (`RoutineCircleIcon`; dimmed + check overlay when `achieve_all` complete) · name (strikethrough when complete) · right-aligned `_ProgressBadge` for `certain_amount`. Row vertical padding is tightened to `8`.
 

@@ -346,6 +346,8 @@ class _DayRoutineRow extends StatelessWidget {
     final isCompleted = controller.isCompletedOnDate(routine, date);
     final progress = controller.progressForDate(routine.id, date);
     final achieveAll = routine.goalType == 'achieve_all';
+    final overdue = !isCompleted && controller.isOverdueOn(routine, date);
+    final originalDate = overdue ? controller.openOccurrenceDate(routine) : null;
 
     return Dismissible(
       key: ValueKey(routine.id),
@@ -360,7 +362,7 @@ class _DayRoutineRow extends StatelessWidget {
       confirmDismiss: (_) async => await _confirmDelete(context),
       onDismissed: (_) => controller.deleteRoutine(routine.id),
       child: GestureDetector(
-        onTap: () => controller.recordProgress(routine, date),
+        onTap: () => _handleTap(context),
         onLongPress: () => _showOptions(context),
         behavior: HitTestBehavior.opaque,
         child: Container(
@@ -383,18 +385,36 @@ class _DayRoutineRow extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  routine.name,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: isCompleted
-                        ? CupertinoColors.secondaryLabel.resolveFrom(context)
-                        : CupertinoColors.label.resolveFrom(context),
-                    decoration: isCompleted && achieveAll
-                        ? TextDecoration.lineThrough
-                        : null,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      routine.name,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: isCompleted
+                            ? CupertinoColors.secondaryLabel
+                                .resolveFrom(context)
+                            : CupertinoColors.label.resolveFrom(context),
+                        decoration: isCompleted && achieveAll
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    ),
+                    if (overdue && originalDate != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${S.of(context).overdueLabel} · '
+                        '${formatTaskDateRelative(context, originalDate)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: CupertinoColors.systemRed.resolveFrom(context),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               if (!achieveAll) ...[
@@ -411,6 +431,44 @@ class _DayRoutineRow extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _handleTap(BuildContext context) async {
+    // For an overdue wait-for-completion occurrence, ask whether to record the
+    // completion on the occurrence's original day or on the viewed day (which
+    // shifts all future occurrences). Only for single-tap (achieve_all) goals —
+    // amount goals would otherwise prompt on every partial increment.
+    final overdue = routine.goalType == 'achieve_all' &&
+        !controller.isCompletedOnDate(routine, date) &&
+        controller.isOverdueOn(routine, date);
+    final original = controller.openOccurrenceDate(routine);
+    if (overdue && original != null) {
+      final s = S.of(context);
+      final choice = await showSelectionMenu<String>(
+        context: context,
+        title: s.overdueRoutineBody,
+        options: [
+          SelectionMenuOption(
+            value: 'original',
+            label:
+                '${s.recordOnOriginalDate} · ${formatTaskDateRelative(context, original)}',
+            icon: CupertinoIcons.calendar,
+          ),
+          SelectionMenuOption(
+            value: 'shift',
+            label: s.completeTodayShift,
+            icon: CupertinoIcons.checkmark_circle,
+          ),
+        ],
+      );
+      if (choice == 'original') {
+        controller.recordProgress(routine, original);
+      } else if (choice == 'shift') {
+        controller.recordProgress(routine, date);
+      }
+      return;
+    }
+    controller.recordProgress(routine, date);
   }
 
   Future<bool> _confirmDelete(BuildContext context) {
@@ -552,6 +610,9 @@ class _AllRoutineRow extends StatelessWidget {
 
   String _scheduleLabel(BuildContext context, Routine r) {
     final s = S.of(context);
+    if (r.frequencyType == 'interval') {
+      return '${s.routineIntervalEvery} ${s.routineIntervalDays(r.intervalDays ?? 1)}';
+    }
     final days = r.weekdays;
     if (r.frequencyType != 'specific_days' ||
         days == null ||

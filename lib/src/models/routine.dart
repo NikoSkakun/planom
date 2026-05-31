@@ -1,18 +1,20 @@
 import 'package:uuid/uuid.dart';
 
 import 'item.dart';
+import 'routine_reminder.dart';
 
 /// A habit tracked per calendar day. Each day is recorded independently via
 /// [RoutineEntry] rows, so history is preserved and the routine "resets"
 /// automatically every day (no entry for a day = not done that day).
 ///
-/// Two schedule types are supported:
-/// - `'daily'` — appears every day.
+/// Schedule types ([frequencyType]):
+/// - `'daily'`         — appears every day.
 /// - `'specific_days'` — appears only on the weekdays listed in [weekdays]
-///   (0 = Mon … 6 = Sun); the list always has at least one day.
-///
-/// NOTE: the "days after completion" schedule and the auto-reset / carry-over
-/// options were removed in the routines refactor and may be reintroduced later.
+///                       (0 = Mon … 6 = Sun); the list always has ≥1 day.
+/// - `'interval'`      — appears every [intervalDays] days from [startDate].
+///                       With [waitForCompletion], the next occurrence is
+///                       anchored to the completion date and a missed occurrence
+///                       carries forward as overdue (shifting future ones).
 class Routine extends AppItem {
   final String name;
   final int iconColor; // ARGB tint for SF-symbol icons (ignored for photos)
@@ -22,11 +24,25 @@ class Routine extends AppItem {
   final String? goalUnit;
   final int? recordAmount;
 
-  final String frequencyType; // 'daily' | 'specific_days'
+  final String frequencyType; // 'daily' | 'specific_days' | 'interval'
 
-  /// Selected weekdays for `specific_days` (0 = Mon … 6 = Sun). Null for
-  /// `daily`.
+  /// Selected weekdays for `specific_days` (0 = Mon … 6 = Sun). Null otherwise.
   final List<int>? weekdays;
+
+  /// Day the routine starts being active (date-only). Defaults to the creation
+  /// day when null.
+  final DateTime? startDate;
+
+  /// Interval length in days for `interval` routines (≥ 1).
+  final int? intervalDays;
+
+  /// `interval` only: when true, the next occurrence is scheduled relative to
+  /// the completion date rather than on a fixed grid, and a missed occurrence
+  /// stays overdue until completed.
+  final bool waitForCompletion;
+
+  /// Reminders for this routine (see [RoutineReminder]).
+  final List<RoutineReminder> reminders;
 
   Routine({
     String? id,
@@ -40,6 +56,10 @@ class Routine extends AppItem {
     this.recordAmount,
     this.frequencyType = 'daily',
     this.weekdays,
+    this.startDate,
+    this.intervalDays,
+    this.waitForCompletion = false,
+    this.reminders = const [],
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -60,6 +80,12 @@ class Routine extends AppItem {
     String? frequencyType,
     List<int>? weekdays,
     bool clearWeekdays = false,
+    DateTime? startDate,
+    bool clearStartDate = false,
+    int? intervalDays,
+    bool clearIntervalDays = false,
+    bool? waitForCompletion,
+    List<RoutineReminder>? reminders,
   }) {
     return Routine(
       id: id,
@@ -74,6 +100,11 @@ class Routine extends AppItem {
           clearRecordAmount ? null : (recordAmount ?? this.recordAmount),
       frequencyType: frequencyType ?? this.frequencyType,
       weekdays: clearWeekdays ? null : (weekdays ?? this.weekdays),
+      startDate: clearStartDate ? null : (startDate ?? this.startDate),
+      intervalDays:
+          clearIntervalDays ? null : (intervalDays ?? this.intervalDays),
+      waitForCompletion: waitForCompletion ?? this.waitForCompletion,
+      reminders: reminders ?? this.reminders,
     );
   }
 
@@ -89,6 +120,10 @@ class Routine extends AppItem {
         'recordAmount': recordAmount,
         'frequencyType': frequencyType,
         'weekdays': weekdays?.join(','),
+        'startDate': startDate?.millisecondsSinceEpoch,
+        'intervalDays': intervalDays,
+        'waitForCompletion': waitForCompletion ? 1 : 0,
+        'reminders': RoutineReminder.encode(reminders),
       };
 
   factory Routine.fromMap(Map<String, dynamic> map) => Routine(
@@ -102,9 +137,15 @@ class Routine extends AppItem {
         goalAmount: map['goalAmount'] as int?,
         goalUnit: map['goalUnit'] as String?,
         recordAmount: map['recordAmount'] as int?,
-        // Tolerate legacy rows / backups where these are absent.
+        // Tolerate legacy rows / backups where newer fields are absent.
         frequencyType: (map['frequencyType'] as String?) ?? 'daily',
         weekdays: _parseWeekdays(map['weekdays'] as String?),
+        startDate: map['startDate'] == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(map['startDate'] as int),
+        intervalDays: map['intervalDays'] as int?,
+        waitForCompletion: (map['waitForCompletion'] as int? ?? 0) == 1,
+        reminders: RoutineReminder.decode(map['reminders'] as String?),
       );
 
   // Empty strings round-trip as `null` so an empty list does not crash

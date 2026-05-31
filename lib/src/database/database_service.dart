@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 27;
+  static const _dbVersion = 28;
 
   Database? _db;
 
@@ -144,7 +144,11 @@ class DatabaseService {
             goalUnit TEXT,
             recordAmount INTEGER,
             frequencyType TEXT NOT NULL DEFAULT 'daily',
-            weekdays TEXT
+            weekdays TEXT,
+            startDate INTEGER,
+            intervalDays INTEGER,
+            waitForCompletion INTEGER NOT NULL DEFAULT 0,
+            reminders TEXT
           )
         ''');
         await db.execute('''
@@ -524,6 +528,15 @@ class DatabaseService {
           // selected weekdays (0=Mon … 6=Sun) as a comma-joined string; daily
           // routines leave it null.
           await db.execute('ALTER TABLE routines ADD COLUMN weekdays TEXT');
+        }
+        if (oldVersion < 28) {
+          // Routine start date, interval scheduling, and reminders.
+          await db.execute('ALTER TABLE routines ADD COLUMN startDate INTEGER');
+          await db
+              .execute('ALTER TABLE routines ADD COLUMN intervalDays INTEGER');
+          await db.execute(
+              'ALTER TABLE routines ADD COLUMN waitForCompletion INTEGER NOT NULL DEFAULT 0');
+          await db.execute('ALTER TABLE routines ADD COLUMN reminders TEXT');
         }
       },
     );

@@ -209,6 +209,41 @@ class NotificationService {
     }
   }
 
+  // ── Routine reminders ───────────────────────────────────────────────────────
+  //
+  // Routines have no single due time; the controller computes concrete future
+  // fire times (fixed clock times, intra-day spreads, and reactive "after each"
+  // anchors) across a rolling horizon and passes them here as absolute dates.
+
+  Future<void> scheduleRoutineReminders(
+    String routineId,
+    String title,
+    List<DateTime> fireTimes,
+  ) async {
+    await cancelRoutineReminders(routineId);
+    if (fireTimes.isEmpty) return;
+    if (!_permissionGranted) await checkPermission();
+    if (!_permissionGranted) return;
+
+    final now = DateTime.now();
+    final times = fireTimes.where((t) => t.isAfter(now)).toList()..sort();
+    for (int i = 0; i < times.length && i < _maxSlots; i++) {
+      await _schedule(
+        id: _notifSlot(routineId, i),
+        title: title,
+        body: '',
+        fireAt: times[i],
+      );
+    }
+  }
+
+  Future<void> cancelRoutineReminders(String routineId) async {
+    if (!PlatformCapabilities.supportsLocalNotifications) return;
+    for (int i = 0; i < _maxSlots; i++) {
+      await _plugin.cancel(_notifSlot(routineId, i));
+    }
+  }
+
   // ── Cancel all ────────────────────────────────────────────────────────────
 
   Future<void> cancelAll() async {

@@ -11,6 +11,7 @@ import 'package:planom/src/models/note_folder.dart';
 import 'package:planom/src/models/recurrence.dart';
 import 'package:planom/src/models/routine.dart';
 import 'package:planom/src/models/routine_entry.dart';
+import 'package:planom/src/models/routine_reminder.dart';
 import 'package:planom/src/models/tag.dart';
 import 'package:planom/src/models/task.dart';
 
@@ -273,6 +274,65 @@ void main() {
       );
       final back = Routine.fromMap(r.toMap());
       expect(back.iconId, 'icons/1234.png');
+    });
+
+    test('round-trips interval, start date, wait flag and reminders', () {
+      final r = Routine(
+        name: 'Clean',
+        goalType: 'achieve_all',
+        frequencyType: 'interval',
+        intervalDays: 3,
+        waitForCompletion: true,
+        startDate: DateTime(2026, 5, 10),
+        reminders: const [
+          RoutineReminder.time(540),
+          RoutineReminder.spread(startMinute: 480, every: 120),
+          RoutineReminder.afterEach(90),
+        ],
+      );
+      final back = Routine.fromMap(r.toMap());
+      expect(back.frequencyType, 'interval');
+      expect(back.intervalDays, 3);
+      expect(back.waitForCompletion, isTrue);
+      expect(back.startDate, DateTime(2026, 5, 10));
+      expect(back.reminders.length, 3);
+      expect(back.reminders[0].type, RoutineReminder.typeTime);
+      expect(back.reminders[0].value, 540);
+      expect(back.reminders[1].type, RoutineReminder.typeSpread);
+      expect(back.reminders[1].interval, 120);
+      expect(back.reminders[2], const RoutineReminder.afterEach(90));
+    });
+
+    test('legacy map without new fields defaults safely', () {
+      final r = Routine(name: 'R', goalType: 'achieve_all');
+      final map = r.toMap()
+        ..remove('startDate')
+        ..remove('intervalDays')
+        ..remove('waitForCompletion')
+        ..remove('reminders');
+      final back = Routine.fromMap(map);
+      expect(back.startDate, isNull);
+      expect(back.intervalDays, isNull);
+      expect(back.waitForCompletion, isFalse);
+      expect(back.reminders, isEmpty);
+    });
+  });
+
+  group('RoutineReminder', () {
+    test('encode/decode round-trip', () {
+      const list = [
+        RoutineReminder.time(600),
+        RoutineReminder.spread(startMinute: 480, every: 90),
+        RoutineReminder.afterEach(120),
+      ];
+      final back = RoutineReminder.decode(RoutineReminder.encode(list));
+      expect(back, list);
+    });
+
+    test('decode tolerates null/garbage', () {
+      expect(RoutineReminder.decode(null), isEmpty);
+      expect(RoutineReminder.decode(''), isEmpty);
+      expect(RoutineReminder.decode('not json'), isEmpty);
     });
   });
 

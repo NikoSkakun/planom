@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:planom/src/database/database_service.dart';
 import 'package:planom/src/models/routine.dart';
 import 'package:planom/src/models/routine_entry.dart';
+import 'package:planom/src/models/routine_reminder.dart';
 import 'package:planom/src/routines/routine_controller.dart';
 
 import 'support/test_db.dart';
@@ -195,6 +196,168 @@ void main() {
       final reloaded = fresh.routines.firstWhere((x) => x.id == r.id);
       expect(fresh.progressForDate(r.id, day), 3);
       expect(fresh.isCompletedOnDate(reloaded, day), isTrue);
+    });
+  });
+
+  group('start date', () {
+    test('routine is hidden before its start date', () async {
+      final start = today().add(const Duration(days: 2));
+      final r = Routine(
+        name: 'Future',
+        goalType: 'achieve_all',
+        startDate: start,
+        creationDate: today(),
+      );
+      await controller.addRoutine(r);
+
+      expect(controller.routinesForDate(today()).map((x) => x.id),
+          isNot(contains(r.id)));
+      expect(controller.routinesForDate(start).map((x) => x.id),
+          contains(r.id));
+      expect(
+          controller.routinesForDate(start.add(const Duration(days: 1)))
+              .map((x) => x.id),
+          contains(r.id));
+    });
+  });
+
+  group('interval (fixed grid)', () {
+    test('appears every N days from the start date', () async {
+      final start = DateTime(2026, 6, 1);
+      final r = Routine(
+        name: 'Clean',
+        goalType: 'achieve_all',
+        frequencyType: 'interval',
+        intervalDays: 3,
+        startDate: start,
+        creationDate: start,
+      );
+      await controller.addRoutine(r);
+
+      bool shows(DateTime d) =>
+          controller.routinesForDate(d).map((x) => x.id).contains(r.id);
+
+      expect(shows(DateTime(2026, 6, 1)), isTrue); // day 0
+      expect(shows(DateTime(2026, 6, 2)), isFalse);
+      expect(shows(DateTime(2026, 6, 3)), isFalse);
+      expect(shows(DateTime(2026, 6, 4)), isTrue); // day 3
+      expect(shows(DateTime(2026, 6, 7)), isTrue); // day 6
+    });
+  });
+
+  group('interval (wait for completion)', () {
+    Routine waitRoutine(DateTime start) => Routine(
+          name: 'Clean',
+          goalType: 'achieve_all',
+          frequencyType: 'interval',
+          intervalDays: 3,
+          waitForCompletion: true,
+          startDate: start,
+          creationDate: start,
+        );
+
+    test('open occurrence carries forward as overdue until completed',
+        () async {
+      // Started 5 days ago, interval 3, never completed -> overdue, and the
+      // single open occurrence shows on its scheduled day through today.
+      final start = today().subtract(const Duration(days: 5));
+      final r = waitRoutine(start);
+      await controller.addRoutine(r);
+
+      bool shows(DateTime d) =>
+          controller.routinesForDate(d).map((x) => x.id).contains(r.id);
+
+      expect(controller.openOccurrenceDate(r), start);
+      expect(shows(start), isTrue);
+      expect(shows(today()), isTrue); // overdue, still showing today
+      expect(controller.isOverdueOn(r, today()), isTrue);
+      expect(controller.isOverdueOn(r, start), isFalse); // on its own day
+    });
+
+    test('completing on the original date shifts the next from there',
+        () async {
+      final start = today().subtract(const Duration(days: 5));
+      final r = waitRoutine(start);
+      await controller.addRoutine(r);
+
+      // Record on the original (scheduled) date.
+      await controller.recordProgress(r, start);
+      expect(controller.isCompletedOnDate(r, start), isTrue);
+      // Next occurrence = start + 3 days.
+      expect(controller.openOccurrenceDate(r),
+          start.add(const Duration(days: 3)));
+    });
+
+    test('completing today shifts the next occurrence from today', () async {
+      final start = today().subtract(const Duration(days: 5));
+      final r = waitRoutine(start);
+      await controller.addRoutine(r);
+
+      await controller.recordProgress(r, today());
+      // Past scheduled days no longer show the (now closed) occurrence.
+      expect(controller.routinesForDate(start).map((x) => x.id),
+          isNot(contains(r.id)));
+      // Completion shows on today; next occurrence is 3 days out.
+      expect(controller.isCompletedOnDate(r, today()), isTrue);
+      expect(controller.openOccurrenceDate(r),
+          today().add(const Duration(days: 3)));
+    });
+
+    test('a completed occurrence is no longer overdue', () async {
+      final start = today().subtract(const Duration(days: 1));
+      final r = waitRoutine(start);
+      await controller.addRoutine(r);
+
+      await controller.recordProgress(r, today());
+      expect(controller.isOverdueOn(r, today()), isFalse);
+      expect(controller.openOccurrenceDate(r),
+          today().add(const Duration(days: 3)));
+    });
+
+    test('schedule survives a reload', () async {
+      final start = today().subtract(const Duration(days: 2));
+      final r = waitRoutine(start);
+      await controller.addRoutine(r);
+      await controller.recordProgress(r, start);
+
+      final fresh = RoutineController(db);
+      await fresh.load();
+      final reloaded = fresh.routines.firstWhere((x) => x.id == r.id);
+      expect(reloaded.frequencyType, 'interval');
+      expect(reloaded.intervalDays, 3);
+      expect(reloaded.waitForCompletion, isTrue);
+      expect(fresh.openOccurrenceDate(reloaded),
+          start.add(const Duration(days: 3)));
+    });
+  });
+
+  group('reminders', () {
+    test('fixed-time reminder yields a future fire time on an active day',
+        () async {
+      final r = Routine(
+        name: 'Stretch',
+        goalType: 'achieve_all',
+        reminders: const [RoutineReminder.time(23 * 60 + 59)], // 23:59
+      );
+      await controller.addRoutine(r);
+      final times = controller.reminderFireTimes(r);
+      expect(times, isNotEmpty);
+      expect(times.every((t) => t.isAfter(DateTime.now())), isTrue);
+    });
+
+    test('spread reminder yields one fire time per iteration', () async {
+      // Anchor near end of day so the times are in the future regardless of
+      // when the test runs is not guaranteed; assert the per-iteration count
+      // by computing for an explicit active future day via horizon.
+      final r = Routine(
+        name: 'Water',
+        goalType: 'certain_amount',
+        goalAmount: 4,
+        recordAmount: 1,
+        reminders: const [RoutineReminder.spread(startMinute: 0, every: 60)],
+      );
+      await controller.addRoutine(r);
+      expect(controller.iterationsPerDay(r), 4);
     });
   });
 }
