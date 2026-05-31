@@ -6,11 +6,12 @@ import '../models/routine_entry.dart';
 
 /// Owns the list of routines and their per-day progress entries.
 ///
-/// Routines are strictly daily: each calendar day is tracked independently by
-/// a [RoutineEntry] row, so a routine automatically "resets" every day and the
-/// full history is preserved (useful for revisiting past days and, later, for
-/// streaks). All progress queries take an explicit `date` so the UI can show
-/// and edit any day, not just today.
+/// Each calendar day is tracked independently by a [RoutineEntry] row, so a
+/// routine automatically "resets" every day and the full history is preserved
+/// (useful for revisiting past days and, later, for streaks). All progress
+/// queries take an explicit `date` so the UI can show and edit any day, not
+/// just today. A routine shows on a given day per its schedule: `daily` every
+/// day, `specific_days` only on its selected weekdays.
 class RoutineController with ChangeNotifier {
   RoutineController(this._db);
 
@@ -29,14 +30,21 @@ class RoutineController with ChangeNotifier {
   static DateTime normalizeDate(DateTime dt) =>
       DateTime(dt.year, dt.month, dt.day);
 
-  /// Routines that should appear on [date]. A daily routine shows on every day
-  /// from its creation day onward — never before it existed, so past-day
-  /// history stays accurate.
+  /// Routines that should appear on [date], from their creation day onward
+  /// (never before they existed, so past-day history stays accurate). A
+  /// `specific_days` routine additionally only shows on its selected weekdays.
   List<Routine> routinesForDate(DateTime date) {
     final day = normalizeDate(date);
-    return _routines
-        .where((r) => !normalizeDate(r.creationDate).isAfter(day))
-        .toList();
+    // Dart weekday is 1=Mon … 7=Sun; convert to 0=Mon … 6=Sun.
+    final weekdayIndex = day.weekday - 1;
+    return _routines.where((r) {
+      if (normalizeDate(r.creationDate).isAfter(day)) return false;
+      if (r.frequencyType == 'specific_days') {
+        final days = r.weekdays;
+        return days != null && days.contains(weekdayIndex);
+      }
+      return true;
+    }).toList();
   }
 
   /// Convenience for the default "today" view.

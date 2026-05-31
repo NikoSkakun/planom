@@ -225,6 +225,24 @@ void main() {
       expect(back.frequencyType, 'daily');
     });
 
+    test('round-trips specific_days weekdays', () {
+      final r = Routine(
+        name: 'Gym',
+        goalType: 'achieve_all',
+        frequencyType: 'specific_days',
+        weekdays: const [0, 2, 4],
+      );
+      final back = Routine.fromMap(r.toMap());
+      expect(back.frequencyType, 'specific_days');
+      expect(back.weekdays, const [0, 2, 4]);
+    });
+
+    test('daily routine has null weekdays (no parse crash)', () {
+      final r = Routine(name: 'R', goalType: 'achieve_all');
+      final back = Routine.fromMap(r.toMap());
+      expect(back.weekdays, isNull);
+    });
+
     test('copyWith clear flags', () {
       final r = Routine(
         name: 'R',
@@ -232,15 +250,19 @@ void main() {
         goalAmount: 5,
         goalUnit: 'x',
         recordAmount: 2,
+        frequencyType: 'specific_days',
+        weekdays: const [1, 3],
       );
       final c = r.copyWith(
         clearGoalAmount: true,
         clearGoalUnit: true,
         clearRecordAmount: true,
+        clearWeekdays: true,
       );
       expect(c.goalAmount, isNull);
       expect(c.goalUnit, isNull);
       expect(c.recordAmount, isNull);
+      expect(c.weekdays, isNull);
     });
 
     test('preserves a custom photo iconId', () {

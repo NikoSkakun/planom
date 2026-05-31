@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 26;
+  static const _dbVersion = 27;
 
   Database? _db;
 
@@ -143,7 +143,8 @@ class DatabaseService {
             goalAmount INTEGER,
             goalUnit TEXT,
             recordAmount INTEGER,
-            frequencyType TEXT NOT NULL DEFAULT 'daily'
+            frequencyType TEXT NOT NULL DEFAULT 'daily',
+            weekdays TEXT
           )
         ''');
         await db.execute('''
@@ -517,6 +518,12 @@ class DatabaseService {
               amount INTEGER NOT NULL DEFAULT 0
             )
           ''');
+        }
+        if (oldVersion < 27) {
+          // Re-introduce a weekday schedule: `specific_days` routines store the
+          // selected weekdays (0=Mon … 6=Sun) as a comma-joined string; daily
+          // routines leave it null.
+          await db.execute('ALTER TABLE routines ADD COLUMN weekdays TEXT');
         }
       },
     );

@@ -542,13 +542,26 @@ class _AllRoutineRow extends StatelessWidget {
   }
 
   String _subtitle(BuildContext context, Routine r) {
-    final s = S.of(context);
-    // Only daily routines exist today; show the goal as a hint.
+    final schedule = _scheduleLabel(context, r);
     if (r.goalType == 'certain_amount') {
       final unit = (r.goalUnit ?? '').isNotEmpty ? ' ${r.goalUnit}' : '';
-      return '${s.everyDayLabel} · ${r.goalAmount ?? 1}$unit';
+      return '$schedule · ${r.goalAmount ?? 1}$unit';
     }
-    return s.everyDayLabel;
+    return schedule;
+  }
+
+  String _scheduleLabel(BuildContext context, Routine r) {
+    final s = S.of(context);
+    final days = r.weekdays;
+    if (r.frequencyType != 'specific_days' ||
+        days == null ||
+        days.isEmpty ||
+        days.length == 7) {
+      return s.everyDayLabel;
+    }
+    final labels = weekdaysShort(context);
+    final sorted = [...days]..sort();
+    return sorted.map((d) => labels[d]).join(', ');
   }
 
   Future<bool> _confirmDelete(BuildContext context) {

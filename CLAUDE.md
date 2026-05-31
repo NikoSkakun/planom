@@ -19,7 +19,7 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 ## Tech stack
 
 - **Framework**: Flutter / Dart, Cupertino (iOS-native) widgets throughout — no Material widgets in UI except `showModalBottomSheet` (which requires `GlobalMaterialLocalizations.delegate` already registered)
-- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **25**. FTS5 virtual tables for search.
+- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **27**. FTS5 virtual tables for search.
 - **Multi-space**: `SpaceManager` (`lib/src/spaces/`) owns a list of `Space`s and swaps the active space's controllers; the default space shares the global `planom.db` handle.
 - **App lock**: `SecurityService` (`lib/src/security/`) — optional PIN (4–8 digit) / custom password + optional biometric (Face ID, Touch ID, Windows Hello via `local_auth`); salted + key-stretched PBKDF2/HMAC-SHA256 hash in `app_settings` (`auth_*` keys), excluded from backups.
 - **Local notifications**: `NotificationService` (`lib/src/notifications/`) — `flutter_local_notifications` + `timezone`; per-task / per-event reminder scheduling via slot-based IDs. iOS + macOS only today.
@@ -84,10 +84,11 @@ Routine extends AppItem (lib/src/models/routine.dart)
                    — `icons/…`, same storage as folders/lists)
   goalType ('achieve_all' | 'certain_amount')
   goalAmount?, goalUnit?, recordAmount?   ← certain_amount only
-  frequencyType ('daily')            ← DAILY ONLY for now. Weekly / "days after
-                                       completion" scheduling + auto-reset were
-                                       removed in the routines refactor and will
-                                       return later; field kept for forward-compat.
+  frequencyType ('daily' | 'specific_days')
+  weekdays?: List<int>               ← specific_days only: 0=Mon … 6=Sun, ≥1 day;
+                                       null for daily. ("days after completion"
+                                       scheduling + auto-reset were removed in the
+                                       routines refactor and may return later.)
 
 AppFolder (lib/src/models/app_folder.dart)
   name, parentFolderId?, sortOrder, iconId?, iconColor? (ARGB override)
@@ -202,7 +203,8 @@ Migration history:
 | v23 | `app_lists.listType TEXT NOT NULL DEFAULT 'tasks'` |
 | v24 | Birthday columns added to `tasks` (transitional); `tasks.sectionId TEXT`; `list_sections` table |
 | v25 | Migrates birthday rows out of `tasks` into a new `contacts` table; recreates `tasks` without birthday columns (SQLite < 3.35 can't drop columns); re-creates `tasks_*` FTS triggers after the rename |
-| v26 | Routines refactor: drops + recreates `routines` (now `weekdays` / `daysAfterComplete` / `autoReset`-free; `frequencyType` defaults `'daily'`) and `routine_entries` clean. Old routine data is intentionally discarded (sanctioned by the refactor). Legacy backups still import — `BackupService` normalises routine rows through `Routine.fromMap`/`toMap` to drop the removed columns |
+| v26 | Routines refactor: drops + recreates `routines` (now `daysAfterComplete` / `autoReset`-free; `frequencyType` defaults `'daily'`) and `routine_entries` clean. Old routine data is intentionally discarded (sanctioned by the refactor). Legacy backups still import — `BackupService` normalises routine rows through `Routine.fromMap`/`toMap` to drop the removed columns |
+| v27 | `routines.weekdays TEXT` — re-introduces a weekday schedule: `specific_days` routines store selected weekdays (0=Mon … 6=Sun) as a comma-joined string; `daily` leaves it null |
 
 When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 
@@ -268,8 +270,8 @@ Every controller is a `ChangeNotifier`. They're constructed in `main.dart` (glob
 - Date math: Feb 29 births fall back to Feb 28 in non-leap years (`_safeDate`).
 
 **`RoutineController`** (`lib/src/routines/routine_controller.dart`)
-- **Strictly daily, per-day history.** Each calendar day is tracked independently by a `RoutineEntry` row, so a routine auto-resets every day and the full history is preserved (revisit/edit any past day; future days are blocked). All progress queries take an explicit `date`.
-- `routinesForDate(date)` — daily routines from their creation day onward (never before they existed, so past-day history stays accurate). `todayRoutines` = `routinesForDate(now)`.
+- **Per-day history.** Each calendar day is tracked independently by a `RoutineEntry` row, so a routine auto-resets every day and the full history is preserved (revisit/edit any past day; future days are blocked). All progress queries take an explicit `date`.
+- `routinesForDate(date)` — routines from their creation day onward (never before they existed, so past-day history stays accurate); `specific_days` routines additionally only show on their selected weekdays (Dart `weekday - 1` → 0=Mon … 6=Sun). `todayRoutines` = `routinesForDate(now)`.
 - `entryForDate` / `progressForDate` / `isCompletedOnDate(routine, date)` (+ `entryForToday` / `todayProgress` / `isTodayCompleted` convenience wrappers). `goalFor(routine)` = `1` for `achieve_all`, else `goalAmount`.
 - `recordProgress(routine, [date])` — `achieve_all` toggles 0↔1; `certain_amount` adds `recordAmount` and wraps back to 0 once the goal is reached (so a day can be un-completed/corrected). Defaults to today when `date` omitted.
 
@@ -475,8 +477,8 @@ Key state:
 |------|---------|
 | `routine_icons.dart` | `kRoutineIconPresets` — 16 `(iconId, colorARGB)` preset combos; `routineIconData(iconId)` maps string keys to `CupertinoIcons`; `RoutineCircleIcon` renders a circular icon (custom photo clipped to circle, or tinted SF-symbol) with optional `dimmed` / `showCheck`. |
 | `routine_controller.dart` | (see Controllers above) |
-| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; reused for editing (`existing` param). Sections: name+icon, inline icon picker (preset grid + "choose photo" tile via `pickCustomIcon`), Goal (segmented + amount/unit/record fields). No Frequency section yet — daily-only. |
-| `routines_view.dart` | Tab root with two segments. **Day** segment: a `_DayNavigator` (‹ date ›, future blocked) over the routines for the selected day — tap a row to record progress for *that* day (history-editable); swipe-to-delete; long-press → edit/delete. **All** segment: every routine with goal subtitle; tap → edit. Custom photos render via `RoutineCircleIcon`. |
+| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; reused for editing (`existing` param). Sections: name+icon, inline icon picker (preset grid + "choose photo" tile via `pickCustomIcon`), Frequency (segmented `Daily` / `Specific Days`; the latter reveals a Mon-first `_WeekdayPicker` that won't let you deselect the last day), Goal (segmented + amount/unit/record fields). |
+| `routines_view.dart` | Tab root with two segments. **Day** segment: a `_DayNavigator` (‹ date ›, future blocked) over the routines for the selected day — tap a row to record progress for *that* day (history-editable); swipe-to-delete; long-press → edit/delete. **All** segment: every routine with a schedule subtitle (`Every day` or the weekday list) + goal; tap → edit. Custom photos render via `RoutineCircleIcon`. |
 
 **Row layout**: 40 px circle icon (`RoutineCircleIcon`; dimmed + check overlay when `achieve_all` complete) · name (strikethrough when complete) · right-aligned `_ProgressBadge` for `certain_amount`. Row vertical padding is tightened to `8`.
 

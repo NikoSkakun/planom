@@ -69,6 +69,44 @@ void main() {
       expect(controller.routinesForDate(DateTime(2026, 5, 19)).map((x) => x.id),
           isNot(contains(r.id)));
     });
+
+    test('specific_days routine only shows on its selected weekdays', () async {
+      // 2026-06-01 is a Monday (weekday index 0); 2026-06-02 is a Tuesday (1).
+      final monday = DateTime(2026, 6, 1);
+      final tuesday = DateTime(2026, 6, 2);
+      expect(monday.weekday, DateTime.monday);
+
+      final r = Routine(
+        name: 'Gym',
+        goalType: 'achieve_all',
+        frequencyType: 'specific_days',
+        weekdays: const [0, 2, 4], // Mon, Wed, Fri
+        creationDate: DateTime(2026, 1, 1),
+      );
+      await controller.addRoutine(r);
+
+      expect(controller.routinesForDate(monday).map((x) => x.id),
+          contains(r.id));
+      expect(controller.routinesForDate(tuesday).map((x) => x.id),
+          isNot(contains(r.id)));
+    });
+
+    test('specific_days schedule survives a reload', () async {
+      final r = Routine(
+        name: 'Gym',
+        goalType: 'achieve_all',
+        frequencyType: 'specific_days',
+        weekdays: const [5, 6], // Sat, Sun
+        creationDate: DateTime(2026, 1, 1),
+      );
+      await controller.addRoutine(r);
+
+      final fresh = RoutineController(db);
+      await fresh.load();
+      final reloaded = fresh.routines.firstWhere((x) => x.id == r.id);
+      expect(reloaded.frequencyType, 'specific_days');
+      expect(reloaded.weekdays, const [5, 6]);
+    });
   });
 
   group('recordProgress: achieve_all', () {

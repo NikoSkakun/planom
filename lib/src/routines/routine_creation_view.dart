@@ -61,10 +61,11 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
   late String _goalType; // 'achieve_all' | 'certain_amount'
   late String _goalUnit;
   late bool _useCustomUnit;
+  late String _frequencyType; // 'daily' | 'specific_days'
+  late List<int> _weekdays; // 0=Mon … 6=Sun
 
-  // Frequency is always daily for now. Weekly / "days after completion"
-  // scheduling and the auto-reset options were removed in the routines
-  // refactor and will be reintroduced later.
+  // The "days after completion" schedule and auto-reset options were removed in
+  // the routines refactor and will be reintroduced later.
 
   bool _nameEmpty = true;
   bool _showIconPicker = false;
@@ -80,6 +81,12 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
     final unit = r?.goalUnit ?? 'ml';
     _useCustomUnit = !_kUnits.contains(unit);
     _goalUnit = _useCustomUnit ? 'count' : unit;
+    _frequencyType = r?.frequencyType ?? 'daily';
+    // Default to all days selected so switching to "specific days" starts from
+    // a sensible base the user can pare down.
+    _weekdays = (r?.weekdays != null && r!.weekdays!.isNotEmpty)
+        ? List<int>.from(r.weekdays!)
+        : [0, 1, 2, 3, 4, 5, 6];
 
     _nameCtrl = TextEditingController(text: r?.name ?? '');
     _customUnitCtrl =
@@ -117,6 +124,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
             : _customUnitCtrl.text.trim()
         : _goalUnit;
 
+    final specificDays = _frequencyType == 'specific_days';
     final routine = Routine(
       id: widget.existing?.id,
       creationDate: widget.existing?.creationDate,
@@ -127,7 +135,8 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
       goalAmount: _goalType == 'certain_amount' ? goalAmount : null,
       goalUnit: _goalType == 'certain_amount' ? unit : null,
       recordAmount: _goalType == 'certain_amount' ? recordAmount : null,
-      frequencyType: 'daily',
+      frequencyType: _frequencyType,
+      weekdays: specificDays ? (List<int>.from(_weekdays)..sort()) : null,
     );
 
     if (widget.existing != null) {
@@ -244,11 +253,22 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
             ),
 
             // ── Frequency ────────────────────────────────────────────────
-            // Only daily frequency is supported for now, so there's no
-            // selector here. The weekly / "days after completion" schedules
-            // and the auto-reset options were removed in the routines refactor
-            // and will be reintroduced later (model field `frequencyType` is
-            // retained for that future work).
+            _SectionHeader(s.sectionFrequency),
+            _Section(children: [
+              _SegmentedRow(
+                options: [s.freqDaily, s.freqSpecificDays],
+                selected: _frequencyType == 'daily' ? 0 : 1,
+                onChanged: (i) => setState(() =>
+                    _frequencyType = i == 0 ? 'daily' : 'specific_days'),
+              ),
+              if (_frequencyType == 'specific_days') ...[
+                const _Divider(),
+                _WeekdayPicker(
+                  selected: _weekdays,
+                  onChanged: (days) => setState(() => _weekdays = days),
+                ),
+              ],
+            ]),
 
             // ── Goal ─────────────────────────────────────────────────────
             _SectionHeader(s.sectionGoal),
@@ -534,6 +554,64 @@ class _SegmentedRow extends StatelessWidget {
         onValueChanged: (v) {
           if (v != null) onChanged(v);
         },
+      ),
+    );
+  }
+}
+
+// Mon-first weekday toggle row. The currently-selected day can't be the only
+// one removed — at least one day must stay selected.
+class _WeekdayPicker extends StatelessWidget {
+  const _WeekdayPicker({required this.selected, required this.onChanged});
+
+  final List<int> selected;
+  final void Function(List<int>) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = AppColors.accent;
+    final labels = weekdaysShort(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List.generate(7, (i) {
+          final isOn = selected.contains(i);
+          return GestureDetector(
+            onTap: () {
+              final next = List<int>.from(selected);
+              if (isOn) {
+                // Never let the user deselect the last remaining day.
+                if (next.length > 1) next.remove(i);
+              } else {
+                next.add(i);
+              }
+              onChanged(next);
+            },
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isOn
+                    ? accent
+                    : CupertinoColors.tertiarySystemFill.resolveFrom(context),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  labels[i].substring(0, 1),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isOn
+                        ? CupertinoColors.white
+                        : CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
