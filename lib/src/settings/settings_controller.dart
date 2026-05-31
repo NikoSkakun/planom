@@ -56,6 +56,18 @@ double animationSpeedScale(AnimationSpeed s) {
   }
 }
 
+/// How the Calendar tab lays out days.
+enum CalendarViewMode {
+  /// Default: each month is its own grid, starting on a fresh week row with
+  /// blank leading/trailing cells so weeks never straddle a month boundary.
+  months,
+
+  /// Continuous scroll: weeks flow into one another with no gap between
+  /// months, so the last day of a month sits next to the first day of the
+  /// next. Month boundaries are marked inline on the 1st of each month.
+  continuous,
+}
+
 /// What the app icon badge counts. Only the current space's data feeds in.
 enum BadgeMode {
   /// No badge at all.
@@ -106,6 +118,10 @@ class SettingsController with ChangeNotifier {
   // Default is Monday to match the existing calendar grid.
   int _firstDayOfWeek = DateTime.monday;
   int get firstDayOfWeek => _firstDayOfWeek;
+
+  // How the Calendar tab lays out days. Defaults to the classic month grid.
+  CalendarViewMode _calendarViewMode = CalendarViewMode.months;
+  CalendarViewMode get calendarViewMode => _calendarViewMode;
 
   BadgeMode _badgeMode = BadgeMode.todayTasks;
   BadgeMode get badgeMode => _badgeMode;
@@ -244,6 +260,8 @@ class SettingsController with ChangeNotifier {
       } else if (key == 'first_day_of_week') {
         final v = int.tryParse(value);
         if (v != null && v >= 1 && v <= 7) _firstDayOfWeek = v;
+      } else if (key == 'calendar_view_mode') {
+        _calendarViewMode = _decodeCalendarViewMode(value);
       } else if (key == 'badge_mode') {
         _badgeMode = _decodeBadgeMode(value);
       } else if (key == 'animation_speed') {
@@ -345,6 +363,14 @@ class SettingsController with ChangeNotifier {
     _firstDayOfWeek = isoDay;
     notifyListeners();
     await _db.setAppSetting('first_day_of_week', isoDay.toString());
+  }
+
+  Future<void> updateCalendarViewMode(CalendarViewMode mode) async {
+    if (mode == _calendarViewMode) return;
+    _calendarViewMode = mode;
+    notifyListeners();
+    await _db.setAppSetting(
+        'calendar_view_mode', _encodeCalendarViewMode(mode));
   }
 
   Future<void> updateBadgeMode(BadgeMode mode) async {
@@ -461,6 +487,25 @@ class SettingsController with ChangeNotifier {
       case 'normal':
       default:
         return AnimationSpeed.normal;
+    }
+  }
+
+  static String _encodeCalendarViewMode(CalendarViewMode m) {
+    switch (m) {
+      case CalendarViewMode.months:
+        return 'months';
+      case CalendarViewMode.continuous:
+        return 'continuous';
+    }
+  }
+
+  static CalendarViewMode _decodeCalendarViewMode(String v) {
+    switch (v) {
+      case 'continuous':
+        return CalendarViewMode.continuous;
+      case 'months':
+      default:
+        return CalendarViewMode.months;
     }
   }
 
