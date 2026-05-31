@@ -48,9 +48,17 @@ class _NoteDetailViewState extends State<NoteDetailView>
   final ScrollController _contentScroll = ScrollController();
   String? _folderId;
   bool _deleted = false;
+  bool _disposed = false;
   bool _persistedNew = false;
   bool _isEditing = false;
   Timer? _autosaveTimer;
+
+  // Single-flight guard for the async save. `_saving` is true while a write
+  // is in flight; `_resaveRequested` records that the text changed again
+  // during that write so we loop and persist the newest text once it lands.
+  // This keeps writes ordered (newest wins) without overlapping DB calls.
+  bool _saving = false;
+  bool _resaveRequested = false;
 
   // Baseline of what is currently persisted, so the change check stays
   // accurate after each save (widget.note is captured once and never updated).
@@ -137,31 +145,57 @@ class _NoteDetailViewState extends State<NoteDetailView>
   }
 
   /// Cancels any pending debounce and saves the current text right now.
-  void _flushSave() {
+  /// Awaitable so callers that can wait (lifecycle/pop) give the write a
+  /// chance to finish before the process is suspended.
+  Future<void> _flushSave() {
     _autosaveTimer?.cancel();
-    _save();
+    return _save();
   }
 
-  void _save() {
+  /// Serializes saves: only one write runs at a time, and any text change
+  /// that arrives mid-write triggers exactly one more pass with the latest
+  /// text. This prevents out-of-order writes and lost trailing edits.
+  Future<void> _save() async {
+    if (_deleted) return;
+    if (_saving) {
+      _resaveRequested = true;
+      return;
+    }
+    _saving = true;
+    try {
+      do {
+        _resaveRequested = false;
+        await _persistOnce();
+      } while (_resaveRequested && !_deleted && !_disposed);
+    } finally {
+      _saving = false;
+    }
+  }
+
+  Future<void> _persistOnce() async {
     if (_deleted) return;
     final title = _title.text.trim();
     // Persist the body exactly as typed — trimming would silently drop leading
-    // indentation (meaningful in markdown) and trailing blank lines.
+    // indentation (meaningful in markdown) and trailing blank lines. Captured
+    // before any await so it stays valid even if the controllers are disposed
+    // mid-flight (the final save fires from dispose()).
     final content = _content.text;
+    final folderId = _folderId;
     if (widget.isNew && !_persistedNew) {
       if (title.isEmpty && content.trim().isEmpty) return;
-      widget.controller.addNote(
+      await widget.controller.addNote(
         widget.note.copyWith(
           title: title,
           content: content,
-          folderId: _folderId,
-          clearFolderId: _folderId == null,
+          folderId: folderId,
+          clearFolderId: folderId == null,
         ),
       );
+      // Advance the baseline only after the write lands (see below).
       _persistedNew = true;
       _savedTitle = title;
       _savedContent = content;
-      _savedFolderId = _folderId;
+      _savedFolderId = folderId;
       return;
     }
     // Skip the write when nothing actually changed — otherwise copyWith bumps
@@ -170,20 +204,24 @@ class _NoteDetailViewState extends State<NoteDetailView>
     // genuine edit is never mistaken for "unchanged".
     if (title == _savedTitle &&
         content == _savedContent &&
-        _folderId == _savedFolderId) {
+        folderId == _savedFolderId) {
       return;
     }
-    widget.controller.updateNote(
+    await widget.controller.updateNote(
       widget.note.copyWith(
         title: title,
         content: content,
-        folderId: _folderId,
-        clearFolderId: _folderId == null,
+        folderId: folderId,
+        clearFolderId: folderId == null,
       ),
     );
+    // Only advance the baseline once the write has actually completed. If the
+    // write throws or is interrupted, the baseline stays behind so the next
+    // save retries instead of being masked into a no-op (which would silently
+    // drop the edit forever).
     _savedTitle = title;
     _savedContent = content;
-    _savedFolderId = _folderId;
+    _savedFolderId = folderId;
   }
 
   @override
@@ -251,13 +289,21 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   @override
   void dispose() {
+    _disposed = true;
     _autosaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
-    _save();
+    // Detach the change/focus listeners first so disposing the controllers
+    // and focus nodes below can't re-enter the save path.
+    _title.removeListener(_scheduleAutosave);
+    _content.removeListener(_scheduleAutosave);
     _content.removeListener(_onContentSelectionChanged);
     _contentFocus.removeListener(_onContentFocusChanged);
-    _contentFocus.dispose();
     _titleFocus.removeListener(_onTitleFocusChanged);
+    // Best-effort final save. `_persistOnce` reads the controllers
+    // synchronously before its first await, so the in-flight write stays
+    // valid even though we dispose them on the next lines.
+    _save();
+    _contentFocus.dispose();
     _titleFocus.dispose();
     _title.dispose();
     _content.dispose();
