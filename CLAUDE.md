@@ -138,7 +138,7 @@ RemoteEvent (lib/src/integrations/google/remote_event.dart) ← in-memory only,
   calendarColor, htmlLink, etag, isReadOnly, recurringEventId)
 ```
 
-`Task.copyWith` accepts clear-flags (`clearDueDate`, `clearDoTime`, `clearDuration`, `clearListId`, `clearDeletedDate`, `clearCompletionDate`, `clearParentTaskId`, `clearRecurrence`, `clearSectionId`). `AppFolder` / `AppList` / `Contact` / `Event` / `Note` follow the same pattern. Item spacing: task rows use `vertical: 7` padding; list/folder rows use `vertical: 9`.
+`Task.copyWith` accepts clear-flags (`clearNote`, `clearDueDate`, `clearDoTime`, `clearDuration`, `clearListId`, `clearDeletedDate`, `clearCompletionDate`, `clearParentTaskId`, `clearRecurrence`, `clearSectionId`). `AppFolder` / `AppList` / `Contact` / `Event` / `Note` follow the same pattern. Item spacing: task rows use `vertical: 7` padding; list/folder rows use `vertical: 9`.
 
 ### Soft-delete pattern
 

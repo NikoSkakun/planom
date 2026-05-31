@@ -56,6 +56,7 @@ class Task extends AppItem {
   Task copyWith({
     String? title,
     String? note,
+    bool clearNote = false,
     bool? isCompleted,
     DateTime? dueDate,
     bool clearDueDate = false,
@@ -86,7 +87,7 @@ class Task extends AppItem {
       creationDate: creationDate,
       iconId: iconId,
       title: title ?? this.title,
-      note: note ?? this.note,
+      note: clearNote ? null : (note ?? this.note),
       isCompleted: isCompleted ?? this.isCompleted,
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       doTime: clearDoTime ? null : (doTime ?? this.doTime),
