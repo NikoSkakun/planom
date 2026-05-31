@@ -63,22 +63,30 @@ class GoogleCalendarSettingsView extends StatelessWidget {
     final cals = controller.writableSelectedCalendars;
     if (cals.isEmpty) return;
     final multiAccount = controller.accountCount > 1;
-    final options = cals
-        .map((c) => SelectionMenuOption(
-              value: c.key,
-              label: multiAccount ? '${c.summary} · ${c.accountId}' : c.summary,
-            ))
-        .toList();
+    final options = <SelectionMenuOption<String>>[
+      SelectionMenuOption(value: _localContainerKey, label: s.planomLocal),
+      for (final c in cals)
+        SelectionMenuOption(
+          value: c.key,
+          label: multiAccount ? '${c.summary} · ${c.accountId}' : c.summary,
+        ),
+    ];
     final pick = await showSelectionMenu<String>(
       context: context,
       title: s.googleCalendarDefault,
-      current: controller.defaultCalendar?.key,
+      current: controller.defaultCalendar?.key ?? _localContainerKey,
       options: options,
     );
     if (pick == null) return;
+    if (pick == _localContainerKey) {
+      await controller.clearDefaultCalendar();
+      return;
+    }
     final match = cals.where((c) => c.key == pick).toList();
     if (match.isNotEmpty) await controller.setDefaultCalendar(match.first);
   }
+
+  static const String _localContainerKey = '__planom_local__';
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +193,7 @@ class GoogleCalendarSettingsView extends StatelessWidget {
 
   String _defaultLabel(GoogleCalendarController c, S s) {
     final def = c.defaultCalendar;
-    return def?.summary ?? s.googleCalendarNoDefault;
+    return def?.summary ?? s.planomLocal;
   }
 
   String _formatLastSync(DateTime t) {

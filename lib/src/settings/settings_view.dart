@@ -200,6 +200,7 @@ class _SettingsViewState extends State<SettingsView> {
                 FastRoute<void>(
                   builder: (_) => CalendarSettingsView(
                     controller: widget.controller,
+                    googleCalendarController: widget.googleCalendarController,
                   ),
                 ),
               ),

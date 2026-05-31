@@ -364,16 +364,8 @@ class GoogleCalendarController with ChangeNotifier {
       _selectedKeys.addAll(cals.map((c) => c.key));
       await _persistSelected();
 
-      // First writable calendar becomes the default if none is set yet.
-      if (defaultCalendar == null) {
-        final primary = cals.where((c) => c.primary && c.canWrite).toList();
-        final pick = primary.isNotEmpty
-            ? primary.first
-            : cals.where((c) => c.canWrite).firstOrNull;
-        if (pick != null) {
-          await _setDefault(pick.accountId, pick.id);
-        }
-      }
+      // No auto-default — new events stay local (Planom) until the user picks
+      // a Google calendar as the default container in Settings → Calendar.
 
       // New calendars have no events in the loaded range yet.
       _resetLoadedRange();
@@ -515,12 +507,23 @@ class GoogleCalendarController with ChangeNotifier {
   /// (e.g. a token that couldn't be refreshed) does NOT blank out an account
   /// that already has known calendars — that's what left a still-valid account
   /// reading "No calendars found" after another account was connected.
+  ///
+  /// When an account's calendars are populated for the first time (the initial
+  /// [addAccount] returned an empty list due to a transient API hiccup, and
+  /// this refresh is the first successful fetch), the new calendars are
+  /// auto-selected so they appear in the event-creation picker. Otherwise
+  /// `setCalendarSelected` is the only way to enter/leave [_selectedKeys].
   Future<void> _fetchAndCacheCalendars(GoogleAccount account) async {
     try {
       final cals = await _api.listCalendars(account);
       if (cals.isNotEmpty || !_calendarsByAccount.containsKey(account.id)) {
+        final previous = _calendarsByAccount[account.id] ?? const [];
         _calendarsByAccount[account.id] = cals;
         await _persistCalendars();
+        if (previous.isEmpty && cals.isNotEmpty) {
+          _selectedKeys.addAll(cals.map((c) => c.key));
+          await _persistSelected();
+        }
       }
     } catch (e) {
       debugPrint('listCalendars(${account.id}) failed: $e');

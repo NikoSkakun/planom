@@ -290,6 +290,49 @@ void main() {
     expect(eventIds(), {'a1', 'b1'});
   });
 
+  test(
+      'an account added while its calendar list comes back empty still '
+      'auto-selects its calendars on the next successful refresh',
+      () async {
+    api.register('a@x.com',
+        calendars: [cal('a@x.com', 'cal', primary: true)],
+        events: {
+          'cal': [ev('a@x.com', 'cal', 'a1')]
+        });
+
+    // First account in normally.
+    await addAccount('a@x.com', api: api);
+    await settle();
+
+    // Second account: register it but have listCalendars return [] during
+    // addAccount (simulating a transient API hiccup right after consent).
+    api.register('b@y.com',
+        calendars: [cal('b@y.com', 'cal', primary: true)],
+        events: {
+          'cal': [ev('b@y.com', 'cal', 'b1')]
+        });
+    final realCalendars = List<GoogleCalendarMeta>.of(api._cals['b@y.com']!);
+    api._cals['b@y.com'] = const [];
+    await addAccount('b@y.com', api: api);
+    await settle();
+
+    // listCalendars now succeeds; a fresh refresh should populate b@y.com's
+    // calendars AND select them so they appear in writableSelectedCalendars
+    // (which the event-creation picker reads).
+    api._cals['b@y.com'] = realCalendars;
+    await controller.refresh();
+    await settle();
+
+    expect(controller.accountCount, 2);
+    expect(controller.calendarsForAccount('b@y.com').map((c) => c.id).toList(),
+        ['cal']);
+    expect(
+        controller.writableSelectedCalendars
+            .map((c) => '${c.accountId}/${c.id}')
+            .toSet(),
+        {'a@x.com/cal', 'b@y.com/cal'});
+  });
+
   test('read-only account calendars are not writable and reject creates',
       () async {
     api.register('r@x.com',

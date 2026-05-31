@@ -389,6 +389,7 @@ class S {
   String get eventOption => t('eventOption');
   String get calendarAllowCreatingTasks => t('calendarAllowCreatingTasks');
   String get calendarAllowCreatingEvents => t('calendarAllowCreatingEvents');
+  String get calendarDefaultContainer => t('calendarDefaultContainer');
   String get noTasks => t('noTasks');
   String get noTasksForToday => t('noTasksForToday');
   String get noUpcomingTasks => t('noUpcomingTasks');
@@ -942,6 +943,7 @@ const Map<String, String> _en = {
   'addToCalendar': 'Add to Calendar', 'taskOption': 'Task', 'eventOption': 'Event',
   'calendarAllowCreatingTasks': 'Allow creating tasks',
   'calendarAllowCreatingEvents': 'Allow creating events',
+  'calendarDefaultContainer': 'Default for new events',
   'noTasks': 'No tasks', 'noTasksForToday': 'No tasks for today',
   'noUpcomingTasks': 'No upcoming tasks', 'noCompletedTasks': 'No completed tasks',
   'noItems': 'No items', 'noNotes': 'No notes',
@@ -1123,6 +1125,7 @@ const Map<String, String> _uk = {
   'addToCalendar': 'Додати до календаря', 'taskOption': 'Завдання', 'eventOption': 'Подія',
   'calendarAllowCreatingTasks': 'Дозволити створення завдань',
   'calendarAllowCreatingEvents': 'Дозволити створення подій',
+  'calendarDefaultContainer': 'Типовий контейнер для нових подій',
   'noTasks': 'Немає завдань', 'noTasksForToday': 'Немає завдань на сьогодні',
   'noUpcomingTasks': 'Немає майбутніх завдань',
   'noCompletedTasks': 'Немає виконаних завдань',
@@ -1263,6 +1266,7 @@ const Map<String, String> _es = {
   'addToCalendar': 'Añadir al calendario', 'taskOption': 'Tarea', 'eventOption': 'Evento',
   'calendarAllowCreatingTasks': 'Permitir crear tareas',
   'calendarAllowCreatingEvents': 'Permitir crear eventos',
+  'calendarDefaultContainer': 'Predeterminado para eventos nuevos',
   'noTasks': 'Sin tareas', 'noTasksForToday': 'Sin tareas para hoy',
   'noUpcomingTasks': 'Sin tareas próximas',
   'noCompletedTasks': 'Sin tareas completadas',
@@ -1403,6 +1407,7 @@ const Map<String, String> _fr = {
   'addToCalendar': 'Ajouter au calendrier', 'taskOption': 'Tâche', 'eventOption': 'Événement',
   'calendarAllowCreatingTasks': 'Autoriser la création de tâches',
   'calendarAllowCreatingEvents': 'Autoriser la création d\'événements',
+  'calendarDefaultContainer': 'Par défaut pour les nouveaux événements',
   'noTasks': 'Aucune tâche', 'noTasksForToday': 'Aucune tâche aujourd\'hui',
   'noUpcomingTasks': 'Aucune tâche à venir',
   'noCompletedTasks': 'Aucune tâche terminée',
@@ -1543,6 +1548,7 @@ const Map<String, String> _de = {
   'addToCalendar': 'Zum Kalender hinzufügen', 'taskOption': 'Aufgabe', 'eventOption': 'Ereignis',
   'calendarAllowCreatingTasks': 'Aufgaben erstellen erlauben',
   'calendarAllowCreatingEvents': 'Ereignisse erstellen erlauben',
+  'calendarDefaultContainer': 'Standard für neue Ereignisse',
   'noTasks': 'Keine Aufgaben', 'noTasksForToday': 'Keine Aufgaben für heute',
   'noUpcomingTasks': 'Keine anstehenden Aufgaben',
   'noCompletedTasks': 'Keine erledigten Aufgaben',
@@ -1683,6 +1689,7 @@ const Map<String, String> _it = {
   'addToCalendar': 'Aggiungi al calendario', 'taskOption': 'Attività', 'eventOption': 'Evento',
   'calendarAllowCreatingTasks': 'Consenti la creazione di attività',
   'calendarAllowCreatingEvents': 'Consenti la creazione di eventi',
+  'calendarDefaultContainer': 'Predefinito per nuovi eventi',
   'noTasks': 'Nessuna attività', 'noTasksForToday': 'Nessuna attività per oggi',
   'noUpcomingTasks': 'Nessuna attività in arrivo',
   'noCompletedTasks': 'Nessuna attività completata',
@@ -1823,6 +1830,7 @@ const Map<String, String> _pt = {
   'addToCalendar': 'Adicionar ao calendário', 'taskOption': 'Tarefa', 'eventOption': 'Evento',
   'calendarAllowCreatingTasks': 'Permitir criar tarefas',
   'calendarAllowCreatingEvents': 'Permitir criar eventos',
+  'calendarDefaultContainer': 'Padrão para novos eventos',
   'noTasks': 'Sem tarefas', 'noTasksForToday': 'Sem tarefas para hoje',
   'noUpcomingTasks': 'Sem tarefas próximas',
   'noCompletedTasks': 'Sem tarefas concluídas',
@@ -1963,6 +1971,7 @@ const Map<String, String> _ru = {
   'addToCalendar': 'Добавить в календарь', 'taskOption': 'Задача', 'eventOption': 'Событие',
   'calendarAllowCreatingTasks': 'Разрешить создание задач',
   'calendarAllowCreatingEvents': 'Разрешить создание событий',
+  'calendarDefaultContainer': 'По умолчанию для новых событий',
   'noTasks': 'Нет задач', 'noTasksForToday': 'Нет задач на сегодня',
   'noUpcomingTasks': 'Нет предстоящих задач',
   'noCompletedTasks': 'Нет выполненных задач',
@@ -2102,6 +2111,7 @@ const Map<String, String> _zh = {
   'addToCalendar': '添加到日历', 'taskOption': '任务', 'eventOption': '事件',
   'calendarAllowCreatingTasks': '允许创建任务',
   'calendarAllowCreatingEvents': '允许创建事件',
+  'calendarDefaultContainer': '新事件的默认位置',
   'noTasks': '没有任务', 'noTasksForToday': '今天没有任务',
   'noUpcomingTasks': '没有即将到来的任务',
   'noCompletedTasks': '没有已完成的任务',
@@ -2241,6 +2251,7 @@ const Map<String, String> _ja = {
   'addToCalendar': 'カレンダーに追加', 'taskOption': 'タスク', 'eventOption': 'イベント',
   'calendarAllowCreatingTasks': 'タスクの作成を許可',
   'calendarAllowCreatingEvents': 'イベントの作成を許可',
+  'calendarDefaultContainer': '新しいイベントの既定の場所',
   'noTasks': 'タスクなし', 'noTasksForToday': '今日のタスクなし',
   'noUpcomingTasks': '今後のタスクなし',
   'noCompletedTasks': '完了したタスクなし',

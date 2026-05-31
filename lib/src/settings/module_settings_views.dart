@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_icon_picker.dart';
+import '../integrations/google/google_calendar_controller.dart';
 import '../localization/strings.dart';
 import '../utils/selection_menu.dart';
 import 'settings_controller.dart';
@@ -190,13 +191,57 @@ class NotesSettingsView extends StatelessWidget {
 }
 
 class CalendarSettingsView extends StatelessWidget {
-  const CalendarSettingsView({super.key, required this.controller});
+  const CalendarSettingsView({
+    super.key,
+    required this.controller,
+    this.googleCalendarController,
+  });
 
   final SettingsController controller;
+  final GoogleCalendarController? googleCalendarController;
+
+  Future<void> _pickDefaultContainer(BuildContext context) async {
+    final gc = googleCalendarController;
+    if (gc == null) return;
+    final s = S.of(context);
+    final writable = gc.writableSelectedCalendars;
+    if (writable.isEmpty) return;
+    final multiAccount = gc.accountCount > 1;
+    final options = <SelectionMenuOption<String>>[
+      SelectionMenuOption(value: _localContainerKey, label: s.planomLocal),
+      for (final cal in writable)
+        SelectionMenuOption(
+          value: cal.key,
+          label: multiAccount ? '${cal.summary} · ${cal.accountId}' : cal.summary,
+        ),
+    ];
+    final pick = await showSelectionMenu<String>(
+      context: context,
+      title: s.calendarDefaultContainer,
+      current: gc.defaultCalendar?.key ?? _localContainerKey,
+      options: options,
+    );
+    if (pick == null) return;
+    if (pick == _localContainerKey) {
+      await gc.clearDefaultCalendar();
+      return;
+    }
+    final match = writable.where((c) => c.key == pick).toList();
+    if (match.isNotEmpty) await gc.setDefaultCalendar(match.first);
+  }
+
+  String _defaultContainerLabel(S s, GoogleCalendarController? gc) {
+    final def = gc?.defaultCalendar;
+    if (def == null) return s.planomLocal;
+    return (gc!.accountCount > 1)
+        ? '${def.summary} · ${def.accountId}'
+        : def.summary;
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
+    final gc = googleCalendarController;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
@@ -204,8 +249,12 @@ class CalendarSettingsView extends StatelessWidget {
       ),
       child: SafeArea(
         child: ListenableBuilder(
-          listenable: controller,
+          listenable: gc == null
+              ? controller
+              : Listenable.merge([controller, gc]),
           builder: (context, _) {
+            final hasWritableGoogleCalendars =
+                gc != null && gc.isConnected && gc.writableSelectedCalendars.isNotEmpty;
             return SingleChildScrollView(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -223,6 +272,14 @@ class CalendarSettingsView extends StatelessWidget {
                     value: controller.calendarAllowCreatingEvents,
                     onChanged: controller.updateCalendarAllowCreatingEvents,
                   ),
+                  if (hasWritableGoogleCalendars) ...[
+                    const SizedBox(height: 18),
+                    SettingsNavRow(
+                      label: s.calendarDefaultContainer,
+                      trailingLabel: _defaultContainerLabel(s, gc),
+                      onTap: () => _pickDefaultContainer(context),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -232,6 +289,9 @@ class CalendarSettingsView extends StatelessWidget {
     );
   }
 }
+
+/// Sentinel value for "Planom (Local)" in the default-container picker.
+const String _localContainerKey = '__planom_local__';
 
 class RoutinesSettingsView extends StatelessWidget {
   const RoutinesSettingsView({super.key});
