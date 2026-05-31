@@ -123,6 +123,15 @@ class SettingsController with ChangeNotifier {
   CalendarViewMode _calendarViewMode = CalendarViewMode.months;
   CalendarViewMode get calendarViewMode => _calendarViewMode;
 
+  // Whether the Calendar tab's + button can create Tasks / Events. Both
+  // default to true. If both are off the + button is hidden in Calendar; if
+  // exactly one is off the + button skips the picker and routes straight to
+  // the remaining option.
+  bool _calendarAllowCreatingTasks = true;
+  bool get calendarAllowCreatingTasks => _calendarAllowCreatingTasks;
+  bool _calendarAllowCreatingEvents = true;
+  bool get calendarAllowCreatingEvents => _calendarAllowCreatingEvents;
+
   BadgeMode _badgeMode = BadgeMode.todayTasks;
   BadgeMode get badgeMode => _badgeMode;
 
@@ -262,6 +271,10 @@ class SettingsController with ChangeNotifier {
         if (v != null && v >= 1 && v <= 7) _firstDayOfWeek = v;
       } else if (key == 'calendar_view_mode') {
         _calendarViewMode = _decodeCalendarViewMode(value);
+      } else if (key == 'calendar_allow_tasks') {
+        _calendarAllowCreatingTasks = value != 'false';
+      } else if (key == 'calendar_allow_events') {
+        _calendarAllowCreatingEvents = value != 'false';
       } else if (key == 'badge_mode') {
         _badgeMode = _decodeBadgeMode(value);
       } else if (key == 'animation_speed') {
@@ -371,6 +384,20 @@ class SettingsController with ChangeNotifier {
     notifyListeners();
     await _db.setAppSetting(
         'calendar_view_mode', _encodeCalendarViewMode(mode));
+  }
+
+  Future<void> updateCalendarAllowCreatingTasks(bool value) async {
+    if (value == _calendarAllowCreatingTasks) return;
+    _calendarAllowCreatingTasks = value;
+    notifyListeners();
+    await _db.setAppSetting('calendar_allow_tasks', value.toString());
+  }
+
+  Future<void> updateCalendarAllowCreatingEvents(bool value) async {
+    if (value == _calendarAllowCreatingEvents) return;
+    _calendarAllowCreatingEvents = value;
+    notifyListeners();
+    await _db.setAppSetting('calendar_allow_events', value.toString());
   }
 
   Future<void> updateBadgeMode(BadgeMode mode) async {

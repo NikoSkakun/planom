@@ -146,10 +146,13 @@ class _HomeShellState extends State<HomeShell> {
           if (_lastTabIndex == 1) _showPlusButton.value = false;
         },
       ),
-      // Calendar tab: hide when navigated deeper.
+      // Calendar tab: hide when navigated deeper, and hide entirely when
+      // both task and event creation are disabled.
       _DepthObserver(
         onChanged: (depth, trackedCount) {
-          if (_lastTabIndex == 2) _showPlusButton.value = depth <= 1;
+          if (_lastTabIndex == 2) {
+            _showPlusButton.value = depth <= 1 && _calendarPlusAllowed();
+          }
         },
       ),
       // Routines tab: hide when navigated deeper.
@@ -165,8 +168,11 @@ class _HomeShellState extends State<HomeShell> {
         },
       ),
     ];
-    // Notes (1) and Settings (4) never show the global +.
-    _showPlusButton.value = _lastTabIndex != 1 && _lastTabIndex != 4;
+    // Notes (1) and Settings (4) never show the global +. The Calendar tab
+    // additionally hides + when both creation toggles are off.
+    _showPlusButton.value = _lastTabIndex != 1 &&
+        _lastTabIndex != 4 &&
+        (_lastTabIndex != 2 || _calendarPlusAllowed());
 
     // Wire up Plus-button drag drop callbacks. These run regardless of which
     // tab is currently active because a Draggable receives drops anywhere on
@@ -368,6 +374,11 @@ class _HomeShellState extends State<HomeShell> {
 
     if (visibleIndices.contains(_lastTabIndex)) {
       _tabController.index = _visualForBuiltin(_lastTabIndex);
+      // Settings toggles may have flipped Calendar's + button visibility.
+      if (_lastTabIndex == 2) {
+        _showPlusButton.value =
+            _depthObservers[2].depth <= 1 && _calendarPlusAllowed();
+      }
       return;
     }
     // The active tab was just hidden from the tab bar. Fall back to Tasks (or
@@ -433,9 +444,13 @@ class _HomeShellState extends State<HomeShell> {
       return;
     }
 
-    // On Calendar tab with a selected day: choose Task vs Event.
-    if (_lastTabIndex == 2 && _activeDueDate.value != null) {
-      _showCalendarItemPicker(_activeDueDate.value!);
+    // On Calendar tab: tap of + always routes through the calendar item
+    // picker (which gates on the task/event-creation toggles). When no day
+    // is selected, default to today so the new item has a date.
+    if (_lastTabIndex == 2) {
+      final now = DateTime.now();
+      final date = _activeDueDate.value ?? DateTime(now.year, now.month, now.day);
+      _showCalendarItemPicker(date);
       return;
     }
 
@@ -465,6 +480,30 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Future<void> _showCalendarItemPicker(DateTime date) async {
+    final allowTasks = widget.settingsController.calendarAllowCreatingTasks;
+    final allowEvents = widget.settingsController.calendarAllowCreatingEvents;
+    if (!allowTasks && !allowEvents) return;
+
+    if (allowTasks && !allowEvents) {
+      showTaskCreationSheet(
+        context,
+        widget.taskController,
+        widget.folderController,
+        initialDueDate: date,
+        settingsController: widget.settingsController,
+      );
+      return;
+    }
+    if (allowEvents && !allowTasks) {
+      showEventCreationSheet(
+        context,
+        widget.eventController,
+        initialDate: date,
+        googleCalendarController: widget.googleCalendarController,
+      );
+      return;
+    }
+
     final s = S.of(context);
     final choice = await showSelectionMenu<String>(
       context: context,
@@ -531,6 +570,9 @@ class _HomeShellState extends State<HomeShell> {
         _showPlusButton.value = _depthObservers[0].trackedCount == 0;
       case 1:
         _showPlusButton.value = false;
+      case 2:
+        _showPlusButton.value =
+            _depthObservers[2].depth <= 1 && _calendarPlusAllowed();
       case 4:
         _showPlusButton.value = false;
       default:
@@ -539,6 +581,12 @@ class _HomeShellState extends State<HomeShell> {
     _lastTabIndex = tappedIndex;
     widget.settingsController.setLastOpenedTab(tappedIndex);
   }
+
+  /// Whether the floating + button is allowed on the Calendar tab. Off when
+  /// both task and event creation are disabled in Settings → Calendar.
+  bool _calendarPlusAllowed() =>
+      widget.settingsController.calendarAllowCreatingTasks ||
+      widget.settingsController.calendarAllowCreatingEvents;
 
   /// Builtin tab indices appearing in the currently visible page's items,
   /// in display order. Shortcut items don't count toward this — they're

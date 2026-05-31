@@ -190,10 +190,47 @@ class NotesSettingsView extends StatelessWidget {
 }
 
 class CalendarSettingsView extends StatelessWidget {
-  const CalendarSettingsView({super.key});
+  const CalendarSettingsView({super.key, required this.controller});
+
+  final SettingsController controller;
+
   @override
-  Widget build(BuildContext context) =>
-      _EmptySettingsView(title: S.of(context).tabCalendar);
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        middle: Text(s.tabCalendar),
+      ),
+      child: SafeArea(
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) {
+            return SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SettingsToggleRow(
+                    label: s.calendarAllowCreatingTasks,
+                    value: controller.calendarAllowCreatingTasks,
+                    onChanged: controller.updateCalendarAllowCreatingTasks,
+                  ),
+                  const SizedBox(height: 1),
+                  SettingsToggleRow(
+                    label: s.calendarAllowCreatingEvents,
+                    value: controller.calendarAllowCreatingEvents,
+                    onChanged: controller.updateCalendarAllowCreatingEvents,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 }
 
 class RoutinesSettingsView extends StatelessWidget {

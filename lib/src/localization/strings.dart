@@ -387,6 +387,8 @@ class S {
   String get addToCalendar => t('addToCalendar');
   String get taskOption => t('taskOption');
   String get eventOption => t('eventOption');
+  String get calendarAllowCreatingTasks => t('calendarAllowCreatingTasks');
+  String get calendarAllowCreatingEvents => t('calendarAllowCreatingEvents');
   String get noTasks => t('noTasks');
   String get noTasksForToday => t('noTasksForToday');
   String get noUpcomingTasks => t('noUpcomingTasks');
@@ -920,6 +922,8 @@ const Map<String, String> _en = {
   'sortByCreation': 'By Creation Date', 'sortByName': 'By Name',
   'sortByPriority': 'By Priority', 'sortByDateTime': 'By Date & Time',
   'addToCalendar': 'Add to Calendar', 'taskOption': 'Task', 'eventOption': 'Event',
+  'calendarAllowCreatingTasks': 'Allow creating tasks',
+  'calendarAllowCreatingEvents': 'Allow creating events',
   'noTasks': 'No tasks', 'noTasksForToday': 'No tasks for today',
   'noUpcomingTasks': 'No upcoming tasks', 'noCompletedTasks': 'No completed tasks',
   'noItems': 'No items', 'noNotes': 'No notes',
@@ -1098,6 +1102,8 @@ const Map<String, String> _uk = {
   'sortByCreation': 'За датою створення', 'sortByName': 'За назвою',
   'sortByPriority': 'За пріоритетом', 'sortByDateTime': 'За датою і часом',
   'addToCalendar': 'Додати до календаря', 'taskOption': 'Завдання', 'eventOption': 'Подія',
+  'calendarAllowCreatingTasks': 'Дозволити створення завдань',
+  'calendarAllowCreatingEvents': 'Дозволити створення подій',
   'noTasks': 'Немає завдань', 'noTasksForToday': 'Немає завдань на сьогодні',
   'noUpcomingTasks': 'Немає майбутніх завдань',
   'noCompletedTasks': 'Немає виконаних завдань',
@@ -1235,6 +1241,8 @@ const Map<String, String> _es = {
   'sortByCreation': 'Por fecha de creación', 'sortByName': 'Por nombre',
   'sortByPriority': 'Por prioridad', 'sortByDateTime': 'Por fecha y hora',
   'addToCalendar': 'Añadir al calendario', 'taskOption': 'Tarea', 'eventOption': 'Evento',
+  'calendarAllowCreatingTasks': 'Permitir crear tareas',
+  'calendarAllowCreatingEvents': 'Permitir crear eventos',
   'noTasks': 'Sin tareas', 'noTasksForToday': 'Sin tareas para hoy',
   'noUpcomingTasks': 'Sin tareas próximas',
   'noCompletedTasks': 'Sin tareas completadas',
@@ -1372,6 +1380,8 @@ const Map<String, String> _fr = {
   'sortByCreation': 'Par date de création', 'sortByName': 'Par nom',
   'sortByPriority': 'Par priorité', 'sortByDateTime': 'Par date et heure',
   'addToCalendar': 'Ajouter au calendrier', 'taskOption': 'Tâche', 'eventOption': 'Événement',
+  'calendarAllowCreatingTasks': 'Autoriser la création de tâches',
+  'calendarAllowCreatingEvents': 'Autoriser la création d\'événements',
   'noTasks': 'Aucune tâche', 'noTasksForToday': 'Aucune tâche aujourd\'hui',
   'noUpcomingTasks': 'Aucune tâche à venir',
   'noCompletedTasks': 'Aucune tâche terminée',
@@ -1509,6 +1519,8 @@ const Map<String, String> _de = {
   'sortByCreation': 'Nach Erstellungsdatum', 'sortByName': 'Nach Name',
   'sortByPriority': 'Nach Priorität', 'sortByDateTime': 'Nach Datum & Zeit',
   'addToCalendar': 'Zum Kalender hinzufügen', 'taskOption': 'Aufgabe', 'eventOption': 'Ereignis',
+  'calendarAllowCreatingTasks': 'Aufgaben erstellen erlauben',
+  'calendarAllowCreatingEvents': 'Ereignisse erstellen erlauben',
   'noTasks': 'Keine Aufgaben', 'noTasksForToday': 'Keine Aufgaben für heute',
   'noUpcomingTasks': 'Keine anstehenden Aufgaben',
   'noCompletedTasks': 'Keine erledigten Aufgaben',
@@ -1646,6 +1658,8 @@ const Map<String, String> _it = {
   'sortByCreation': 'Per data creazione', 'sortByName': 'Per nome',
   'sortByPriority': 'Per priorità', 'sortByDateTime': 'Per data e ora',
   'addToCalendar': 'Aggiungi al calendario', 'taskOption': 'Attività', 'eventOption': 'Evento',
+  'calendarAllowCreatingTasks': 'Consenti la creazione di attività',
+  'calendarAllowCreatingEvents': 'Consenti la creazione di eventi',
   'noTasks': 'Nessuna attività', 'noTasksForToday': 'Nessuna attività per oggi',
   'noUpcomingTasks': 'Nessuna attività in arrivo',
   'noCompletedTasks': 'Nessuna attività completata',
@@ -1783,6 +1797,8 @@ const Map<String, String> _pt = {
   'sortByCreation': 'Por data de criação', 'sortByName': 'Por nome',
   'sortByPriority': 'Por prioridade', 'sortByDateTime': 'Por data e hora',
   'addToCalendar': 'Adicionar ao calendário', 'taskOption': 'Tarefa', 'eventOption': 'Evento',
+  'calendarAllowCreatingTasks': 'Permitir criar tarefas',
+  'calendarAllowCreatingEvents': 'Permitir criar eventos',
   'noTasks': 'Sem tarefas', 'noTasksForToday': 'Sem tarefas para hoje',
   'noUpcomingTasks': 'Sem tarefas próximas',
   'noCompletedTasks': 'Sem tarefas concluídas',
@@ -1920,6 +1936,8 @@ const Map<String, String> _ru = {
   'sortByCreation': 'По дате создания', 'sortByName': 'По имени',
   'sortByPriority': 'По приоритету', 'sortByDateTime': 'По дате и времени',
   'addToCalendar': 'Добавить в календарь', 'taskOption': 'Задача', 'eventOption': 'Событие',
+  'calendarAllowCreatingTasks': 'Разрешить создание задач',
+  'calendarAllowCreatingEvents': 'Разрешить создание событий',
   'noTasks': 'Нет задач', 'noTasksForToday': 'Нет задач на сегодня',
   'noUpcomingTasks': 'Нет предстоящих задач',
   'noCompletedTasks': 'Нет выполненных задач',
@@ -2056,6 +2074,8 @@ const Map<String, String> _zh = {
   'sortByCreation': '按创建日期', 'sortByName': '按名称',
   'sortByPriority': '按优先级', 'sortByDateTime': '按日期和时间',
   'addToCalendar': '添加到日历', 'taskOption': '任务', 'eventOption': '事件',
+  'calendarAllowCreatingTasks': '允许创建任务',
+  'calendarAllowCreatingEvents': '允许创建事件',
   'noTasks': '没有任务', 'noTasksForToday': '今天没有任务',
   'noUpcomingTasks': '没有即将到来的任务',
   'noCompletedTasks': '没有已完成的任务',
@@ -2192,6 +2212,8 @@ const Map<String, String> _ja = {
   'sortByCreation': '作成日順', 'sortByName': '名前順',
   'sortByPriority': '優先度順', 'sortByDateTime': '日時順',
   'addToCalendar': 'カレンダーに追加', 'taskOption': 'タスク', 'eventOption': 'イベント',
+  'calendarAllowCreatingTasks': 'タスクの作成を許可',
+  'calendarAllowCreatingEvents': 'イベントの作成を許可',
   'noTasks': 'タスクなし', 'noTasksForToday': '今日のタスクなし',
   'noUpcomingTasks': '今後のタスクなし',
   'noCompletedTasks': '完了したタスクなし',

@@ -198,7 +198,9 @@ class _SettingsViewState extends State<SettingsView> {
               icon: CupertinoIcons.calendar,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
-                  builder: (_) => const CalendarSettingsView(),
+                  builder: (_) => CalendarSettingsView(
+                    controller: widget.controller,
+                  ),
                 ),
               ),
             ),

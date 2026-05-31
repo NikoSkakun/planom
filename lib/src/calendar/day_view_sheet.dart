@@ -84,6 +84,31 @@ class _DayViewSheetState extends State<DayViewSheet> {
   }
 
   void _showAddPicker(BuildContext context) {
+    final allowTasks =
+        widget.settingsController?.calendarAllowCreatingTasks ?? true;
+    final allowEvents =
+        widget.settingsController?.calendarAllowCreatingEvents ?? true;
+    if (!allowTasks && !allowEvents) return;
+    if (allowTasks && !allowEvents) {
+      showTaskCreationSheet(
+        context,
+        widget.taskController,
+        widget.folderController,
+        initialDueDate: widget.date,
+        settingsController: widget.settingsController,
+      );
+      return;
+    }
+    if (allowEvents && !allowTasks) {
+      showEventCreationSheet(
+        context,
+        widget.eventController,
+        initialDate: widget.date,
+        googleCalendarController: widget.googleCalendarController,
+      );
+      return;
+    }
+
     _pickerEntry?.remove();
     final overlay = Overlay.of(context);
     late OverlayEntry entry;
@@ -261,27 +286,36 @@ class _DayViewSheetState extends State<DayViewSheet> {
               SizedBox(height: mq.padding.bottom + 72),
             ],
           ),
-          // Floating + button — bottom right
-          Positioned(
-            bottom: mq.padding.bottom + 16,
-            right: 20,
-            child: GestureDetector(
-              onTap: () => _showAddPicker(context),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  CupertinoIcons.plus,
-                  color: CupertinoColors.white,
-                  size: 22,
-                ),
+          // Floating + button — bottom right. Hidden when both task and
+          // event creation are disabled in Settings → Calendar.
+          if (widget.settingsController == null)
+            Positioned(
+              bottom: mq.padding.bottom + 16,
+              right: 20,
+              child: _DayViewPlusButton(
+                onTap: () => _showAddPicker(context),
               ),
+            )
+          else
+            ListenableBuilder(
+              listenable: widget.settingsController!,
+              builder: (context, _) {
+                final allowTasks =
+                    widget.settingsController!.calendarAllowCreatingTasks;
+                final allowEvents =
+                    widget.settingsController!.calendarAllowCreatingEvents;
+                if (!allowTasks && !allowEvents) {
+                  return const SizedBox.shrink();
+                }
+                return Positioned(
+                  bottom: mq.padding.bottom + 16,
+                  right: 20,
+                  child: _DayViewPlusButton(
+                    onTap: () => _showAddPicker(context),
+                  ),
+                );
+              },
             ),
-          ),
         ],
       ),
     );
@@ -407,6 +441,34 @@ class _DayViewSheetState extends State<DayViewSheet> {
         const SizedBox(height: 8),
       ],
     ];
+  }
+}
+
+// ─── Floating + button ────────────────────────────────────────────────────────
+
+class _DayViewPlusButton extends StatelessWidget {
+  const _DayViewPlusButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: AppColors.accent,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          CupertinoIcons.plus,
+          color: CupertinoColors.white,
+          size: 22,
+        ),
+      ),
+    );
   }
 }
 
