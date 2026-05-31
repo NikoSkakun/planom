@@ -4,6 +4,13 @@ import '../database/database_service.dart';
 import '../models/routine.dart';
 import '../models/routine_entry.dart';
 
+/// Owns the list of routines and their per-day progress entries.
+///
+/// Routines are strictly daily: each calendar day is tracked independently by
+/// a [RoutineEntry] row, so a routine automatically "resets" every day and the
+/// full history is preserved (useful for revisiting past days and, later, for
+/// streaks). All progress queries take an explicit `date` so the UI can show
+/// and edit any day, not just today.
 class RoutineController with ChangeNotifier {
   RoutineController(this._db);
 
@@ -19,103 +26,85 @@ class RoutineController with ChangeNotifier {
     notifyListeners();
   }
 
-  static DateTime _normalizeDate(DateTime dt) =>
+  static DateTime normalizeDate(DateTime dt) =>
       DateTime(dt.year, dt.month, dt.day);
 
-  /// Routines that should appear in today's list.
-  List<Routine> get todayRoutines {
-    final today = _normalizeDate(DateTime.now());
-    // Dart weekday: 1=Mon … 7=Sun; convert to 0=Mon … 6=Sun
-    final todayWeekday = today.weekday - 1;
-
-    return _routines.where((r) {
-      if (r.frequencyType == 'daily') {
-        final days = r.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
-        return days.contains(todayWeekday);
-      } else {
-        // days_after_complete: show when today >= last completion + gap
-        final lastCompletion = _lastCompletedEntry(r);
-        if (lastCompletion == null) return true; // never completed
-        // Use date-component arithmetic, not Duration(days:): adding a Duration
-        // across a DST boundary can land on the wrong calendar day.
-        final last = _normalizeDate(lastCompletion.date);
-        final nextDate =
-            DateTime(last.year, last.month, last.day + (r.daysAfterComplete ?? 1));
-        return !today.isBefore(nextDate);
-      }
-    }).toList();
+  /// Routines that should appear on [date]. A daily routine shows on every day
+  /// from its creation day onward — never before it existed, so past-day
+  /// history stays accurate.
+  List<Routine> routinesForDate(DateTime date) {
+    final day = normalizeDate(date);
+    return _routines
+        .where((r) => !normalizeDate(r.creationDate).isAfter(day))
+        .toList();
   }
 
-  /// Today's entry for a routine (null if none recorded yet today).
-  RoutineEntry? entryForToday(String routineId) {
-    final today = _normalizeDate(DateTime.now());
+  /// Convenience for the default "today" view.
+  List<Routine> get todayRoutines => routinesForDate(DateTime.now());
+
+  /// The progress entry for a routine on a specific day, or null if untouched.
+  RoutineEntry? entryForDate(String routineId, DateTime date) {
+    final day = normalizeDate(date);
     for (final e in _entries) {
-      if (e.routineId == routineId && _normalizeDate(e.date) == today) {
-        return e;
-      }
+      if (e.routineId == routineId && normalizeDate(e.date) == day) return e;
     }
     return null;
   }
 
-  /// Current progress amount to display for a routine today.
-  int todayProgress(String routineId) {
-    final routine = _routineById(routineId);
-    if (routine == null) return 0;
-    final todayEntry = entryForToday(routineId);
-    if (todayEntry != null) return todayEntry.amount;
-    // autoReset='none': carry over last recorded amount
-    if (routine.autoReset == 'none') {
-      return _lastEntryForRoutine(routineId)?.amount ?? 0;
-    }
-    return 0;
-  }
+  RoutineEntry? entryForToday(String routineId) =>
+      entryForDate(routineId, DateTime.now());
 
-  bool isTodayCompleted(Routine r) {
+  /// Recorded amount for a routine on [date] (0 if nothing recorded).
+  int progressForDate(String routineId, DateTime date) =>
+      entryForDate(routineId, date)?.amount ?? 0;
+
+  int todayProgress(String routineId) =>
+      progressForDate(routineId, DateTime.now());
+
+  /// The goal threshold that marks a routine complete for a day.
+  int goalFor(Routine r) =>
+      r.goalType == 'achieve_all' ? 1 : (r.goalAmount ?? 1);
+
+  bool isCompletedOnDate(Routine r, DateTime date) =>
+      progressForDate(r.id, date) >= goalFor(r);
+
+  bool isTodayCompleted(Routine r) => isCompletedOnDate(r, DateTime.now());
+
+  /// Records progress for [r] on [date].
+  ///
+  /// - achieve_all: toggles done/undone.
+  /// - certain_amount: adds `recordAmount`; once the goal is reached another
+  ///   tap wraps back to 0 so a day can be un-completed/corrected.
+  Future<void> recordProgress(Routine r, [DateTime? date]) async {
+    final day = normalizeDate(date ?? DateTime.now());
+    final existing = entryForDate(r.id, day);
+    final goal = goalFor(r);
+    final current = existing?.amount ?? 0;
+
+    final int next;
     if (r.goalType == 'achieve_all') {
-      if (r.autoReset == 'none') {
-        // stays completed if ever completed (until toggled off today)
-        final todayEntry = entryForToday(r.id);
-        if (todayEntry != null) return todayEntry.amount >= 1;
-        return _lastCompletedEntry(r) != null;
-      }
-      final entry = entryForToday(r.id);
-      return entry != null && entry.amount >= 1;
-    }
-    return todayProgress(r.id) >= (r.goalAmount ?? 1);
-  }
-
-  /// Record one unit of progress (toggle for achieve_all, +recordAmount for certain_amount).
-  Future<void> recordProgress(Routine r) async {
-    final today = _normalizeDate(DateTime.now());
-    final existing = entryForToday(r.id);
-
-    if (r.goalType == 'achieve_all') {
-      if (existing == null) {
-        final entry = RoutineEntry(routineId: r.id, date: today, amount: 1);
-        await _db.insertRoutineEntry(entry);
-        _entries.insert(0, entry);
-      } else {
-        final updated = existing.copyWith(amount: existing.amount >= 1 ? 0 : 1);
-        await _db.updateRoutineEntry(updated);
-        _replaceEntry(updated);
-      }
+      next = current >= 1 ? 0 : 1;
     } else {
       final add = r.recordAmount ?? 1;
-      if (existing == null) {
-        final startAmount = r.autoReset == 'none'
-            ? (_lastEntryForRoutine(r.id)?.amount ?? 0) + add
-            : add;
-        final entry =
-            RoutineEntry(routineId: r.id, date: today, amount: startAmount);
-        await _db.insertRoutineEntry(entry);
-        _entries.insert(0, entry);
-      } else {
-        final updated = existing.copyWith(amount: existing.amount + add);
-        await _db.updateRoutineEntry(updated);
-        _replaceEntry(updated);
-      }
+      next = current >= goal ? 0 : current + add;
     }
+    await _setAmount(r.id, day, existing, next);
     notifyListeners();
+  }
+
+  Future<void> _setAmount(
+      String routineId, DateTime day, RoutineEntry? existing, int amount) async {
+    if (existing == null) {
+      final entry =
+          RoutineEntry(routineId: routineId, date: day, amount: amount);
+      await _db.insertRoutineEntry(entry);
+      _entries.insert(0, entry);
+    } else {
+      final updated = existing.copyWith(amount: amount);
+      await _db.updateRoutineEntry(updated);
+      final i = _entries.indexWhere((e) => e.id == updated.id);
+      if (i != -1) _entries[i] = updated;
+    }
   }
 
   Future<void> addRoutine(Routine routine) async {
@@ -136,41 +125,5 @@ class RoutineController with ChangeNotifier {
     _routines.removeWhere((r) => r.id == id);
     _entries.removeWhere((e) => e.routineId == id);
     notifyListeners();
-  }
-
-  Routine? _routineById(String id) {
-    for (final r in _routines) {
-      if (r.id == id) return r;
-    }
-    return null;
-  }
-
-  RoutineEntry? _lastEntryForRoutine(String routineId) {
-    RoutineEntry? latest;
-    for (final e in _entries) {
-      if (e.routineId == routineId) {
-        if (latest == null || e.date.isAfter(latest.date)) latest = e;
-      }
-    }
-    return latest;
-  }
-
-  RoutineEntry? _lastCompletedEntry(Routine r) {
-    RoutineEntry? latest;
-    for (final e in _entries) {
-      if (e.routineId != r.id) continue;
-      final completed = r.goalType == 'achieve_all'
-          ? e.amount >= 1
-          : e.amount >= (r.goalAmount ?? 1);
-      if (completed) {
-        if (latest == null || e.date.isAfter(latest.date)) latest = e;
-      }
-    }
-    return latest;
-  }
-
-  void _replaceEntry(RoutineEntry updated) {
-    final i = _entries.indexWhere((e) => e.id == updated.id);
-    if (i != -1) _entries[i] = updated;
   }
 }

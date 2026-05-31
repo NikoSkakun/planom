@@ -13,48 +13,31 @@ void main() {
   late DatabaseService db;
   late RoutineController controller;
 
-  // 0=Mon … 6=Sun (matches Routine.weekdays indexing).
-  final int todayIdx = DateTime.now().weekday - 1;
-  final int otherIdx = (todayIdx + 1) % 7;
-
   setUp(() async {
     db = freshDb();
     controller = RoutineController(db);
     await controller.load();
   });
 
+  Routine achieveAll(String name) =>
+      Routine(name: name, goalType: 'achieve_all');
+
   group('CRUD', () {
     test('addRoutine then routines getter', () async {
-      final r = Routine(
-        name: 'Water',
-        goalType: 'achieve_all',
-        frequencyType: 'daily',
-        autoReset: 'everyday',
-      );
-      await controller.addRoutine(r);
+      await controller.addRoutine(achieveAll('Water'));
       expect(controller.routines.length, 1);
       expect(controller.routines.single.name, 'Water');
     });
 
     test('updateRoutine mutates record', () async {
-      final r = Routine(
-        name: 'Water',
-        goalType: 'achieve_all',
-        frequencyType: 'daily',
-        autoReset: 'everyday',
-      );
+      final r = achieveAll('Water');
       await controller.addRoutine(r);
       await controller.updateRoutine(r.copyWith(name: 'Hydrate'));
       expect(controller.routines.single.name, 'Hydrate');
     });
 
     test('deleteRoutine also removes its entries', () async {
-      final r = Routine(
-        name: 'Pushups',
-        goalType: 'achieve_all',
-        frequencyType: 'daily',
-        autoReset: 'everyday',
-      );
+      final r = achieveAll('Pushups');
       await controller.addRoutine(r);
       await controller.recordProgress(r); // creates today's entry
       expect((await db.getRoutineEntries()).length, 1);
@@ -69,80 +52,28 @@ void main() {
     });
   });
 
-  group('todayRoutines scheduling', () {
-    test('daily with weekdays == today is shown', () async {
-      final r = Routine(
-        name: 'Today',
-        goalType: 'achieve_all',
-        frequencyType: 'daily',
-        weekdays: [todayIdx],
-        autoReset: 'everyday',
-      );
-      await controller.addRoutine(r);
-      expect(controller.todayRoutines.map((x) => x.id), contains(r.id));
-    });
-
-    test('daily with a different weekday is NOT shown', () async {
-      final r = Routine(
-        name: 'NotToday',
-        goalType: 'achieve_all',
-        frequencyType: 'daily',
-        weekdays: [otherIdx],
-        autoReset: 'everyday',
-      );
-      await controller.addRoutine(r);
-      expect(controller.todayRoutines.map((x) => x.id), isNot(contains(r.id)));
-    });
-
-    test('daily with null weekdays is shown every day', () async {
-      final r = Routine(
-        name: 'EveryDay',
-        goalType: 'achieve_all',
-        frequencyType: 'daily',
-        weekdays: null,
-        autoReset: 'everyday',
-      );
-      await controller.addRoutine(r);
-      expect(controller.todayRoutines.map((x) => x.id), contains(r.id));
-    });
-
-    test('days_after_complete: never completed is shown', () async {
-      final r = Routine(
-        name: 'AfterGap',
-        goalType: 'achieve_all',
-        frequencyType: 'days_after_complete',
-        daysAfterComplete: 2,
-        autoReset: 'everyday',
-      );
-      await controller.addRoutine(r);
-      expect(controller.todayRoutines.map((x) => x.id), contains(r.id));
-    });
-
-    test('days_after_complete: completed today with gap=2 is NOT shown today',
+  group('routinesForDate scheduling', () {
+    test('a daily routine shows on its creation day and every later day',
         () async {
+      final created = DateTime(2026, 5, 20, 9, 30);
       final r = Routine(
-        name: 'AfterGap',
-        goalType: 'achieve_all',
-        frequencyType: 'days_after_complete',
-        daysAfterComplete: 2,
-        autoReset: 'everyday',
-      );
+          name: 'Daily', goalType: 'achieve_all', creationDate: created);
       await controller.addRoutine(r);
-      await controller.recordProgress(r); // completes today
 
-      // next due = today + 2, so it is hidden today.
-      expect(controller.todayRoutines.map((x) => x.id), isNot(contains(r.id)));
+      // Creation day and a later day: shown.
+      expect(controller.routinesForDate(DateTime(2026, 5, 20)).map((x) => x.id),
+          contains(r.id));
+      expect(controller.routinesForDate(DateTime(2026, 6, 1)).map((x) => x.id),
+          contains(r.id));
+      // Before it existed: hidden (history stays accurate).
+      expect(controller.routinesForDate(DateTime(2026, 5, 19)).map((x) => x.id),
+          isNot(contains(r.id)));
     });
   });
 
   group('recordProgress: achieve_all', () {
     test('first call completes, second call toggles back off', () async {
-      final r = Routine(
-        name: 'Meditate',
-        goalType: 'achieve_all',
-        frequencyType: 'daily',
-        autoReset: 'everyday',
-      );
+      final r = achieveAll('Meditate');
       await controller.addRoutine(r);
 
       await controller.recordProgress(r);
@@ -156,15 +87,14 @@ void main() {
   });
 
   group('recordProgress: certain_amount', () {
-    test('each call adds recordAmount; reaches goal after 4 calls', () async {
+    test('each call adds recordAmount; wraps to 0 once the goal is reached',
+        () async {
       final r = Routine(
         name: 'Drink',
         goalType: 'certain_amount',
         goalAmount: 8,
         recordAmount: 2,
         goalUnit: 'cup',
-        frequencyType: 'daily',
-        autoReset: 'everyday',
       );
       await controller.addRoutine(r);
 
@@ -177,32 +107,56 @@ void main() {
       await controller.recordProgress(r);
       expect(controller.todayProgress(r.id), 8);
       expect(controller.isTodayCompleted(r), isTrue);
+
+      // Tapping again wraps back to 0 so the day can be un-completed.
+      await controller.recordProgress(r);
+      expect(controller.todayProgress(r.id), 0);
+      expect(controller.isTodayCompleted(r), isFalse);
     });
   });
 
-  group('autoReset = none', () {
-    test('achieve_all completed on a prior day still counts as completed today',
-        () async {
-      final r = Routine(
-        name: 'Streak',
-        goalType: 'achieve_all',
-        frequencyType: 'daily',
-        autoReset: 'none',
-      );
+  group('per-day history', () {
+    test('progress on different days is tracked independently', () async {
+      final r = achieveAll('Streak');
       await controller.addRoutine(r);
 
-      // Insert a prior-day completion directly into the DB.
       final yesterday = today().subtract(const Duration(days: 1));
-      await db.insertRoutineEntry(
-        RoutineEntry(routineId: r.id, date: yesterday, amount: 1),
-      );
+
+      // Complete yesterday only.
+      await controller.recordProgress(r, yesterday);
+      expect(controller.isCompletedOnDate(r, yesterday), isTrue);
+      // Today is a fresh, separate item — not completed.
+      expect(controller.isTodayCompleted(r), isFalse);
+      expect(controller.progressForDate(r.id, yesterday), 1);
+      expect(controller.progressForDate(r.id, today()), 0);
+    });
+
+    test('editing a past day persists across reload', () async {
+      final r = achieveAll('History');
+      await controller.addRoutine(r);
+      final twoDaysAgo = today().subtract(const Duration(days: 2));
+      await controller.recordProgress(r, twoDaysAgo);
 
       final fresh = RoutineController(db);
       await fresh.load();
       final reloaded = fresh.routines.firstWhere((x) => x.id == r.id);
-      // No entry today, but a prior completion exists -> still completed.
-      expect(fresh.entryForToday(r.id), isNull);
-      expect(fresh.isTodayCompleted(reloaded), isTrue);
+      expect(fresh.isCompletedOnDate(reloaded, twoDaysAgo), isTrue);
+      expect(fresh.isTodayCompleted(reloaded), isFalse);
+    });
+
+    test('amounts written for a day are reflected in queries', () async {
+      final r = Routine(
+          name: 'Manual', goalType: 'certain_amount', goalAmount: 3);
+      await controller.addRoutine(r);
+      final day = today().subtract(const Duration(days: 3));
+      await db.insertRoutineEntry(
+          RoutineEntry(routineId: r.id, date: day, amount: 3));
+
+      final fresh = RoutineController(db);
+      await fresh.load();
+      final reloaded = fresh.routines.firstWhere((x) => x.id == r.id);
+      expect(fresh.progressForDate(r.id, day), 3);
+      expect(fresh.isCompletedOnDate(reloaded, day), isTrue);
     });
   });
 }

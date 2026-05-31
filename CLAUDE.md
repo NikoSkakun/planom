@@ -80,13 +80,14 @@ Task extends AppItem (lib/src/models/task.dart)
   recurrence?                        ← JSON-encoded Recurrence rule
 
 Routine extends AppItem (lib/src/models/routine.dart)
-  name, iconColor (ARGB; iconId is the SF-symbol key)
+  name, iconColor (ARGB; iconId is an SF-symbol key OR a custom photo path
+                   — `icons/…`, same storage as folders/lists)
   goalType ('achieve_all' | 'certain_amount')
   goalAmount?, goalUnit?, recordAmount?   ← certain_amount only
-  frequencyType ('daily' | 'days_after_complete')
-  weekdays?: List<int>               ← 0=Mon … 6=Sun; null = all (daily only)
-  daysAfterComplete?
-  autoReset ('everyday' | 'none')
+  frequencyType ('daily')            ← DAILY ONLY for now. Weekly / "days after
+                                       completion" scheduling + auto-reset were
+                                       removed in the routines refactor and will
+                                       return later; field kept for forward-compat.
 
 AppFolder (lib/src/models/app_folder.dart)
   name, parentFolderId?, sortOrder, iconId?, iconColor? (ARGB override)
@@ -162,7 +163,7 @@ Permanent deletion (from Trash) hard-deletes the row:
 
 ### Custom icon storage (`lib/src/folders/folder_icon_picker.dart`)
 
-Custom photo icons for folders and lists are stored as **relative paths** (`icons/<timestamp>.<ext>`) under the app's documents directory. Critical for iOS — absolute paths break after every reinstall because the container UUID changes.
+Custom photo icons for folders, lists, and routines are stored as **relative paths** (`icons/<timestamp>.<ext>`) under the app's documents directory. Critical for iOS — absolute paths break after every reinstall because the container UUID changes. (Routines reuse this storage; `RoutineCircleIcon` resolves the same `icons/…` paths.)
 
 - `initFolderIconService()` — called once in `main.dart` before `runApp`; caches `getApplicationDocumentsDirectory()` so path resolution is synchronous during widget builds.
 - `isCustomIconId(iconId)` — `true` for relative paths (`icons/…`) and legacy absolute paths (`/…`).
@@ -201,6 +202,7 @@ Migration history:
 | v23 | `app_lists.listType TEXT NOT NULL DEFAULT 'tasks'` |
 | v24 | Birthday columns added to `tasks` (transitional); `tasks.sectionId TEXT`; `list_sections` table |
 | v25 | Migrates birthday rows out of `tasks` into a new `contacts` table; recreates `tasks` without birthday columns (SQLite < 3.35 can't drop columns); re-creates `tasks_*` FTS triggers after the rename |
+| v26 | Routines refactor: drops + recreates `routines` (now `weekdays` / `daysAfterComplete` / `autoReset`-free; `frequencyType` defaults `'daily'`) and `routine_entries` clean. Old routine data is intentionally discarded (sanctioned by the refactor). Legacy backups still import — `BackupService` normalises routine rows through `Routine.fromMap`/`toMap` to drop the removed columns |
 
 When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 
@@ -266,10 +268,10 @@ Every controller is a `ChangeNotifier`. They're constructed in `main.dart` (glob
 - Date math: Feb 29 births fall back to Feb 28 in non-leap years (`_safeDate`).
 
 **`RoutineController`** (`lib/src/routines/routine_controller.dart`)
-- `todayRoutines` filters by schedule: `daily` checks weekday membership; `days_after_complete` shows when `today >= lastCompletionDate + gap`.
-- `recordProgress(routine)` toggles `achieve_all` (0↔1) and increments `certain_amount` by `recordAmount`; creates today's entry if absent.
-- `autoReset='none'`: for `achieve_all` shows as done if any historical completion exists (until toggled off today); for `certain_amount` carries over the last entry's amount as today's starting value.
-- Weekdays stored as `List<int>` (0=Mon … 6=Sun); Dart's `DateTime.weekday` is 1=Mon, so always `- 1` when comparing.
+- **Strictly daily, per-day history.** Each calendar day is tracked independently by a `RoutineEntry` row, so a routine auto-resets every day and the full history is preserved (revisit/edit any past day; future days are blocked). All progress queries take an explicit `date`.
+- `routinesForDate(date)` — daily routines from their creation day onward (never before they existed, so past-day history stays accurate). `todayRoutines` = `routinesForDate(now)`.
+- `entryForDate` / `progressForDate` / `isCompletedOnDate(routine, date)` (+ `entryForToday` / `todayProgress` / `isTodayCompleted` convenience wrappers). `goalFor(routine)` = `1` for `achieve_all`, else `goalAmount`.
+- `recordProgress(routine, [date])` — `achieve_all` toggles 0↔1; `certain_amount` adds `recordAmount` and wraps back to 0 once the goal is reached (so a day can be un-completed/corrected). Defaults to today when `date` omitted.
 
 **`EventController`** (`lib/src/calendar/event_controller.dart`)
 - Owns local `_events`; mirrors `TaskController` shape but without subtasks/tags.
@@ -284,7 +286,7 @@ Every controller is a `ChangeNotifier`. They're constructed in `main.dart` (glob
 
 **`BackupService`** (`lib/src/settings/backup_service.dart`)
 - Not a `ChangeNotifier`. Created by `SpaceManager` per active space and passed through `MyApp` → `HomeShell` → `SettingsView`.
-- `buildPayloadJson()` — serialises every table (active + trashed) + custom icon bytes (base64) + `smart_list_prefs`; filters `auth_*` and `gcal_*` keys from `app_settings`. Returns the canonical payload string.
+- `buildPayloadJson()` — serialises every table (active + trashed) + custom icon bytes (base64) + `smart_list_prefs`; filters `auth_*` and `gcal_*` keys from `app_settings`. Folder / list / note-folder / **routine** `iconId`s are run through `_inlineIcons` so custom photos travel with the backup. Returns the canonical payload string.
 - `exportBackup({passphrase?})` — generates the payload, optionally encrypts (`backup_crypto.encryptBackup`), writes a `planom_backup_YYYY-MM-DD.planom` file to temp, and either shares (mobile/macOS) or opens a Save-As dialog (Linux/Windows).
 - `importBackup({passphraseProvider?})` — picks a file, detects encryption via `isEncryptedBackup`, calls the provider if a passphrase is required, then `_applyImportedPayload`.
 - `importPayloadJson(plain)` — sync's entry point (no UI / file picker).
@@ -471,12 +473,12 @@ Key state:
 
 | File | Purpose |
 |------|---------|
-| `routine_icons.dart` | `kRoutineIconPresets` — 16 `(iconId, colorARGB)` preset combos; `routineIconData(iconId)` maps string keys to `CupertinoIcons`. |
+| `routine_icons.dart` | `kRoutineIconPresets` — 16 `(iconId, colorARGB)` preset combos; `routineIconData(iconId)` maps string keys to `CupertinoIcons`; `RoutineCircleIcon` renders a circular icon (custom photo clipped to circle, or tinted SF-symbol) with optional `dimmed` / `showCheck`. |
 | `routine_controller.dart` | (see Controllers above) |
-| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; reused for editing (`existing` param). Sections: name+icon, icon preset grid, Frequency (segmented + weekday chips or days-after input + auto-reset), Goal (segmented + amount/unit/record fields). |
-| `routines_view.dart` | Tab root; `todayRoutines` list with `_RoutineRow` items; swipe-to-delete; tap → `recordProgress`; long-press → `showSelectionMenu` (edit / delete). Empty-state prompt. |
+| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; reused for editing (`existing` param). Sections: name+icon, inline icon picker (preset grid + "choose photo" tile via `pickCustomIcon`), Goal (segmented + amount/unit/record fields). No Frequency section yet — daily-only. |
+| `routines_view.dart` | Tab root with two segments. **Day** segment: a `_DayNavigator` (‹ date ›, future blocked) over the routines for the selected day — tap a row to record progress for *that* day (history-editable); swipe-to-delete; long-press → edit/delete. **All** segment: every routine with goal subtitle; tap → edit. Custom photos render via `RoutineCircleIcon`. |
 
-**Row layout**: 40 px colored circle icon (dimmed + check overlay when `achieve_all` complete) · name (strikethrough when complete) · right-aligned `_ProgressBadge` for `certain_amount`.
+**Row layout**: 40 px circle icon (`RoutineCircleIcon`; dimmed + check overlay when `achieve_all` complete) · name (strikethrough when complete) · right-aligned `_ProgressBadge` for `certain_amount`. Row vertical padding is tightened to `8`.
 
 **Unit picker**: `_UnitPickerSheet` offers presets (`ml`, `L`, `oz`, `count`, `minute`, `hour`, `km`, `mi`, `page`, `cup`, `lap`, `step`) plus a free-text "Custom…" option.
 

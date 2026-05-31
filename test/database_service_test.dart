@@ -463,7 +463,6 @@ void main() {
           name: 'Routine $id',
           goalType: 'achieve_all',
           frequencyType: 'daily',
-          autoReset: 'everyday',
         );
 
     RoutineEntry makeEntry(String id, String routineId,

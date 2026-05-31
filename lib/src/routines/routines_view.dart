@@ -11,6 +11,7 @@ import '../search/search_pull_scope.dart';
 import '../settings/backup_service.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_menu.dart';
+import '../tasks/calendar_date_picker.dart' show formatTaskDateRelative;
 import '../tasks/task_controller.dart';
 import '../theme/app_theme.dart';
 import '../utils/confirm_dialogs.dart';
@@ -109,7 +110,7 @@ class _RoutinesViewState extends State<RoutinesView>
           child: ListenableBuilder(
             listenable: widget.controller,
             builder: (context, _) => _tab == 0
-                ? _TodayContent(controller: widget.controller)
+                ? _DayContent(controller: widget.controller)
                 : _AllContent(controller: widget.controller),
           ),
         ),
@@ -136,48 +137,125 @@ class _RoutinesViewState extends State<RoutinesView>
   }
 }
 
-// ── Today tab ────────────────────────────────────────────────────────────────
+// ── Day tab (per-day checklist with history navigation) ──────────────────────
 
-class _TodayContent extends StatelessWidget {
-  const _TodayContent({required this.controller});
+class _DayContent extends StatefulWidget {
+  const _DayContent({required this.controller});
   final RoutineController controller;
+
+  @override
+  State<_DayContent> createState() => _DayContentState();
+}
+
+class _DayContentState extends State<_DayContent> {
+  DateTime _selected = RoutineController.normalizeDate(DateTime.now());
+
+  bool get _isToday =>
+      _selected == RoutineController.normalizeDate(DateTime.now());
+
+  void _shiftDay(int delta) {
+    final next = DateTime(_selected.year, _selected.month, _selected.day + delta);
+    // Don't allow navigating into the future — routines reset daily and
+    // future days have no meaning yet.
+    if (next.isAfter(RoutineController.normalizeDate(DateTime.now()))) return;
+    setState(() => _selected = next);
+  }
+
+  void _jumpToToday() {
+    setState(() => _selected = RoutineController.normalizeDate(DateTime.now()));
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    final routines = controller.todayRoutines;
-    if (routines.isEmpty) {
-      return _EmptyState(
-        message: s.noRoutinesToday,
-        hint: s.tapPlusFirstAdd,
-      );
-    }
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Text(
-              s.routinesTodaySection,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.5,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
-          ),
+    final routines = widget.controller.routinesForDate(_selected);
+
+    return Column(
+      children: [
+        _DayNavigator(
+          date: _selected,
+          isToday: _isToday,
+          onPrev: () => _shiftDay(-1),
+          onNext: _isToday ? null : () => _shiftDay(1),
+          onToday: _isToday ? null : _jumpToToday,
         ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) => _TodayRoutineRow(
-              routine: routines[index],
-              controller: controller,
-            ),
-            childCount: routines.length,
-          ),
+        Expanded(
+          child: routines.isEmpty
+              ? _EmptyState(
+                  message: s.noRoutinesToday,
+                  hint: s.tapPlusFirstAdd,
+                )
+              : ListView.builder(
+                  itemCount: routines.length,
+                  itemBuilder: (context, index) => _DayRoutineRow(
+                    routine: routines[index],
+                    controller: widget.controller,
+                    date: _selected,
+                  ),
+                ),
         ),
       ],
+    );
+  }
+}
+
+class _DayNavigator extends StatelessWidget {
+  const _DayNavigator({
+    required this.date,
+    required this.isToday,
+    required this.onPrev,
+    required this.onNext,
+    required this.onToday,
+  });
+
+  final DateTime date;
+  final bool isToday;
+  final VoidCallback onPrev;
+  final VoidCallback? onNext;
+  final VoidCallback? onToday;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = formatTaskDateRelative(context, date);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: CupertinoColors.separator.resolveFrom(context),
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            minSize: 0,
+            onPressed: onPrev,
+            child: const Icon(CupertinoIcons.chevron_left, size: 20),
+          ),
+          Expanded(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            minSize: 0,
+            onPressed: onNext,
+            child: Icon(
+              CupertinoIcons.chevron_right,
+              size: 20,
+              color: onNext == null
+                  ? CupertinoColors.quaternaryLabel.resolveFrom(context)
+                  : null,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -250,18 +328,24 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ── Today routine row ─────────────────────────────────────────────────────────
+// ── Day routine row ───────────────────────────────────────────────────────────
 
-class _TodayRoutineRow extends StatelessWidget {
-  const _TodayRoutineRow({required this.routine, required this.controller});
+class _DayRoutineRow extends StatelessWidget {
+  const _DayRoutineRow({
+    required this.routine,
+    required this.controller,
+    required this.date,
+  });
 
   final Routine routine;
   final RoutineController controller;
+  final DateTime date;
 
   @override
   Widget build(BuildContext context) {
-    final isCompleted = controller.isTodayCompleted(routine);
-    final progress = controller.todayProgress(routine.id);
+    final isCompleted = controller.isCompletedOnDate(routine, date);
+    final progress = controller.progressForDate(routine.id, date);
+    final achieveAll = routine.goalType == 'achieve_all';
 
     return Dismissible(
       key: ValueKey(routine.id),
@@ -276,11 +360,11 @@ class _TodayRoutineRow extends StatelessWidget {
       confirmDismiss: (_) async => await _confirmDelete(context),
       onDismissed: (_) => controller.deleteRoutine(routine.id),
       child: GestureDetector(
-        onTap: () => controller.recordProgress(routine),
+        onTap: () => controller.recordProgress(routine, date),
         onLongPress: () => _showOptions(context),
         behavior: HitTestBehavior.opaque,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
@@ -291,7 +375,12 @@ class _TodayRoutineRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              _RoutineIcon(routine: routine, isCompleted: isCompleted),
+              RoutineCircleIcon(
+                iconId: routine.iconId,
+                iconColor: routine.iconColor,
+                dimmed: isCompleted,
+                showCheck: isCompleted && achieveAll,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
@@ -302,13 +391,13 @@ class _TodayRoutineRow extends StatelessWidget {
                     color: isCompleted
                         ? CupertinoColors.secondaryLabel.resolveFrom(context)
                         : CupertinoColors.label.resolveFrom(context),
-                    decoration: isCompleted && routine.goalType == 'achieve_all'
+                    decoration: isCompleted && achieveAll
                         ? TextDecoration.lineThrough
                         : null,
                   ),
                 ),
               ),
-              if (routine.goalType == 'certain_amount') ...[
+              if (!achieveAll) ...[
                 const SizedBox(width: 8),
                 _ProgressBadge(
                   progress: progress,
@@ -351,6 +440,7 @@ class _TodayRoutineRow extends StatelessWidget {
         ),
       ],
     );
+    if (!context.mounted) return;
     if (choice == 'edit') {
       Navigator.of(context).push(
         FastRoute(
@@ -400,7 +490,7 @@ class _AllRoutineRow extends StatelessWidget {
         ),
         behavior: HitTestBehavior.opaque,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
@@ -411,7 +501,10 @@ class _AllRoutineRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              _RoutineIcon(routine: routine, isCompleted: false),
+              RoutineCircleIcon(
+                iconId: routine.iconId,
+                iconColor: routine.iconColor,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -426,7 +519,7 @@ class _AllRoutineRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _frequencyLabel(context, routine),
+                      _subtitle(context, routine),
                       style: TextStyle(
                         fontSize: 13,
                         color: CupertinoColors.secondaryLabel
@@ -448,15 +541,14 @@ class _AllRoutineRow extends StatelessWidget {
     );
   }
 
-  String _frequencyLabel(BuildContext context, Routine r) {
+  String _subtitle(BuildContext context, Routine r) {
     final s = S.of(context);
-    if (r.frequencyType == 'days_after_complete') {
-      return s.daysAfterCount(r.daysAfterComplete ?? 1);
+    // Only daily routines exist today; show the goal as a hint.
+    if (r.goalType == 'certain_amount') {
+      final unit = (r.goalUnit ?? '').isNotEmpty ? ' ${r.goalUnit}' : '';
+      return '${s.everyDayLabel} · ${r.goalAmount ?? 1}$unit';
     }
-    final days = r.weekdays;
-    if (days == null || days.length == 7) return s.everyDayLabel;
-    final labels = weekdaysShort(context);
-    return days.map((d) => labels[d]).join(', ');
+    return s.everyDayLabel;
   }
 
   Future<bool> _confirmDelete(BuildContext context) {
@@ -470,34 +562,6 @@ class _AllRoutineRow extends StatelessWidget {
 }
 
 // ── Shared widgets ────────────────────────────────────────────────────────────
-
-class _RoutineIcon extends StatelessWidget {
-  const _RoutineIcon({required this.routine, required this.isCompleted});
-
-  final Routine routine;
-  final bool isCompleted;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: isCompleted
-            ? Color(routine.iconColor).withOpacity(0.5)
-            : Color(routine.iconColor),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        isCompleted && routine.goalType == 'achieve_all'
-            ? CupertinoIcons.checkmark
-            : routineIconData(routine.iconId),
-        color: CupertinoColors.white,
-        size: 20,
-      ),
-    );
-  }
-}
 
 class _ProgressBadge extends StatelessWidget {
   const _ProgressBadge({

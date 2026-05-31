@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 25;
+  static const _dbVersion = 26;
 
   Database? _db;
 
@@ -143,10 +143,7 @@ class DatabaseService {
             goalAmount INTEGER,
             goalUnit TEXT,
             recordAmount INTEGER,
-            frequencyType TEXT NOT NULL,
-            weekdays TEXT,
-            daysAfterComplete INTEGER,
-            autoReset TEXT NOT NULL
+            frequencyType TEXT NOT NULL DEFAULT 'daily'
           )
         ''');
         await db.execute('''
@@ -489,6 +486,37 @@ class DatabaseService {
           await db.execute('DROP TRIGGER IF EXISTS tasks_ad');
           await db.execute('DROP TRIGGER IF EXISTS tasks_au');
           await _createTaskFtsTriggers(db);
+        }
+        if (oldVersion < 26) {
+          // Routines were reimplemented as daily-only with strict per-day
+          // history. The old schedule columns (weekdays, daysAfterComplete)
+          // and the auto-reset / carry-over model are no longer compatible, so
+          // recreate the routine tables clean. Pre-existing routine data is
+          // intentionally discarded (sanctioned by the refactor).
+          await db.execute('DROP TABLE IF EXISTS routine_entries');
+          await db.execute('DROP TABLE IF EXISTS routines');
+          await db.execute('''
+            CREATE TABLE routines (
+              id TEXT PRIMARY KEY,
+              creationDate INTEGER NOT NULL,
+              iconId TEXT NOT NULL,
+              iconColor INTEGER NOT NULL,
+              name TEXT NOT NULL,
+              goalType TEXT NOT NULL,
+              goalAmount INTEGER,
+              goalUnit TEXT,
+              recordAmount INTEGER,
+              frequencyType TEXT NOT NULL DEFAULT 'daily'
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE routine_entries (
+              id TEXT PRIMARY KEY,
+              routineId TEXT NOT NULL,
+              date INTEGER NOT NULL,
+              amount INTEGER NOT NULL DEFAULT 0
+            )
+          ''');
         }
       },
     );

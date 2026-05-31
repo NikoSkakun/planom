@@ -13,6 +13,7 @@ import '../database/database_service.dart';
 import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
 import '../integrations/google/google_calendar_controller.dart';
+import '../models/routine.dart';
 import '../notes/note_controller.dart';
 import '../routines/routine_controller.dart';
 import '../security/security_service.dart';
@@ -51,12 +52,14 @@ class BackupService {
     var folders = await db.exportFolders();
     var lists = await db.exportLists();
     var noteFolders = await db.exportNoteFolders();
+    var routines = await db.exportRoutines();
 
     final customIcons = <String, String>{};
     folders = await _inlineIcons(folders, 'iconId', docsPath, customIcons);
     lists = await _inlineIcons(lists, 'iconId', docsPath, customIcons);
     noteFolders =
         await _inlineIcons(noteFolders, 'iconId', docsPath, customIcons);
+    routines = await _inlineIcons(routines, 'iconId', docsPath, customIcons);
 
     final payload = <String, dynamic>{
       'version': 1,
@@ -68,7 +71,7 @@ class BackupService {
       'app_lists': lists,
       'note_folders': noteFolders,
       'notes': await db.exportNotes(),
-      'routines': await db.exportRoutines(),
+      'routines': routines,
       'routine_entries': await db.exportRoutineEntries(),
       'events': await db.exportEvents(),
       'list_sections': await db.exportListSections(),
@@ -223,7 +226,11 @@ class BackupService {
         'app_lists': asMaps(data['app_lists']),
         'note_folders': asMaps(data['note_folders']),
         'notes': asMaps(data['notes']),
-        'routines': asMaps(data['routines']),
+        // Normalise routine rows through the model so legacy backups (which
+        // carried weekdays / daysAfterComplete / autoReset columns no longer
+        // present in the schema) drop those keys and import cleanly.
+        'routines':
+            asMaps(data['routines']).map((r) => Routine.fromMap(r).toMap()).toList(),
         'routine_entries': asMaps(data['routine_entries']),
         'events': asMaps(data['events']),
         'list_sections': asMaps(data['list_sections']),
