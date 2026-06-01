@@ -49,16 +49,6 @@ android {
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
-
-        // Redirect scheme captured by flutter_appauth's RedirectUriReceiverActivity
-        // so Google's OAuth consent screen can return to the app. Must match the
-        // scheme part of kGoogleRedirectUri / kGoogleAndroidRedirectUri in
-        // lib/src/integrations/google/oauth_config.dart and be all lowercase.
-        // If you register a dedicated Android OAuth client with a different
-        // reversed-ID scheme, update this value to match it.
-        manifestPlaceholders += [
-            'appAuthRedirectScheme': 'com.googleusercontent.apps.264060209270-4l2qk3d1k4ehkmtg8iikjme28590ihp3'
-        ]
     }
 
     buildTypes {
