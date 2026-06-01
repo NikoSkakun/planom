@@ -1,4 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for the Google Calendar API and the OAuth consent flow. The
+         debug/profile manifests add this automatically, but release builds need
+         it declared here. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 11+ package visibility: flutter_appauth needs to discover a
+         browser / Custom Tabs provider to run the OAuth flow. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
     <application
         android:label="planom"
         android:name="${applicationName}"
