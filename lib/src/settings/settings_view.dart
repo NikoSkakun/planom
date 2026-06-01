@@ -10,6 +10,7 @@ import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
+import 'about_legal_view.dart';
 import 'appearance_view.dart';
 import 'backup_service.dart';
 import 'data_view.dart';
@@ -425,6 +426,27 @@ class _SettingsViewState extends State<SettingsView> {
                 ),
               ),
             ],
+
+            // ── About ─────────────────────────────────────────────────
+            const SizedBox(height: 18),
+            Text(
+              s.sectionAbout,
+              style: TextStyle(
+                fontSize: 13,
+                color: labelColor,
+                letterSpacing: -0.08,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _NavRow(
+              label: s.sectionAbout,
+              icon: CupertinoIcons.info_circle,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => const AboutLegalView(),
+                ),
+              ),
+            ),
           ],
         ),
       ),
