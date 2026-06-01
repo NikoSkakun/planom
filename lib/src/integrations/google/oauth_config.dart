@@ -14,6 +14,13 @@
 //   3. iOS: add the reversed client ID as a URL scheme in
 //      ios/Runner/Info.plist (already done) — flutter_appauth uses it for the
 //      OAuth redirect.
+//   4. Android: register an Android OAuth client (package name + signing SHA-1),
+//      set [kGoogleAndroidClientId] below, and make sure the
+//      `appAuthRedirectScheme` manifest placeholder in android/app/build.gradle
+//      matches the redirect scheme. See [kGoogleAndroidClientId] /
+//      [kGoogleAndroidRedirectUri] for details.
+
+import 'dart:io' show Platform;
 
 /// iOS Google OAuth 2.0 client ID. Format: `<digits>-<hash>.apps.googleusercontent.com`.
 const String kGoogleIosClientId =
@@ -24,6 +31,26 @@ const String kGoogleIosClientId =
 /// in ios/Runner/Info.plist.
 const String kGoogleRedirectUri =
     'com.googleusercontent.apps.264060209270-4l2qk3d1k4ehkmtg8iikjme28590ihp3:/oauthredirect';
+
+/// Android Google OAuth 2.0 client ID.
+///
+/// Google validates Android OAuth clients by the app's application ID
+/// (`com.example.planom` today — change it for a real release) plus the signing
+/// certificate SHA-1 fingerprint, so you must register a dedicated **Android**
+/// client in Google Cloud Console and paste its ID here. Leaving this empty
+/// falls back to the iOS client, which can work for the PKCE installed-app flow
+/// but is not what Google recommends for Android.
+const String kGoogleAndroidClientId = '';
+
+/// Android OAuth redirect URI.
+///
+/// Defaults to the iOS reversed-client-ID scheme so the redirect is captured by
+/// the `appAuthRedirectScheme` manifest placeholder already wired up in
+/// android/app/build.gradle. If you register a dedicated Android client whose
+/// reversed-ID scheme differs, set this to `com.googleusercontent.apps.<that
+/// client id>:/oauthredirect` **and** update the manifest placeholder to match
+/// (schemes must be all lowercase).
+const String kGoogleAndroidRedirectUri = kGoogleRedirectUri;
 
 /// Google's OAuth endpoints. Specified explicitly so we skip the discovery
 /// round-trip flutter_appauth would otherwise make.
@@ -48,6 +75,17 @@ const List<String> kGoogleCalendarReadOnlyScopes = <String>[
 List<String> googleScopesFor({required bool readOnly}) =>
     readOnly ? kGoogleCalendarReadOnlyScopes : kGoogleCalendarReadWriteScopes;
 
+/// The OAuth client ID to use on the current platform. On Android, prefers
+/// [kGoogleAndroidClientId] and falls back to the iOS client when unset.
+String get googleClientId =>
+    Platform.isAndroid && kGoogleAndroidClientId.isNotEmpty
+        ? kGoogleAndroidClientId
+        : kGoogleIosClientId;
+
+/// The OAuth redirect URI to use on the current platform.
+String get googleRedirectUri =>
+    Platform.isAndroid ? kGoogleAndroidRedirectUri : kGoogleRedirectUri;
+
 /// True when the OAuth client is wired up. Gates the settings UI.
 bool get isGoogleSignInConfigured =>
-    kGoogleIosClientId.isNotEmpty && kGoogleRedirectUri.isNotEmpty;
+    googleClientId.isNotEmpty && googleRedirectUri.isNotEmpty;

@@ -53,8 +53,8 @@ class GoogleAuthService {
     try {
       final result = await _appAuth.authorizeAndExchangeCode(
         AuthorizationTokenRequest(
-          kGoogleIosClientId,
-          kGoogleRedirectUri,
+          googleClientId,
+          googleRedirectUri,
           serviceConfiguration: _serviceConfig,
           scopes: scopes,
           // Force the consent screen so Google always returns a refresh token,
@@ -111,8 +111,8 @@ class GoogleAuthService {
     try {
       final result = await _appAuth.token(
         TokenRequest(
-          kGoogleIosClientId,
-          kGoogleRedirectUri,
+          googleClientId,
+          googleRedirectUri,
           serviceConfiguration: _serviceConfig,
           refreshToken: refresh,
           scopes: scopes,
