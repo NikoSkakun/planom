@@ -44,20 +44,34 @@ class _RoutinesTodaySectionState extends State<RoutinesTodaySection> {
         final completed = all
             .where((r) => widget.controller.isCompletedOnDate(r, widget.date))
             .toList();
-        final ordered = [...incomplete, ...completed];
         final s = S.of(context);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _Header(
               label: s.tabRoutines,
-              count: ordered.length,
+              count: incomplete.length + completed.length,
               expanded: _expanded,
               onToggle: () => setState(() => _expanded = !_expanded),
             ),
-            if (_expanded)
-              for (final r in ordered)
+            if (_expanded) ...[
+              for (final r in incomplete)
                 _Row(controller: widget.controller, routine: r, date: widget.date),
+              // Completed routines are visually set apart — a light label divider
+              // plus a dimmed row — so the done/to-do split reads at a glance.
+              if (completed.isNotEmpty) ...[
+                if (incomplete.isNotEmpty) _CompletedDivider(label: s.completed),
+                for (final r in completed)
+                  Opacity(
+                    opacity: 0.55,
+                    child: _Row(
+                      controller: widget.controller,
+                      routine: r,
+                      date: widget.date,
+                    ),
+                  ),
+              ],
+            ],
           ],
         );
       },
@@ -114,6 +128,41 @@ class _Header extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Thin labelled divider that separates completed routines from the to-do ones
+/// inside the Today / Calendar "Routines" section.
+class _CompletedDivider extends StatelessWidget {
+  const _CompletedDivider({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+      child: Row(
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              height: 0.5,
+              color: CupertinoColors.separator.resolveFrom(context),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -152,6 +152,7 @@ class _DayContent extends StatefulWidget {
 
 class _DayContentState extends State<_DayContent> {
   DateTime _selected = RoutineController.normalizeDate(DateTime.now());
+  bool _completedExpanded = false;
 
   bool get _isToday =>
       _selected == RoutineController.normalizeDate(DateTime.now());
@@ -180,7 +181,6 @@ class _DayContentState extends State<_DayContent> {
     final completed = all
         .where((r) => widget.controller.isCompletedOnDate(r, _selected))
         .toList();
-    final ordered = [...incomplete, ...completed];
 
     return Column(
       children: [
@@ -192,21 +192,93 @@ class _DayContentState extends State<_DayContent> {
           onToday: _isToday ? null : _jumpToToday,
         ),
         Expanded(
-          child: ordered.isEmpty
+          child: (incomplete.isEmpty && completed.isEmpty)
               ? _EmptyState(
                   message: s.noRoutinesToday,
                   hint: s.tapPlusFirstAdd,
                 )
-              : ListView.builder(
-                  itemCount: ordered.length,
-                  itemBuilder: (context, index) => _DayRoutineRow(
-                    routine: ordered[index],
-                    controller: widget.controller,
-                    date: _selected,
-                  ),
+              : ListView(
+                  children: [
+                    for (final r in incomplete)
+                      _DayRoutineRow(
+                        routine: r,
+                        controller: widget.controller,
+                        date: _selected,
+                      ),
+                    // Completed routines live under a collapsible section so the
+                    // still-to-do list stays the focus.
+                    if (completed.isNotEmpty)
+                      _CompletedHeader(
+                        count: completed.length,
+                        expanded: _completedExpanded,
+                        onToggle: () => setState(
+                            () => _completedExpanded = !_completedExpanded),
+                      ),
+                    if (_completedExpanded)
+                      for (final r in completed)
+                        _DayRoutineRow(
+                          routine: r,
+                          controller: widget.controller,
+                          date: _selected,
+                        ),
+                  ],
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// Collapsible header that separates completed routines from the to-do ones in
+/// the Day view.
+class _CompletedHeader extends StatelessWidget {
+  const _CompletedHeader({
+    required this.count,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  final int count;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onToggle,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+        child: Row(
+          children: [
+            Icon(
+              expanded
+                  ? CupertinoIcons.chevron_down
+                  : CupertinoIcons.chevron_right,
+              size: 13,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              S.of(context).completed.toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.4,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
