@@ -468,7 +468,23 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                 final rootFolders =
                     widget.folderController.foldersIn(null);
                 final rootLists = widget.folderController.listsIn(null);
-                final todayCount = widget.controller.todayUncompletedCount;
+                var todayCount = widget.controller.todayUncompletedCount;
+                // Optionally fold today's routines / events into the Today
+                // count badge (mirrors what the Today view surfaces).
+                final sc = widget.settingsController;
+                if (sc.countRoutinesInToday &&
+                    widget.routineController != null) {
+                  todayCount +=
+                      widget.routineController!.todayUncompletedCount;
+                }
+                if (sc.showEventsInToday &&
+                    sc.countEventsInToday &&
+                    widget.eventController != null) {
+                  final now = DateTime.now();
+                  todayCount += widget.eventController!
+                      .eventsForDate(DateTime(now.year, now.month, now.day))
+                      .length;
+                }
                 final tomorrowCount =
                     widget.controller.tomorrowUncompletedCount;
                 final upcomingCount =
@@ -540,6 +556,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                     activeDueDate: widget.activeDueDate,
                                     routineController:
                                         widget.routineController,
+                                    eventController:
+                                        widget.eventController,
                                     settingsController:
                                         widget.settingsController,
                                   ),

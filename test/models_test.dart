@@ -285,6 +285,7 @@ void main() {
         waitForCompletion: true,
         startDate: DateTime(2026, 5, 10),
         sortOrder: 7,
+        manualEntry: true,
         reminders: const [
           RoutineReminder.time(540),
           RoutineReminder.spread(startMinute: 480, every: 120),
@@ -297,6 +298,7 @@ void main() {
       expect(back.waitForCompletion, isTrue);
       expect(back.startDate, DateTime(2026, 5, 10));
       expect(back.sortOrder, 7);
+      expect(back.manualEntry, isTrue);
       expect(back.reminders.length, 3);
       expect(back.reminders[0].type, RoutineReminder.typeTime);
       expect(back.reminders[0].value, 540);
@@ -311,12 +313,14 @@ void main() {
         ..remove('startDate')
         ..remove('intervalDays')
         ..remove('waitForCompletion')
-        ..remove('reminders');
+        ..remove('reminders')
+        ..remove('manualEntry');
       final back = Routine.fromMap(map);
       expect(back.startDate, isNull);
       expect(back.intervalDays, isNull);
       expect(back.waitForCompletion, isFalse);
       expect(back.reminders, isEmpty);
+      expect(back.manualEntry, isFalse);
     });
   });
 

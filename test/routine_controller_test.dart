@@ -162,6 +162,27 @@ void main() {
       expect(controller.todayProgress(r.id), 0);
       expect(controller.isTodayCompleted(r), isFalse);
     });
+
+    test('setProgress writes an absolute amount (manual entry)', () async {
+      final r = Routine(
+        name: 'Water',
+        goalType: 'certain_amount',
+        goalAmount: 8,
+        manualEntry: true,
+      );
+      await controller.addRoutine(r);
+
+      await controller.setProgress(r, today(), 5);
+      expect(controller.todayProgress(r.id), 5);
+      expect(controller.isTodayCompleted(r), isFalse);
+
+      await controller.setProgress(r, today(), 8);
+      expect(controller.isTodayCompleted(r), isTrue);
+
+      // Negative clamps to 0 (un-checks the day).
+      await controller.setProgress(r, today(), -3);
+      expect(controller.todayProgress(r.id), 0);
+    });
   });
 
   group('per-day history', () {

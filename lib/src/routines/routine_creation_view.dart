@@ -71,6 +71,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
   late int _intervalDays;
   late bool _waitForCompletion;
   late List<RoutineReminder> _reminders;
+  late bool _manualEntry;
 
   bool _nameEmpty = true;
   bool _showIconPicker = false;
@@ -101,6 +102,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
         : 3;
     _waitForCompletion = r?.waitForCompletion ?? false;
     _reminders = List<RoutineReminder>.from(r?.reminders ?? const []);
+    _manualEntry = r?.manualEntry ?? false;
 
     _nameCtrl = TextEditingController(text: r?.name ?? '');
     _customUnitCtrl =
@@ -140,6 +142,9 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
 
     final specificDays = _frequencyType == 'specific_days';
     final isInterval = _frequencyType == 'interval';
+    final isAmount = _goalType == 'certain_amount';
+    // Manual entry only applies to amount goals; it replaces per-tap recording.
+    final manual = isAmount && _manualEntry;
     final routine = Routine(
       id: widget.existing?.id,
       creationDate: widget.existing?.creationDate,
@@ -147,15 +152,18 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
       name: name,
       iconColor: _iconColor,
       goalType: _goalType,
-      goalAmount: _goalType == 'certain_amount' ? goalAmount : null,
-      goalUnit: _goalType == 'certain_amount' ? unit : null,
-      recordAmount: _goalType == 'certain_amount' ? recordAmount : null,
+      goalAmount: isAmount ? goalAmount : null,
+      goalUnit: isAmount ? unit : null,
+      recordAmount: (isAmount && !manual) ? recordAmount : null,
       frequencyType: _frequencyType,
       weekdays: specificDays ? (List<int>.from(_weekdays)..sort()) : null,
       startDate: _startDate,
       intervalDays: isInterval ? _intervalDays : null,
       waitForCompletion: isInterval && _waitForCompletion,
       reminders: _reminders,
+      manualEntry: manual,
+      // Preserve the manual sort position when editing.
+      sortOrder: widget.existing?.sortOrder ?? 0,
     );
 
     if (widget.existing != null) {
@@ -436,18 +444,27 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
                   ),
                 ],
                 const _Divider(),
-                _AmountRow(
-                  label: s.recordPerTap,
-                  controller: _recordAmountCtrl,
-                  trailingWidget: Text(
-                    _unitLabel(context),
-                    style: TextStyle(
-                      fontSize: 15,
-                      color:
-                          CupertinoColors.secondaryLabel.resolveFrom(context),
+                _SwitchRow(
+                  label: s.recordManual,
+                  sublabel: s.recordManualInfo,
+                  value: _manualEntry,
+                  onChanged: (v) => setState(() => _manualEntry = v),
+                ),
+                if (!_manualEntry) ...[
+                  const _Divider(),
+                  _AmountRow(
+                    label: s.recordPerTap,
+                    controller: _recordAmountCtrl,
+                    trailingWidget: Text(
+                      _unitLabel(context),
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ]),
 

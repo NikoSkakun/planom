@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 29;
+  static const _dbVersion = 30;
 
   Database? _db;
 
@@ -149,7 +149,8 @@ class DatabaseService {
             intervalDays INTEGER,
             waitForCompletion INTEGER NOT NULL DEFAULT 0,
             reminders TEXT,
-            sortOrder INTEGER NOT NULL DEFAULT 0
+            sortOrder INTEGER NOT NULL DEFAULT 0,
+            manualEntry INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -550,6 +551,11 @@ class DatabaseService {
             await db.update('routines', {'sortOrder': i},
                 where: 'id = ?', whereArgs: [rows[i]['id']]);
           }
+        }
+        if (oldVersion < 30) {
+          // Manual amount entry for certain_amount routines.
+          await db.execute(
+              'ALTER TABLE routines ADD COLUMN manualEntry INTEGER NOT NULL DEFAULT 0');
         }
       },
     );

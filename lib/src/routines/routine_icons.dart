@@ -121,3 +121,37 @@ class RoutineCircleIcon extends StatelessWidget {
     );
   }
 }
+
+/// An animated left-to-right background fill conveying a `certain_amount`
+/// routine's progress, so partial completion is visible (and animates when the
+/// recorded amount changes). [fraction] is 0..1; [color] is the routine tint.
+class RoutineProgressFill extends StatelessWidget {
+  const RoutineProgressFill({
+    super.key,
+    required this.fraction,
+    required this.color,
+  });
+
+  final double fraction;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final target = fraction.isNaN ? 0.0 : fraction.clamp(0.0, 1.0);
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: target),
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) {
+        if (value <= 0) return const SizedBox.shrink();
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: FractionallySizedBox(
+            widthFactor: value,
+            child: Container(color: color.withOpacity(0.18)),
+          ),
+        );
+      },
+    );
+  }
+}

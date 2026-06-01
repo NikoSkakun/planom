@@ -149,6 +149,18 @@ class SettingsController with ChangeNotifier {
   bool _showRoutinesInCalendar = false;
   bool get showRoutinesInCalendar => _showRoutinesInCalendar;
 
+  // Whether today's routines feed the Today smart-list count badge (only
+  // relevant when [showRoutinesInToday] is on).
+  bool _countRoutinesInToday = false;
+  bool get countRoutinesInToday => _countRoutinesInToday;
+
+  // Surface today's events as a section in Tasks → Today, and optionally fold
+  // them into the Today count badge. Both default off.
+  bool _showEventsInToday = false;
+  bool get showEventsInToday => _showEventsInToday;
+  bool _countEventsInToday = false;
+  bool get countEventsInToday => _countEventsInToday;
+
   AnimationSpeed _animationSpeed = AnimationSpeed.normal;
   AnimationSpeed get animationSpeed => _animationSpeed;
 
@@ -297,6 +309,12 @@ class SettingsController with ChangeNotifier {
         _showRoutinesInToday = value == 'true';
       } else if (key == 'show_routines_in_calendar') {
         _showRoutinesInCalendar = value == 'true';
+      } else if (key == 'count_routines_in_today') {
+        _countRoutinesInToday = value == 'true';
+      } else if (key == 'show_events_in_today') {
+        _showEventsInToday = value == 'true';
+      } else if (key == 'count_events_in_today') {
+        _countEventsInToday = value == 'true';
       } else if (key == 'animation_speed') {
         _animationSpeed = _decodeAnimationSpeed(value);
       } else if (key == 'default_task_icon') {
@@ -446,6 +464,27 @@ class SettingsController with ChangeNotifier {
     _showRoutinesInCalendar = value;
     notifyListeners();
     await _db.setAppSetting('show_routines_in_calendar', value.toString());
+  }
+
+  Future<void> updateCountRoutinesInToday(bool value) async {
+    if (value == _countRoutinesInToday) return;
+    _countRoutinesInToday = value;
+    notifyListeners();
+    await _db.setAppSetting('count_routines_in_today', value.toString());
+  }
+
+  Future<void> updateShowEventsInToday(bool value) async {
+    if (value == _showEventsInToday) return;
+    _showEventsInToday = value;
+    notifyListeners();
+    await _db.setAppSetting('show_events_in_today', value.toString());
+  }
+
+  Future<void> updateCountEventsInToday(bool value) async {
+    if (value == _countEventsInToday) return;
+    _countEventsInToday = value;
+    notifyListeners();
+    await _db.setAppSetting('count_events_in_today', value.toString());
   }
 
   Future<void> updateAnimationSpeed(AnimationSpeed speed) async {

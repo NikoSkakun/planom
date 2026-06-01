@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../calendar/event_controller.dart';
+import '../calendar/today_events_section.dart';
 import '../folders/folder_controller.dart';
 import '../localization/strings.dart';
 import '../routines/routine_controller.dart';
@@ -15,6 +17,7 @@ class TodayView extends StatefulWidget {
     required this.folderController,
     required this.activeDueDate,
     this.routineController,
+    this.eventController,
     this.settingsController,
   });
 
@@ -22,11 +25,11 @@ class TodayView extends StatefulWidget {
   final FolderController folderController;
   final ValueNotifier<DateTime?> activeDueDate;
 
-  /// Optional — when both are provided and
-  /// [SettingsController.showRoutinesInToday] is on, today's routines are
-  /// shown as a collapsible section between the uncompleted and completed
-  /// tasks.
+  /// Optional — when provided and the matching setting is on, today's routines
+  /// / events are shown as collapsible sections between the uncompleted and
+  /// completed tasks.
   final RoutineController? routineController;
+  final EventController? eventController;
   final SettingsController? settingsController;
 
   @override
@@ -56,7 +59,6 @@ class _TodayViewState extends State<TodayView> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final sc = widget.settingsController;
-    final rc = widget.routineController;
 
     Widget shell(Widget? between) => SelectableTaskListShell(
           title: s.today,
@@ -67,18 +69,33 @@ class _TodayViewState extends State<TodayView> {
           betweenContent: between,
         );
 
-    if (sc == null || rc == null) return shell(null);
+    if (sc == null) return shell(null);
 
     return ListenableBuilder(
       listenable: sc,
       builder: (context, _) {
         final now = DateTime.now();
-        final between = sc.showRoutinesInToday
-            ? RoutinesTodaySection(
-                controller: rc,
-                date: DateTime(now.year, now.month, now.day),
-              )
-            : null;
+        final today = DateTime(now.year, now.month, now.day);
+        final sections = <Widget>[];
+        if (sc.showEventsInToday && widget.eventController != null) {
+          sections.add(TodayEventsSection(
+            controller: widget.eventController!,
+            date: today,
+          ));
+        }
+        if (sc.showRoutinesInToday && widget.routineController != null) {
+          sections.add(RoutinesTodaySection(
+            controller: widget.routineController!,
+            date: today,
+          ));
+        }
+        final between = sections.isEmpty
+            ? null
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: sections,
+              );
         return shell(between);
       },
     );

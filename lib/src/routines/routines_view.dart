@@ -20,6 +20,7 @@ import '../utils/confirm_dialogs.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
+import 'routine_amount_dialog.dart';
 import 'routine_controller.dart';
 import 'routine_creation_view.dart';
 import 'routine_icons.dart';
@@ -170,7 +171,16 @@ class _DayContentState extends State<_DayContent> {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    final routines = widget.controller.routinesForDate(_selected);
+    final all = widget.controller.routinesForDate(_selected);
+    // Completed routines sink below the still-to-do ones (each group keeps its
+    // manual order).
+    final incomplete = all
+        .where((r) => !widget.controller.isCompletedOnDate(r, _selected))
+        .toList();
+    final completed = all
+        .where((r) => widget.controller.isCompletedOnDate(r, _selected))
+        .toList();
+    final ordered = [...incomplete, ...completed];
 
     return Column(
       children: [
@@ -182,15 +192,15 @@ class _DayContentState extends State<_DayContent> {
           onToday: _isToday ? null : _jumpToToday,
         ),
         Expanded(
-          child: routines.isEmpty
+          child: ordered.isEmpty
               ? _EmptyState(
                   message: s.noRoutinesToday,
                   hint: s.tapPlusFirstAdd,
                 )
               : ListView.builder(
-                  itemCount: routines.length,
+                  itemCount: ordered.length,
                   itemBuilder: (context, index) => _DayRoutineRow(
-                    routine: routines[index],
+                    routine: ordered[index],
                     controller: widget.controller,
                     date: _selected,
                   ),
@@ -398,7 +408,6 @@ class _DayRoutineRow extends StatelessWidget {
         onLongPress: () => _showOptions(context),
         behavior: HitTestBehavior.opaque,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
@@ -407,57 +416,74 @@ class _DayRoutineRow extends StatelessWidget {
               ),
             ),
           ),
-          child: Row(
+          child: Stack(
             children: [
-              RoutineCircleIcon(
-                iconId: routine.iconId,
-                iconColor: routine.iconColor,
-                dimmed: isCompleted,
-                showCheck: isCompleted && achieveAll,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Amount goals: an animated background fill that lingers so a
+              // partially-completed routine reads at a glance.
+              if (!achieveAll)
+                Positioned.fill(
+                  child: RoutineProgressFill(
+                    fraction: (routine.goalAmount ?? 1) <= 0
+                        ? 0
+                        : progress / (routine.goalAmount ?? 1),
+                    color: Color(routine.iconColor),
+                  ),
+                ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
                   children: [
-                    Text(
-                      routine.name,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: isCompleted
-                            ? CupertinoColors.secondaryLabel
-                                .resolveFrom(context)
-                            : CupertinoColors.label.resolveFrom(context),
-                        decoration: isCompleted && achieveAll
-                            ? TextDecoration.lineThrough
-                            : null,
+                    RoutineCircleIcon(
+                      iconId: routine.iconId,
+                      iconColor: routine.iconColor,
+                      dimmed: isCompleted,
+                      showCheck: isCompleted && achieveAll,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            routine.name,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: isCompleted
+                                  ? CupertinoColors.secondaryLabel
+                                      .resolveFrom(context)
+                                  : CupertinoColors.label.resolveFrom(context),
+                            ),
+                          ),
+                          if (overdue && originalDate != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '${S.of(context).overdueLabel} · '
+                              '${formatTaskDateRelative(context, originalDate)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: CupertinoColors.systemRed
+                                    .resolveFrom(context),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                    if (overdue && originalDate != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        '${S.of(context).overdueLabel} · '
-                        '${formatTaskDateRelative(context, originalDate)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: CupertinoColors.systemRed.resolveFrom(context),
-                        ),
+                    if (!achieveAll) ...[
+                      const SizedBox(width: 8),
+                      _ProgressBadge(
+                        progress: progress,
+                        goal: routine.goalAmount ?? 1,
+                        unit: routine.goalUnit ?? '',
+                        isCompleted: isCompleted,
                       ),
                     ],
                   ],
                 ),
               ),
-              if (!achieveAll) ...[
-                const SizedBox(width: 8),
-                _ProgressBadge(
-                  progress: progress,
-                  goal: routine.goalAmount ?? 1,
-                  unit: routine.goalUnit ?? '',
-                  isCompleted: isCompleted,
-                ),
-              ],
             ],
           ),
         ),
@@ -466,6 +492,17 @@ class _DayRoutineRow extends StatelessWidget {
   }
 
   Future<void> _handleTap(BuildContext context) async {
+    // Manual amount entry: prompt for the completed amount instead of stepping.
+    if (routine.manualEntry && routine.goalType == 'certain_amount') {
+      final amount = await showRoutineAmountDialog(
+        context,
+        name: routine.name,
+        current: controller.progressForDate(routine.id, date),
+        unit: routine.goalUnit,
+      );
+      if (amount != null) controller.setProgress(routine, date, amount);
+      return;
+    }
     // For an overdue wait-for-completion occurrence, ask whether to record the
     // completion on the occurrence's original day or on the viewed day (which
     // shifts all future occurrences). Only for single-tap (achieve_all) goals —

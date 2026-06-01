@@ -47,6 +47,10 @@ class Routine extends AppItem {
   /// Manual display order (ascending). Ties break on creation date.
   final int sortOrder;
 
+  /// `certain_amount` only: when true, checking the routine prompts the user to
+  /// type the amount completed instead of adding [recordAmount] per tap.
+  final bool manualEntry;
+
   Routine({
     String? id,
     DateTime? creationDate,
@@ -64,6 +68,7 @@ class Routine extends AppItem {
     this.waitForCompletion = false,
     this.reminders = const [],
     this.sortOrder = 0,
+    this.manualEntry = false,
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -91,6 +96,7 @@ class Routine extends AppItem {
     bool? waitForCompletion,
     List<RoutineReminder>? reminders,
     int? sortOrder,
+    bool? manualEntry,
   }) {
     return Routine(
       id: id,
@@ -111,6 +117,7 @@ class Routine extends AppItem {
       waitForCompletion: waitForCompletion ?? this.waitForCompletion,
       reminders: reminders ?? this.reminders,
       sortOrder: sortOrder ?? this.sortOrder,
+      manualEntry: manualEntry ?? this.manualEntry,
     );
   }
 
@@ -131,6 +138,7 @@ class Routine extends AppItem {
         'waitForCompletion': waitForCompletion ? 1 : 0,
         'reminders': RoutineReminder.encode(reminders),
         'sortOrder': sortOrder,
+        'manualEntry': manualEntry ? 1 : 0,
       };
 
   factory Routine.fromMap(Map<String, dynamic> map) => Routine(
@@ -154,6 +162,7 @@ class Routine extends AppItem {
         waitForCompletion: (map['waitForCompletion'] as int? ?? 0) == 1,
         reminders: RoutineReminder.decode(map['reminders'] as String?),
         sortOrder: map['sortOrder'] as int? ?? 0,
+        manualEntry: (map['manualEntry'] as int? ?? 0) == 1,
       );
 
   // Empty strings round-trip as `null` so an empty list does not crash

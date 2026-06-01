@@ -519,6 +519,12 @@ class S {
   String get goalCertainAmount => t('goalCertainAmount');
   String get dailyGoal => t('dailyGoal');
   String get recordPerTap => t('recordPerTap');
+  String get recordManual => t('recordManual');
+  String get recordManualInfo => t('recordManualInfo');
+  String recordAmountPrompt(String unit) =>
+      t('recordAmountPrompt').replaceAll('{unit}', unit);
+  String get showEventsInToday => t('showEventsInToday');
+  String get includeInTodayCount => t('includeInTodayCount');
   String get unitName => t('unitName');
   String get unitEgGlass => t('unitEgGlass');
   String get noRoutinesToday => t('noRoutinesToday');
@@ -1009,6 +1015,7 @@ const Map<String, String> _en = {
   'sectionGoal': 'GOAL',
   'goalAchieveAll': 'Achieve it all', 'goalCertainAmount': 'Reach certain amount',
   'dailyGoal': 'Daily goal', 'recordPerTap': 'Record per tap',
+  'recordManual': 'Record manually', 'recordManualInfo': 'Type the amount each time you check this routine', 'recordAmountPrompt': 'Amount in {unit}', 'showEventsInToday': 'Show events in Today', 'includeInTodayCount': 'Include in Today\'s count',
   'unitName': 'Unit name', 'unitEgGlass': 'e.g. glass',
   'noRoutinesToday': 'No routines today', 'noRoutinesYet': 'No routines yet',
   'tapPlusFirstAdd': 'Tap + to add your first routine',
@@ -1193,6 +1200,7 @@ const Map<String, String> _uk = {
   'sectionGoal': 'МЕТА',
   'goalAchieveAll': 'Виконати все', 'goalCertainAmount': 'Досягти певної кількості',
   'dailyGoal': 'Денна ціль', 'recordPerTap': 'Запис за натискання',
+  'recordManual': 'Ручний запис', 'recordManualInfo': 'Щоразу вводьте кількість, коли позначаєте звичку', 'recordAmountPrompt': 'Кількість у {unit}', 'showEventsInToday': 'Показувати події в «Сьогодні»', 'includeInTodayCount': 'Враховувати в лічильнику «Сьогодні»',
   'unitName': 'Одиниця', 'unitEgGlass': 'напр. склянка',
   'noRoutinesToday': 'Сьогодні звичок немає', 'noRoutinesYet': 'Ще немає звичок',
   'tapPlusFirstAdd': 'Натисніть +, щоб додати першу звичку',
@@ -1335,6 +1343,7 @@ const Map<String, String> _es = {
   'sectionGoal': 'OBJETIVO',
   'goalAchieveAll': 'Lograr todo', 'goalCertainAmount': 'Alcanzar cantidad',
   'dailyGoal': 'Meta diaria', 'recordPerTap': 'Registro por toque',
+  'recordManual': 'Registro manual', 'recordManualInfo': 'Escribe la cantidad cada vez que marcas la rutina', 'recordAmountPrompt': 'Cantidad en {unit}', 'showEventsInToday': 'Mostrar eventos en Hoy', 'includeInTodayCount': 'Incluir en el contador de Hoy',
   'unitName': 'Unidad', 'unitEgGlass': 'ej. vaso',
   'noRoutinesToday': 'Sin rutinas hoy', 'noRoutinesYet': 'Aún sin rutinas',
   'tapPlusFirstAdd': 'Toca + para añadir tu primera rutina',
@@ -1477,6 +1486,7 @@ const Map<String, String> _fr = {
   'sectionGoal': 'OBJECTIF',
   'goalAchieveAll': 'Tout accomplir', 'goalCertainAmount': 'Atteindre un montant',
   'dailyGoal': 'Objectif quotidien', 'recordPerTap': 'Par appui',
+  'recordManual': 'Saisie manuelle', 'recordManualInfo': 'Saisissez la quantité à chaque fois que vous cochez la routine', 'recordAmountPrompt': 'Quantité en {unit}', 'showEventsInToday': 'Afficher les événements dans Aujourd\'hui', 'includeInTodayCount': 'Inclure dans le compteur Aujourd\'hui',
   'unitName': 'Unité', 'unitEgGlass': 'ex. verre',
   'noRoutinesToday': 'Aucune routine aujourd\'hui', 'noRoutinesYet': 'Aucune routine',
   'tapPlusFirstAdd': 'Appuyez sur + pour ajouter votre première routine',
@@ -1619,6 +1629,7 @@ const Map<String, String> _de = {
   'sectionGoal': 'ZIEL',
   'goalAchieveAll': 'Alles erreichen', 'goalCertainAmount': 'Bestimmte Menge',
   'dailyGoal': 'Tagesziel', 'recordPerTap': 'Pro Tipp aufzeichnen',
+  'recordManual': 'Manuell erfassen', 'recordManualInfo': 'Gib jedes Mal die Menge ein, wenn du die Routine abhakst', 'recordAmountPrompt': 'Menge in {unit}', 'showEventsInToday': 'Termine in Heute anzeigen', 'includeInTodayCount': 'In Heute-Zähler einbeziehen',
   'unitName': 'Einheit', 'unitEgGlass': 'z. B. Glas',
   'noRoutinesToday': 'Heute keine Routinen', 'noRoutinesYet': 'Noch keine Routinen',
   'tapPlusFirstAdd': 'Tippe +, um deine erste Routine hinzuzufügen',
@@ -1761,6 +1772,7 @@ const Map<String, String> _it = {
   'sectionGoal': 'OBIETTIVO',
   'goalAchieveAll': 'Realizza tutto', 'goalCertainAmount': 'Raggiungi quantità',
   'dailyGoal': 'Obiettivo giornaliero', 'recordPerTap': 'Registra per tocco',
+  'recordManual': 'Inserimento manuale', 'recordManualInfo': 'Inserisci la quantità ogni volta che segni la routine', 'recordAmountPrompt': 'Quantità in {unit}', 'showEventsInToday': 'Mostra gli eventi in Oggi', 'includeInTodayCount': 'Includi nel conteggio di Oggi',
   'unitName': 'Unità', 'unitEgGlass': 'es. bicchiere',
   'noRoutinesToday': 'Nessuna abitudine oggi', 'noRoutinesYet': 'Nessuna abitudine',
   'tapPlusFirstAdd': 'Tocca + per aggiungere la prima abitudine',
@@ -1903,6 +1915,7 @@ const Map<String, String> _pt = {
   'sectionGoal': 'META',
   'goalAchieveAll': 'Concluir tudo', 'goalCertainAmount': 'Atingir quantidade',
   'dailyGoal': 'Meta diária', 'recordPerTap': 'Por toque',
+  'recordManual': 'Registro manual', 'recordManualInfo': 'Digite a quantidade sempre que marcar a rotina', 'recordAmountPrompt': 'Quantidade em {unit}', 'showEventsInToday': 'Mostrar eventos em Hoje', 'includeInTodayCount': 'Incluir na contagem de Hoje',
   'unitName': 'Unidade', 'unitEgGlass': 'ex. copo',
   'noRoutinesToday': 'Sem rotinas hoje', 'noRoutinesYet': 'Ainda sem rotinas',
   'tapPlusFirstAdd': 'Toque + para adicionar sua primeira rotina',
@@ -2045,6 +2058,7 @@ const Map<String, String> _ru = {
   'sectionGoal': 'ЦЕЛЬ',
   'goalAchieveAll': 'Выполнить всё', 'goalCertainAmount': 'Достичь количества',
   'dailyGoal': 'Дневная цель', 'recordPerTap': 'За одно нажатие',
+  'recordManual': 'Ручной ввод', 'recordManualInfo': 'Вводите количество каждый раз при отметке привычки', 'recordAmountPrompt': 'Количество в {unit}', 'showEventsInToday': 'Показывать события в «Сегодня»', 'includeInTodayCount': 'Учитывать в счётчике «Сегодня»',
   'unitName': 'Единица', 'unitEgGlass': 'напр. стакан',
   'noRoutinesToday': 'Сегодня привычек нет', 'noRoutinesYet': 'Пока нет привычек',
   'tapPlusFirstAdd': 'Нажмите +, чтобы добавить первую привычку',
@@ -2186,6 +2200,7 @@ const Map<String, String> _zh = {
   'sectionGoal': '目标',
   'goalAchieveAll': '全部完成', 'goalCertainAmount': '达到一定数量',
   'dailyGoal': '每日目标', 'recordPerTap': '每次点击记录',
+  'recordManual': '手动记录', 'recordManualInfo': '每次勾选该习惯时输入数量', 'recordAmountPrompt': '数量（{unit}）', 'showEventsInToday': '在“今天”中显示事件', 'includeInTodayCount': '计入“今天”的计数',
   'unitName': '单位', 'unitEgGlass': '例如：杯',
   'noRoutinesToday': '今天没有习惯', 'noRoutinesYet': '还没有习惯',
   'tapPlusFirstAdd': '点击 + 添加第一个习惯',
@@ -2327,6 +2342,7 @@ const Map<String, String> _ja = {
   'sectionGoal': '目標',
   'goalAchieveAll': 'すべて達成', 'goalCertainAmount': '一定量に達する',
   'dailyGoal': '1日の目標', 'recordPerTap': 'タップごとに記録',
+  'recordManual': '手動で記録', 'recordManualInfo': 'このルーティンをチェックするたびに数量を入力', 'recordAmountPrompt': '数量（{unit}）', 'showEventsInToday': '「今日」にイベントを表示', 'includeInTodayCount': '「今日」のカウントに含める',
   'unitName': '単位', 'unitEgGlass': '例: グラス',
   'noRoutinesToday': '今日の習慣はありません', 'noRoutinesYet': 'まだ習慣がありません',
   'tapPlusFirstAdd': '＋ をタップして最初の習慣を追加',

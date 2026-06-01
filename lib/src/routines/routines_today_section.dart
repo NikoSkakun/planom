@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../localization/strings.dart';
 import '../models/routine.dart';
 import '../theme/app_theme.dart';
+import 'routine_amount_dialog.dart';
 import 'routine_controller.dart';
 import 'routine_icons.dart';
 
@@ -34,20 +35,28 @@ class _RoutinesTodaySectionState extends State<RoutinesTodaySection> {
     return ListenableBuilder(
       listenable: widget.controller,
       builder: (context, _) {
-        final routines = widget.controller.routinesForDate(widget.date);
-        if (routines.isEmpty) return const SizedBox.shrink();
+        final all = widget.controller.routinesForDate(widget.date);
+        if (all.isEmpty) return const SizedBox.shrink();
+        // Completed routines sink to the bottom of the section.
+        final incomplete = all
+            .where((r) => !widget.controller.isCompletedOnDate(r, widget.date))
+            .toList();
+        final completed = all
+            .where((r) => widget.controller.isCompletedOnDate(r, widget.date))
+            .toList();
+        final ordered = [...incomplete, ...completed];
         final s = S.of(context);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _Header(
               label: s.tabRoutines,
-              count: routines.length,
+              count: ordered.length,
               expanded: _expanded,
               onToggle: () => setState(() => _expanded = !_expanded),
             ),
             if (_expanded)
-              for (final r in routines)
+              for (final r in ordered)
                 _Row(controller: widget.controller, routine: r, date: widget.date),
           ],
         );
@@ -121,50 +130,75 @@ class _Row extends StatelessWidget {
   final Routine routine;
   final DateTime date;
 
+  Future<void> _onTap(BuildContext context) async {
+    if (routine.manualEntry && routine.goalType == 'certain_amount') {
+      final amount = await showRoutineAmountDialog(
+        context,
+        name: routine.name,
+        current: controller.progressForDate(routine.id, date),
+        unit: routine.goalUnit,
+      );
+      if (amount != null) controller.setProgress(routine, date, amount);
+      return;
+    }
+    controller.recordProgress(routine, date);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCompleted = controller.isCompletedOnDate(routine, date);
     final achieveAll = routine.goalType == 'achieve_all';
+    final progress = controller.progressForDate(routine.id, date);
     return GestureDetector(
-      onTap: () => controller.recordProgress(routine, date),
+      onTap: () => _onTap(context),
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          children: [
-            RoutineCircleIcon(
-              iconId: routine.iconId,
-              iconColor: routine.iconColor,
-              size: 30,
-              dimmed: isCompleted,
-              showCheck: isCompleted && achieveAll,
+      child: Stack(
+        children: [
+          if (!achieveAll)
+            Positioned.fill(
+              child: RoutineProgressFill(
+                fraction: (routine.goalAmount ?? 1) <= 0
+                    ? 0
+                    : progress / (routine.goalAmount ?? 1),
+                color: Color(routine.iconColor),
+              ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                routine.name,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: isCompleted
-                      ? CupertinoColors.secondaryLabel.resolveFrom(context)
-                      : CupertinoColors.label.resolveFrom(context),
-                  decoration: isCompleted && achieveAll
-                      ? TextDecoration.lineThrough
-                      : null,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                RoutineCircleIcon(
+                  iconId: routine.iconId,
+                  iconColor: routine.iconColor,
+                  size: 30,
+                  dimmed: isCompleted,
+                  showCheck: isCompleted && achieveAll,
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    routine.name,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: isCompleted
+                          ? CupertinoColors.secondaryLabel.resolveFrom(context)
+                          : CupertinoColors.label.resolveFrom(context),
+                    ),
+                  ),
+                ),
+                if (!achieveAll) ...[
+                  const SizedBox(width: 8),
+                  _ProgressBadge(
+                    progress: progress,
+                    goal: routine.goalAmount ?? 1,
+                    unit: routine.goalUnit ?? '',
+                    isCompleted: isCompleted,
+                  ),
+                ],
+              ],
             ),
-            if (!achieveAll) ...[
-              const SizedBox(width: 8),
-              _ProgressBadge(
-                progress: controller.progressForDate(routine.id, date),
-                goal: routine.goalAmount ?? 1,
-                unit: routine.goalUnit ?? '',
-                isCompleted: isCompleted,
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -211,6 +211,16 @@ class RoutineController with ChangeNotifier {
     _syncReminders(r, afterEachAnchor: anchor);
   }
 
+  /// Sets the absolute recorded amount for [r] on [date] (clamped to ≥ 0).
+  /// Used by manual-entry routines where the user types the amount completed.
+  Future<void> setProgress(Routine r, DateTime date, int amount) async {
+    final day = normalizeDate(date);
+    final existing = entryForDate(r.id, day);
+    await _setAmount(r.id, day, existing, amount < 0 ? 0 : amount);
+    notifyListeners();
+    _syncReminders(r);
+  }
+
   Future<void> _setAmount(
       String routineId, DateTime day, RoutineEntry? existing, int amount) async {
     if (existing == null) {
