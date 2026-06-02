@@ -483,6 +483,10 @@ class S {
   String get thisYear => t('thisYear');
   String get nextYear => t('nextYear');
   String get addSection => t('addSection');
+  String get viewLabel => t('viewLabel');
+  String get viewAsList => t('viewAsList');
+  String get viewAsKanban => t('viewAsKanban');
+  String get noSectionTitle => t('noSectionTitle');
   String get sectionName => t('sectionName');
   String get sectionCompleted => t('sectionCompleted');
   String get turns => t('turns');
@@ -1043,6 +1047,7 @@ const Map<String, String> _en = {
   'birthDate': 'Birth Date', 'includeYear': 'Include year',
   'completable': 'Show checkbox', 'thisYear': 'This year',
   'nextYear': 'Next year', 'addSection': 'Add Section',
+  'viewLabel': 'View', 'viewAsList': 'List View', 'viewAsKanban': 'Kanban View', 'noSectionTitle': 'No Section',
   'sectionName': 'Section name', 'sectionCompleted': 'Completed',
   'turns': 'turns',
   'selectColor': 'Select Color', 'otherDots': 'Other…',
@@ -1231,6 +1236,7 @@ const Map<String, String> _uk = {
   'birthDate': 'Дата народження', 'includeYear': 'Включити рік',
   'completable': 'Показати чекбокс', 'thisYear': 'Цей рік',
   'nextYear': 'Наступний рік', 'addSection': 'Додати розділ',
+  'viewLabel': 'Вигляд', 'viewAsList': 'Список', 'viewAsKanban': 'Канбан', 'noSectionTitle': 'Без розділу',
   'sectionName': 'Назва розділу', 'sectionCompleted': 'Виконано',
   'turns': 'виповнюється',
   'selectColor': 'Вибрати колір', 'otherDots': 'Інше…',
@@ -1377,6 +1383,7 @@ const Map<String, String> _es = {
   'birthDate': 'Fecha de nacimiento', 'includeYear': 'Incluir año',
   'completable': 'Mostrar casilla', 'thisYear': 'Este año',
   'nextYear': 'Próximo año', 'addSection': 'Añadir sección',
+  'viewLabel': 'Vista', 'viewAsList': 'Vista de lista', 'viewAsKanban': 'Vista Kanban', 'noSectionTitle': 'Sin sección',
   'sectionName': 'Nombre de la sección', 'sectionCompleted': 'Completadas',
   'turns': 'cumple',
   'selectColor': 'Seleccionar color', 'otherDots': 'Otro…',
@@ -1523,6 +1530,7 @@ const Map<String, String> _fr = {
   'birthDate': 'Date de naissance', 'includeYear': "Inclure l'année",
   'completable': 'Afficher la case', 'thisYear': 'Cette année',
   'nextYear': 'Année prochaine', 'addSection': 'Ajouter une section',
+  'viewLabel': 'Affichage', 'viewAsList': 'Vue liste', 'viewAsKanban': 'Vue Kanban', 'noSectionTitle': 'Sans section',
   'sectionName': 'Nom de la section', 'sectionCompleted': 'Terminé',
   'turns': 'fête',
   'selectColor': 'Sélectionner', 'otherDots': 'Autre…',
@@ -1669,6 +1677,7 @@ const Map<String, String> _de = {
   'birthDate': 'Geburtsdatum', 'includeYear': 'Jahr einschließen',
   'completable': 'Kästchen anzeigen', 'thisYear': 'Dieses Jahr',
   'nextYear': 'Nächstes Jahr', 'addSection': 'Abschnitt hinzufügen',
+  'viewLabel': 'Ansicht', 'viewAsList': 'Listenansicht', 'viewAsKanban': 'Kanban-Ansicht', 'noSectionTitle': 'Kein Abschnitt',
   'sectionName': 'Abschnittsname', 'sectionCompleted': 'Erledigt',
   'turns': 'wird',
   'selectColor': 'Farbe wählen', 'otherDots': 'Andere…',
@@ -1815,6 +1824,7 @@ const Map<String, String> _it = {
   'birthDate': 'Data di nascita', 'includeYear': 'Includi anno',
   'completable': 'Mostra casella', 'thisYear': "Quest'anno",
   'nextYear': 'Anno prossimo', 'addSection': 'Aggiungi sezione',
+  'viewLabel': 'Vista', 'viewAsList': 'Vista elenco', 'viewAsKanban': 'Vista Kanban', 'noSectionTitle': 'Nessuna sezione',
   'sectionName': 'Nome sezione', 'sectionCompleted': 'Completate',
   'turns': 'compie',
   'selectColor': 'Seleziona colore', 'otherDots': 'Altro…',
@@ -1961,6 +1971,7 @@ const Map<String, String> _pt = {
   'birthDate': 'Data de nascimento', 'includeYear': 'Incluir ano',
   'completable': 'Mostrar caixa', 'thisYear': 'Este ano',
   'nextYear': 'Próximo ano', 'addSection': 'Adicionar seção',
+  'viewLabel': 'Visualização', 'viewAsList': 'Lista', 'viewAsKanban': 'Kanban', 'noSectionTitle': 'Sem seção',
   'sectionName': 'Nome da seção', 'sectionCompleted': 'Concluídas',
   'turns': 'faz',
   'selectColor': 'Selecionar cor', 'otherDots': 'Outro…',
@@ -2107,6 +2118,7 @@ const Map<String, String> _ru = {
   'birthDate': 'Дата рождения', 'includeYear': 'Включить год',
   'completable': 'Показывать чекбокс', 'thisYear': 'В этом году',
   'nextYear': 'В следующем году', 'addSection': 'Добавить раздел',
+  'viewLabel': 'Вид', 'viewAsList': 'Список', 'viewAsKanban': 'Канбан', 'noSectionTitle': 'Без раздела',
   'sectionName': 'Название раздела', 'sectionCompleted': 'Выполнено',
   'turns': 'исполняется',
   'selectColor': 'Выбрать цвет', 'otherDots': 'Другое…',
@@ -2252,6 +2264,7 @@ const Map<String, String> _zh = {
   'birthDate': '出生日期', 'includeYear': '包含年份',
   'completable': '显示复选框', 'thisYear': '今年',
   'nextYear': '明年', 'addSection': '添加分组',
+  'viewLabel': '视图', 'viewAsList': '列表视图', 'viewAsKanban': '看板视图', 'noSectionTitle': '无分组',
   'sectionName': '分组名称', 'sectionCompleted': '已完成',
   'turns': '将满',
   'selectColor': '选择颜色', 'otherDots': '其他…',
@@ -2397,6 +2410,7 @@ const Map<String, String> _ja = {
   'birthDate': '生年月日', 'includeYear': '年を含める',
   'completable': 'チェックボックスを表示', 'thisYear': '今年',
   'nextYear': '来年', 'addSection': 'セクションを追加',
+  'viewLabel': '表示', 'viewAsList': 'リスト表示', 'viewAsKanban': 'カンバン表示', 'noSectionTitle': 'セクションなし',
   'sectionName': 'セクション名', 'sectionCompleted': '完了',
   'turns': '歳',
   'selectColor': '色を選択', 'otherDots': 'その他…',

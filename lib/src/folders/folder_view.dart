@@ -4,7 +4,9 @@ import '../contacts/contact_controller.dart';
 import '../localization/strings.dart';
 import '../models/app_folder.dart';
 import '../settings/settings_controller.dart';
+import '../tasks/complete_with_undo.dart';
 import '../tasks/task_controller.dart';
+import '../tasks/task_detail_view.dart';
 import '../tasks/task_field_prefs.dart';
 import '../theme/app_theme.dart';
 import '../utils/confirm_dialogs.dart';
@@ -14,6 +16,7 @@ import '../utils/item_info_sheet.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
 import '../utils/reorder_drag.dart';
+import '../utils/selection_menu.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart'
     show
@@ -23,6 +26,7 @@ import 'create_folder_list_sheet.dart'
         showEditItemSheet;
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
+import 'kanban_board.dart';
 import 'list_task_view.dart';
 import 'move_to_sheet.dart';
 
@@ -48,10 +52,13 @@ class FolderView extends StatefulWidget {
   State<FolderView> createState() => _FolderViewState();
 }
 
+enum _FolderViewMode { list, kanban }
+
 class _FolderViewState extends State<FolderView>
     with DropdownOverlayMixin {
   late AppFolder _currentFolder;
   final Set<String> _expandedIds = {};
+  _FolderViewMode _viewMode = _FolderViewMode.list;
 
   @override
   void initState() {
@@ -205,6 +212,11 @@ class _FolderViewState extends State<FolderView>
     showDropdown(context, (dismiss) {
       return _FolderOptionsDropdown(
         onDismiss: dismiss,
+        isKanban: _viewMode == _FolderViewMode.kanban,
+        onView: () {
+          dismiss();
+          _pickViewMode();
+        },
         onAddList: () {
           dismiss();
           showCreateFolderListSheet(
@@ -252,6 +264,70 @@ class _FolderViewState extends State<FolderView>
         },
       );
     });
+  }
+
+  Future<void> _pickViewMode() async {
+    final s = S.of(context);
+    final picked = await showSelectionMenu<_FolderViewMode>(
+      context: context,
+      title: s.viewLabel,
+      current: _viewMode,
+      options: [
+        SelectionMenuOption(
+          value: _FolderViewMode.list,
+          label: s.viewAsList,
+          icon: CupertinoIcons.list_bullet,
+        ),
+        SelectionMenuOption(
+          value: _FolderViewMode.kanban,
+          label: s.viewAsKanban,
+          icon: CupertinoIcons.square_split_2x1,
+        ),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _viewMode = picked);
+  }
+
+  /// Moves a task into [toListId] (a list directly inside this folder) when a
+  /// Kanban card is dropped onto another column. Clears the section assignment
+  /// since the target list has its own sections.
+  void _moveTaskToList(String taskId, String toListId) {
+    final task = widget.taskController.taskById(taskId);
+    if (task == null || task.listId == toListId) return;
+    widget.taskController.updateTask(
+      task.copyWith(listId: toListId, clearSectionId: true),
+    );
+  }
+
+  Widget _buildKanbanBoard(BuildContext context) {
+    final lists = widget.folderController.listsIn(_currentFolder.id);
+    final columns = [
+      for (final l in lists)
+        KanbanColumnData(
+          id: l.id,
+          title: l.name,
+          accentColor: l.color != null ? Color(l.color!) : null,
+          tasks: widget.taskController.tasksForList(l.id),
+        ),
+    ];
+    return KanbanBoard(
+      columns: columns,
+      emptyLabel: S.of(context).noItems,
+      onMoveTask: _moveTaskToList,
+      onToggleTask: (task) =>
+          toggleTaskCompletedWithUndo(context, widget.taskController, task),
+      onTapTask: (task) => Navigator.of(context).push(
+        FastRoute<void>(
+          settings: const RouteSettings(name: TaskDetailView.routeName),
+          builder: (_) => TaskDetailView(
+            task: task,
+            controller: widget.taskController,
+            folderController: widget.folderController,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openEditSheet() async {
@@ -321,6 +397,9 @@ class _FolderViewState extends State<FolderView>
                   widget.settingsController!,
               ]),
               builder: (context, _) {
+                if (_viewMode == _FolderViewMode.kanban) {
+                  return _buildKanbanBoard(context);
+                }
                 final subFolders =
                     widget.folderController.foldersIn(_currentFolder.id);
                 final lists =
@@ -582,6 +661,8 @@ class _FolderViewState extends State<FolderView>
 class _FolderOptionsDropdown extends StatelessWidget {
   const _FolderOptionsDropdown({
     required this.onDismiss,
+    required this.onView,
+    required this.isKanban,
     required this.onAddList,
     required this.onAddFolder,
     required this.onEdit,
@@ -591,6 +672,8 @@ class _FolderOptionsDropdown extends StatelessWidget {
   });
 
   final VoidCallback onDismiss;
+  final VoidCallback onView;
+  final bool isKanban;
   final VoidCallback onAddList;
   final VoidCallback onAddFolder;
   final VoidCallback onEdit;
@@ -613,6 +696,12 @@ class _FolderOptionsDropdown extends StatelessWidget {
           right: 8,
           child: _DropdownPanel(
             items: [
+              _DropdownItem(
+                  label: S.of(context).viewLabel,
+                  icon: isKanban
+                      ? CupertinoIcons.square_split_2x1
+                      : CupertinoIcons.list_bullet,
+                  onTap: onView),
               _DropdownItem(
                   label: S.of(context).addList,
                   icon: CupertinoIcons.add_circled,
