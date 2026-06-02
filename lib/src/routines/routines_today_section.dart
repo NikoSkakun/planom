@@ -213,13 +213,13 @@ class _Row extends StatelessWidget {
               ),
             ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
             child: Row(
               children: [
                 RoutineCircleIcon(
                   iconId: routine.iconId,
                   iconColor: routine.iconColor,
-                  size: 30,
+                  size: 20 * AppScale.factor,
                   dimmed: isCompleted,
                   showCheck: isCompleted && achieveAll,
                 ),
