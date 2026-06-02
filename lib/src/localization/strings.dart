@@ -214,6 +214,9 @@ class S {
   String get undoOnComplete => t('undoOnComplete');
   String get undoOnCompleteHint => t('undoOnCompleteHint');
   String get firstDayOfWeek => t('firstDayOfWeek');
+  String get calendarView => t('calendarView');
+  String get calendarViewMonths => t('calendarViewMonths');
+  String get calendarViewContinuous => t('calendarViewContinuous');
   String get appBadge => t('appBadge');
   String get appBadgeMode => t('appBadgeMode');
   String get appBadgeHint => t('appBadgeHint');
@@ -222,6 +225,20 @@ class S {
   String get appBadgeTodayTasksAndEvents => t('appBadgeTodayTasksAndEvents');
   String get appBadgeInbox => t('appBadgeInbox');
   String get appBadgeAllUncompleted => t('appBadgeAllUncompleted');
+  String get appBadgeCustom => t('appBadgeCustom');
+  String get appBadgeSources => t('appBadgeSources');
+  String get smartListsHeader => t('smartListsHeader');
+  String get listsAndFoldersHeader => t('listsAndFoldersHeader');
+  String get appBadgeIncludeRoutines => t('appBadgeIncludeRoutines');
+  String get emojiOrSymbol => t('emojiOrSymbol');
+  String get emojiOrSymbolPlaceholder => t('emojiOrSymbolPlaceholder');
+  String get descriptionPlaceholder => t('descriptionPlaceholder');
+  String get defaultList => t('defaultList');
+  String get defaultListNone => t('defaultListNone');
+  String get showRoutinesInToday => t('showRoutinesInToday');
+  String get showRoutinesInCalendar => t('showRoutinesInCalendar');
+  String get showRoutinesHint => t('showRoutinesHint');
+  String get sectionShowRoutines => t('sectionShowRoutines');
   String get sectionDefaults => t('sectionDefaults');
   String get defaultTaskIcon => t('defaultTaskIcon');
   String get defaultListIcon => t('defaultListIcon');
@@ -230,6 +247,24 @@ class S {
   String get textSize => t('textSize');
   String get useSystemTextSize => t('useSystemTextSize');
   String get textSizeHint => t('textSizeHint');
+  // Appearance: background + text color overrides + dynamic colors.
+  String get background => t('background');
+  String get textColor => t('textColor');
+  String get appearanceModeDefault => t('appearanceModeDefault');
+  String get appearanceModeSolid => t('appearanceModeSolid');
+  String get appearanceModeImage => t('appearanceModeImage');
+  String get appearanceModeDynamic => t('appearanceModeDynamic');
+  String get chooseImage => t('chooseImage');
+  String get changeImage => t('changeImage');
+  String get removeImage => t('removeImage');
+  String get autoTextColor => t('autoTextColor');
+  String get autoTextColorHint => t('autoTextColorHint');
+  String get dynamicColors => t('dynamicColors');
+  String get dynamicColorsHint => t('dynamicColorsHint');
+  String get addColorStop => t('addColorStop');
+  String get backgroundHint => t('backgroundHint');
+  String get textColorHint => t('textColorHint');
+  String get timeLabel => t('timeLabel');
   String get animationSpeed => t('animationSpeed');
   String get animationSpeedHint => t('animationSpeedHint');
   String get animationSpeedOff => t('animationSpeedOff');
@@ -384,6 +419,9 @@ class S {
   String get addToCalendar => t('addToCalendar');
   String get taskOption => t('taskOption');
   String get eventOption => t('eventOption');
+  String get calendarAllowCreatingTasks => t('calendarAllowCreatingTasks');
+  String get calendarAllowCreatingEvents => t('calendarAllowCreatingEvents');
+  String get calendarDefaultContainer => t('calendarDefaultContainer');
   String get noTasks => t('noTasks');
   String get noTasksForToday => t('noTasksForToday');
   String get noUpcomingTasks => t('noUpcomingTasks');
@@ -454,6 +492,10 @@ class S {
   String get thisYear => t('thisYear');
   String get nextYear => t('nextYear');
   String get addSection => t('addSection');
+  String get viewLabel => t('viewLabel');
+  String get viewAsList => t('viewAsList');
+  String get viewAsKanban => t('viewAsKanban');
+  String get noSectionTitle => t('noSectionTitle');
   String get sectionName => t('sectionName');
   String get sectionCompleted => t('sectionCompleted');
   String get turns => t('turns');
@@ -479,7 +521,26 @@ class S {
   String get editRoutine => t('editRoutine');
   String get sectionFrequency => t('sectionFrequency');
   String get freqDaily => t('freqDaily');
+  String get freqSpecificDays => t('freqSpecificDays');
+  String get freqInterval => t('freqInterval');
   String get freqDaysAfter => t('freqDaysAfter');
+  String get startDate => t('startDate');
+  String get routineIntervalEvery => t('routineIntervalEvery');
+  String routineIntervalDays(int n) =>
+      t('routineIntervalDays').replaceAll('{n}', '$n');
+  String get waitForCompletion => t('waitForCompletion');
+  String get waitForCompletionInfo => t('waitForCompletionInfo');
+  String get addReminder => t('addReminder');
+  String get reminderTypeTime => t('reminderTypeTime');
+  String get reminderTypeSpread => t('reminderTypeSpread');
+  String get reminderTypeAfterEach => t('reminderTypeAfterEach');
+  String get reminderEveryLabel => t('reminderEveryLabel');
+  String get reminderAfterEachLabel => t('reminderAfterEachLabel');
+  String get recordOnOriginalDate => t('recordOnOriginalDate');
+  String get completeTodayShift => t('completeTodayShift');
+  String get overdueRoutineTitle => t('overdueRoutineTitle');
+  String get overdueRoutineBody => t('overdueRoutineBody');
+  String get overdueLabel => t('overdueLabel');
   String get daysAfterCompletion => t('daysAfterCompletion');
   String get autoReset => t('autoReset');
   String get autoResetEveryDay => t('autoResetEveryDay');
@@ -489,6 +550,12 @@ class S {
   String get goalCertainAmount => t('goalCertainAmount');
   String get dailyGoal => t('dailyGoal');
   String get recordPerTap => t('recordPerTap');
+  String get recordManual => t('recordManual');
+  String get recordManualInfo => t('recordManualInfo');
+  String recordAmountPrompt(String unit) =>
+      t('recordAmountPrompt').replaceAll('{unit}', unit);
+  String get showEventsInToday => t('showEventsInToday');
+  String get includeInTodayCount => t('includeInTodayCount');
   String get unitName => t('unitName');
   String get unitEgGlass => t('unitEgGlass');
   String get noRoutinesToday => t('noRoutinesToday');
@@ -551,6 +618,13 @@ class S {
   String get googleCalendarReadOnlyDesc => t('googleCalendarReadOnlyDesc');
   String get planomLocal => t('planomLocal');
   String get eventCalendar => t('eventCalendar');
+
+  // ── About / Legal ─────────────────────────────────────────────────────────
+  String get sectionAbout => t('sectionAbout');
+  String get legal => t('legal');
+  String get privacyPolicy => t('privacyPolicy');
+  String get termsOfService => t('termsOfService');
+  String get version => t('version');
 
   // ── Parameterized helpers ────────────────────────────────────────────────
   String moveToTrashQuestion(String name) =>
@@ -706,6 +780,9 @@ const Map<String, String> _en = {
   'sectionSmartLists': 'Smart Lists', 'sectionCustomization': 'Customization',
   'tabBar': 'Tab Bar', 'sectionLanguage': 'Language', 'language': 'Language', 'font': 'Font', 'searchFonts': 'Search fonts', 'systemFont': 'System', 'fontOfflineWarning': 'Offline — only cached fonts show previews', 'editPreviewText': 'Edit Preview Text', 'previewText': 'Preview Text',
   'sectionData': 'Data',
+  'sectionAbout': 'About', 'legal': 'Legal',
+  'privacyPolicy': 'Privacy Policy', 'termsOfService': 'Terms of Service',
+  'version': 'Version',
   'exportBackup': 'Export Backup', 'importBackup': 'Import Backup',
   'exportBackupSublabel': 'Planom (.planom) · full restore',
   'importBackupSublabel': 'Planom (.planom) · replaces all data',
@@ -726,6 +803,7 @@ const Map<String, String> _en = {
   'exportFailedBody': 'An error occurred while creating the backup.',
   'newSpace': 'New Space', 'spaceName': 'Space name', 'spaces': 'Spaces',
   'noOptionsYet': 'No options yet.', 'sectionModules': 'MODULES',
+  'appBadgeIncludeRoutines': 'Include today\'s routines', 'showRoutinesInToday': 'Show routines in Today', 'showRoutinesInCalendar': 'Show routines in Calendar', 'showRoutinesHint': 'Today\'s routines appear as a collapsible section in Tasks → Today and in the Calendar day view.', 'sectionShowRoutines': 'SHOW ROUTINES IN',
   'sectionTaskFields': 'TASK FIELDS',
   'taskFieldsHint': 'Hidden fields are not shown when editing a task.',
   'sectionBody': 'BODY', 'useMarkdown': 'Format with Markdown',
@@ -771,6 +849,9 @@ const Map<String, String> _en = {
   'undoOnCompleteHint':
       'Show a brief Undo banner when you check a task off, so an accidental tap is easy to reverse.',
   'firstDayOfWeek': 'First day of week',
+  'calendarView': 'View',
+  'calendarViewMonths': 'Months',
+  'calendarViewContinuous': 'Continuous',
   'appBadge': 'APP ICON BADGE',
   'appBadgeMode': 'Show as badge',
   'appBadgeHint': 'The number shown on the app icon on your home screen.',
@@ -779,6 +860,15 @@ const Map<String, String> _en = {
   'appBadgeTodayTasksAndEvents': "Today's tasks + upcoming events",
   'appBadgeInbox': 'Inbox uncompleted',
   'appBadgeAllUncompleted': 'All uncompleted tasks',
+  'appBadgeCustom': 'Custom…',
+  'appBadgeSources': 'Badge sources',
+  'smartListsHeader': 'SMART LISTS',
+  'listsAndFoldersHeader': 'LISTS & FOLDERS',
+  'emojiOrSymbol': 'Emoji or symbol',
+  'emojiOrSymbolPlaceholder': 'Type an emoji',
+  'descriptionPlaceholder': 'Add a description (optional)',
+  'defaultList': 'Default list',
+  'defaultListNone': 'None',
   'sectionDefaults': 'DEFAULTS',
   'defaultTaskIcon': 'Default task icon',
   'defaultListIcon': 'Default list icon',
@@ -787,6 +877,23 @@ const Map<String, String> _en = {
   'textSize': 'Text size',
   'useSystemTextSize': 'Use system text size',
   'textSizeHint': 'Scales all text in the app. UI elements next to text grow with the chosen size.',
+  'background': 'Background',
+  'textColor': 'Text Color',
+  'appearanceModeDefault': 'Default',
+  'appearanceModeSolid': 'Color',
+  'appearanceModeImage': 'Image',
+  'appearanceModeDynamic': 'Dynamic',
+  'chooseImage': 'Choose Image',
+  'changeImage': 'Change Image',
+  'removeImage': 'Remove Image',
+  'autoTextColor': 'Adjust to background automatically',
+  'autoTextColorHint': 'Picks black or white text based on the brightness of the background.',
+  'dynamicColors': 'Dynamic Colors',
+  'dynamicColorsHint': 'The color blends smoothly between the stops you place across the day.',
+  'addColorStop': 'Add Color',
+  'backgroundHint': 'Override the app background for the light and dark themes, with a solid color, a photo, or colors that shift through the day.',
+  'textColorHint': 'Override the app text color for the light and dark themes.',
+  'timeLabel': 'Time',
   'animationSpeed': 'Animation speed',
   'animationSpeedHint': 'Controls how fast page transitions, list reorders, drag and other UI animations play. Choose Off for immediate, snap-style transitions.',
   'animationSpeedOff': 'Off',
@@ -913,6 +1020,9 @@ const Map<String, String> _en = {
   'sortByCreation': 'By Creation Date', 'sortByName': 'By Name',
   'sortByPriority': 'By Priority', 'sortByDateTime': 'By Date & Time',
   'addToCalendar': 'Add to Calendar', 'taskOption': 'Task', 'eventOption': 'Event',
+  'calendarAllowCreatingTasks': 'Allow creating tasks',
+  'calendarAllowCreatingEvents': 'Allow creating events',
+  'calendarDefaultContainer': 'Default for new events',
   'noTasks': 'No tasks', 'noTasksForToday': 'No tasks for today',
   'noUpcomingTasks': 'No upcoming tasks', 'noCompletedTasks': 'No completed tasks',
   'noItems': 'No items', 'noNotes': 'No notes',
@@ -955,6 +1065,7 @@ const Map<String, String> _en = {
   'birthDate': 'Birth Date', 'includeYear': 'Include year',
   'completable': 'Show checkbox', 'thisYear': 'This year',
   'nextYear': 'Next year', 'addSection': 'Add Section',
+  'viewLabel': 'View', 'viewAsList': 'List View', 'viewAsKanban': 'Kanban View', 'noSectionTitle': 'No Section',
   'sectionName': 'Section name', 'sectionCompleted': 'Completed',
   'turns': 'turns',
   'selectColor': 'Select Color', 'otherDots': 'Other…',
@@ -964,13 +1075,15 @@ const Map<String, String> _en = {
   'folder': 'Folder', 'list': 'List',
   'newRoutine': 'New Routine', 'editRoutine': 'Edit Routine',
   'sectionFrequency': 'FREQUENCY',
-  'freqDaily': 'Daily', 'freqDaysAfter': 'X days after completion',
+  'freqDaily': 'Daily', 'freqSpecificDays': 'Specific Days', 'freqDaysAfter': 'X days after completion',
+  'freqInterval': 'Interval', 'startDate': 'Start Date', 'routineIntervalEvery': 'Every', 'routineIntervalDays': '{n} days', 'waitForCompletion': 'Wait for completion', 'waitForCompletionInfo': 'Schedule the next occurrence after you complete this one. Missed days stay overdue.', 'addReminder': 'Add Reminder', 'reminderTypeTime': 'At a time', 'reminderTypeSpread': 'Spread through day', 'reminderTypeAfterEach': 'After each', 'reminderEveryLabel': 'every', 'reminderAfterEachLabel': 'after each', 'recordOnOriginalDate': 'Mark done on its original day', 'completeTodayShift': 'Complete today (shift next)', 'overdueRoutineTitle': 'Overdue routine', 'overdueRoutineBody': 'When did you do this?', 'overdueLabel': 'Overdue',
   'daysAfterCompletion': 'days after completion',
   'autoReset': 'Auto Reset', 'autoResetEveryDay': 'Every day',
   'autoResetNone': 'Do not reset',
   'sectionGoal': 'GOAL',
   'goalAchieveAll': 'Achieve it all', 'goalCertainAmount': 'Reach certain amount',
   'dailyGoal': 'Daily goal', 'recordPerTap': 'Record per tap',
+  'recordManual': 'Record manually', 'recordManualInfo': 'Type the amount each time you check this routine', 'recordAmountPrompt': 'Amount in {unit}', 'showEventsInToday': 'Show events in Today', 'includeInTodayCount': 'Include in Today\'s count',
   'unitName': 'Unit name', 'unitEgGlass': 'e.g. glass',
   'noRoutinesToday': 'No routines today', 'noRoutinesYet': 'No routines yet',
   'tapPlusFirstAdd': 'Tap + to add your first routine',
@@ -1044,6 +1157,7 @@ const Map<String, String> _uk = {
   'confirm': 'Підтвердити', 'insert': 'Вставити', 'move': 'Перемістити',
   'putBack': 'Відновити', 'clear': 'Очистити', 'untitled': 'Без назви',
   'tabTasks': 'Завдання', 'tabNotes': 'Нотатки', 'tabCalendar': 'Календар',
+  'calendarView': 'Вигляд', 'calendarViewMonths': 'Місяці', 'calendarViewContinuous': 'Безперервний',
   'tabRoutines': 'Звички', 'tabSettings': 'Налаштування',
   'inbox': 'Вхідні', 'today': 'Сьогодні', 'yesterday': 'Вчора', 'tomorrow': 'Завтра', 'upcoming': 'Майбутні',
   'allTasks': 'Всі завдання',
@@ -1055,6 +1169,9 @@ const Map<String, String> _uk = {
   'sectionSmartLists': 'Розумні списки', 'sectionCustomization': 'Налаштування',
   'tabBar': 'Панель вкладок', 'sectionLanguage': 'Мова', 'language': 'Мова', 'font': 'Шрифт', 'searchFonts': 'Пошук шрифтів', 'systemFont': 'Системний', 'fontOfflineWarning': 'Офлайн — лише завантажені шрифти', 'editPreviewText': 'Змінити текст прикладу', 'previewText': 'Текст прикладу',
   'sectionData': 'Дані',
+  'sectionAbout': 'Про застосунок', 'legal': 'Правова інформація',
+  'privacyPolicy': 'Політика конфіденційності', 'termsOfService': 'Умови використання',
+  'version': 'Версія',
   'exportBackup': 'Експорт резервної копії', 'importBackup': 'Імпорт резервної копії',
   'exportBackupSublabel': 'Planom (.planom) · повне відновлення',
   'importBackupSublabel': 'Planom (.planom) · замінює всі дані',
@@ -1075,6 +1192,7 @@ const Map<String, String> _uk = {
   'exportFailedBody': 'Сталася помилка під час створення резервної копії.',
   'newSpace': 'Новий простір', 'spaceName': 'Назва простору', 'spaces': 'Простори',
   'noOptionsYet': 'Параметрів ще немає.', 'sectionModules': 'МОДУЛІ',
+  'appBadgeIncludeRoutines': 'Враховувати звички на сьогодні', 'showRoutinesInToday': 'Показувати звички в «Сьогодні»', 'showRoutinesInCalendar': 'Показувати звички в Календарі', 'showRoutinesHint': 'Звички на сьогодні зʼявляються окремою згортуваною секцією у «Завдання → Сьогодні» та в денному перегляді Календаря.', 'sectionShowRoutines': 'ПОКАЗУВАТИ ЗВИЧКИ В',
   'sectionTaskFields': 'ПОЛЯ ЗАВДАННЯ',
   'taskFieldsHint': 'Приховані поля не показуються при редагуванні завдання.',
   'sectionBody': 'ТІЛО', 'useMarkdown': 'Форматувати з Markdown',
@@ -1090,6 +1208,9 @@ const Map<String, String> _uk = {
   'sortByCreation': 'За датою створення', 'sortByName': 'За назвою',
   'sortByPriority': 'За пріоритетом', 'sortByDateTime': 'За датою і часом',
   'addToCalendar': 'Додати до календаря', 'taskOption': 'Завдання', 'eventOption': 'Подія',
+  'calendarAllowCreatingTasks': 'Дозволити створення завдань',
+  'calendarAllowCreatingEvents': 'Дозволити створення подій',
+  'calendarDefaultContainer': 'Типовий контейнер для нових подій',
   'noTasks': 'Немає завдань', 'noTasksForToday': 'Немає завдань на сьогодні',
   'noUpcomingTasks': 'Немає майбутніх завдань',
   'noCompletedTasks': 'Немає виконаних завдань',
@@ -1133,6 +1254,7 @@ const Map<String, String> _uk = {
   'birthDate': 'Дата народження', 'includeYear': 'Включити рік',
   'completable': 'Показати чекбокс', 'thisYear': 'Цей рік',
   'nextYear': 'Наступний рік', 'addSection': 'Додати розділ',
+  'viewLabel': 'Вигляд', 'viewAsList': 'Список', 'viewAsKanban': 'Канбан', 'noSectionTitle': 'Без розділу',
   'sectionName': 'Назва розділу', 'sectionCompleted': 'Виконано',
   'turns': 'виповнюється',
   'selectColor': 'Вибрати колір', 'otherDots': 'Інше…',
@@ -1142,13 +1264,15 @@ const Map<String, String> _uk = {
   'folder': 'Папка', 'list': 'Список',
   'newRoutine': 'Нова звичка', 'editRoutine': 'Редагувати звичку',
   'sectionFrequency': 'ЧАСТОТА',
-  'freqDaily': 'Щодня', 'freqDaysAfter': 'Через X днів після виконання',
+  'freqDaily': 'Щодня', 'freqSpecificDays': 'Певні дні', 'freqDaysAfter': 'Через X днів після виконання',
+  'freqInterval': 'Інтервал', 'startDate': 'Дата початку', 'routineIntervalEvery': 'Кожні', 'routineIntervalDays': '{n} дн.', 'waitForCompletion': 'Чекати на виконання', 'waitForCompletionInfo': 'Наступне повторення планується після виконання поточного. Пропущені дні лишаються простроченими.', 'addReminder': 'Додати нагадування', 'reminderTypeTime': 'У певний час', 'reminderTypeSpread': 'Рівномірно за день', 'reminderTypeAfterEach': 'Після кожного', 'reminderEveryLabel': 'кожні', 'reminderAfterEachLabel': 'після кожного', 'recordOnOriginalDate': 'Позначити в початковий день', 'completeTodayShift': 'Виконати сьогодні (зсунути)', 'overdueRoutineTitle': 'Прострочена звичка', 'overdueRoutineBody': 'Коли ви це зробили?', 'overdueLabel': 'Прострочено',
   'daysAfterCompletion': 'днів після виконання',
   'autoReset': 'Автоскидання', 'autoResetEveryDay': 'Щодня',
   'autoResetNone': 'Не скидати',
   'sectionGoal': 'МЕТА',
   'goalAchieveAll': 'Виконати все', 'goalCertainAmount': 'Досягти певної кількості',
   'dailyGoal': 'Денна ціль', 'recordPerTap': 'Запис за натискання',
+  'recordManual': 'Ручний запис', 'recordManualInfo': 'Щоразу вводьте кількість, коли позначаєте звичку', 'recordAmountPrompt': 'Кількість у {unit}', 'showEventsInToday': 'Показувати події в «Сьогодні»', 'includeInTodayCount': 'Враховувати в лічильнику «Сьогодні»',
   'unitName': 'Одиниця', 'unitEgGlass': 'напр. склянка',
   'noRoutinesToday': 'Сьогодні звичок немає', 'noRoutinesYet': 'Ще немає звичок',
   'tapPlusFirstAdd': 'Натисніть +, щоб додати першу звичку',
@@ -1180,6 +1304,7 @@ const Map<String, String> _es = {
   'confirm': 'Confirmar', 'insert': 'Insertar', 'move': 'Mover',
   'putBack': 'Restaurar', 'clear': 'Borrar', 'untitled': 'Sin título',
   'tabTasks': 'Tareas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendario',
+  'calendarView': 'Vista', 'calendarViewMonths': 'Meses', 'calendarViewContinuous': 'Continuo',
   'tabRoutines': 'Rutinas', 'tabSettings': 'Ajustes',
   'inbox': 'Bandeja', 'today': 'Hoy', 'yesterday': 'Ayer', 'tomorrow': 'Mañana', 'upcoming': 'Próximas',
   'allTasks': 'Todas las tareas',
@@ -1191,6 +1316,9 @@ const Map<String, String> _es = {
   'sectionSmartLists': 'Listas inteligentes', 'sectionCustomization': 'Personalización',
   'tabBar': 'Barra de pestañas', 'sectionLanguage': 'Idioma', 'language': 'Idioma', 'font': 'Fuente', 'searchFonts': 'Buscar fuentes', 'systemFont': 'Sistema', 'fontOfflineWarning': 'Sin conexión — solo fuentes en caché', 'editPreviewText': 'Editar texto de vista previa', 'previewText': 'Texto de vista previa',
   'sectionData': 'Datos',
+  'sectionAbout': 'Acerca de', 'legal': 'Información legal',
+  'privacyPolicy': 'Política de privacidad', 'termsOfService': 'Términos del servicio',
+  'version': 'Versión',
   'exportBackup': 'Exportar copia', 'importBackup': 'Importar copia',
   'exportBackupSublabel': 'Planom (.planom) · restauración completa',
   'importBackupSublabel': 'Planom (.planom) · reemplaza todos los datos',
@@ -1211,6 +1339,7 @@ const Map<String, String> _es = {
   'exportFailedBody': 'Ocurrió un error al crear la copia.',
   'newSpace': 'Nuevo espacio', 'spaceName': 'Nombre del espacio', 'spaces': 'Espacios',
   'noOptionsYet': 'Aún no hay opciones.', 'sectionModules': 'MÓDULOS',
+  'appBadgeIncludeRoutines': 'Incluir las rutinas de hoy', 'showRoutinesInToday': 'Mostrar rutinas en Hoy', 'showRoutinesInCalendar': 'Mostrar rutinas en Calendario', 'showRoutinesHint': 'Las rutinas de hoy aparecen como una sección plegable en Tareas → Hoy y en la vista diaria del Calendario.', 'sectionShowRoutines': 'MOSTRAR RUTINAS EN',
   'sectionTaskFields': 'CAMPOS DE TAREA',
   'taskFieldsHint': 'Los campos ocultos no se muestran al editar una tarea.',
   'sectionBody': 'CUERPO', 'useMarkdown': 'Formatear con Markdown',
@@ -1226,6 +1355,9 @@ const Map<String, String> _es = {
   'sortByCreation': 'Por fecha de creación', 'sortByName': 'Por nombre',
   'sortByPriority': 'Por prioridad', 'sortByDateTime': 'Por fecha y hora',
   'addToCalendar': 'Añadir al calendario', 'taskOption': 'Tarea', 'eventOption': 'Evento',
+  'calendarAllowCreatingTasks': 'Permitir crear tareas',
+  'calendarAllowCreatingEvents': 'Permitir crear eventos',
+  'calendarDefaultContainer': 'Predeterminado para eventos nuevos',
   'noTasks': 'Sin tareas', 'noTasksForToday': 'Sin tareas para hoy',
   'noUpcomingTasks': 'Sin tareas próximas',
   'noCompletedTasks': 'Sin tareas completadas',
@@ -1269,6 +1401,7 @@ const Map<String, String> _es = {
   'birthDate': 'Fecha de nacimiento', 'includeYear': 'Incluir año',
   'completable': 'Mostrar casilla', 'thisYear': 'Este año',
   'nextYear': 'Próximo año', 'addSection': 'Añadir sección',
+  'viewLabel': 'Vista', 'viewAsList': 'Vista de lista', 'viewAsKanban': 'Vista Kanban', 'noSectionTitle': 'Sin sección',
   'sectionName': 'Nombre de la sección', 'sectionCompleted': 'Completadas',
   'turns': 'cumple',
   'selectColor': 'Seleccionar color', 'otherDots': 'Otro…',
@@ -1278,13 +1411,15 @@ const Map<String, String> _es = {
   'folder': 'Carpeta', 'list': 'Lista',
   'newRoutine': 'Nueva rutina', 'editRoutine': 'Editar rutina',
   'sectionFrequency': 'FRECUENCIA',
-  'freqDaily': 'Diario', 'freqDaysAfter': 'X días después de completar',
+  'freqDaily': 'Diario', 'freqSpecificDays': 'Días específicos', 'freqDaysAfter': 'X días después de completar',
+  'freqInterval': 'Intervalo', 'startDate': 'Fecha de inicio', 'routineIntervalEvery': 'Cada', 'routineIntervalDays': '{n} días', 'waitForCompletion': 'Esperar a completar', 'waitForCompletionInfo': 'Programa la próxima vez tras completar esta. Los días perdidos quedan vencidos.', 'addReminder': 'Añadir recordatorio', 'reminderTypeTime': 'A una hora', 'reminderTypeSpread': 'Repartido en el día', 'reminderTypeAfterEach': 'Tras cada uno', 'reminderEveryLabel': 'cada', 'reminderAfterEachLabel': 'tras cada uno', 'recordOnOriginalDate': 'Marcar en su día original', 'completeTodayShift': 'Completar hoy (desplazar)', 'overdueRoutineTitle': 'Rutina vencida', 'overdueRoutineBody': '¿Cuándo lo hiciste?', 'overdueLabel': 'Vencido',
   'daysAfterCompletion': 'días después de completar',
   'autoReset': 'Reinicio automático', 'autoResetEveryDay': 'Cada día',
   'autoResetNone': 'No reiniciar',
   'sectionGoal': 'OBJETIVO',
   'goalAchieveAll': 'Lograr todo', 'goalCertainAmount': 'Alcanzar cantidad',
   'dailyGoal': 'Meta diaria', 'recordPerTap': 'Registro por toque',
+  'recordManual': 'Registro manual', 'recordManualInfo': 'Escribe la cantidad cada vez que marcas la rutina', 'recordAmountPrompt': 'Cantidad en {unit}', 'showEventsInToday': 'Mostrar eventos en Hoy', 'includeInTodayCount': 'Incluir en el contador de Hoy',
   'unitName': 'Unidad', 'unitEgGlass': 'ej. vaso',
   'noRoutinesToday': 'Sin rutinas hoy', 'noRoutinesYet': 'Aún sin rutinas',
   'tapPlusFirstAdd': 'Toca + para añadir tu primera rutina',
@@ -1316,6 +1451,7 @@ const Map<String, String> _fr = {
   'confirm': 'Confirmer', 'insert': 'Insérer', 'move': 'Déplacer',
   'putBack': 'Restaurer', 'clear': 'Effacer', 'untitled': 'Sans titre',
   'tabTasks': 'Tâches', 'tabNotes': 'Notes', 'tabCalendar': 'Calendrier',
+  'calendarView': 'Affichage', 'calendarViewMonths': 'Mois', 'calendarViewContinuous': 'Continu',
   'tabRoutines': 'Routines', 'tabSettings': 'Réglages',
   'inbox': 'Boîte', 'today': "Aujourd'hui", 'yesterday': 'Hier', 'tomorrow': 'Demain', 'upcoming': 'À venir',
   'allTasks': 'Toutes les tâches',
@@ -1327,6 +1463,9 @@ const Map<String, String> _fr = {
   'sectionSmartLists': 'Listes intelligentes', 'sectionCustomization': 'Personnalisation',
   'tabBar': "Barre d'onglets", 'sectionLanguage': 'Langue', 'language': 'Langue', 'font': 'Police', 'searchFonts': 'Rechercher des polices', 'systemFont': 'Système', 'fontOfflineWarning': 'Hors ligne — aperçu des polices en cache uniquement', 'editPreviewText': "Modifier le texte d'aperçu", 'previewText': "Texte d'aperçu",
   'sectionData': 'Données',
+  'sectionAbout': 'À propos', 'legal': 'Mentions légales',
+  'privacyPolicy': 'Politique de confidentialité', 'termsOfService': 'Conditions d\'utilisation',
+  'version': 'Version',
   'exportBackup': 'Exporter la sauvegarde', 'importBackup': 'Importer la sauvegarde',
   'exportBackupSublabel': 'Planom (.planom) · restauration complète',
   'importBackupSublabel': 'Planom (.planom) · remplace toutes les données',
@@ -1347,6 +1486,7 @@ const Map<String, String> _fr = {
   'exportFailedBody': 'Une erreur est survenue lors de la création de la sauvegarde.',
   'newSpace': 'Nouvel espace', 'spaceName': 'Nom de l\'espace', 'spaces': 'Espaces',
   'noOptionsYet': 'Aucune option pour le moment.', 'sectionModules': 'MODULES',
+  'appBadgeIncludeRoutines': 'Inclure les routines du jour', 'showRoutinesInToday': 'Afficher les routines dans Aujourd\'hui', 'showRoutinesInCalendar': 'Afficher les routines dans le Calendrier', 'showRoutinesHint': 'Les routines du jour apparaissent dans une section repliable dans Tâches → Aujourd\'hui et dans la vue du jour du Calendrier.', 'sectionShowRoutines': 'AFFICHER LES ROUTINES DANS',
   'sectionTaskFields': 'CHAMPS DE TÂCHE',
   'taskFieldsHint': "Les champs masqués ne s'affichent pas lors de l'édition d'une tâche.",
   'sectionBody': 'CORPS', 'useMarkdown': 'Formater en Markdown',
@@ -1362,6 +1502,9 @@ const Map<String, String> _fr = {
   'sortByCreation': 'Par date de création', 'sortByName': 'Par nom',
   'sortByPriority': 'Par priorité', 'sortByDateTime': 'Par date et heure',
   'addToCalendar': 'Ajouter au calendrier', 'taskOption': 'Tâche', 'eventOption': 'Événement',
+  'calendarAllowCreatingTasks': 'Autoriser la création de tâches',
+  'calendarAllowCreatingEvents': 'Autoriser la création d\'événements',
+  'calendarDefaultContainer': 'Par défaut pour les nouveaux événements',
   'noTasks': 'Aucune tâche', 'noTasksForToday': 'Aucune tâche aujourd\'hui',
   'noUpcomingTasks': 'Aucune tâche à venir',
   'noCompletedTasks': 'Aucune tâche terminée',
@@ -1405,6 +1548,7 @@ const Map<String, String> _fr = {
   'birthDate': 'Date de naissance', 'includeYear': "Inclure l'année",
   'completable': 'Afficher la case', 'thisYear': 'Cette année',
   'nextYear': 'Année prochaine', 'addSection': 'Ajouter une section',
+  'viewLabel': 'Affichage', 'viewAsList': 'Vue liste', 'viewAsKanban': 'Vue Kanban', 'noSectionTitle': 'Sans section',
   'sectionName': 'Nom de la section', 'sectionCompleted': 'Terminé',
   'turns': 'fête',
   'selectColor': 'Sélectionner', 'otherDots': 'Autre…',
@@ -1414,13 +1558,15 @@ const Map<String, String> _fr = {
   'folder': 'Dossier', 'list': 'Liste',
   'newRoutine': 'Nouvelle routine', 'editRoutine': 'Modifier la routine',
   'sectionFrequency': 'FRÉQUENCE',
-  'freqDaily': 'Quotidien', 'freqDaysAfter': 'X jours après l\'achèvement',
+  'freqDaily': 'Quotidien', 'freqSpecificDays': 'Jours précis', 'freqDaysAfter': 'X jours après l\'achèvement',
+  'freqInterval': 'Intervalle', 'startDate': 'Date de début', 'routineIntervalEvery': 'Tous les', 'routineIntervalDays': '{n} jours', 'waitForCompletion': 'Attendre la réalisation', 'waitForCompletionInfo': 'Planifie la prochaine fois après avoir terminé celle-ci. Les jours manqués restent en retard.', 'addReminder': 'Ajouter un rappel', 'reminderTypeTime': 'À une heure', 'reminderTypeSpread': 'Réparti sur la journée', 'reminderTypeAfterEach': 'Après chacun', 'reminderEveryLabel': 'toutes les', 'reminderAfterEachLabel': 'après chacun', 'recordOnOriginalDate': 'Marquer à sa date initiale', 'completeTodayShift': 'Terminer aujourd\'hui (décaler)', 'overdueRoutineTitle': 'Routine en retard', 'overdueRoutineBody': 'Quand l\'avez-vous fait ?', 'overdueLabel': 'En retard',
   'daysAfterCompletion': 'jours après l\'achèvement',
   'autoReset': 'Réinitialisation auto', 'autoResetEveryDay': 'Chaque jour',
   'autoResetNone': 'Ne pas réinitialiser',
   'sectionGoal': 'OBJECTIF',
   'goalAchieveAll': 'Tout accomplir', 'goalCertainAmount': 'Atteindre un montant',
   'dailyGoal': 'Objectif quotidien', 'recordPerTap': 'Par appui',
+  'recordManual': 'Saisie manuelle', 'recordManualInfo': 'Saisissez la quantité à chaque fois que vous cochez la routine', 'recordAmountPrompt': 'Quantité en {unit}', 'showEventsInToday': 'Afficher les événements dans Aujourd\'hui', 'includeInTodayCount': 'Inclure dans le compteur Aujourd\'hui',
   'unitName': 'Unité', 'unitEgGlass': 'ex. verre',
   'noRoutinesToday': 'Aucune routine aujourd\'hui', 'noRoutinesYet': 'Aucune routine',
   'tapPlusFirstAdd': 'Appuyez sur + pour ajouter votre première routine',
@@ -1452,6 +1598,7 @@ const Map<String, String> _de = {
   'confirm': 'Bestätigen', 'insert': 'Einfügen', 'move': 'Verschieben',
   'putBack': 'Wiederherstellen', 'clear': 'Löschen', 'untitled': 'Ohne Titel',
   'tabTasks': 'Aufgaben', 'tabNotes': 'Notizen', 'tabCalendar': 'Kalender',
+  'calendarView': 'Ansicht', 'calendarViewMonths': 'Monate', 'calendarViewContinuous': 'Fortlaufend',
   'tabRoutines': 'Routinen', 'tabSettings': 'Einstellungen',
   'inbox': 'Eingang', 'today': 'Heute', 'yesterday': 'Gestern', 'tomorrow': 'Morgen', 'upcoming': 'Anstehend',
   'allTasks': 'Alle Aufgaben',
@@ -1463,6 +1610,9 @@ const Map<String, String> _de = {
   'sectionSmartLists': 'Intelligente Listen', 'sectionCustomization': 'Anpassung',
   'tabBar': 'Tab-Leiste', 'sectionLanguage': 'Sprache', 'language': 'Sprache', 'font': 'Schrift', 'searchFonts': 'Schriften suchen', 'systemFont': 'System', 'fontOfflineWarning': 'Offline — nur gecachte Schriften', 'editPreviewText': 'Vorschautext bearbeiten', 'previewText': 'Vorschautext',
   'sectionData': 'Daten',
+  'sectionAbout': 'Über die App', 'legal': 'Rechtliches',
+  'privacyPolicy': 'Datenschutzrichtlinie', 'termsOfService': 'Nutzungsbedingungen',
+  'version': 'Version',
   'exportBackup': 'Backup exportieren', 'importBackup': 'Backup importieren',
   'exportBackupSublabel': 'Planom (.planom) · vollständige Wiederherstellung',
   'importBackupSublabel': 'Planom (.planom) · ersetzt alle Daten',
@@ -1483,6 +1633,7 @@ const Map<String, String> _de = {
   'exportFailedBody': 'Beim Erstellen des Backups ist ein Fehler aufgetreten.',
   'newSpace': 'Neuer Bereich', 'spaceName': 'Bereichsname', 'spaces': 'Bereiche',
   'noOptionsYet': 'Noch keine Optionen.', 'sectionModules': 'MODULE',
+  'appBadgeIncludeRoutines': 'Heutige Routinen einbeziehen', 'showRoutinesInToday': 'Routinen in Heute anzeigen', 'showRoutinesInCalendar': 'Routinen im Kalender anzeigen', 'showRoutinesHint': 'Die heutigen Routinen erscheinen als einklappbarer Abschnitt in Aufgaben → Heute und in der Tagesansicht des Kalenders.', 'sectionShowRoutines': 'ROUTINEN ANZEIGEN IN',
   'sectionTaskFields': 'AUFGABENFELDER',
   'taskFieldsHint': 'Ausgeblendete Felder erscheinen nicht beim Bearbeiten einer Aufgabe.',
   'sectionBody': 'KÖRPER', 'useMarkdown': 'Mit Markdown formatieren',
@@ -1498,6 +1649,9 @@ const Map<String, String> _de = {
   'sortByCreation': 'Nach Erstellungsdatum', 'sortByName': 'Nach Name',
   'sortByPriority': 'Nach Priorität', 'sortByDateTime': 'Nach Datum & Zeit',
   'addToCalendar': 'Zum Kalender hinzufügen', 'taskOption': 'Aufgabe', 'eventOption': 'Ereignis',
+  'calendarAllowCreatingTasks': 'Aufgaben erstellen erlauben',
+  'calendarAllowCreatingEvents': 'Ereignisse erstellen erlauben',
+  'calendarDefaultContainer': 'Standard für neue Ereignisse',
   'noTasks': 'Keine Aufgaben', 'noTasksForToday': 'Keine Aufgaben für heute',
   'noUpcomingTasks': 'Keine anstehenden Aufgaben',
   'noCompletedTasks': 'Keine erledigten Aufgaben',
@@ -1541,6 +1695,7 @@ const Map<String, String> _de = {
   'birthDate': 'Geburtsdatum', 'includeYear': 'Jahr einschließen',
   'completable': 'Kästchen anzeigen', 'thisYear': 'Dieses Jahr',
   'nextYear': 'Nächstes Jahr', 'addSection': 'Abschnitt hinzufügen',
+  'viewLabel': 'Ansicht', 'viewAsList': 'Listenansicht', 'viewAsKanban': 'Kanban-Ansicht', 'noSectionTitle': 'Kein Abschnitt',
   'sectionName': 'Abschnittsname', 'sectionCompleted': 'Erledigt',
   'turns': 'wird',
   'selectColor': 'Farbe wählen', 'otherDots': 'Andere…',
@@ -1550,13 +1705,15 @@ const Map<String, String> _de = {
   'folder': 'Ordner', 'list': 'Liste',
   'newRoutine': 'Neue Routine', 'editRoutine': 'Routine bearbeiten',
   'sectionFrequency': 'HÄUFIGKEIT',
-  'freqDaily': 'Täglich', 'freqDaysAfter': 'X Tage nach Abschluss',
+  'freqDaily': 'Täglich', 'freqSpecificDays': 'Bestimmte Tage', 'freqDaysAfter': 'X Tage nach Abschluss',
+  'freqInterval': 'Intervall', 'startDate': 'Startdatum', 'routineIntervalEvery': 'Alle', 'routineIntervalDays': '{n} Tage', 'waitForCompletion': 'Auf Abschluss warten', 'waitForCompletionInfo': 'Plant das nächste Mal nach Abschluss dieses. Verpasste Tage bleiben überfällig.', 'addReminder': 'Erinnerung hinzufügen', 'reminderTypeTime': 'Zu einer Zeit', 'reminderTypeSpread': 'Über den Tag verteilt', 'reminderTypeAfterEach': 'Nach jedem', 'reminderEveryLabel': 'alle', 'reminderAfterEachLabel': 'nach jedem', 'recordOnOriginalDate': 'Am ursprünglichen Tag erledigen', 'completeTodayShift': 'Heute erledigen (verschieben)', 'overdueRoutineTitle': 'Überfällige Routine', 'overdueRoutineBody': 'Wann hast du das gemacht?', 'overdueLabel': 'Überfällig',
   'daysAfterCompletion': 'Tage nach Abschluss',
   'autoReset': 'Automatisch zurücksetzen', 'autoResetEveryDay': 'Jeden Tag',
   'autoResetNone': 'Nicht zurücksetzen',
   'sectionGoal': 'ZIEL',
   'goalAchieveAll': 'Alles erreichen', 'goalCertainAmount': 'Bestimmte Menge',
   'dailyGoal': 'Tagesziel', 'recordPerTap': 'Pro Tipp aufzeichnen',
+  'recordManual': 'Manuell erfassen', 'recordManualInfo': 'Gib jedes Mal die Menge ein, wenn du die Routine abhakst', 'recordAmountPrompt': 'Menge in {unit}', 'showEventsInToday': 'Termine in Heute anzeigen', 'includeInTodayCount': 'In Heute-Zähler einbeziehen',
   'unitName': 'Einheit', 'unitEgGlass': 'z. B. Glas',
   'noRoutinesToday': 'Heute keine Routinen', 'noRoutinesYet': 'Noch keine Routinen',
   'tapPlusFirstAdd': 'Tippe +, um deine erste Routine hinzuzufügen',
@@ -1588,6 +1745,7 @@ const Map<String, String> _it = {
   'confirm': 'Conferma', 'insert': 'Inserisci', 'move': 'Sposta',
   'putBack': 'Ripristina', 'clear': 'Cancella', 'untitled': 'Senza titolo',
   'tabTasks': 'Attività', 'tabNotes': 'Note', 'tabCalendar': 'Calendario',
+  'calendarView': 'Vista', 'calendarViewMonths': 'Mesi', 'calendarViewContinuous': 'Continuo',
   'tabRoutines': 'Abitudini', 'tabSettings': 'Impostazioni',
   'inbox': 'In arrivo', 'today': 'Oggi', 'yesterday': 'Ieri', 'tomorrow': 'Domani', 'upcoming': 'In arrivo',
   'allTasks': 'Tutte le attività',
@@ -1599,6 +1757,9 @@ const Map<String, String> _it = {
   'sectionSmartLists': 'Liste intelligenti', 'sectionCustomization': 'Personalizzazione',
   'tabBar': 'Barra schede', 'sectionLanguage': 'Lingua', 'language': 'Lingua', 'font': 'Carattere', 'searchFonts': 'Cerca caratteri', 'systemFont': 'Sistema', 'fontOfflineWarning': 'Offline — solo caratteri nella cache', 'editPreviewText': 'Modifica testo di anteprima', 'previewText': 'Testo di anteprima',
   'sectionData': 'Dati',
+  'sectionAbout': 'Informazioni', 'legal': 'Note legali',
+  'privacyPolicy': 'Informativa sulla privacy', 'termsOfService': 'Termini di servizio',
+  'version': 'Versione',
   'exportBackup': 'Esporta backup', 'importBackup': 'Importa backup',
   'exportBackupSublabel': 'Planom (.planom) · ripristino completo',
   'importBackupSublabel': 'Planom (.planom) · sostituisce tutti i dati',
@@ -1619,6 +1780,7 @@ const Map<String, String> _it = {
   'exportFailedBody': 'Si è verificato un errore durante la creazione del backup.',
   'newSpace': 'Nuovo spazio', 'spaceName': 'Nome dello spazio', 'spaces': 'Spazi',
   'noOptionsYet': 'Ancora nessuna opzione.', 'sectionModules': 'MODULI',
+  'appBadgeIncludeRoutines': 'Includi le routine di oggi', 'showRoutinesInToday': 'Mostra le routine in Oggi', 'showRoutinesInCalendar': 'Mostra le routine nel Calendario', 'showRoutinesHint': 'Le routine di oggi appaiono come sezione comprimibile in Attività → Oggi e nella vista giornaliera del Calendario.', 'sectionShowRoutines': 'MOSTRA LE ROUTINE IN',
   'sectionTaskFields': 'CAMPI ATTIVITÀ',
   'taskFieldsHint': "I campi nascosti non vengono mostrati durante la modifica di un'attività.",
   'sectionBody': 'CORPO', 'useMarkdown': 'Formatta con Markdown',
@@ -1634,6 +1796,9 @@ const Map<String, String> _it = {
   'sortByCreation': 'Per data creazione', 'sortByName': 'Per nome',
   'sortByPriority': 'Per priorità', 'sortByDateTime': 'Per data e ora',
   'addToCalendar': 'Aggiungi al calendario', 'taskOption': 'Attività', 'eventOption': 'Evento',
+  'calendarAllowCreatingTasks': 'Consenti la creazione di attività',
+  'calendarAllowCreatingEvents': 'Consenti la creazione di eventi',
+  'calendarDefaultContainer': 'Predefinito per nuovi eventi',
   'noTasks': 'Nessuna attività', 'noTasksForToday': 'Nessuna attività per oggi',
   'noUpcomingTasks': 'Nessuna attività in arrivo',
   'noCompletedTasks': 'Nessuna attività completata',
@@ -1677,6 +1842,7 @@ const Map<String, String> _it = {
   'birthDate': 'Data di nascita', 'includeYear': 'Includi anno',
   'completable': 'Mostra casella', 'thisYear': "Quest'anno",
   'nextYear': 'Anno prossimo', 'addSection': 'Aggiungi sezione',
+  'viewLabel': 'Vista', 'viewAsList': 'Vista elenco', 'viewAsKanban': 'Vista Kanban', 'noSectionTitle': 'Nessuna sezione',
   'sectionName': 'Nome sezione', 'sectionCompleted': 'Completate',
   'turns': 'compie',
   'selectColor': 'Seleziona colore', 'otherDots': 'Altro…',
@@ -1686,13 +1852,15 @@ const Map<String, String> _it = {
   'folder': 'Cartella', 'list': 'Lista',
   'newRoutine': 'Nuova abitudine', 'editRoutine': 'Modifica abitudine',
   'sectionFrequency': 'FREQUENZA',
-  'freqDaily': 'Giornaliero', 'freqDaysAfter': 'X giorni dopo completamento',
+  'freqDaily': 'Giornaliero', 'freqSpecificDays': 'Giorni specifici', 'freqDaysAfter': 'X giorni dopo completamento',
+  'freqInterval': 'Intervallo', 'startDate': 'Data di inizio', 'routineIntervalEvery': 'Ogni', 'routineIntervalDays': '{n} giorni', 'waitForCompletion': 'Attendi il completamento', 'waitForCompletionInfo': 'Pianifica la prossima dopo aver completato questa. I giorni saltati restano scaduti.', 'addReminder': 'Aggiungi promemoria', 'reminderTypeTime': 'A un orario', 'reminderTypeSpread': 'Distribuito nel giorno', 'reminderTypeAfterEach': 'Dopo ognuno', 'reminderEveryLabel': 'ogni', 'reminderAfterEachLabel': 'dopo ognuno', 'recordOnOriginalDate': 'Segna nel giorno originale', 'completeTodayShift': 'Completa oggi (sposta)', 'overdueRoutineTitle': 'Routine scaduta', 'overdueRoutineBody': 'Quando lo hai fatto?', 'overdueLabel': 'Scaduto',
   'daysAfterCompletion': 'giorni dopo completamento',
   'autoReset': 'Reset automatico', 'autoResetEveryDay': 'Ogni giorno',
   'autoResetNone': 'Non resettare',
   'sectionGoal': 'OBIETTIVO',
   'goalAchieveAll': 'Realizza tutto', 'goalCertainAmount': 'Raggiungi quantità',
   'dailyGoal': 'Obiettivo giornaliero', 'recordPerTap': 'Registra per tocco',
+  'recordManual': 'Inserimento manuale', 'recordManualInfo': 'Inserisci la quantità ogni volta che segni la routine', 'recordAmountPrompt': 'Quantità in {unit}', 'showEventsInToday': 'Mostra gli eventi in Oggi', 'includeInTodayCount': 'Includi nel conteggio di Oggi',
   'unitName': 'Unità', 'unitEgGlass': 'es. bicchiere',
   'noRoutinesToday': 'Nessuna abitudine oggi', 'noRoutinesYet': 'Nessuna abitudine',
   'tapPlusFirstAdd': 'Tocca + per aggiungere la prima abitudine',
@@ -1724,6 +1892,7 @@ const Map<String, String> _pt = {
   'confirm': 'Confirmar', 'insert': 'Inserir', 'move': 'Mover',
   'putBack': 'Restaurar', 'clear': 'Limpar', 'untitled': 'Sem título',
   'tabTasks': 'Tarefas', 'tabNotes': 'Notas', 'tabCalendar': 'Calendário',
+  'calendarView': 'Visualização', 'calendarViewMonths': 'Meses', 'calendarViewContinuous': 'Contínuo',
   'tabRoutines': 'Rotinas', 'tabSettings': 'Ajustes',
   'inbox': 'Caixa', 'today': 'Hoje', 'yesterday': 'Ontem', 'tomorrow': 'Amanhã', 'upcoming': 'Próximas',
   'allTasks': 'Todas as tarefas',
@@ -1735,6 +1904,9 @@ const Map<String, String> _pt = {
   'sectionSmartLists': 'Listas inteligentes', 'sectionCustomization': 'Personalização',
   'tabBar': 'Barra de abas', 'sectionLanguage': 'Idioma', 'language': 'Idioma', 'font': 'Fonte', 'searchFonts': 'Pesquisar fontes', 'systemFont': 'Sistema', 'fontOfflineWarning': 'Offline — apenas fontes em cache', 'editPreviewText': 'Editar texto de previsualização', 'previewText': 'Texto de previsualização',
   'sectionData': 'Dados',
+  'sectionAbout': 'Sobre', 'legal': 'Informações legais',
+  'privacyPolicy': 'Política de Privacidade', 'termsOfService': 'Termos de Serviço',
+  'version': 'Versão',
   'exportBackup': 'Exportar backup', 'importBackup': 'Importar backup',
   'exportBackupSublabel': 'Planom (.planom) · restauração completa',
   'importBackupSublabel': 'Planom (.planom) · substitui todos os dados',
@@ -1755,6 +1927,7 @@ const Map<String, String> _pt = {
   'exportFailedBody': 'Ocorreu um erro ao criar o backup.',
   'newSpace': 'Novo espaço', 'spaceName': 'Nome do espaço', 'spaces': 'Espaços',
   'noOptionsYet': 'Ainda sem opções.', 'sectionModules': 'MÓDULOS',
+  'appBadgeIncludeRoutines': 'Incluir as rotinas de hoje', 'showRoutinesInToday': 'Mostrar rotinas em Hoje', 'showRoutinesInCalendar': 'Mostrar rotinas no Calendário', 'showRoutinesHint': 'As rotinas de hoje aparecem como uma seção recolhível em Tarefas → Hoje e na vista diária do Calendário.', 'sectionShowRoutines': 'MOSTRAR ROTINAS EM',
   'sectionTaskFields': 'CAMPOS DE TAREFA',
   'taskFieldsHint': 'Os campos ocultos não aparecem ao editar uma tarefa.',
   'sectionBody': 'CORPO', 'useMarkdown': 'Formatar com Markdown',
@@ -1770,6 +1943,9 @@ const Map<String, String> _pt = {
   'sortByCreation': 'Por data de criação', 'sortByName': 'Por nome',
   'sortByPriority': 'Por prioridade', 'sortByDateTime': 'Por data e hora',
   'addToCalendar': 'Adicionar ao calendário', 'taskOption': 'Tarefa', 'eventOption': 'Evento',
+  'calendarAllowCreatingTasks': 'Permitir criar tarefas',
+  'calendarAllowCreatingEvents': 'Permitir criar eventos',
+  'calendarDefaultContainer': 'Padrão para novos eventos',
   'noTasks': 'Sem tarefas', 'noTasksForToday': 'Sem tarefas para hoje',
   'noUpcomingTasks': 'Sem tarefas próximas',
   'noCompletedTasks': 'Sem tarefas concluídas',
@@ -1813,6 +1989,7 @@ const Map<String, String> _pt = {
   'birthDate': 'Data de nascimento', 'includeYear': 'Incluir ano',
   'completable': 'Mostrar caixa', 'thisYear': 'Este ano',
   'nextYear': 'Próximo ano', 'addSection': 'Adicionar seção',
+  'viewLabel': 'Visualização', 'viewAsList': 'Lista', 'viewAsKanban': 'Kanban', 'noSectionTitle': 'Sem seção',
   'sectionName': 'Nome da seção', 'sectionCompleted': 'Concluídas',
   'turns': 'faz',
   'selectColor': 'Selecionar cor', 'otherDots': 'Outro…',
@@ -1822,13 +1999,15 @@ const Map<String, String> _pt = {
   'folder': 'Pasta', 'list': 'Lista',
   'newRoutine': 'Nova rotina', 'editRoutine': 'Editar rotina',
   'sectionFrequency': 'FREQUÊNCIA',
-  'freqDaily': 'Diário', 'freqDaysAfter': 'X dias após concluir',
+  'freqDaily': 'Diário', 'freqSpecificDays': 'Dias específicos', 'freqDaysAfter': 'X dias após concluir',
+  'freqInterval': 'Intervalo', 'startDate': 'Data de início', 'routineIntervalEvery': 'A cada', 'routineIntervalDays': '{n} dias', 'waitForCompletion': 'Aguardar conclusão', 'waitForCompletionInfo': 'Agenda a próxima após concluir esta. Dias perdidos ficam atrasados.', 'addReminder': 'Adicionar lembrete', 'reminderTypeTime': 'A uma hora', 'reminderTypeSpread': 'Distribuído no dia', 'reminderTypeAfterEach': 'Após cada', 'reminderEveryLabel': 'a cada', 'reminderAfterEachLabel': 'após cada', 'recordOnOriginalDate': 'Marcar no dia original', 'completeTodayShift': 'Concluir hoje (deslocar)', 'overdueRoutineTitle': 'Rotina atrasada', 'overdueRoutineBody': 'Quando você fez isto?', 'overdueLabel': 'Atrasado',
   'daysAfterCompletion': 'dias após concluir',
   'autoReset': 'Reinício automático', 'autoResetEveryDay': 'Todo dia',
   'autoResetNone': 'Não reiniciar',
   'sectionGoal': 'META',
   'goalAchieveAll': 'Concluir tudo', 'goalCertainAmount': 'Atingir quantidade',
   'dailyGoal': 'Meta diária', 'recordPerTap': 'Por toque',
+  'recordManual': 'Registro manual', 'recordManualInfo': 'Digite a quantidade sempre que marcar a rotina', 'recordAmountPrompt': 'Quantidade em {unit}', 'showEventsInToday': 'Mostrar eventos em Hoje', 'includeInTodayCount': 'Incluir na contagem de Hoje',
   'unitName': 'Unidade', 'unitEgGlass': 'ex. copo',
   'noRoutinesToday': 'Sem rotinas hoje', 'noRoutinesYet': 'Ainda sem rotinas',
   'tapPlusFirstAdd': 'Toque + para adicionar sua primeira rotina',
@@ -1860,6 +2039,7 @@ const Map<String, String> _ru = {
   'confirm': 'Подтвердить', 'insert': 'Вставить', 'move': 'Переместить',
   'putBack': 'Восстановить', 'clear': 'Очистить', 'untitled': 'Без названия',
   'tabTasks': 'Задачи', 'tabNotes': 'Заметки', 'tabCalendar': 'Календарь',
+  'calendarView': 'Вид', 'calendarViewMonths': 'Месяцы', 'calendarViewContinuous': 'Непрерывный',
   'tabRoutines': 'Привычки', 'tabSettings': 'Настройки',
   'inbox': 'Входящие', 'today': 'Сегодня', 'yesterday': 'Вчера', 'tomorrow': 'Завтра', 'upcoming': 'Предстоящие',
   'allTasks': 'Все задачи',
@@ -1871,6 +2051,9 @@ const Map<String, String> _ru = {
   'sectionSmartLists': 'Умные списки', 'sectionCustomization': 'Настройка',
   'tabBar': 'Панель вкладок', 'sectionLanguage': 'Язык', 'language': 'Язык', 'font': 'Шрифт', 'searchFonts': 'Поиск шрифтов', 'systemFont': 'Системный', 'fontOfflineWarning': 'Офлайн — только кешированные шрифты', 'editPreviewText': 'Изменить текст примера', 'previewText': 'Текст примера',
   'sectionData': 'Данные',
+  'sectionAbout': 'О приложении', 'legal': 'Правовая информация',
+  'privacyPolicy': 'Политика конфиденциальности', 'termsOfService': 'Условия использования',
+  'version': 'Версия',
   'exportBackup': 'Экспорт резервной копии', 'importBackup': 'Импорт резервной копии',
   'exportBackupSublabel': 'Planom (.planom) · полное восстановление',
   'importBackupSublabel': 'Planom (.planom) · заменяет все данные',
@@ -1891,6 +2074,7 @@ const Map<String, String> _ru = {
   'exportFailedBody': 'Произошла ошибка при создании резервной копии.',
   'newSpace': 'Новое пространство', 'spaceName': 'Название пространства', 'spaces': 'Пространства',
   'noOptionsYet': 'Пока нет параметров.', 'sectionModules': 'МОДУЛИ',
+  'appBadgeIncludeRoutines': 'Учитывать привычки на сегодня', 'showRoutinesInToday': 'Показывать привычки в «Сегодня»', 'showRoutinesInCalendar': 'Показывать привычки в Календаре', 'showRoutinesHint': 'Привычки на сегодня показываются отдельной сворачиваемой секцией в «Задачи → Сегодня» и в дневном виде Календаря.', 'sectionShowRoutines': 'ПОКАЗЫВАТЬ ПРИВЫЧКИ В',
   'sectionTaskFields': 'ПОЛЯ ЗАДАЧИ',
   'taskFieldsHint': 'Скрытые поля не отображаются при редактировании задачи.',
   'sectionBody': 'ТЕЛО', 'useMarkdown': 'Форматировать с Markdown',
@@ -1906,6 +2090,9 @@ const Map<String, String> _ru = {
   'sortByCreation': 'По дате создания', 'sortByName': 'По имени',
   'sortByPriority': 'По приоритету', 'sortByDateTime': 'По дате и времени',
   'addToCalendar': 'Добавить в календарь', 'taskOption': 'Задача', 'eventOption': 'Событие',
+  'calendarAllowCreatingTasks': 'Разрешить создание задач',
+  'calendarAllowCreatingEvents': 'Разрешить создание событий',
+  'calendarDefaultContainer': 'По умолчанию для новых событий',
   'noTasks': 'Нет задач', 'noTasksForToday': 'Нет задач на сегодня',
   'noUpcomingTasks': 'Нет предстоящих задач',
   'noCompletedTasks': 'Нет выполненных задач',
@@ -1949,6 +2136,7 @@ const Map<String, String> _ru = {
   'birthDate': 'Дата рождения', 'includeYear': 'Включить год',
   'completable': 'Показывать чекбокс', 'thisYear': 'В этом году',
   'nextYear': 'В следующем году', 'addSection': 'Добавить раздел',
+  'viewLabel': 'Вид', 'viewAsList': 'Список', 'viewAsKanban': 'Канбан', 'noSectionTitle': 'Без раздела',
   'sectionName': 'Название раздела', 'sectionCompleted': 'Выполнено',
   'turns': 'исполняется',
   'selectColor': 'Выбрать цвет', 'otherDots': 'Другое…',
@@ -1958,13 +2146,15 @@ const Map<String, String> _ru = {
   'folder': 'Папка', 'list': 'Список',
   'newRoutine': 'Новая привычка', 'editRoutine': 'Редактировать',
   'sectionFrequency': 'ЧАСТОТА',
-  'freqDaily': 'Ежедневно', 'freqDaysAfter': 'Через X дней после выполнения',
+  'freqDaily': 'Ежедневно', 'freqSpecificDays': 'Определённые дни', 'freqDaysAfter': 'Через X дней после выполнения',
+  'freqInterval': 'Интервал', 'startDate': 'Дата начала', 'routineIntervalEvery': 'Каждые', 'routineIntervalDays': '{n} дн.', 'waitForCompletion': 'Ждать выполнения', 'waitForCompletionInfo': 'Следующее повторение планируется после выполнения текущего. Пропущенные дни остаются просроченными.', 'addReminder': 'Добавить напоминание', 'reminderTypeTime': 'В заданное время', 'reminderTypeSpread': 'Равномерно за день', 'reminderTypeAfterEach': 'После каждого', 'reminderEveryLabel': 'каждые', 'reminderAfterEachLabel': 'после каждого', 'recordOnOriginalDate': 'Отметить в исходный день', 'completeTodayShift': 'Выполнить сегодня (сдвинуть)', 'overdueRoutineTitle': 'Просроченная привычка', 'overdueRoutineBody': 'Когда вы это сделали?', 'overdueLabel': 'Просрочено',
   'daysAfterCompletion': 'дней после выполнения',
   'autoReset': 'Автосброс', 'autoResetEveryDay': 'Каждый день',
   'autoResetNone': 'Не сбрасывать',
   'sectionGoal': 'ЦЕЛЬ',
   'goalAchieveAll': 'Выполнить всё', 'goalCertainAmount': 'Достичь количества',
   'dailyGoal': 'Дневная цель', 'recordPerTap': 'За одно нажатие',
+  'recordManual': 'Ручной ввод', 'recordManualInfo': 'Вводите количество каждый раз при отметке привычки', 'recordAmountPrompt': 'Количество в {unit}', 'showEventsInToday': 'Показывать события в «Сегодня»', 'includeInTodayCount': 'Учитывать в счётчике «Сегодня»',
   'unitName': 'Единица', 'unitEgGlass': 'напр. стакан',
   'noRoutinesToday': 'Сегодня привычек нет', 'noRoutinesYet': 'Пока нет привычек',
   'tapPlusFirstAdd': 'Нажмите +, чтобы добавить первую привычку',
@@ -1995,6 +2185,7 @@ const Map<String, String> _zh = {
   'confirm': '确认', 'insert': '插入', 'move': '移动',
   'putBack': '恢复', 'clear': '清除', 'untitled': '无标题',
   'tabTasks': '任务', 'tabNotes': '笔记', 'tabCalendar': '日历',
+  'calendarView': '视图', 'calendarViewMonths': '按月', 'calendarViewContinuous': '连续',
   'tabRoutines': '习惯', 'tabSettings': '设置',
   'inbox': '收件箱', 'today': '今天', 'yesterday': '昨天', 'tomorrow': '明天', 'upcoming': '即将',
   'allTasks': '所有任务',
@@ -2006,6 +2197,9 @@ const Map<String, String> _zh = {
   'sectionSmartLists': '智能列表', 'sectionCustomization': '自定义',
   'tabBar': '标签栏', 'sectionLanguage': '语言', 'language': '语言', 'font': '字体', 'searchFonts': '搜索字体', 'systemFont': '系统', 'fontOfflineWarning': '离线 — 仅显示已缓存字体', 'editPreviewText': '编辑预览文字', 'previewText': '预览文字',
   'sectionData': '数据',
+  'sectionAbout': '关于', 'legal': '法律信息',
+  'privacyPolicy': '隐私政策', 'termsOfService': '服务条款',
+  'version': '版本',
   'exportBackup': '导出备份', 'importBackup': '导入备份',
   'exportBackupSublabel': 'Planom (.planom) · 完整恢复',
   'importBackupSublabel': 'Planom (.planom) · 替换所有数据',
@@ -2026,6 +2220,7 @@ const Map<String, String> _zh = {
   'exportFailedBody': '创建备份时出错。',
   'newSpace': '新空间', 'spaceName': '空间名称', 'spaces': '空间',
   'noOptionsYet': '尚无选项。', 'sectionModules': '模块',
+  'appBadgeIncludeRoutines': '包含今天的习惯', 'showRoutinesInToday': '在“今天”中显示习惯', 'showRoutinesInCalendar': '在日历中显示习惯', 'showRoutinesHint': '今天的习惯会在“任务 → 今天”和日历的当日视图中以可折叠的分区显示。', 'sectionShowRoutines': '显示习惯于',
   'sectionTaskFields': '任务字段',
   'taskFieldsHint': '隐藏的字段在编辑任务时不会显示。',
   'sectionBody': '正文', 'useMarkdown': '使用 Markdown 格式',
@@ -2041,6 +2236,9 @@ const Map<String, String> _zh = {
   'sortByCreation': '按创建日期', 'sortByName': '按名称',
   'sortByPriority': '按优先级', 'sortByDateTime': '按日期和时间',
   'addToCalendar': '添加到日历', 'taskOption': '任务', 'eventOption': '事件',
+  'calendarAllowCreatingTasks': '允许创建任务',
+  'calendarAllowCreatingEvents': '允许创建事件',
+  'calendarDefaultContainer': '新事件的默认位置',
   'noTasks': '没有任务', 'noTasksForToday': '今天没有任务',
   'noUpcomingTasks': '没有即将到来的任务',
   'noCompletedTasks': '没有已完成的任务',
@@ -2084,6 +2282,7 @@ const Map<String, String> _zh = {
   'birthDate': '出生日期', 'includeYear': '包含年份',
   'completable': '显示复选框', 'thisYear': '今年',
   'nextYear': '明年', 'addSection': '添加分组',
+  'viewLabel': '视图', 'viewAsList': '列表视图', 'viewAsKanban': '看板视图', 'noSectionTitle': '无分组',
   'sectionName': '分组名称', 'sectionCompleted': '已完成',
   'turns': '将满',
   'selectColor': '选择颜色', 'otherDots': '其他…',
@@ -2093,13 +2292,15 @@ const Map<String, String> _zh = {
   'folder': '文件夹', 'list': '列表',
   'newRoutine': '新习惯', 'editRoutine': '编辑习惯',
   'sectionFrequency': '频率',
-  'freqDaily': '每天', 'freqDaysAfter': '完成后 X 天',
+  'freqDaily': '每天', 'freqSpecificDays': '指定日期', 'freqDaysAfter': '完成后 X 天',
+  'freqInterval': '间隔', 'startDate': '开始日期', 'routineIntervalEvery': '每', 'routineIntervalDays': '{n} 天', 'waitForCompletion': '等待完成', 'waitForCompletionInfo': '完成当前后再安排下一次。错过的日子会保持逾期。', 'addReminder': '添加提醒', 'reminderTypeTime': '在某时间', 'reminderTypeSpread': '全天分散', 'reminderTypeAfterEach': '每次之后', 'reminderEveryLabel': '每', 'reminderAfterEachLabel': '每次之后', 'recordOnOriginalDate': '标记在原始日期', 'completeTodayShift': '今天完成（顺延）', 'overdueRoutineTitle': '逾期的习惯', 'overdueRoutineBody': '你是什么时候做的？', 'overdueLabel': '逾期',
   'daysAfterCompletion': '完成后天数',
   'autoReset': '自动重置', 'autoResetEveryDay': '每天',
   'autoResetNone': '不重置',
   'sectionGoal': '目标',
   'goalAchieveAll': '全部完成', 'goalCertainAmount': '达到一定数量',
   'dailyGoal': '每日目标', 'recordPerTap': '每次点击记录',
+  'recordManual': '手动记录', 'recordManualInfo': '每次勾选该习惯时输入数量', 'recordAmountPrompt': '数量（{unit}）', 'showEventsInToday': '在“今天”中显示事件', 'includeInTodayCount': '计入“今天”的计数',
   'unitName': '单位', 'unitEgGlass': '例如：杯',
   'noRoutinesToday': '今天没有习惯', 'noRoutinesYet': '还没有习惯',
   'tapPlusFirstAdd': '点击 + 添加第一个习惯',
@@ -2130,6 +2331,7 @@ const Map<String, String> _ja = {
   'confirm': '確認', 'insert': '挿入', 'move': '移動',
   'putBack': '戻す', 'clear': 'クリア', 'untitled': '無題',
   'tabTasks': 'タスク', 'tabNotes': 'ノート', 'tabCalendar': 'カレンダー',
+  'calendarView': '表示', 'calendarViewMonths': '月別', 'calendarViewContinuous': '連続',
   'tabRoutines': '習慣', 'tabSettings': '設定',
   'inbox': '受信箱', 'today': '今日', 'yesterday': '昨日', 'tomorrow': '明日', 'upcoming': '今後',
   'allTasks': 'すべてのタスク',
@@ -2141,6 +2343,9 @@ const Map<String, String> _ja = {
   'sectionSmartLists': 'スマートリスト', 'sectionCustomization': 'カスタマイズ',
   'tabBar': 'タブバー', 'sectionLanguage': '言語', 'language': '言語', 'font': 'フォント', 'searchFonts': 'フォントを検索', 'systemFont': 'システム', 'fontOfflineWarning': 'オフライン — キャッシュ済みフォントのみ', 'editPreviewText': 'プレビューテキストを編集', 'previewText': 'プレビューテキスト',
   'sectionData': 'データ',
+  'sectionAbout': 'アプリについて', 'legal': '法的情報',
+  'privacyPolicy': 'プライバシーポリシー', 'termsOfService': '利用規約',
+  'version': 'バージョン',
   'exportBackup': 'バックアップを書き出す', 'importBackup': 'バックアップを読み込む',
   'exportBackupSublabel': 'Planom (.planom) · 完全復元',
   'importBackupSublabel': 'Planom (.planom) · 全データを置換',
@@ -2161,6 +2366,7 @@ const Map<String, String> _ja = {
   'exportFailedBody': 'バックアップの作成中にエラーが発生しました。',
   'newSpace': '新規スペース', 'spaceName': 'スペース名', 'spaces': 'スペース',
   'noOptionsYet': 'まだ設定はありません。', 'sectionModules': 'モジュール',
+  'appBadgeIncludeRoutines': '今日のルーティンを含める', 'showRoutinesInToday': '「今日」にルーティンを表示', 'showRoutinesInCalendar': 'カレンダーにルーティンを表示', 'showRoutinesHint': '今日のルーティンは、タスク → 今日 とカレンダーの日表示に折りたたみ可能なセクションとして表示されます。', 'sectionShowRoutines': 'ルーティンの表示先',
   'sectionTaskFields': 'タスク項目',
   'taskFieldsHint': '非表示の項目はタスク編集時に表示されません。',
   'sectionBody': '本文', 'useMarkdown': 'Markdown でフォーマット',
@@ -2176,6 +2382,9 @@ const Map<String, String> _ja = {
   'sortByCreation': '作成日順', 'sortByName': '名前順',
   'sortByPriority': '優先度順', 'sortByDateTime': '日時順',
   'addToCalendar': 'カレンダーに追加', 'taskOption': 'タスク', 'eventOption': 'イベント',
+  'calendarAllowCreatingTasks': 'タスクの作成を許可',
+  'calendarAllowCreatingEvents': 'イベントの作成を許可',
+  'calendarDefaultContainer': '新しいイベントの既定の場所',
   'noTasks': 'タスクなし', 'noTasksForToday': '今日のタスクなし',
   'noUpcomingTasks': '今後のタスクなし',
   'noCompletedTasks': '完了したタスクなし',
@@ -2219,6 +2428,7 @@ const Map<String, String> _ja = {
   'birthDate': '生年月日', 'includeYear': '年を含める',
   'completable': 'チェックボックスを表示', 'thisYear': '今年',
   'nextYear': '来年', 'addSection': 'セクションを追加',
+  'viewLabel': '表示', 'viewAsList': 'リスト表示', 'viewAsKanban': 'カンバン表示', 'noSectionTitle': 'セクションなし',
   'sectionName': 'セクション名', 'sectionCompleted': '完了',
   'turns': '歳',
   'selectColor': '色を選択', 'otherDots': 'その他…',
@@ -2228,13 +2438,15 @@ const Map<String, String> _ja = {
   'folder': 'フォルダ', 'list': 'リスト',
   'newRoutine': '新しい習慣', 'editRoutine': '習慣を編集',
   'sectionFrequency': '頻度',
-  'freqDaily': '毎日', 'freqDaysAfter': '完了から X 日後',
+  'freqDaily': '毎日', 'freqSpecificDays': '特定の曜日', 'freqDaysAfter': '完了から X 日後',
+  'freqInterval': '間隔', 'startDate': '開始日', 'routineIntervalEvery': '毎', 'routineIntervalDays': '{n} 日', 'waitForCompletion': '完了を待つ', 'waitForCompletionInfo': 'これを完了してから次回を予定します。逃した日は期限切れのまま残ります。', 'addReminder': 'リマインダーを追加', 'reminderTypeTime': '指定時刻', 'reminderTypeSpread': '一日に分散', 'reminderTypeAfterEach': '各回のあと', 'reminderEveryLabel': '毎', 'reminderAfterEachLabel': '各回のあと', 'recordOnOriginalDate': '元の日に記録', 'completeTodayShift': '今日完了（次回をずらす）', 'overdueRoutineTitle': '期限切れの習慣', 'overdueRoutineBody': 'いつ行いましたか？', 'overdueLabel': '期限切れ',
   'daysAfterCompletion': '完了からの日数',
   'autoReset': '自動リセット', 'autoResetEveryDay': '毎日',
   'autoResetNone': 'リセットしない',
   'sectionGoal': '目標',
   'goalAchieveAll': 'すべて達成', 'goalCertainAmount': '一定量に達する',
   'dailyGoal': '1日の目標', 'recordPerTap': 'タップごとに記録',
+  'recordManual': '手動で記録', 'recordManualInfo': 'このルーティンをチェックするたびに数量を入力', 'recordAmountPrompt': '数量（{unit}）', 'showEventsInToday': '「今日」にイベントを表示', 'includeInTodayCount': '「今日」のカウントに含める',
   'unitName': '単位', 'unitEgGlass': '例: グラス',
   'noRoutinesToday': '今日の習慣はありません', 'noRoutinesYet': 'まだ習慣がありません',
   'tapPlusFirstAdd': '＋ をタップして最初の習慣を追加',

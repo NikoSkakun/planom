@@ -6,14 +6,13 @@ import '../integrations/google/google_calendar_controller.dart';
 import '../localization/strings.dart';
 import '../security/security_service.dart';
 import '../spaces/space_manager.dart';
-import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
+import 'about_legal_view.dart';
 import 'appearance_view.dart';
 import 'backup_service.dart';
 import 'data_view.dart';
-import 'font_picker_view.dart';
 import 'google_calendar_settings_view.dart';
 import 'module_settings_views.dart';
 import 'notifications_view.dart';
@@ -60,14 +59,6 @@ class _SettingsViewState extends State<SettingsView> {
     if (selected != null) {
       widget.controller.updateLocale(Locale(selected));
     }
-  }
-
-  void _openFontPicker(BuildContext context) {
-    Navigator.of(context).push(
-      FastRoute<void>(
-        builder: (_) => FontPickerView(controller: widget.controller),
-      ),
-    );
   }
 
   @override
@@ -142,21 +133,6 @@ class _SettingsViewState extends State<SettingsView> {
                 );
               },
             ),
-            const SizedBox(height: 1),
-            ListenableBuilder(
-              listenable: widget.controller,
-              builder: (ctx, _) {
-                final key = widget.controller.fontKey;
-                return _NavRow(
-                  label: s.font,
-                  icon: CupertinoIcons.textformat,
-                  trailingLabel: key == kSystemFontKey
-                      ? s.systemFont
-                      : fontDisplayName(key),
-                  onTap: () => _openFontPicker(context),
-                );
-              },
-            ),
 
             // ── Modules ─────────────────────────────────────────────────
             const SizedBox(height: 18),
@@ -198,7 +174,10 @@ class _SettingsViewState extends State<SettingsView> {
               icon: CupertinoIcons.calendar,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
-                  builder: (_) => const CalendarSettingsView(),
+                  builder: (_) => CalendarSettingsView(
+                    controller: widget.controller,
+                    googleCalendarController: widget.googleCalendarController,
+                  ),
                 ),
               ),
             ),
@@ -208,7 +187,9 @@ class _SettingsViewState extends State<SettingsView> {
               icon: CupertinoIcons.repeat,
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
-                  builder: (_) => const RoutinesSettingsView(),
+                  builder: (_) => RoutinesSettingsView(
+                    controller: widget.controller,
+                  ),
                 ),
               ),
             ),
@@ -420,6 +401,27 @@ class _SettingsViewState extends State<SettingsView> {
                 ),
               ),
             ],
+
+            // ── About ─────────────────────────────────────────────────
+            const SizedBox(height: 18),
+            Text(
+              s.sectionAbout,
+              style: TextStyle(
+                fontSize: 13,
+                color: labelColor,
+                letterSpacing: -0.08,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _NavRow(
+              label: s.sectionAbout,
+              icon: CupertinoIcons.info_circle,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => const AboutLegalView(),
+                ),
+              ),
+            ),
           ],
         ),
       ),

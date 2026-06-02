@@ -83,6 +83,7 @@ class _HomeShellState extends State<HomeShell> {
   final _navigatorKeys = List.generate(5, (_) => GlobalKey<NavigatorState>());
   late final List<_DepthObserver> _depthObservers;
   final _activeListId = ValueNotifier<String?>(null);
+  final _activeFolderId = ValueNotifier<String?>(null);
   final _activeDueDate = ValueNotifier<DateTime?>(null);
   final _tasksCollapseSignal = ValueNotifier<int>(0);
   final _notesCollapseSignal = ValueNotifier<int>(0);
@@ -146,10 +147,13 @@ class _HomeShellState extends State<HomeShell> {
           if (_lastTabIndex == 1) _showPlusButton.value = false;
         },
       ),
-      // Calendar tab: hide when navigated deeper.
+      // Calendar tab: hide when navigated deeper, and hide entirely when
+      // both task and event creation are disabled.
       _DepthObserver(
         onChanged: (depth, trackedCount) {
-          if (_lastTabIndex == 2) _showPlusButton.value = depth <= 1;
+          if (_lastTabIndex == 2) {
+            _showPlusButton.value = depth <= 1 && _calendarPlusAllowed();
+          }
         },
       ),
       // Routines tab: hide when navigated deeper.
@@ -165,8 +169,11 @@ class _HomeShellState extends State<HomeShell> {
         },
       ),
     ];
-    // Notes (1) and Settings (4) never show the global +.
-    _showPlusButton.value = _lastTabIndex != 1 && _lastTabIndex != 4;
+    // Notes (1) and Settings (4) never show the global +. The Calendar tab
+    // additionally hides + when both creation toggles are off.
+    _showPlusButton.value = _lastTabIndex != 1 &&
+        _lastTabIndex != 4 &&
+        (_lastTabIndex != 2 || _calendarPlusAllowed());
 
     // Wire up Plus-button drag drop callbacks. These run regardless of which
     // tab is currently active because a Draggable receives drops anywhere on
@@ -267,15 +274,37 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _handleDropOnFolder(String folderId) {
-    // Dropping on a folder opens the standard task-creation sheet with no
-    // list pre-filled — the user can still pick a list inside that folder
-    // from the sheet's list picker if they want.
+    // Dropping on a folder pre-fills the new task with the folder's chosen
+    // default list — or, failing that, the first list inside it. The user can
+    // still change the list from the sheet's list picker.
+    final resolved = _resolveFolderDefaultList(folderId);
+    if (resolved != null) {
+      // Route through the list handler so Birthdays lists open the contact
+      // creator instead of the task sheet.
+      _handleDropOnList(resolved);
+      return;
+    }
     showTaskCreationSheet(
       context,
       widget.taskController,
       widget.folderController,
       settingsController: widget.settingsController,
     );
+  }
+
+  /// Resolves the list a new task should land in when created from inside
+  /// [folderId]: the folder's configured `defaultListId` when it still points
+  /// at a list in that folder, otherwise the first list directly inside it.
+  /// Returns null when the folder has no lists (→ Inbox).
+  String? _resolveFolderDefaultList(String folderId) {
+    final lists = widget.folderController.listsIn(folderId);
+    if (lists.isEmpty) return null;
+    final folder = widget.folderController.folderById(folderId);
+    final preferred = folder?.defaultListId;
+    if (preferred != null && lists.any((l) => l.id == preferred)) {
+      return preferred;
+    }
+    return lists.first.id;
   }
 
   void _handleDropOnSection(String listId, String sectionId) {
@@ -336,6 +365,7 @@ class _HomeShellState extends State<HomeShell> {
     widget.settingsController.removeListener(_onSettingsChanged);
     _tabController.dispose();
     _activeListId.dispose();
+    _activeFolderId.dispose();
     _activeDueDate.dispose();
     _tasksCollapseSignal.dispose();
     _notesCollapseSignal.dispose();
@@ -368,6 +398,11 @@ class _HomeShellState extends State<HomeShell> {
 
     if (visibleIndices.contains(_lastTabIndex)) {
       _tabController.index = _visualForBuiltin(_lastTabIndex);
+      // Settings toggles may have flipped Calendar's + button visibility.
+      if (_lastTabIndex == 2) {
+        _showPlusButton.value =
+            _depthObservers[2].depth <= 1 && _calendarPlusAllowed();
+      }
       return;
     }
     // The active tab was just hidden from the tab bar. Fall back to Tasks (or
@@ -433,22 +468,32 @@ class _HomeShellState extends State<HomeShell> {
       return;
     }
 
-    // On Calendar tab with a selected day: choose Task vs Event.
-    if (_lastTabIndex == 2 && _activeDueDate.value != null) {
-      _showCalendarItemPicker(_activeDueDate.value!);
+    // On Calendar tab: tap of + always routes through the calendar item
+    // picker (which gates on the task/event-creation toggles). When no day
+    // is selected, default to today so the new item has a date.
+    if (_lastTabIndex == 2) {
+      final now = DateTime.now();
+      final date = _activeDueDate.value ?? DateTime(now.year, now.month, now.day);
+      _showCalendarItemPicker(date);
       return;
     }
 
-    // When the active list is a Birthdays list, open the contact creator
-    // instead of the standard task sheet.
-    final listId = _activeListId.value;
-    if (listId != null) {
-      final list = widget.folderController.listById(listId);
+    // Resolve the target list: the active list if any, otherwise the active
+    // folder's default (or first) list when we're browsing inside a folder.
+    var initialListId = _activeListId.value;
+    if (initialListId == null && _activeFolderId.value != null) {
+      initialListId = _resolveFolderDefaultList(_activeFolderId.value!);
+    }
+
+    // When the target is a Birthdays list, open the contact creator instead
+    // of the standard task sheet.
+    if (initialListId != null) {
+      final list = widget.folderController.listById(initialListId);
       if (list?.listType == ListType.birthdays) {
         showContactCreationSheet(
           context,
           widget.contactController,
-          listId: listId,
+          listId: initialListId,
         );
         return;
       }
@@ -458,13 +503,37 @@ class _HomeShellState extends State<HomeShell> {
       context,
       widget.taskController,
       widget.folderController,
-      initialListId: _activeListId.value,
+      initialListId: initialListId,
       initialDueDate: _activeDueDate.value,
       settingsController: widget.settingsController,
     );
   }
 
   Future<void> _showCalendarItemPicker(DateTime date) async {
+    final allowTasks = widget.settingsController.calendarAllowCreatingTasks;
+    final allowEvents = widget.settingsController.calendarAllowCreatingEvents;
+    if (!allowTasks && !allowEvents) return;
+
+    if (allowTasks && !allowEvents) {
+      showTaskCreationSheet(
+        context,
+        widget.taskController,
+        widget.folderController,
+        initialDueDate: date,
+        settingsController: widget.settingsController,
+      );
+      return;
+    }
+    if (allowEvents && !allowTasks) {
+      showEventCreationSheet(
+        context,
+        widget.eventController,
+        initialDate: date,
+        googleCalendarController: widget.googleCalendarController,
+      );
+      return;
+    }
+
     final s = S.of(context);
     final choice = await showSelectionMenu<String>(
       context: context,
@@ -531,6 +600,9 @@ class _HomeShellState extends State<HomeShell> {
         _showPlusButton.value = _depthObservers[0].trackedCount == 0;
       case 1:
         _showPlusButton.value = false;
+      case 2:
+        _showPlusButton.value =
+            _depthObservers[2].depth <= 1 && _calendarPlusAllowed();
       case 4:
         _showPlusButton.value = false;
       default:
@@ -539,6 +611,12 @@ class _HomeShellState extends State<HomeShell> {
     _lastTabIndex = tappedIndex;
     widget.settingsController.setLastOpenedTab(tappedIndex);
   }
+
+  /// Whether the floating + button is allowed on the Calendar tab. Off when
+  /// both task and event creation are disabled in Settings → Calendar.
+  bool _calendarPlusAllowed() =>
+      widget.settingsController.calendarAllowCreatingTasks ||
+      widget.settingsController.calendarAllowCreatingEvents;
 
   /// Builtin tab indices appearing in the currently visible page's items,
   /// in display order. Shortcut items don't count toward this — they're
@@ -761,18 +839,9 @@ class _HomeShellState extends State<HomeShell> {
         return BottomNavigationBarItem(
           icon: const Padding(
             padding: EdgeInsets.only(top: 8),
-            child: Icon(CupertinoIcons.gear_alt, size: 24),
+            child: ImageIcon(AssetImage('assets/icons/tab_bar/settings.png')),
           ),
-          activeIcon: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Icon(
-              deselectAll
-                  ? CupertinoIcons.gear_alt
-                  : CupertinoIcons.gear_alt_fill,
-              size: 24,
-              color: deselectAll ? null : AppColors.accent,
-            ),
-          ),
+          activeIcon: activeIcon('assets/icons/tab_bar/settings.png'),
           label: hideLabels ? null : s.tabSettings,
         );
     }
@@ -785,8 +854,10 @@ class _HomeShellState extends State<HomeShell> {
           folderController: widget.folderController,
           contactController: widget.contactController,
           settingsController: widget.settingsController,
+          routineController: widget.routineController,
           activeListId: _activeListId,
           activeDueDate: _activeDueDate,
+          activeFolderId: _activeFolderId,
           collapseSignal: _tasksCollapseSignal,
           backupService: widget.backupService,
           db: SpaceManagerProvider.of(context).db,
@@ -814,6 +885,7 @@ class _HomeShellState extends State<HomeShell> {
           onDaySelected: (d) => _activeDueDate.value = d,
           db: SpaceManagerProvider.of(context).db,
           noteController: widget.noteController,
+          routineController: widget.routineController,
           googleCalendarController: widget.googleCalendarController,
         ),
       3 => RoutinesView(

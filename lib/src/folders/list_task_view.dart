@@ -30,9 +30,17 @@ import '../utils/selection_toolbar.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
+import 'item_description_block.dart';
+import 'kanban_board.dart';
 import 'list_picker_sheet.dart';
 import 'move_to_sheet.dart';
 import 'section_name_sheet.dart';
+
+/// Sentinel column id for the implicit "no section" group in the list Kanban
+/// board (maps to a null sectionId).
+const String _kTopColumnId = '__top__';
+
+enum _ListViewMode { list, kanban }
 
 class ListTaskView extends StatefulWidget {
   const ListTaskView({
@@ -58,6 +66,7 @@ class _ListTaskViewState extends State<ListTaskView>
     with DropdownOverlayMixin {
   late AppList _currentList;
   final _selection = SelectionController();
+  _ListViewMode _viewMode = _ListViewMode.list;
 
   @override
   void initState() {
@@ -79,6 +88,13 @@ class _ListTaskViewState extends State<ListTaskView>
     showDropdown(context, (dismiss) {
       return _ListOptionsDropdown(
         onDismiss: dismiss,
+        isKanban: _viewMode == _ListViewMode.kanban,
+        onView: _currentList.listType == ListType.birthdays
+            ? null
+            : () {
+                dismiss();
+                _pickViewMode();
+              },
         onSelect: _currentList.listType == ListType.birthdays
             ? null
             : () {
@@ -248,6 +264,96 @@ class _ListTaskViewState extends State<ListTaskView>
     ));
   }
 
+  Future<void> _pickViewMode() async {
+    final s = S.of(context);
+    final picked = await showSelectionMenu<_ListViewMode>(
+      context: context,
+      title: s.viewLabel,
+      current: _viewMode,
+      options: [
+        SelectionMenuOption(
+          value: _ListViewMode.list,
+          label: s.viewAsList,
+          icon: CupertinoIcons.list_bullet,
+        ),
+        SelectionMenuOption(
+          value: _ListViewMode.kanban,
+          label: s.viewAsKanban,
+          icon: CupertinoIcons.square_split_2x1,
+        ),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _viewMode = picked);
+  }
+
+  /// Moves a task into the section identified by [toColumnId] when a Kanban
+  /// card is dropped onto another column. The sentinel id maps to the implicit
+  /// "no section" group (null sectionId).
+  void _moveTaskToColumn(String taskId, String toColumnId) {
+    final sectionId = toColumnId == _kTopColumnId ? null : toColumnId;
+    final task = widget.taskController.taskById(taskId);
+    if (task == null || task.sectionId == sectionId) return;
+    widget.taskController.moveTaskToSection(taskId, sectionId);
+  }
+
+  Widget _buildKanbanBody(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        widget.taskController,
+        widget.folderController,
+      ]),
+      builder: (context, _) {
+        final s = S.of(context);
+        final sections =
+            widget.folderController.sectionsForList(_currentList.id);
+        final completed =
+            widget.taskController.completedTasksForList(_currentList.id);
+
+        List<Task> tasksFor(String? sectionId) => [
+              ...widget.taskController
+                  .tasksForListSection(_currentList.id, sectionId),
+              ...completed.where((t) => t.sectionId == sectionId),
+            ];
+
+        final columns = <KanbanColumnData>[
+          KanbanColumnData(
+            id: _kTopColumnId,
+            title: s.noSectionTitle,
+            accentColor: _currentList.color != null
+                ? Color(_currentList.color!)
+                : null,
+            tasks: tasksFor(null),
+          ),
+          for (final section in sections)
+            KanbanColumnData(
+              id: section.id,
+              title: section.name,
+              tasks: tasksFor(section.id),
+            ),
+        ];
+
+        return KanbanBoard(
+          columns: columns,
+          emptyLabel: s.noTasks,
+          onMoveTask: _moveTaskToColumn,
+          onToggleTask: (task) => toggleTaskCompletedWithUndo(
+              context, widget.taskController, task),
+          onTapTask: (task) => Navigator.of(context).push(
+            FastRoute<void>(
+              settings: const RouteSettings(name: TaskDetailView.routeName),
+              builder: (_) => TaskDetailView(
+                task: task,
+                controller: widget.taskController,
+                folderController: widget.folderController,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _openEditSheet() async {
     final result = await showEditItemSheet(
       context,
@@ -258,6 +364,7 @@ class _ListTaskViewState extends State<ListTaskView>
         color: _currentList.color,
         isFolder: false,
         supportsColor: true,
+        description: _currentList.description,
       ),
     );
     if (result == null || !mounted) return;
@@ -269,6 +376,8 @@ class _ListTaskViewState extends State<ListTaskView>
       clearIconColor: result.iconColor == null,
       color: result.color,
       clearColor: result.color == null,
+      description: result.description,
+      clearDescription: result.description == null,
     );
     await widget.folderController.updateList(updated);
     if (mounted) setState(() => _currentList = updated);
@@ -343,18 +452,25 @@ class _ListTaskViewState extends State<ListTaskView>
               bottom: !selecting,
               child: Column(
                 children: [
+                  if (!selecting &&
+                      (_currentList.description ?? '').trim().isNotEmpty)
+                    ItemDescriptionBlock(
+                      description: _currentList.description!.trim(),
+                    ),
                   Expanded(
                     child: _currentList.listType == ListType.birthdays
                         ? ContactListView(
                             listId: _currentList.id,
                             controller: widget.contactController,
                           )
-                        : _SectionedListBody(
-                            list: _currentList,
-                            taskController: widget.taskController,
-                            folderController: widget.folderController,
-                            selection: _selection,
-                          ),
+                        : (_viewMode == _ListViewMode.kanban && !selecting)
+                            ? _buildKanbanBody(context)
+                            : _SectionedListBody(
+                                list: _currentList,
+                                taskController: widget.taskController,
+                                folderController: widget.folderController,
+                                selection: _selection,
+                              ),
                   ),
                   if (selecting)
                     SelectionToolbar(
@@ -972,6 +1088,8 @@ class _ListOptionsDropdown extends StatelessWidget {
     required this.onMoveTo,
     required this.onInfo,
     required this.onDelete,
+    required this.isKanban,
+    this.onView,
     this.onAddSection,
     this.onSelect,
   });
@@ -981,6 +1099,8 @@ class _ListOptionsDropdown extends StatelessWidget {
   final VoidCallback onMoveTo;
   final VoidCallback onInfo;
   final VoidCallback onDelete;
+  final bool isKanban;
+  final VoidCallback? onView;
   final VoidCallback? onAddSection;
   final VoidCallback? onSelect;
 
@@ -999,6 +1119,13 @@ class _ListOptionsDropdown extends StatelessWidget {
           right: 8,
           child: _DropdownPanel(
             items: [
+              if (onView != null)
+                _DropdownItem(
+                    label: S.of(context).viewLabel,
+                    icon: isKanban
+                        ? CupertinoIcons.square_split_2x1
+                        : CupertinoIcons.list_bullet,
+                    onTap: onView!),
               if (onSelect != null)
                 _DropdownItem(
                     label: S.of(context).select,

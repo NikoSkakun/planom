@@ -10,6 +10,8 @@ import '../localization/strings.dart';
 import '../models/contact.dart';
 import '../models/event.dart';
 import '../models/task.dart';
+import '../routines/routine_controller.dart';
+import '../routines/routines_today_section.dart';
 import '../settings/settings_controller.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../tasks/task_controller.dart';
@@ -30,6 +32,7 @@ Future<void> showDayViewSheet(
   required FolderController folderController,
   required ContactController contactController,
   SettingsController? settingsController,
+  RoutineController? routineController,
   GoogleCalendarController? googleCalendarController,
 }) {
   return showModalBottomSheet<void>(
@@ -44,6 +47,7 @@ Future<void> showDayViewSheet(
       folderController: folderController,
       contactController: contactController,
       settingsController: settingsController,
+      routineController: routineController,
       googleCalendarController: googleCalendarController,
     ),
   );
@@ -58,6 +62,7 @@ class DayViewSheet extends StatefulWidget {
     required this.folderController,
     required this.contactController,
     this.settingsController,
+    this.routineController,
     this.googleCalendarController,
   });
 
@@ -67,6 +72,7 @@ class DayViewSheet extends StatefulWidget {
   final FolderController folderController;
   final ContactController contactController;
   final SettingsController? settingsController;
+  final RoutineController? routineController;
   final GoogleCalendarController? googleCalendarController;
 
   @override
@@ -84,6 +90,31 @@ class _DayViewSheetState extends State<DayViewSheet> {
   }
 
   void _showAddPicker(BuildContext context) {
+    final allowTasks =
+        widget.settingsController?.calendarAllowCreatingTasks ?? true;
+    final allowEvents =
+        widget.settingsController?.calendarAllowCreatingEvents ?? true;
+    if (!allowTasks && !allowEvents) return;
+    if (allowTasks && !allowEvents) {
+      showTaskCreationSheet(
+        context,
+        widget.taskController,
+        widget.folderController,
+        initialDueDate: widget.date,
+        settingsController: widget.settingsController,
+      );
+      return;
+    }
+    if (allowEvents && !allowTasks) {
+      showEventCreationSheet(
+        context,
+        widget.eventController,
+        initialDate: widget.date,
+        googleCalendarController: widget.googleCalendarController,
+      );
+      return;
+    }
+
     _pickerEntry?.remove();
     final overlay = Overlay.of(context);
     late OverlayEntry entry;
@@ -252,6 +283,10 @@ class _DayViewSheetState extends State<DayViewSheet> {
                     widget.taskController,
                     widget.eventController,
                     widget.folderController,
+                    if (widget.routineController != null)
+                      widget.routineController!,
+                    if (widget.settingsController != null)
+                      widget.settingsController!,
                     if (widget.googleCalendarController != null)
                       widget.googleCalendarController!,
                   ]),
@@ -261,27 +296,36 @@ class _DayViewSheetState extends State<DayViewSheet> {
               SizedBox(height: mq.padding.bottom + 72),
             ],
           ),
-          // Floating + button — bottom right
-          Positioned(
-            bottom: mq.padding.bottom + 16,
-            right: 20,
-            child: GestureDetector(
-              onTap: () => _showAddPicker(context),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  CupertinoIcons.plus,
-                  color: CupertinoColors.white,
-                  size: 22,
-                ),
+          // Floating + button — bottom right. Hidden when both task and
+          // event creation are disabled in Settings → Calendar.
+          if (widget.settingsController == null)
+            Positioned(
+              bottom: mq.padding.bottom + 16,
+              right: 20,
+              child: _DayViewPlusButton(
+                onTap: () => _showAddPicker(context),
               ),
+            )
+          else
+            ListenableBuilder(
+              listenable: widget.settingsController!,
+              builder: (context, _) {
+                final allowTasks =
+                    widget.settingsController!.calendarAllowCreatingTasks;
+                final allowEvents =
+                    widget.settingsController!.calendarAllowCreatingEvents;
+                if (!allowTasks && !allowEvents) {
+                  return const SizedBox.shrink();
+                }
+                return Positioned(
+                  bottom: mq.padding.bottom + 16,
+                  right: 20,
+                  child: _DayViewPlusButton(
+                    onTap: () => _showAddPicker(context),
+                  ),
+                );
+              },
             ),
-          ),
         ],
       ),
     );
@@ -296,10 +340,17 @@ class _DayViewSheetState extends State<DayViewSheet> {
             ?.eventsForDate(widget.date) ??
         const <RemoteEvent>[];
 
+    final rc = widget.routineController;
+    final showRoutines =
+        (widget.settingsController?.showRoutinesInCalendar ?? false) &&
+            rc != null &&
+            rc.routinesForDate(widget.date).isNotEmpty;
+
     final isEmpty = tasks.isEmpty &&
         events.isEmpty &&
         remoteEvents.isEmpty &&
-        birthdays.isEmpty;
+        birthdays.isEmpty &&
+        !showRoutines;
 
     if (isEmpty) {
       return Center(
@@ -341,6 +392,19 @@ class _DayViewSheetState extends State<DayViewSheet> {
         ],
         ...activeChildren,
         ...pastChildren,
+        if (showRoutines)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            // The section uses 16px horizontal padding internally; offset the
+            // list's 20px padding so it lines up with the day's cards.
+            child: Transform.translate(
+              offset: const Offset(-4, 0),
+              child: RoutinesTodaySection(
+                controller: rc,
+                date: widget.date,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -407,6 +471,34 @@ class _DayViewSheetState extends State<DayViewSheet> {
         const SizedBox(height: 8),
       ],
     ];
+  }
+}
+
+// ─── Floating + button ────────────────────────────────────────────────────────
+
+class _DayViewPlusButton extends StatelessWidget {
+  const _DayViewPlusButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: AppColors.accent,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          CupertinoIcons.plus,
+          color: CupertinoColors.white,
+          size: 22,
+        ),
+      ),
+    );
   }
 }
 

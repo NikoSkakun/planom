@@ -1,46 +1,12 @@
 import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_icon_picker.dart';
+import '../integrations/google/google_calendar_controller.dart';
 import '../localization/strings.dart';
 import '../utils/selection_menu.dart';
 import 'settings_controller.dart';
 import 'settings_widgets.dart';
 import 'smart_list_prefs.dart';
-
-/// Per-tab settings sub-pages reached from Settings → (Notes / Calendar /
-/// Routines). They currently host no settings; the page exists so that
-/// per-tab options have a stable home as features grow.
-class _EmptySettingsView extends StatelessWidget {
-  const _EmptySettingsView({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.of(context);
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        border: null,
-        middle: Text(title),
-      ),
-      child: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              s.noOptionsYet,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 15,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class NotesSettingsView extends StatelessWidget {
   const NotesSettingsView({super.key, required this.controller});
@@ -190,15 +156,168 @@ class NotesSettingsView extends StatelessWidget {
 }
 
 class CalendarSettingsView extends StatelessWidget {
-  const CalendarSettingsView({super.key});
+  const CalendarSettingsView({
+    super.key,
+    required this.controller,
+    this.googleCalendarController,
+  });
+
+  final SettingsController controller;
+  final GoogleCalendarController? googleCalendarController;
+
+  Future<void> _pickDefaultContainer(BuildContext context) async {
+    final gc = googleCalendarController;
+    if (gc == null) return;
+    final s = S.of(context);
+    final writable = gc.writableSelectedCalendars;
+    if (writable.isEmpty) return;
+    final multiAccount = gc.accountCount > 1;
+    final options = <SelectionMenuOption<String>>[
+      SelectionMenuOption(value: _localContainerKey, label: s.planomLocal),
+      for (final cal in writable)
+        SelectionMenuOption(
+          value: cal.key,
+          label: multiAccount ? '${cal.summary} · ${cal.accountId}' : cal.summary,
+        ),
+    ];
+    final pick = await showSelectionMenu<String>(
+      context: context,
+      title: s.calendarDefaultContainer,
+      current: gc.defaultCalendar?.key ?? _localContainerKey,
+      options: options,
+    );
+    if (pick == null) return;
+    if (pick == _localContainerKey) {
+      await gc.clearDefaultCalendar();
+      return;
+    }
+    final match = writable.where((c) => c.key == pick).toList();
+    if (match.isNotEmpty) await gc.setDefaultCalendar(match.first);
+  }
+
+  String _defaultContainerLabel(S s, GoogleCalendarController? gc) {
+    final def = gc?.defaultCalendar;
+    if (def == null) return s.planomLocal;
+    return (gc!.accountCount > 1)
+        ? '${def.summary} · ${def.accountId}'
+        : def.summary;
+  }
+
   @override
-  Widget build(BuildContext context) =>
-      _EmptySettingsView(title: S.of(context).tabCalendar);
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final gc = googleCalendarController;
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        middle: Text(s.tabCalendar),
+      ),
+      child: SafeArea(
+        child: ListenableBuilder(
+          listenable: gc == null
+              ? controller
+              : Listenable.merge([controller, gc]),
+          builder: (context, _) {
+            final hasWritableGoogleCalendars =
+                gc != null && gc.isConnected && gc.writableSelectedCalendars.isNotEmpty;
+            return SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SettingsToggleRow(
+                    label: s.calendarAllowCreatingTasks,
+                    value: controller.calendarAllowCreatingTasks,
+                    onChanged: controller.updateCalendarAllowCreatingTasks,
+                  ),
+                  const SizedBox(height: 1),
+                  SettingsToggleRow(
+                    label: s.calendarAllowCreatingEvents,
+                    value: controller.calendarAllowCreatingEvents,
+                    onChanged: controller.updateCalendarAllowCreatingEvents,
+                  ),
+                  if (hasWritableGoogleCalendars) ...[
+                    const SizedBox(height: 18),
+                    SettingsNavRow(
+                      label: s.calendarDefaultContainer,
+                      trailingLabel: _defaultContainerLabel(s, gc),
+                      onTap: () => _pickDefaultContainer(context),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  SettingsSectionHeader(s.tabRoutines),
+                  SettingsToggleRow(
+                    label: s.showRoutinesInCalendar,
+                    value: controller.showRoutinesInCalendar,
+                    onChanged: controller.updateShowRoutinesInCalendar,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 }
 
+/// Sentinel value for "Planom (Local)" in the default-container picker.
+const String _localContainerKey = '__planom_local__';
+
 class RoutinesSettingsView extends StatelessWidget {
-  const RoutinesSettingsView({super.key});
+  const RoutinesSettingsView({super.key, required this.controller});
+
+  final SettingsController controller;
+
   @override
-  Widget build(BuildContext context) =>
-      _EmptySettingsView(title: S.of(context).tabRoutines);
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        middle: Text(s.tabRoutines),
+      ),
+      child: SafeArea(
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) {
+            return SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SettingsSectionHeader(s.sectionShowRoutines),
+                  SettingsToggleRow(
+                    label: s.showRoutinesInToday,
+                    value: controller.showRoutinesInToday,
+                    onChanged: controller.updateShowRoutinesInToday,
+                  ),
+                  const SizedBox(height: 1),
+                  SettingsToggleRow(
+                    label: s.showRoutinesInCalendar,
+                    value: controller.showRoutinesInCalendar,
+                    onChanged: controller.updateShowRoutinesInCalendar,
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      s.showRoutinesHint,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 }

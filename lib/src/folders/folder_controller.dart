@@ -264,6 +264,7 @@ class FolderController with ChangeNotifier {
       color: orig.color,
       iconId: orig.iconId,
       iconColor: orig.iconColor,
+      description: orig.description,
       listType: orig.listType,
     );
     await _db.restoreList(id);
@@ -287,6 +288,8 @@ class FolderController with ChangeNotifier {
       sortOrder: orig.sortOrder,
       iconId: orig.iconId,
       iconColor: orig.iconColor,
+      description: orig.description,
+      defaultListId: orig.defaultListId,
     );
     await _db.restoreFolder(id);
     if (targetParentId != orig.parentFolderId) {

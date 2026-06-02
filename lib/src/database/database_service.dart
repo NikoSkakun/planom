@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 25;
+  static const _dbVersion = 31;
 
   Database? _db;
 
@@ -88,6 +88,8 @@ class DatabaseService {
             sortOrder INTEGER NOT NULL DEFAULT 0,
             iconId TEXT,
             iconColor INTEGER,
+            description TEXT,
+            defaultListId TEXT,
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER
           )
@@ -102,6 +104,7 @@ class DatabaseService {
             color INTEGER,
             iconId TEXT,
             iconColor INTEGER,
+            description TEXT,
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
             listType TEXT NOT NULL DEFAULT 'tasks'
@@ -143,10 +146,14 @@ class DatabaseService {
             goalAmount INTEGER,
             goalUnit TEXT,
             recordAmount INTEGER,
-            frequencyType TEXT NOT NULL,
+            frequencyType TEXT NOT NULL DEFAULT 'daily',
             weekdays TEXT,
-            daysAfterComplete INTEGER,
-            autoReset TEXT NOT NULL
+            startDate INTEGER,
+            intervalDays INTEGER,
+            waitForCompletion INTEGER NOT NULL DEFAULT 0,
+            reminders TEXT,
+            sortOrder INTEGER NOT NULL DEFAULT 0,
+            manualEntry INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -489,6 +496,76 @@ class DatabaseService {
           await db.execute('DROP TRIGGER IF EXISTS tasks_ad');
           await db.execute('DROP TRIGGER IF EXISTS tasks_au');
           await _createTaskFtsTriggers(db);
+        }
+        if (oldVersion < 26) {
+          // Routines were reimplemented as daily-only with strict per-day
+          // history. The old schedule columns (weekdays, daysAfterComplete)
+          // and the auto-reset / carry-over model are no longer compatible, so
+          // recreate the routine tables clean. Pre-existing routine data is
+          // intentionally discarded (sanctioned by the refactor).
+          await db.execute('DROP TABLE IF EXISTS routine_entries');
+          await db.execute('DROP TABLE IF EXISTS routines');
+          await db.execute('''
+            CREATE TABLE routines (
+              id TEXT PRIMARY KEY,
+              creationDate INTEGER NOT NULL,
+              iconId TEXT NOT NULL,
+              iconColor INTEGER NOT NULL,
+              name TEXT NOT NULL,
+              goalType TEXT NOT NULL,
+              goalAmount INTEGER,
+              goalUnit TEXT,
+              recordAmount INTEGER,
+              frequencyType TEXT NOT NULL DEFAULT 'daily'
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE routine_entries (
+              id TEXT PRIMARY KEY,
+              routineId TEXT NOT NULL,
+              date INTEGER NOT NULL,
+              amount INTEGER NOT NULL DEFAULT 0
+            )
+          ''');
+        }
+        if (oldVersion < 27) {
+          // Re-introduce a weekday schedule: `specific_days` routines store the
+          // selected weekdays (0=Mon … 6=Sun) as a comma-joined string; daily
+          // routines leave it null.
+          await db.execute('ALTER TABLE routines ADD COLUMN weekdays TEXT');
+        }
+        if (oldVersion < 28) {
+          // Routine start date, interval scheduling, and reminders.
+          await db.execute('ALTER TABLE routines ADD COLUMN startDate INTEGER');
+          await db
+              .execute('ALTER TABLE routines ADD COLUMN intervalDays INTEGER');
+          await db.execute(
+              'ALTER TABLE routines ADD COLUMN waitForCompletion INTEGER NOT NULL DEFAULT 0');
+          await db.execute('ALTER TABLE routines ADD COLUMN reminders TEXT');
+        }
+        if (oldVersion < 29) {
+          // Manual routine ordering. Seed sortOrder from the existing
+          // creation-date order so the first reorder doesn't reshuffle.
+          await db.execute(
+              'ALTER TABLE routines ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0');
+          final rows =
+              await db.query('routines', orderBy: 'creationDate ASC');
+          for (var i = 0; i < rows.length; i++) {
+            await db.update('routines', {'sortOrder': i},
+                where: 'id = ?', whereArgs: [rows[i]['id']]);
+          }
+        }
+        if (oldVersion < 30) {
+          // Manual amount entry for certain_amount routines.
+          await db.execute(
+              'ALTER TABLE routines ADD COLUMN manualEntry INTEGER NOT NULL DEFAULT 0');
+        }
+        if (oldVersion < 31) {
+          // Folder/list descriptions + a folder's default list (used when
+          // creating a task from inside the folder via the + button).
+          await db.execute('ALTER TABLE folders ADD COLUMN description TEXT');
+          await db.execute('ALTER TABLE folders ADD COLUMN defaultListId TEXT');
+          await db.execute('ALTER TABLE app_lists ADD COLUMN description TEXT');
         }
       },
     );
@@ -857,8 +934,19 @@ class DatabaseService {
   // Routines
   Future<List<Routine>> getRoutines() async {
     final db = await _database;
-    final rows = await db.query('routines', orderBy: 'creationDate ASC');
+    final rows = await db.query('routines',
+        orderBy: 'sortOrder ASC, creationDate ASC');
     return rows.map(Routine.fromMap).toList();
+  }
+
+  Future<void> updateRoutineSortOrders(List<Routine> routines) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final r in routines) {
+      batch.update('routines', {'sortOrder': r.sortOrder},
+          where: 'id = ?', whereArgs: [r.id]);
+    }
+    await batch.commit(noResult: true);
   }
 
   Future<void> insertRoutine(Routine routine) async {

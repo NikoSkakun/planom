@@ -1,21 +1,55 @@
 import 'package:uuid/uuid.dart';
 
 import 'item.dart';
+import 'routine_reminder.dart';
 
+/// A habit tracked per calendar day. Each day is recorded independently via
+/// [RoutineEntry] rows, so history is preserved and the routine "resets"
+/// automatically every day (no entry for a day = not done that day).
+///
+/// Schedule types ([frequencyType]):
+/// - `'daily'`         — appears every day.
+/// - `'specific_days'` — appears only on the weekdays listed in [weekdays]
+///                       (0 = Mon … 6 = Sun); the list always has ≥1 day.
+/// - `'interval'`      — appears every [intervalDays] days from [startDate].
+///                       With [waitForCompletion], the next occurrence is
+///                       anchored to the completion date and a missed occurrence
+///                       carries forward as overdue (shifting future ones).
 class Routine extends AppItem {
   final String name;
-  final int iconColor; // ARGB
+  final int iconColor; // ARGB tint for SF-symbol icons (ignored for photos)
 
   final String goalType; // 'achieve_all' | 'certain_amount'
   final int? goalAmount;
   final String? goalUnit;
   final int? recordAmount;
 
-  final String frequencyType; // 'daily' | 'days_after_complete'
-  final List<int>? weekdays; // 0=Mon … 6=Sun; null means all days
-  final int? daysAfterComplete;
+  final String frequencyType; // 'daily' | 'specific_days' | 'interval'
 
-  final String autoReset; // 'everyday' | 'none'
+  /// Selected weekdays for `specific_days` (0 = Mon … 6 = Sun). Null otherwise.
+  final List<int>? weekdays;
+
+  /// Day the routine starts being active (date-only). Defaults to the creation
+  /// day when null.
+  final DateTime? startDate;
+
+  /// Interval length in days for `interval` routines (≥ 1).
+  final int? intervalDays;
+
+  /// `interval` only: when true, the next occurrence is scheduled relative to
+  /// the completion date rather than on a fixed grid, and a missed occurrence
+  /// stays overdue until completed.
+  final bool waitForCompletion;
+
+  /// Reminders for this routine (see [RoutineReminder]).
+  final List<RoutineReminder> reminders;
+
+  /// Manual display order (ascending). Ties break on creation date.
+  final int sortOrder;
+
+  /// `certain_amount` only: when true, checking the routine prompts the user to
+  /// type the amount completed instead of adding [recordAmount] per tap.
+  final bool manualEntry;
 
   Routine({
     String? id,
@@ -27,10 +61,14 @@ class Routine extends AppItem {
     this.goalAmount,
     this.goalUnit,
     this.recordAmount,
-    required this.frequencyType,
+    this.frequencyType = 'daily',
     this.weekdays,
-    this.daysAfterComplete,
-    required this.autoReset,
+    this.startDate,
+    this.intervalDays,
+    this.waitForCompletion = false,
+    this.reminders = const [],
+    this.sortOrder = 0,
+    this.manualEntry = false,
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -51,9 +89,14 @@ class Routine extends AppItem {
     String? frequencyType,
     List<int>? weekdays,
     bool clearWeekdays = false,
-    int? daysAfterComplete,
-    bool clearDaysAfterComplete = false,
-    String? autoReset,
+    DateTime? startDate,
+    bool clearStartDate = false,
+    int? intervalDays,
+    bool clearIntervalDays = false,
+    bool? waitForCompletion,
+    List<RoutineReminder>? reminders,
+    int? sortOrder,
+    bool? manualEntry,
   }) {
     return Routine(
       id: id,
@@ -68,10 +111,13 @@ class Routine extends AppItem {
           clearRecordAmount ? null : (recordAmount ?? this.recordAmount),
       frequencyType: frequencyType ?? this.frequencyType,
       weekdays: clearWeekdays ? null : (weekdays ?? this.weekdays),
-      daysAfterComplete: clearDaysAfterComplete
-          ? null
-          : (daysAfterComplete ?? this.daysAfterComplete),
-      autoReset: autoReset ?? this.autoReset,
+      startDate: clearStartDate ? null : (startDate ?? this.startDate),
+      intervalDays:
+          clearIntervalDays ? null : (intervalDays ?? this.intervalDays),
+      waitForCompletion: waitForCompletion ?? this.waitForCompletion,
+      reminders: reminders ?? this.reminders,
+      sortOrder: sortOrder ?? this.sortOrder,
+      manualEntry: manualEntry ?? this.manualEntry,
     );
   }
 
@@ -87,8 +133,12 @@ class Routine extends AppItem {
         'recordAmount': recordAmount,
         'frequencyType': frequencyType,
         'weekdays': weekdays?.join(','),
-        'daysAfterComplete': daysAfterComplete,
-        'autoReset': autoReset,
+        'startDate': startDate?.millisecondsSinceEpoch,
+        'intervalDays': intervalDays,
+        'waitForCompletion': waitForCompletion ? 1 : 0,
+        'reminders': RoutineReminder.encode(reminders),
+        'sortOrder': sortOrder,
+        'manualEntry': manualEntry ? 1 : 0,
       };
 
   factory Routine.fromMap(Map<String, dynamic> map) => Routine(
@@ -102,13 +152,20 @@ class Routine extends AppItem {
         goalAmount: map['goalAmount'] as int?,
         goalUnit: map['goalUnit'] as String?,
         recordAmount: map['recordAmount'] as int?,
-        frequencyType: map['frequencyType'] as String,
+        // Tolerate legacy rows / backups where newer fields are absent.
+        frequencyType: (map['frequencyType'] as String?) ?? 'daily',
         weekdays: _parseWeekdays(map['weekdays'] as String?),
-        daysAfterComplete: map['daysAfterComplete'] as int?,
-        autoReset: map['autoReset'] as String,
+        startDate: map['startDate'] == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(map['startDate'] as int),
+        intervalDays: map['intervalDays'] as int?,
+        waitForCompletion: (map['waitForCompletion'] as int? ?? 0) == 1,
+        reminders: RoutineReminder.decode(map['reminders'] as String?),
+        sortOrder: map['sortOrder'] as int? ?? 0,
+        manualEntry: (map['manualEntry'] as int? ?? 0) == 1,
       );
 
-  // Empty strings round-trip as `null` so an empty weekday list does not crash
+  // Empty strings round-trip as `null` so an empty list does not crash
   // `int.parse('')` on the next load.
   static List<int>? _parseWeekdays(String? raw) {
     if (raw == null || raw.isEmpty) return null;

@@ -11,6 +11,7 @@ class AppList {
   final int? color; // ARGB; null = no color
   final String? iconId; // null=default asset; SF-symbol key or absolute file path
   final int? iconColor; // ARGB override for SF-symbol icon; null=use accent
+  final String? description; // optional free-text shown atop the list view
   final bool isDeleted;
   final DateTime? deletedDate;
   final ListType listType;
@@ -24,6 +25,7 @@ class AppList {
     this.color,
     this.iconId,
     this.iconColor,
+    this.description,
     this.isDeleted = false,
     this.deletedDate,
     this.listType = ListType.tasks,
@@ -41,6 +43,8 @@ class AppList {
     bool clearIconId = false,
     int? iconColor,
     bool clearIconColor = false,
+    String? description,
+    bool clearDescription = false,
     bool? isDeleted,
     DateTime? deletedDate,
     bool clearDeletedDate = false,
@@ -55,6 +59,8 @@ class AppList {
         color: clearColor ? null : (color ?? this.color),
         iconId: clearIconId ? null : (iconId ?? this.iconId),
         iconColor: clearIconColor ? null : (iconColor ?? this.iconColor),
+        description:
+            clearDescription ? null : (description ?? this.description),
         isDeleted: isDeleted ?? this.isDeleted,
         deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
         listType: listType ?? this.listType,
@@ -69,6 +75,7 @@ class AppList {
         'color': color,
         'iconId': iconId,
         'iconColor': iconColor,
+        'description': description,
         'isDeleted': isDeleted ? 1 : 0,
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
         'listType': listType.value,
@@ -84,6 +91,7 @@ class AppList {
         color: map['color'] as int?,
         iconId: map['iconId'] as String?,
         iconColor: map['iconColor'] as int?,
+        description: map['description'] as String?,
         isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
         deletedDate: map['deletedDate'] != null
             ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)

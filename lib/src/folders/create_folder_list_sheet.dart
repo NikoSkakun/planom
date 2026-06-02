@@ -39,6 +39,7 @@ class EditItemArgs {
     required this.color,
     required this.isFolder,
     required this.supportsColor,
+    this.description,
   });
 
   final String name;
@@ -47,6 +48,7 @@ class EditItemArgs {
   final int? color;
   final bool isFolder;
   final bool supportsColor;
+  final String? description;
 }
 
 class EditItemResult {
@@ -55,12 +57,14 @@ class EditItemResult {
     required this.iconId,
     required this.iconColor,
     required this.color,
+    this.description,
   });
 
   final String name;
   final String? iconId;
   final int? iconColor;
   final int? color;
+  final String? description;
 }
 
 /// Single sheet that composes Rename + Change Icon + (for lists) Change Color.
@@ -211,6 +215,7 @@ class _CreateSheet extends StatefulWidget {
 class _CreateSheetState extends State<_CreateSheet> {
   late _CreateType _type = widget.initialType;
   final _nameCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
   int? _selectedColor;
   late String? _selectedIconId =
       _type == _CreateType.folder ? AppDefaults.folderIcon : AppDefaults.listIcon;
@@ -236,18 +241,21 @@ class _CreateSheetState extends State<_CreateSheet> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _descCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
+    final desc = _descCtrl.text.trim();
     if (_type == _CreateType.folder) {
       await widget.controller.addFolder(AppFolder(
         name: name,
         parentFolderId: widget.parentFolderId,
         iconId: _selectedIconId,
         iconColor: _selectedIconColor,
+        description: desc.isEmpty ? null : desc,
       ));
     } else {
       await widget.controller.addList(AppList(
@@ -256,6 +264,7 @@ class _CreateSheetState extends State<_CreateSheet> {
         color: _selectedColor,
         iconId: _selectedIconId,
         iconColor: _selectedIconColor,
+        description: desc.isEmpty ? null : desc,
         listType: _listType,
       ));
     }
@@ -404,6 +413,8 @@ class _CreateSheetState extends State<_CreateSheet> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          _DescriptionField(controller: _descCtrl),
           if (_type == _CreateType.list) ...[
             const SizedBox(height: 16),
             _ListTypeButton(
@@ -454,6 +465,7 @@ class _EditItemSheet extends StatefulWidget {
 
 class _EditItemSheetState extends State<_EditItemSheet> {
   late final TextEditingController _nameCtrl;
+  late final TextEditingController _descCtrl;
   late String? _iconId;
   late int? _iconColor;
   late int? _color;
@@ -462,6 +474,7 @@ class _EditItemSheetState extends State<_EditItemSheet> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.args.name);
+    _descCtrl = TextEditingController(text: widget.args.description ?? '');
     _iconId = widget.args.iconId;
     _iconColor = widget.args.iconColor;
     _color = widget.args.color;
@@ -470,17 +483,20 @@ class _EditItemSheetState extends State<_EditItemSheet> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _descCtrl.dispose();
     super.dispose();
   }
 
   void _submit() {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
+    final desc = _descCtrl.text.trim();
     Navigator.of(context, rootNavigator: true).pop(EditItemResult(
       name: name,
       iconId: _iconId,
       iconColor: _iconColor,
       color: _color,
+      description: desc.isEmpty ? null : desc,
     ));
   }
 
@@ -578,6 +594,8 @@ class _EditItemSheetState extends State<_EditItemSheet> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          _DescriptionField(controller: _descCtrl),
           if (widget.args.supportsColor) ...[
             const SizedBox(height: 16),
             _ColorPickerButton(
@@ -606,6 +624,29 @@ class _EditItemSheetState extends State<_EditItemSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DescriptionField extends StatelessWidget {
+  const _DescriptionField({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoTextField(
+      controller: controller,
+      placeholder: S.of(context).descriptionPlaceholder,
+      textCapitalization: TextCapitalization.sentences,
+      minLines: 1,
+      maxLines: 4,
+      style: const TextStyle(fontSize: 15),
+      decoration: BoxDecoration(
+        color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     );
   }
 }

@@ -8,6 +8,8 @@ class AppFolder {
   final int sortOrder;
   final String? iconId; // null=default asset; SF-symbol key or absolute file path
   final int? iconColor; // ARGB override for SF-symbol icon; null=use accent
+  final String? description; // optional free-text shown atop the folder view
+  final String? defaultListId; // list used when creating from this folder's +
   final bool isDeleted;
   final DateTime? deletedDate;
 
@@ -19,6 +21,8 @@ class AppFolder {
     this.sortOrder = 0,
     this.iconId,
     this.iconColor,
+    this.description,
+    this.defaultListId,
     this.isDeleted = false,
     this.deletedDate,
   })  : id = id ?? const Uuid().v4(),
@@ -33,6 +37,10 @@ class AppFolder {
     bool clearIconId = false,
     int? iconColor,
     bool clearIconColor = false,
+    String? description,
+    bool clearDescription = false,
+    String? defaultListId,
+    bool clearDefaultListId = false,
     bool? isDeleted,
     DateTime? deletedDate,
     bool clearDeletedDate = false,
@@ -46,6 +54,10 @@ class AppFolder {
         sortOrder: sortOrder ?? this.sortOrder,
         iconId: clearIconId ? null : (iconId ?? this.iconId),
         iconColor: clearIconColor ? null : (iconColor ?? this.iconColor),
+        description:
+            clearDescription ? null : (description ?? this.description),
+        defaultListId:
+            clearDefaultListId ? null : (defaultListId ?? this.defaultListId),
         isDeleted: isDeleted ?? this.isDeleted,
         deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
       );
@@ -58,6 +70,8 @@ class AppFolder {
         'sortOrder': sortOrder,
         'iconId': iconId,
         'iconColor': iconColor,
+        'description': description,
+        'defaultListId': defaultListId,
         'isDeleted': isDeleted ? 1 : 0,
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
       };
@@ -71,6 +85,8 @@ class AppFolder {
         sortOrder: map['sortOrder'] as int? ?? 0,
         iconId: map['iconId'] as String?,
         iconColor: map['iconColor'] as int?,
+        description: map['description'] as String?,
+        defaultListId: map['defaultListId'] as String?,
         isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
         deletedDate: map['deletedDate'] != null
             ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)

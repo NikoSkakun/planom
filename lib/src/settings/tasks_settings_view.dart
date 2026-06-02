@@ -207,6 +207,36 @@ class TasksSettingsView extends StatelessWidget {
                 ),
 
                 const SizedBox(height: 18),
+                SettingsSectionHeader(s.today),
+                SettingsToggleRow(
+                  label: s.showRoutinesInToday,
+                  value: controller.showRoutinesInToday,
+                  onChanged: controller.updateShowRoutinesInToday,
+                ),
+                if (controller.showRoutinesInToday) ...[
+                  const SizedBox(height: 1),
+                  SettingsToggleRow(
+                    label: s.includeInTodayCount,
+                    value: controller.countRoutinesInToday,
+                    onChanged: controller.updateCountRoutinesInToday,
+                  ),
+                ],
+                const SizedBox(height: 1),
+                SettingsToggleRow(
+                  label: s.showEventsInToday,
+                  value: controller.showEventsInToday,
+                  onChanged: controller.updateShowEventsInToday,
+                ),
+                if (controller.showEventsInToday) ...[
+                  const SizedBox(height: 1),
+                  SettingsToggleRow(
+                    label: s.includeInTodayCount,
+                    value: controller.countEventsInToday,
+                    onChanged: controller.updateCountEventsInToday,
+                  ),
+                ],
+
+                const SizedBox(height: 18),
                 SettingsSectionHeader(s.sectionTaskCounters),
                 SettingsNavRow(
                   label: s.folderCounter,

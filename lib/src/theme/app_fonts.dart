@@ -35,28 +35,38 @@ String fontDisplayName(String key) {
       .join(' ');
 }
 
-TextStyle _applyFont(String key, TextStyle base) {
+TextStyle _applyFont(String key, TextStyle base, {Color? color}) {
+  final styled = color != null ? base.copyWith(color: color) : base;
   final fontFn = GoogleFonts.asMap()[key];
-  if (fontFn != null) return fontFn(textStyle: base);
-  return base;
+  if (fontFn != null) return fontFn(textStyle: styled);
+  return styled;
 }
 
 /// Builds a [CupertinoTextThemeData] with [fontKey] applied to every text
 /// role used by Cupertino (body text, nav titles, action buttons, picker
 /// labels, etc.).
-CupertinoTextThemeData buildCupertinoTextTheme(String fontKey) {
+///
+/// When [color] is non-null it overrides the primary text color for the
+/// reading roles (body, nav titles, picker text). Action / nav-action roles
+/// keep their accent tint so buttons stay recognisable. [color] may be a
+/// [CupertinoDynamicColor] so it resolves per brightness.
+CupertinoTextThemeData buildCupertinoTextTheme(String fontKey, {Color? color}) {
   const defaults = CupertinoTextThemeData();
-  if (fontKey == kSystemFontKey) return defaults;
+  final useFont = fontKey != kSystemFontKey;
+  if (!useFont && color == null) return defaults;
+
+  TextStyle role(TextStyle base, {bool tinted = false}) =>
+      _applyFont(useFont ? fontKey : kSystemFontKey, base,
+          color: tinted ? null : color);
+
   return CupertinoTextThemeData(
-    textStyle: _applyFont(fontKey, defaults.textStyle),
-    actionTextStyle: _applyFont(fontKey, defaults.actionTextStyle),
-    tabLabelTextStyle: _applyFont(fontKey, defaults.tabLabelTextStyle),
-    navTitleTextStyle: _applyFont(fontKey, defaults.navTitleTextStyle),
-    navLargeTitleTextStyle:
-        _applyFont(fontKey, defaults.navLargeTitleTextStyle),
-    navActionTextStyle: _applyFont(fontKey, defaults.navActionTextStyle),
-    pickerTextStyle: _applyFont(fontKey, defaults.pickerTextStyle),
-    dateTimePickerTextStyle:
-        _applyFont(fontKey, defaults.dateTimePickerTextStyle),
+    textStyle: role(defaults.textStyle),
+    actionTextStyle: role(defaults.actionTextStyle, tinted: true),
+    tabLabelTextStyle: role(defaults.tabLabelTextStyle, tinted: true),
+    navTitleTextStyle: role(defaults.navTitleTextStyle),
+    navLargeTitleTextStyle: role(defaults.navLargeTitleTextStyle),
+    navActionTextStyle: role(defaults.navActionTextStyle, tinted: true),
+    pickerTextStyle: role(defaults.pickerTextStyle),
+    dateTimePickerTextStyle: role(defaults.dateTimePickerTextStyle),
   );
 }

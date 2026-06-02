@@ -19,7 +19,7 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 ## Tech stack
 
 - **Framework**: Flutter / Dart, Cupertino (iOS-native) widgets throughout — no Material widgets in UI except `showModalBottomSheet` (which requires `GlobalMaterialLocalizations.delegate` already registered)
-- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **25**. FTS5 virtual tables for search.
+- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **31**. FTS5 virtual tables for search.
 - **Multi-space**: `SpaceManager` (`lib/src/spaces/`) owns a list of `Space`s and swaps the active space's controllers; the default space shares the global `planom.db` handle.
 - **App lock**: `SecurityService` (`lib/src/security/`) — optional PIN (4–8 digit) / custom password + optional biometric (Face ID, Touch ID, Windows Hello via `local_auth`); salted + key-stretched PBKDF2/HMAC-SHA256 hash in `app_settings` (`auth_*` keys), excluded from backups.
 - **Local notifications**: `NotificationService` (`lib/src/notifications/`) — `flutter_local_notifications` + `timezone`; per-task / per-event reminder scheduling via slot-based IDs. iOS + macOS only today.
@@ -30,7 +30,7 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 - **State**: Flutter `ChangeNotifier` — no third-party state library.
 - **Routing**: `FastRoute` (custom `CupertinoPageRoute` subclass with 180 ms transition, in `lib/src/utils/fast_route.dart`) used everywhere instead of bare `CupertinoPageRoute`.
 - **Icons**: `cupertino_icons`; custom PNG tab-bar icons in `assets/icons/tab_bar/` (Tasks/Notes/Calendar/Routines use PNGs; Settings uses `CupertinoIcons.gear_alt` / `gear_alt_fill`); list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`.
-- **App badge**: `flutter_app_badger ^1.5.0` (discontinued but functional) — set by `TaskController._updateBadge()` to `todayUncompletedCount`. Gated to mobile via `PlatformCapabilities.supportsAppBadge`.
+- **App badge**: `flutter_app_badger ^1.5.0` (discontinued but functional) — set by `TaskController._updateBadge()` per the selected `BadgeMode`; when `SettingsController.badgeIncludeRoutines` is on, today's uncompleted routines are added (via an injected count getter). Gated to mobile via `PlatformCapabilities.supportsAppBadge`.
 - **Backup / share**: `share_plus` (iOS/Android/macOS share sheet) for `.planom` files; `file_picker` for document picker import. `pdf` for note PDF export. `image_picker` (mobile) + `file_picker` (desktop) for custom-icon photo selection.
 - **Markdown**: `flutter_markdown` for note rendering; custom inline-markdown stripper used in note-row previews.
 - **Fonts**: `google_fonts` — full ~1500-font catalogue exposed via the in-app Font Picker; cached at `<appSupport>/google_fonts/` automatically.
@@ -80,21 +80,44 @@ Task extends AppItem (lib/src/models/task.dart)
   recurrence?                        ← JSON-encoded Recurrence rule
 
 Routine extends AppItem (lib/src/models/routine.dart)
-  name, iconColor (ARGB; iconId is the SF-symbol key)
+  name, iconColor (ARGB; iconId is an SF-symbol key OR a custom photo path
+                   — `icons/…`, same storage as folders/lists)
   goalType ('achieve_all' | 'certain_amount')
   goalAmount?, goalUnit?, recordAmount?   ← certain_amount only
-  frequencyType ('daily' | 'days_after_complete')
-  weekdays?: List<int>               ← 0=Mon … 6=Sun; null = all (daily only)
-  daysAfterComplete?
-  autoReset ('everyday' | 'none')
+  manualEntry: bool                  ← certain_amount: prompt to type the amount
+                                       completed instead of stepping by recordAmount
+  frequencyType ('daily' | 'specific_days' | 'interval')
+  weekdays?: List<int>               ← specific_days only: 0=Mon … 6=Sun, ≥1 day
+  startDate?: DateTime               ← day the routine starts (falls back to
+                                       creationDate when null)
+  intervalDays?: int                 ← interval only: appears every N days
+  waitForCompletion: bool            ← interval only: next occurrence is anchored
+                                       to the completion date; a missed occurrence
+                                       stays overdue and shifts future ones
+  reminders: List<RoutineReminder>   ← per-routine reminders (see below)
+  sortOrder: int                     ← manual display order (drag-reorder)
+
+RoutineReminder (lib/src/models/routine_reminder.dart)  ← NOT an AppItem
+  type ('time' | 'spread' | 'afterEach'), value (minute-of-day or delay mins),
+       interval? (spread: minutes between reminders)
+  time      = fixed clock time, fires once per active day
+  spread    = amount goals: from `value`, one reminder every `interval` mins,
+              one per planned iteration through the day
+  afterEach = amount goals: `value` mins after each logged unit (scheduled
+              reactively in RoutineController.recordProgress)
+  JSON-encoded into Routine.reminders
 
 AppFolder (lib/src/models/app_folder.dart)
   name, parentFolderId?, sortOrder, iconId?, iconColor? (ARGB override)
+  description?                        ← shown atop the inside-folder view
+  defaultListId?                     ← list used when creating from this
+                                       folder's + button (null → first list)
   isDeleted, deletedDate?
 
 AppList (lib/src/models/app_list.dart)
   name, folderId?, sortOrder
   color? (ARGB accent), iconId?, iconColor? (ARGB override)
+  description?                        ← shown atop the inside-list view
   listType: ListType                 ← 'tasks' | 'birthdays' | 'shopping'
   isDeleted, deletedDate?
 
@@ -138,7 +161,7 @@ RemoteEvent (lib/src/integrations/google/remote_event.dart) ← in-memory only,
   calendarColor, htmlLink, etag, isReadOnly, recurringEventId)
 ```
 
-`Task.copyWith` accepts clear-flags (`clearDueDate`, `clearDoTime`, `clearDuration`, `clearListId`, `clearDeletedDate`, `clearCompletionDate`, `clearParentTaskId`, `clearRecurrence`, `clearSectionId`). `AppFolder` / `AppList` / `Contact` / `Event` / `Note` follow the same pattern. Item spacing: task rows use `vertical: 7` padding; list/folder rows use `vertical: 9`.
+`Task.copyWith` accepts clear-flags (`clearNote`, `clearDueDate`, `clearDoTime`, `clearDuration`, `clearListId`, `clearDeletedDate`, `clearCompletionDate`, `clearParentTaskId`, `clearRecurrence`, `clearSectionId`). `AppFolder` / `AppList` / `Contact` / `Event` / `Note` follow the same pattern. Item spacing: task rows use `vertical: 7` padding; list/folder rows use `vertical: 9`.
 
 ### Soft-delete pattern
 
@@ -162,17 +185,18 @@ Permanent deletion (from Trash) hard-deletes the row:
 
 ### Custom icon storage (`lib/src/folders/folder_icon_picker.dart`)
 
-Custom photo icons for folders and lists are stored as **relative paths** (`icons/<timestamp>.<ext>`) under the app's documents directory. Critical for iOS — absolute paths break after every reinstall because the container UUID changes.
+Custom photo icons for folders, lists, and routines are stored as **relative paths** (`icons/<timestamp>.<ext>`) under the app's documents directory. Critical for iOS — absolute paths break after every reinstall because the container UUID changes. (Routines reuse this storage; `RoutineCircleIcon` resolves the same `icons/…` paths.)
 
 - `initFolderIconService()` — called once in `main.dart` before `runApp`; caches `getApplicationDocumentsDirectory()` so path resolution is synchronous during widget builds.
 - `isCustomIconId(iconId)` — `true` for relative paths (`icons/…`) and legacy absolute paths (`/…`).
+- Folder/list icons may also be an **emoji / unicode character**, stored as `emoji:<char>` (`isEmojiIconId` / `emojiFromIconId`). `buildFolderItemIcon` renders these as centered text; they carry no color tint. The icon picker exposes a text field to set one.
 - `resolveCustomIconPath(iconId)` — runtime absolute path; handles new relative + legacy absolute (graceful fallback).
 - `buildFolderItemIcon(iconId, isFolder)` — synchronous widget builder; falls back to the default PNG on error.
 - Backups inline icon bytes as base64 in a top-level `customIcons` map keyed by relative path; on import they're written back to `<docsDir>/icons/`.
 
 ### Database (`lib/src/database/database_service.dart`)
 
-Single `DatabaseService` class, lazy-opens its DB file (`dbName`, default `planom.db`) via sqflite. Current version: **25**. One `DatabaseService` instance per file — never open the same file with two handles (the default space reuses the global handle; see Spaces).
+Single `DatabaseService` class, lazy-opens its DB file (`dbName`, default `planom.db`) via sqflite. Current version: **31**. One `DatabaseService` instance per file — never open the same file with two handles (the default space reuses the global handle; see Spaces).
 
 Migration history:
 | Version | Changes |
@@ -201,6 +225,12 @@ Migration history:
 | v23 | `app_lists.listType TEXT NOT NULL DEFAULT 'tasks'` |
 | v24 | Birthday columns added to `tasks` (transitional); `tasks.sectionId TEXT`; `list_sections` table |
 | v25 | Migrates birthday rows out of `tasks` into a new `contacts` table; recreates `tasks` without birthday columns (SQLite < 3.35 can't drop columns); re-creates `tasks_*` FTS triggers after the rename |
+| v26 | Routines refactor: drops + recreates `routines` (now `daysAfterComplete` / `autoReset`-free; `frequencyType` defaults `'daily'`) and `routine_entries` clean. Old routine data is intentionally discarded (sanctioned by the refactor). Legacy backups still import — `BackupService` normalises routine rows through `Routine.fromMap`/`toMap` to drop the removed columns |
+| v27 | `routines.weekdays TEXT` — re-introduces a weekday schedule: `specific_days` routines store selected weekdays (0=Mon … 6=Sun) as a comma-joined string; `daily` leaves it null |
+| v28 | `routines.startDate INTEGER`, `routines.intervalDays INTEGER`, `routines.waitForCompletion INTEGER NOT NULL DEFAULT 0`, `routines.reminders TEXT` — start date, `interval` ("every N days") scheduling with optional wait-for-completion, and per-routine reminders (JSON) |
+| v29 | `routines.sortOrder INTEGER NOT NULL DEFAULT 0` — manual routine ordering (drag-reorder); seeded from the existing creation-date order on upgrade |
+| v30 | `routines.manualEntry INTEGER NOT NULL DEFAULT 0` — `certain_amount` routines where checking prompts for a typed amount instead of stepping by `recordAmount` |
+| v31 | `folders.description TEXT`, `folders.defaultListId TEXT`, `app_lists.description TEXT` — folder/list descriptions (shown atop the inside views) + a folder's default list used when creating a task from inside it (+ button / Plus drop) |
 
 When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 
@@ -213,8 +243,12 @@ When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 - `last_tab` — last logical tab opened (persisted for `default_tab = last`)
 - `accent_color`, `completion_color` — ARGB int as decimal string
 - `font` — Google Fonts camelCase key or `'__system__'`
+- `appearance_prefs` — JSON `AppearancePrefs` (`lib/src/theme/appearance_prefs.dart`): per light/dark theme background override (default / solid color / user image / time-of-day dynamic gradient) + font-color override (default / solid / dynamic) + auto-contrast-to-background toggle. Applied in `app.dart` through the CupertinoApp theme (`scaffoldBackgroundColor` + `textTheme` color) for solid/dynamic, and an `AppBackground` painter (`lib/src/theme/app_background.dart`) for images; dynamic colors refresh on a per-minute timer in `_MyAppState`. Background images are stored under `<docs>/backgrounds/` (relative path, like custom icons). Edited via Settings → Appearance → Background / Text Color (`appearance_custom_view.dart` + `dynamic_color_editor.dart`); the Font picker also now lives under Appearance
 - `locale` — BCP-47 language code (`en`, `uk`, `es`, `fr`, `de`, `it`, `pt`, `ru`, `zh`, `ja`)
 - `task_field_prefs` — JSON-serialised `TaskFieldPrefs`
+- `badge_mode`, `badge_include_routines` — app-icon-badge mode + whether today's uncompleted routines are added. `badge_mode = custom` counts a user-chosen combination of smart lists / lists / folders stored in `badge_custom_sources` (comma-joined `BadgeSource` tokens: `smart:<key>` / `list:<id>` / `folder:<id>`); de-duplicated by task id in `TaskController._customBadgeCount`. Edited via Settings → Notifications → Badge sources (`badge_sources_view.dart`)
+- `show_routines_in_today`, `show_routines_in_calendar` — surface today's routines in Tasks → Today / the Calendar day view
+- `count_routines_in_today`, `show_events_in_today`, `count_events_in_today` — fold today's routines into the Today count badge; show today's events as a Today section + optionally fold them into the Today count
 - `auth_type`, `auth_hash`, `auth_salt`, `auth_biometric` — passcode + biometric flag (owned by `SecurityService.authSettingKeys`; **excluded from backup export and never overwritten on import**)
 - `gcal_email`, `gcal_selected_calendar_ids` (JSON list), `gcal_default_calendar_id`, `gcal_last_sync_at`, `gcal_synctoken_<calendarId>` — Google Calendar state (owned by `GoogleCalendarController`; **excluded from backups** via `isReservedKey`)
 - `sync_backend` — selected `SyncBackend` (owned by `SyncController`)
@@ -266,10 +300,13 @@ Every controller is a `ChangeNotifier`. They're constructed in `main.dart` (glob
 - Date math: Feb 29 births fall back to Feb 28 in non-leap years (`_safeDate`).
 
 **`RoutineController`** (`lib/src/routines/routine_controller.dart`)
-- `todayRoutines` filters by schedule: `daily` checks weekday membership; `days_after_complete` shows when `today >= lastCompletionDate + gap`.
-- `recordProgress(routine)` toggles `achieve_all` (0↔1) and increments `certain_amount` by `recordAmount`; creates today's entry if absent.
-- `autoReset='none'`: for `achieve_all` shows as done if any historical completion exists (until toggled off today); for `certain_amount` carries over the last entry's amount as today's starting value.
-- Weekdays stored as `List<int>` (0=Mon … 6=Sun); Dart's `DateTime.weekday` is 1=Mon, so always `- 1` when comparing.
+- **Per-day history.** Each calendar day is tracked independently by a `RoutineEntry` row, so a routine auto-resets every day and the full history is preserved (revisit/edit any past day; future days are blocked). All progress queries take an explicit `date`.
+- `routinesForDate(date)` — routines from their `startFloor` (`startDate ?? creationDate`) onward, filtered by schedule: `daily` always, `specific_days` on its weekdays (Dart `weekday - 1` → 0=Mon … 6=Sun), `interval` per the rules below. Day arithmetic uses `_epochDay` (UTC midnight) to stay DST-safe. `todayRoutines` = `routinesForDate(now)`.
+- **Interval scheduling.** Fixed-grid (`waitForCompletion = false`): appears when `(epochDay(day) - epochDay(start)) % intervalDays == 0`. Wait-for-completion: `intervalOccurrences(r)` reconstructs the occurrence sequence from completion history (each completion opens the next occurrence at `completionDate + intervalDays`); the open occurrence shows from its scheduled date **through today** (overdue carry-forward), and `openOccurrenceDate` / `isOverdueOn(r, date)` drive the UI. Completing an overdue occurrence on its original day vs the viewed day is the "record original vs shift" choice (the UI prompts for `achieve_all`).
+- `entryForDate` / `progressForDate` / `isCompletedOnDate(routine, date)` (+ `entryForToday` / `todayProgress` / `isTodayCompleted` convenience wrappers). `goalFor(routine)` = `1` for `achieve_all`, else `goalAmount`.
+- `recordProgress(routine, [date])` — `achieve_all` toggles 0↔1; `certain_amount` adds `recordAmount` and wraps back to 0 once the goal is reached (so a day can be un-completed/corrected). Defaults to today when `date` omitted. Also (re)schedules reminders; `afterEach` reminders are anchored to the tap. `setProgress(routine, date, amount)` writes an absolute amount (used by `manualEntry` routines, where tapping prompts for a typed amount via `showRoutineAmountDialog`).
+- **Reminders.** `reminderFireTimes(r)` computes concrete future fire times for `time` / `spread` reminders across a rolling horizon of active days; `_syncReminders` hands them to `NotificationService.scheduleRoutineReminders`. Called on `load`/`add`/`update`/`recordProgress`; `delete` cancels.
+- **Ordering.** Routines carry a `sortOrder`; `getRoutines()` returns them ordered. `addRoutine` appends (next `sortOrder`); `reorderRoutines(oldIndex, newIndex)` (ReorderableListView semantics) reindexes and persists via `updateRoutineSortOrders`. `todayUncompletedCount` feeds the optional app-badge routine count.
 
 **`EventController`** (`lib/src/calendar/event_controller.dart`)
 - Owns local `_events`; mirrors `TaskController` shape but without subtasks/tags.
@@ -284,7 +321,7 @@ Every controller is a `ChangeNotifier`. They're constructed in `main.dart` (glob
 
 **`BackupService`** (`lib/src/settings/backup_service.dart`)
 - Not a `ChangeNotifier`. Created by `SpaceManager` per active space and passed through `MyApp` → `HomeShell` → `SettingsView`.
-- `buildPayloadJson()` — serialises every table (active + trashed) + custom icon bytes (base64) + `smart_list_prefs`; filters `auth_*` and `gcal_*` keys from `app_settings`. Returns the canonical payload string.
+- `buildPayloadJson()` — serialises every table (active + trashed) + custom icon bytes (base64) + `smart_list_prefs`; filters `auth_*` and `gcal_*` keys from `app_settings`. Folder / list / note-folder / **routine** `iconId`s are run through `_inlineIcons` so custom photos travel with the backup. Returns the canonical payload string.
 - `exportBackup({passphrase?})` — generates the payload, optionally encrypts (`backup_crypto.encryptBackup`), writes a `planom_backup_YYYY-MM-DD.planom` file to temp, and either shares (mobile/macOS) or opens a Save-As dialog (Linux/Windows).
 - `importBackup({passphraseProvider?})` — picks a file, detects encryption via `isEncryptedBackup`, calls the provider if a passphrase is required, then `_applyImportedPayload`.
 - `importPayloadJson(plain)` — sync's entry point (no UI / file picker).
@@ -325,7 +362,7 @@ API: `load`, `isBiometricAvailable` (calls `local_auth`; returns false on macOS/
 
 ### Notifications (`lib/src/notifications/`)
 
-`NotificationService` (singleton) wraps `flutter_local_notifications` + `timezone`. Tasks/events/contacts carry `reminderOffsets` (minutes relative to the due/event/birthday time).
+`NotificationService` (singleton) wraps `flutter_local_notifications` + `timezone`. Tasks/events/contacts carry `reminderOffsets` (minutes relative to the due/event/birthday time). Routines instead carry `RoutineReminder`s (clock times / spreads / after-each delays); `RoutineController` resolves them to absolute fire times and calls `scheduleRoutineReminders(routineId, title, fireTimes)` / `cancelRoutineReminders(routineId)`.
 
 - Slot-based IDs: `_notifSlot(itemId, slotIndex)` over `0.._maxSlots-1` (20). Scheduling and cancellation **both** use the same slot formula — they must stay in sync.
 - `TaskController.toggleCompleted` cancels reminders on complete and reschedules on un-complete; delete cancels. Recurrence-driven advance also reschedules.
@@ -471,12 +508,14 @@ Key state:
 
 | File | Purpose |
 |------|---------|
-| `routine_icons.dart` | `kRoutineIconPresets` — 16 `(iconId, colorARGB)` preset combos; `routineIconData(iconId)` maps string keys to `CupertinoIcons`. |
+| `routine_icons.dart` | `kRoutineIconPresets` — 16 `(iconId, colorARGB)` preset combos; `routineIconData(iconId)` maps string keys to `CupertinoIcons`; `RoutineCircleIcon` renders a circular icon (custom photo clipped to circle, or tinted SF-symbol) with optional `dimmed` / `showCheck`; `RoutineProgressFill` is the animated left-to-right background fill (via `TweenAnimationBuilder`) showing a `certain_amount` routine's partial progress. |
 | `routine_controller.dart` | (see Controllers above) |
-| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; reused for editing (`existing` param). Sections: name+icon, icon preset grid, Frequency (segmented + weekday chips or days-after input + auto-reset), Goal (segmented + amount/unit/record fields). |
-| `routines_view.dart` | Tab root; `todayRoutines` list with `_RoutineRow` items; swipe-to-delete; tap → `recordProgress`; long-press → `showSelectionMenu` (edit / delete). Empty-state prompt. |
+| `routine_amount_dialog.dart` | `showRoutineAmountDialog(...)` — number-entry dialog for `manualEntry` routines. |
+| `routine_creation_view.dart` | Full-screen `CupertinoPageScaffold` pushed on the Routines tab navigator; `showRoutineCreationView()` helper; reused for editing (`existing` param). Sections: name+icon, inline icon picker (preset grid + "choose photo" tile via `pickCustomIcon`), Frequency (segmented `Daily` / `Specific Days` / `Interval`; Specific Days reveals a Mon-first `_WeekdayPicker` that won't let you deselect the last day, Interval reveals an "Every N days" stepper + a "Wait for completion" switch) with a Start Date row, Goal (segmented + amount/unit/record fields; a "Record manually" switch hides per-tap recording when on), Reminders (add `time` / `spread` / `afterEach` reminders via clock/duration pickers; spread + afterEach are amount-goal only). `_SegmentedRow` labels use an explicit dynamic `CupertinoColors.label` (the control inherits the page's fallback-black `DefaultTextStyle` otherwise → invisible in dark mode). |
+| `routines_view.dart` | Tab root with two segments. **Day** segment: a `_DayNavigator` (‹ date ›, future blocked) over the routines for the selected day, with completed routines sunk to the bottom — tap a row to record progress for *that* day (manual-entry prompts for an amount); overdue interval+wait occurrences show a red "Overdue · date" subtitle and tapping prompts (record on original day vs complete now and shift); swipe-to-delete; long-press → edit/delete. **All** segment: a `ReorderableListView` (long-press a row to drag-reorder via `reorderRoutines`) of every routine with a schedule subtitle + goal; tap → edit. Custom photos render via `RoutineCircleIcon`. |
+| `routines_today_section.dart` | `RoutinesTodaySection` — a collapsible "Routines" section listing `routinesForDate(date)` (completed sunk to bottom); tap a row to record progress for that day. Reused by Tasks → Today (between uncompleted and completed tasks) and the Calendar day view, gated by `showRoutinesInToday` / `showRoutinesInCalendar`. |
 
-**Row layout**: 40 px colored circle icon (dimmed + check overlay when `achieve_all` complete) · name (strikethrough when complete) · right-aligned `_ProgressBadge` for `certain_amount`.
+**Row layout**: 40 px circle icon (`RoutineCircleIcon`; dimmed + check overlay when `achieve_all` complete) · name (no strikethrough when complete) · right-aligned `_ProgressBadge` for `certain_amount`, with an animated `RoutineProgressFill` background. Completed routines sort below uncompleted. Row vertical padding is tightened to `8`.
 
 **Unit picker**: `_UnitPickerSheet` offers presets (`ml`, `L`, `oz`, `count`, `minute`, `hour`, `km`, `mi`, `page`, `cup`, `lap`, `step`) plus a free-text "Custom…" option.
 
@@ -566,9 +605,9 @@ Contacts are intentionally **not** indexed for search yet.
 | `appearance_view.dart` | Theme (Light/System/Dark), 12-swatch accent, 7-swatch completion color. |
 | `font_picker_view.dart` | Browses all ~1500 Google Fonts. `CupertinoSearchTextField` filters. Connectivity check (`InternetAddress.lookup('fonts.gstatic.com')`); offline + uncached fonts grayed out. ⋯ → "Edit Preview Text". |
 | `font_cache.dart` | `FontCache` singleton; persists `Set<String>` of seen keys + custom preview text to `<docsDir>/font_cache.json`. |
-| `module_settings_views.dart` | Per-module setting screens (Tasks field visibility, Notes markdown toggle, etc.). |
-| `tasks_settings_view.dart` | Tasks-module screen — toggles for individual `TaskFieldPrefs` fields, folder-count mode, hide-tab-labels, show-add-folder-button. |
-| `notifications_view.dart` | Permission gate + per-feature toggles (badge, reminders). |
+| `module_settings_views.dart` | Per-module setting screens (Notes, Calendar, Routines). Calendar + Routines pages host the `showRoutinesInCalendar` / `showRoutinesInToday` toggles (mirrored across pages since they read/write the same `SettingsController` fields). |
+| `tasks_settings_view.dart` | Tasks-module screen — toggles for individual `TaskFieldPrefs` fields, folder-count mode, hide-tab-labels, show-add-folder-button, and a **Today** section: show routines / events in Today, each with an "include in Today's count" sub-toggle (`showRoutinesInToday` + `countRoutinesInToday`, `showEventsInToday` + `countEventsInToday`). |
+| `notifications_view.dart` | Permission gate + per-feature toggles (badge mode, `badgeIncludeRoutines`, reminders). |
 | `security_view.dart` | PIN/password setup, biometric toggle (gated by `supportsBiometricAuth`), change-password flow. |
 | `sync_settings_view.dart` | Backend picker (iCloud / disabled), passphrase setup, manual "Push now" / "Pull now", last-synced timestamp. |
 | `spaces_view.dart` | Add / rename / delete / switch space; refuses to delete default or last remaining space. |

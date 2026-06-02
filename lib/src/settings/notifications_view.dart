@@ -2,9 +2,12 @@ import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
 import '../notifications/notification_service.dart';
+import '../spaces/space_manager.dart';
 import '../theme/app_theme.dart';
+import '../utils/fast_route.dart';
 import '../utils/platform_capabilities.dart';
 import '../utils/selection_menu.dart';
+import 'badge_sources_view.dart';
 import 'settings_controller.dart';
 import 'settings_widgets.dart';
 
@@ -131,13 +134,36 @@ class _NotificationsSettingsViewState
               const SizedBox(height: 8),
               ListenableBuilder(
                 listenable: widget.settingsController!,
-                builder: (ctx, _) => SettingsNavRow(
-                  label: s.appBadgeMode,
-                  trailingLabel: _badgeModeLabel(
-                      s, widget.settingsController!.badgeMode),
-                  onTap: () => _pickBadgeMode(
-                      ctx, widget.settingsController!),
-                ),
+                builder: (ctx, _) {
+                  final sc = widget.settingsController!;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SettingsNavRow(
+                        label: s.appBadgeMode,
+                        trailingLabel: _badgeModeLabel(s, sc.badgeMode),
+                        onTap: () => _pickBadgeMode(ctx, sc),
+                      ),
+                      if (sc.badgeMode == BadgeMode.custom) ...[
+                        const SizedBox(height: 1),
+                        SettingsNavRow(
+                          label: s.appBadgeSources,
+                          trailingLabel: sc.badgeCustomSources.isEmpty
+                              ? s.defaultListNone
+                              : '${sc.badgeCustomSources.length}',
+                          onTap: () => _openBadgeSources(ctx, sc),
+                        ),
+                      ],
+                      const SizedBox(height: 1),
+                      SettingsToggleRow(
+                        label: s.appBadgeIncludeRoutines,
+                        value: sc.badgeIncludeRoutines,
+                        enabled: sc.badgeMode != BadgeMode.none,
+                        onChanged: sc.updateBadgeIncludeRoutines,
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 6),
               Padding(
@@ -166,7 +192,21 @@ class _NotificationsSettingsViewState
         return s.appBadgeInbox;
       case BadgeMode.allUncompleted:
         return s.appBadgeAllUncompleted;
+      case BadgeMode.custom:
+        return s.appBadgeCustom;
     }
+  }
+
+  void _openBadgeSources(BuildContext context, SettingsController sc) {
+    final folderController = SpaceManagerProvider.of(context).folderController;
+    Navigator.of(context).push(
+      FastRoute<void>(
+        builder: (_) => BadgeSourcesView(
+          settingsController: sc,
+          folderController: folderController,
+        ),
+      ),
+    );
   }
 
   Future<void> _pickBadgeMode(

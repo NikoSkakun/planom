@@ -2,10 +2,16 @@ import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../folders/folder_icon_picker.dart'
+    show pickCustomIcon, isCustomIconId;
 import '../localization/strings.dart';
 import '../models/routine.dart';
+import '../models/routine_reminder.dart';
+import '../tasks/calendar_date_picker.dart'
+    show formatDoTime, formatTaskDateRelative;
 import '../theme/app_theme.dart';
 import '../utils/fast_route.dart';
+import '../utils/selection_menu.dart';
 import 'routine_controller.dart';
 import 'routine_icons.dart';
 
@@ -23,7 +29,6 @@ const _kUnits = [
   'lap',
   'step',
 ];
-
 
 void showRoutineCreationView(
   BuildContext context,
@@ -52,7 +57,6 @@ class RoutineCreationView extends StatefulWidget {
 class _RoutineCreationViewState extends State<RoutineCreationView> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _customUnitCtrl;
-  late final TextEditingController _daysAfterCtrl;
   late final TextEditingController _goalAmountCtrl;
   late final TextEditingController _recordAmountCtrl;
 
@@ -61,12 +65,17 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
   late String _goalType; // 'achieve_all' | 'certain_amount'
   late String _goalUnit;
   late bool _useCustomUnit;
-  late String _frequencyType; // 'daily' | 'days_after_complete'
+  late String _frequencyType; // 'daily' | 'specific_days' | 'interval'
   late List<int> _weekdays; // 0=Mon … 6=Sun
-  late String _autoReset; // 'everyday' | 'none'
+  late DateTime _startDate;
+  late int _intervalDays;
+  late bool _waitForCompletion;
+  late List<RoutineReminder> _reminders;
+  late bool _manualEntry;
 
   bool _nameEmpty = true;
   bool _showIconPicker = false;
+  bool _pickingPhoto = false;
 
   @override
   void initState() {
@@ -75,18 +84,29 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
     _iconId = r?.iconId ?? kRoutineIconPresets[0].$1;
     _iconColor = r?.iconColor ?? kRoutineIconPresets[0].$2;
     _goalType = r?.goalType ?? 'achieve_all';
-    final unit = r?.goalUnit ?? 'ml';
+    // Default measurement unit is "count" for new routines.
+    final unit = r?.goalUnit ?? 'count';
     _useCustomUnit = !_kUnits.contains(unit);
     _goalUnit = _useCustomUnit ? 'count' : unit;
     _frequencyType = r?.frequencyType ?? 'daily';
-    _weekdays = r?.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
-    _autoReset = r?.autoReset ?? 'everyday';
+    // Default to all days selected so switching to "specific days" starts from
+    // a sensible base the user can pare down.
+    _weekdays = (r?.weekdays != null && r!.weekdays!.isNotEmpty)
+        ? List<int>.from(r.weekdays!)
+        : [0, 1, 2, 3, 4, 5, 6];
+    final now = DateTime.now();
+    _startDate = RoutineController.normalizeDate(
+        r?.startDate ?? r?.creationDate ?? now);
+    _intervalDays = (r?.intervalDays != null && r!.intervalDays! >= 1)
+        ? r.intervalDays!
+        : 3;
+    _waitForCompletion = r?.waitForCompletion ?? false;
+    _reminders = List<RoutineReminder>.from(r?.reminders ?? const []);
+    _manualEntry = r?.manualEntry ?? false;
 
     _nameCtrl = TextEditingController(text: r?.name ?? '');
     _customUnitCtrl =
         TextEditingController(text: _useCustomUnit ? unit : '');
-    _daysAfterCtrl = TextEditingController(
-        text: r?.daysAfterComplete?.toString() ?? '1');
     _goalAmountCtrl =
         TextEditingController(text: r?.goalAmount?.toString() ?? '');
     _recordAmountCtrl =
@@ -103,7 +123,6 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
   void dispose() {
     _nameCtrl.dispose();
     _customUnitCtrl.dispose();
-    _daysAfterCtrl.dispose();
     _goalAmountCtrl.dispose();
     _recordAmountCtrl.dispose();
     super.dispose();
@@ -115,13 +134,17 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
 
     final goalAmount = int.tryParse(_goalAmountCtrl.text.trim());
     final recordAmount = int.tryParse(_recordAmountCtrl.text.trim());
-    final daysAfter = int.tryParse(_daysAfterCtrl.text.trim()) ?? 1;
     final unit = _useCustomUnit
         ? _customUnitCtrl.text.trim().isEmpty
             ? 'count'
             : _customUnitCtrl.text.trim()
         : _goalUnit;
 
+    final specificDays = _frequencyType == 'specific_days';
+    final isInterval = _frequencyType == 'interval';
+    final isAmount = _goalType == 'certain_amount';
+    // Manual entry only applies to amount goals; it replaces per-tap recording.
+    final manual = isAmount && _manualEntry;
     final routine = Routine(
       id: widget.existing?.id,
       creationDate: widget.existing?.creationDate,
@@ -129,14 +152,18 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
       name: name,
       iconColor: _iconColor,
       goalType: _goalType,
-      goalAmount: _goalType == 'certain_amount' ? goalAmount : null,
-      goalUnit: _goalType == 'certain_amount' ? unit : null,
-      recordAmount: _goalType == 'certain_amount' ? recordAmount : null,
+      goalAmount: isAmount ? goalAmount : null,
+      goalUnit: isAmount ? unit : null,
+      recordAmount: (isAmount && !manual) ? recordAmount : null,
       frequencyType: _frequencyType,
-      weekdays: _frequencyType == 'daily' ? _weekdays : null,
-      daysAfterComplete:
-          _frequencyType == 'days_after_complete' ? daysAfter : null,
-      autoReset: _autoReset,
+      weekdays: specificDays ? (List<int>.from(_weekdays)..sort()) : null,
+      startDate: _startDate,
+      intervalDays: isInterval ? _intervalDays : null,
+      waitForCompletion: isInterval && _waitForCompletion,
+      reminders: _reminders,
+      manualEntry: manual,
+      // Preserve the manual sort position when editing.
+      sortOrder: widget.existing?.sortOrder ?? 0,
     );
 
     if (widget.existing != null) {
@@ -145,6 +172,18 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
       await widget.controller.addRoutine(routine);
     }
     if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _pickPhoto() async {
+    if (_pickingPhoto) return;
+    setState(() => _pickingPhoto = true);
+    try {
+      final path = await pickCustomIcon();
+      if (!mounted) return;
+      if (path != null) setState(() => _iconId = path);
+    } finally {
+      if (mounted) setState(() => _pickingPhoto = false);
+    }
   }
 
   Future<void> _pickUnit() async {
@@ -172,6 +211,79 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
       return v.isEmpty ? S.of(context).customDots.replaceAll('…', '') : v;
     }
     return _goalUnit;
+  }
+
+  Future<void> _pickStartDate() async {
+    final picked = await _showDatePicker(context, _startDate);
+    if (picked != null && mounted) setState(() => _startDate = picked);
+  }
+
+  String _reminderSummary(BuildContext context, RoutineReminder r) {
+    final s = S.of(context);
+    switch (r.type) {
+      case RoutineReminder.typeSpread:
+        return '${formatDoTime(r.value)} · ${s.reminderEveryLabel} '
+            '${_formatMinutes(r.interval ?? 60)}';
+      case RoutineReminder.typeAfterEach:
+        return '${_formatMinutes(r.value)} · ${s.reminderAfterEachLabel}';
+      case RoutineReminder.typeTime:
+      default:
+        return formatDoTime(r.value);
+    }
+  }
+
+  Future<void> _addReminder() async {
+    final s = S.of(context);
+    final amountGoal = _goalType == 'certain_amount';
+    final choice = await showSelectionMenu<String>(
+      context: context,
+      title: s.addReminder,
+      options: [
+        SelectionMenuOption(
+          value: RoutineReminder.typeTime,
+          label: s.reminderTypeTime,
+          icon: CupertinoIcons.clock,
+        ),
+        if (amountGoal)
+          SelectionMenuOption(
+            value: RoutineReminder.typeSpread,
+            label: s.reminderTypeSpread,
+            icon: CupertinoIcons.arrow_right_arrow_left,
+          ),
+        if (amountGoal)
+          SelectionMenuOption(
+            value: RoutineReminder.typeAfterEach,
+            label: s.reminderTypeAfterEach,
+            icon: CupertinoIcons.arrow_2_circlepath,
+          ),
+      ],
+    );
+    if (choice == null || !mounted) return;
+
+    if (choice == RoutineReminder.typeTime) {
+      final minute = await _showTimeOfDayPicker(context, 9 * 60);
+      if (minute != null && mounted) {
+        _addUniqueReminder(RoutineReminder.time(minute));
+      }
+    } else if (choice == RoutineReminder.typeSpread) {
+      final start = await _showTimeOfDayPicker(context, 9 * 60);
+      if (start == null || !mounted) return;
+      final every = await _showDurationPicker(context, 120);
+      if (every != null && mounted) {
+        _addUniqueReminder(
+            RoutineReminder.spread(startMinute: start, every: every));
+      }
+    } else if (choice == RoutineReminder.typeAfterEach) {
+      final delay = await _showDurationPicker(context, 120);
+      if (delay != null && mounted) {
+        _addUniqueReminder(RoutineReminder.afterEach(delay));
+      }
+    }
+  }
+
+  void _addUniqueReminder(RoutineReminder r) {
+    if (_reminders.contains(r)) return;
+    setState(() => _reminders.add(r));
   }
 
   @override
@@ -228,10 +340,12 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
                     child: _IconPicker(
                       selectedIconId: _iconId,
                       selectedColor: _iconColor,
+                      picking: _pickingPhoto,
                       onChanged: (iconId, color) => setState(() {
                         _iconId = iconId;
                         _iconColor = color;
                       }),
+                      onPickPhoto: _pickPhoto,
                     ),
                   ),
                 ],
@@ -242,28 +356,44 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
             _SectionHeader(s.sectionFrequency),
             _Section(children: [
               _SegmentedRow(
-                options: [s.freqDaily, s.freqDaysAfter],
-                selected: _frequencyType == 'daily' ? 0 : 1,
-                onChanged: (i) => setState(() =>
-                    _frequencyType = i == 0 ? 'daily' : 'days_after_complete'),
+                options: [s.freqDaily, s.freqSpecificDays, s.freqInterval],
+                selected: _frequencyType == 'daily'
+                    ? 0
+                    : _frequencyType == 'specific_days'
+                        ? 1
+                        : 2,
+                onChanged: (i) => setState(() => _frequencyType = i == 0
+                    ? 'daily'
+                    : i == 1
+                        ? 'specific_days'
+                        : 'interval'),
               ),
-              if (_frequencyType == 'daily') ...[
+              if (_frequencyType == 'specific_days') ...[
                 const _Divider(),
                 _WeekdayPicker(
                   selected: _weekdays,
                   onChanged: (days) => setState(() => _weekdays = days),
                 ),
-              ] else ...[
+              ],
+              if (_frequencyType == 'interval') ...[
                 const _Divider(),
-                _DaysAfterRow(controller: _daysAfterCtrl),
+                _IntervalRow(
+                  days: _intervalDays,
+                  onChanged: (v) => setState(() => _intervalDays = v),
+                ),
+                const _Divider(),
+                _SwitchRow(
+                  label: s.waitForCompletion,
+                  sublabel: s.waitForCompletionInfo,
+                  value: _waitForCompletion,
+                  onChanged: (v) => setState(() => _waitForCompletion = v),
+                ),
               ],
               const _Divider(),
-              _SwitchRow(
-                label: s.autoReset,
-                sublabel: _autoReset == 'everyday'
-                    ? s.autoResetEveryDay
-                    : s.autoResetNone,
-                onTap: () => _showAutoResetPicker(),
+              _ValueRow(
+                label: s.startDate,
+                value: formatTaskDateRelative(context, _startDate),
+                onTap: _pickStartDate,
               ),
             ]),
 
@@ -314,19 +444,42 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
                   ),
                 ],
                 const _Divider(),
-                _AmountRow(
-                  label: s.recordPerTap,
-                  controller: _recordAmountCtrl,
-                  trailingWidget: Text(
-                    _unitLabel(context),
-                    style: TextStyle(
-                      fontSize: 15,
-                      color:
-                          CupertinoColors.secondaryLabel.resolveFrom(context),
+                _SwitchRow(
+                  label: s.recordManual,
+                  sublabel: s.recordManualInfo,
+                  value: _manualEntry,
+                  onChanged: (v) => setState(() => _manualEntry = v),
+                ),
+                if (!_manualEntry) ...[
+                  const _Divider(),
+                  _AmountRow(
+                    label: s.recordPerTap,
+                    controller: _recordAmountCtrl,
+                    trailingWidget: Text(
+                      _unitLabel(context),
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
                     ),
                   ),
+                ],
+              ],
+            ]),
+
+            // ── Reminders ─────────────────────────────────────────────────
+            _SectionHeader(s.reminders),
+            _Section(children: [
+              for (int i = 0; i < _reminders.length; i++) ...[
+                if (i > 0) const _Divider(),
+                _ReminderRow(
+                  label: _reminderSummary(context, _reminders[i]),
+                  onDelete: () => setState(() => _reminders.removeAt(i)),
                 ),
               ],
+              if (_reminders.isNotEmpty) const _Divider(),
+              _AddRow(label: s.addReminder, onTap: _addReminder),
             ]),
           ],
         ),
@@ -335,19 +488,6 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
     );
   }
 
-  Future<void> _showAutoResetPicker() async {
-    await showCupertinoDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => _AutoResetPopup(
-        current: _autoReset,
-        onChanged: (v) {
-          setState(() => _autoReset = v);
-          Navigator.of(context, rootNavigator: true).pop();
-        },
-      ),
-    );
-  }
 }
 
 // ── Sub-widgets ──────────────────────────────────────────────────────────────
@@ -427,18 +567,10 @@ class _NameRow extends StatelessWidget {
         children: [
           GestureDetector(
             onTap: onIconTap,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Color(iconColor),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                routineIconData(iconId),
-                color: CupertinoColors.white,
-                size: 18,
-              ),
+            child: RoutineCircleIcon(
+              iconId: iconId,
+              iconColor: iconColor,
+              size: 36,
             ),
           ),
           const SizedBox(width: 12),
@@ -462,45 +594,85 @@ class _IconPicker extends StatelessWidget {
   const _IconPicker({
     required this.selectedIconId,
     required this.selectedColor,
+    required this.picking,
     required this.onChanged,
+    required this.onPickPhoto,
   });
 
   final String selectedIconId;
   final int selectedColor;
+  final bool picking;
   final void Function(String iconId, int color) onChanged;
+  final VoidCallback onPickPhoto;
 
   @override
   Widget build(BuildContext context) {
+    final customSelected = isCustomIconId(selectedIconId);
     return Wrap(
       spacing: 10,
       runSpacing: 10,
-      children: kRoutineIconPresets.map((preset) {
-        final (iconId, color) = preset;
-        final isSelected =
-            iconId == selectedIconId && color == selectedColor;
-        return GestureDetector(
-          onTap: () => onChanged(iconId, color),
+      children: [
+        ...kRoutineIconPresets.map((preset) {
+          final (iconId, color) = preset;
+          final isSelected =
+              !customSelected && iconId == selectedIconId && color == selectedColor;
+          return GestureDetector(
+            onTap: () => onChanged(iconId, color),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Color(color),
+                shape: BoxShape.circle,
+                border: isSelected
+                    ? Border.all(
+                        color: CupertinoColors.label.resolveFrom(context),
+                        width: 3,
+                      )
+                    : null,
+              ),
+              child: Icon(
+                routineIconData(iconId),
+                color: CupertinoColors.white,
+                size: 22,
+              ),
+            ),
+          );
+        }),
+        // Custom-photo tile: shows the chosen photo when selected, otherwise a
+        // dashed "add photo" affordance.
+        GestureDetector(
+          onTap: picking ? null : onPickPhoto,
           child: Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Color(color),
               shape: BoxShape.circle,
-              border: isSelected
+              color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+              border: customSelected
                   ? Border.all(
                       color: CupertinoColors.label.resolveFrom(context),
                       width: 3,
                     )
-                  : null,
+                  : Border.all(
+                      color: CupertinoColors.separator.resolveFrom(context),
+                      width: 1,
+                    ),
             ),
-            child: Icon(
-              routineIconData(iconId),
-              color: CupertinoColors.white,
-              size: 22,
-            ),
+            child: customSelected
+                ? RoutineCircleIcon(
+                    iconId: selectedIconId,
+                    iconColor: selectedColor,
+                    size: 44,
+                  )
+                : Icon(
+                    picking ? CupertinoIcons.hourglass : CupertinoIcons.photo,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                    size: 20,
+                  ),
           ),
-        );
-      }).toList(),
+        ),
+      ],
     );
   }
 }
@@ -526,7 +698,13 @@ class _SegmentedRow extends StatelessWidget {
           for (int i = 0; i < options.length; i++)
             i: Text(
               options[i],
-              style: const TextStyle(fontSize: 13),
+              // Explicit dynamic color: the control inherits the ambient
+              // DefaultTextStyle, which in the page body falls back to black
+              // and is invisible in dark mode.
+              style: TextStyle(
+                fontSize: 13,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
             ),
         },
         onValueChanged: (v) {
@@ -537,6 +715,8 @@ class _SegmentedRow extends StatelessWidget {
   }
 }
 
+// Mon-first weekday toggle row. The currently-selected day can't be the only
+// one removed — at least one day must stay selected.
 class _WeekdayPicker extends StatelessWidget {
   const _WeekdayPicker({required this.selected, required this.onChanged});
 
@@ -557,6 +737,7 @@ class _WeekdayPicker extends StatelessWidget {
             onTap: () {
               final next = List<int>.from(selected);
               if (isOn) {
+                // Never let the user deselect the last remaining day.
                 if (next.length > 1) next.remove(i);
               } else {
                 next.add(i);
@@ -564,10 +745,12 @@ class _WeekdayPicker extends StatelessWidget {
               onChanged(next);
             },
             child: Container(
-              width: 36,
-              height: 36,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: isOn ? accent : CupertinoColors.tertiarySystemFill.resolveFrom(context),
+                color: isOn
+                    ? accent
+                    : CupertinoColors.tertiarySystemFill.resolveFrom(context),
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -585,86 +768,6 @@ class _WeekdayPicker extends StatelessWidget {
             ),
           );
         }),
-      ),
-    );
-  }
-}
-
-class _DaysAfterRow extends StatelessWidget {
-  const _DaysAfterRow({required this.controller});
-  final TextEditingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 60,
-            child: CupertinoTextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 15),
-              decoration: BoxDecoration(
-                color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            S.of(context).daysAfterCompletion,
-            style: TextStyle(
-              fontSize: 15,
-              color: CupertinoColors.label.resolveFrom(context),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SwitchRow extends StatelessWidget {
-  const _SwitchRow({
-    required this.label,
-    required this.sublabel,
-    required this.onTap,
-  });
-
-  final String label;
-  final String sublabel;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        child: Row(
-          children: [
-            Text(label,
-                style: const TextStyle(fontSize: 15)),
-            const Spacer(),
-            Text(
-              sublabel,
-              style: TextStyle(
-                fontSize: 15,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              CupertinoIcons.chevron_right,
-              size: 13,
-              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -744,86 +847,332 @@ class _TextRow extends StatelessWidget {
   }
 }
 
-// ── Auto-reset popup ─────────────────────────────────────────────────────────
+// Stepper row for the interval length ("Every N days").
+class _IntervalRow extends StatelessWidget {
+  const _IntervalRow({required this.days, required this.onChanged});
 
-class _AutoResetPopup extends StatelessWidget {
-  const _AutoResetPopup({required this.current, required this.onChanged});
+  final int days;
+  final void Function(int) onChanged;
 
-  final String current;
-  final void Function(String) onChanged;
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Row(
+        children: [
+          Text(s.routineIntervalEvery, style: const TextStyle(fontSize: 15)),
+          const Spacer(),
+          _StepButton(
+            icon: CupertinoIcons.minus,
+            onTap: days > 1 ? () => onChanged(days - 1) : null,
+          ),
+          SizedBox(
+            width: 64,
+            child: Text(
+              s.routineIntervalDays(days),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+          _StepButton(
+            icon: CupertinoIcons.plus,
+            onTap: days < 365 ? () => onChanged(days + 1) : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: enabled
+              ? AppColors.accent
+              : CupertinoColors.tertiaryLabel.resolveFrom(context),
+        ),
+      ),
+    );
+  }
+}
+
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({
+    required this.label,
+    required this.sublabel,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String sublabel;
+  final bool value;
+  final void Function(bool) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 15)),
+                const SizedBox(height: 2),
+                Text(
+                  sublabel,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          CupertinoSwitch(
+            value: value,
+            activeColor: AppColors.accent,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ValueRow extends StatelessWidget {
+  const _ValueRow({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        child: Row(
+          children: [
+            Text(label, style: const TextStyle(fontSize: 15)),
+            const Spacer(),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 15,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              CupertinoIcons.chevron_right,
+              size: 13,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderRow extends StatelessWidget {
+  const _ReminderRow({required this.label, required this.onDelete});
+
+  final String label;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      child: Row(
+        children: [
+          Icon(CupertinoIcons.bell,
+              size: 17, color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+          const SizedBox(width: 10),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
+          GestureDetector(
+            onTap: onDelete,
+            behavior: HitTestBehavior.opaque,
+            child: Icon(CupertinoIcons.minus_circle_fill,
+                size: 20, color: CupertinoColors.systemRed.resolveFrom(context)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddRow extends StatelessWidget {
+  const _AddRow({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        child: Row(
+          children: [
+            Icon(CupertinoIcons.add_circled, size: 19, color: AppColors.accent),
+            const SizedBox(width: 8),
+            Text(label,
+                style: TextStyle(fontSize: 15, color: AppColors.accent)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Pickers / formatting ─────────────────────────────────────────────────────
+
+String _formatMinutes(int minutes) {
+  if (minutes < 60) return '${minutes}m';
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  return m == 0 ? '${h}h' : '${h}h ${m}m';
+}
+
+Future<DateTime?> _showDatePicker(BuildContext context, DateTime initial) {
+  DateTime selected = initial;
+  return showCupertinoModalPopup<DateTime>(
+    context: context,
+    builder: (ctx) => _PickerScaffold(
+      onCancel: () => Navigator.of(ctx).pop(),
+      onDone: () => Navigator.of(ctx).pop(
+          RoutineController.normalizeDate(selected)),
+      child: CupertinoDatePicker(
+        mode: CupertinoDatePickerMode.date,
+        initialDateTime: initial,
+        onDateTimeChanged: (d) => selected = d,
+      ),
+    ),
+  );
+}
+
+Future<int?> _showTimeOfDayPicker(BuildContext context, int initialMinute) {
+  final base = DateTime(2026, 1, 1, initialMinute ~/ 60, initialMinute % 60);
+  DateTime selected = base;
+  return showCupertinoModalPopup<int>(
+    context: context,
+    builder: (ctx) => _PickerScaffold(
+      onCancel: () => Navigator.of(ctx).pop(),
+      onDone: () =>
+          Navigator.of(ctx).pop(selected.hour * 60 + selected.minute),
+      child: CupertinoDatePicker(
+        mode: CupertinoDatePickerMode.time,
+        initialDateTime: base,
+        use24hFormat: false,
+        onDateTimeChanged: (d) => selected = d,
+      ),
+    ),
+  );
+}
+
+Future<int?> _showDurationPicker(BuildContext context, int initialMinutes) {
+  Duration selected = Duration(minutes: initialMinutes);
+  return showCupertinoModalPopup<int>(
+    context: context,
+    builder: (ctx) => _PickerScaffold(
+      onCancel: () => Navigator.of(ctx).pop(),
+      onDone: () => Navigator.of(ctx)
+          .pop(selected.inMinutes > 0 ? selected.inMinutes : 1),
+      child: CupertinoTimerPicker(
+        mode: CupertinoTimerPickerMode.hm,
+        initialTimerDuration: selected,
+        onTimerDurationChanged: (d) => selected = d,
+      ),
+    ),
+  );
+}
+
+class _PickerScaffold extends StatelessWidget {
+  const _PickerScaffold({
+    required this.child,
+    required this.onCancel,
+    required this.onDone,
+  });
+
+  final Widget child;
+  final VoidCallback onCancel;
+  final VoidCallback onDone;
 
   @override
   Widget build(BuildContext context) {
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
     final sep = CupertinoColors.separator.resolveFrom(context);
-
-    return Center(
-      child: Container(
-        width: 260,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [
-            BoxShadow(color: Color(0x29000000), blurRadius: 24, offset: Offset(0, 8)),
-          ],
-        ),
+    return Container(
+      height: 300,
+      color: bg,
+      child: SafeArea(
+        top: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-              child: Text(
-                S.of(context).autoReset,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: sep, width: 0.5)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  CupertinoButton(
+                    onPressed: onCancel,
+                    child: Text(S.of(context).cancel),
+                  ),
+                  CupertinoButton(
+                    onPressed: onDone,
+                    child: Text(
+                      S.of(context).done,
+                      style: TextStyle(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
               ),
             ),
-            Container(height: 0.5, color: sep),
-            _Option(label: S.of(context).autoResetEveryDay, value: 'everyday', current: current, onChanged: onChanged),
-            Container(height: 0.5, color: sep),
-            _Option(label: S.of(context).autoResetNone, value: 'none', current: current, onChanged: onChanged),
+            Expanded(child: child),
           ],
         ),
       ),
     );
   }
 }
-
-class _Option extends StatelessWidget {
-  const _Option({
-    required this.label,
-    required this.value,
-    required this.current,
-    required this.onChanged,
-  });
-
-  final String label;
-  final String value;
-  final String current;
-  final void Function(String) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = current == value;
-    return GestureDetector(
-      onTap: () => onChanged(value),
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Text(label, style: const TextStyle(fontSize: 15)),
-            const Spacer(),
-            if (selected)
-              Icon(CupertinoIcons.checkmark,
-                  size: 16, color: AppColors.accent),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Unit picker sheet ────────────────────────────────────────────────────────
 
 class _UnitPickerSheet extends StatefulWidget {
   const _UnitPickerSheet({

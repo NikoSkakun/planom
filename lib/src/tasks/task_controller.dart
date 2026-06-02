@@ -39,6 +39,8 @@ class TaskController with ChangeNotifier {
   // the host (SpaceManager / main wiring) via [_eventCountToday].
   SettingsController? _settings;
   int Function()? _eventCountToday;
+  int Function()? _routineCountToday;
+  List<String> Function(String folderId)? _listIdsInFolder;
   VoidCallback? _settingsListener;
 
   /// Wires the data the badge needs from outside the controller. Pass the
@@ -48,12 +50,16 @@ class TaskController with ChangeNotifier {
   void attachBadgeContext({
     SettingsController? settings,
     int Function()? eventCountToday,
+    int Function()? routineCountToday,
+    List<String> Function(String folderId)? listIdsInFolder,
   }) {
     if (_settings != null && _settingsListener != null) {
       _settings!.removeListener(_settingsListener!);
     }
     _settings = settings;
     _eventCountToday = eventCountToday;
+    _routineCountToday = routineCountToday;
+    _listIdsInFolder = listIdsInFolder;
     if (_settings != null) {
       _settingsListener = _updateBadge;
       _settings!.addListener(_settingsListener!);
@@ -625,6 +631,55 @@ class TaskController with ChangeNotifier {
     return [...incomplete, ...completed];
   }
 
+  /// Counts the uncompleted top-level tasks matching the selected badge
+  /// [sources] (smart lists, lists, folders). Task ids are de-duplicated so
+  /// overlapping sources (e.g. Today + a list a today-task lives in) only
+  /// count once.
+  int _customBadgeCount(List<String> sources) {
+    if (sources.isEmpty) return 0;
+    final ids = <String>{};
+    for (final source in sources) {
+      if (source.startsWith(BadgeSource.smartPrefix)) {
+        final key = source.substring(BadgeSource.smartPrefix.length);
+        for (final t in _smartListTasks(key)) {
+          ids.add(t.id);
+        }
+      } else if (source.startsWith(BadgeSource.listPrefix)) {
+        final listId = source.substring(BadgeSource.listPrefix.length);
+        for (final t in _topLevel.where(
+            (t) => !t.isCompleted && t.listId == listId)) {
+          ids.add(t.id);
+        }
+      } else if (source.startsWith(BadgeSource.folderPrefix)) {
+        final folderId = source.substring(BadgeSource.folderPrefix.length);
+        final listIds = (_listIdsInFolder?.call(folderId) ?? const []).toSet();
+        if (listIds.isEmpty) continue;
+        for (final t in _topLevel.where((t) =>
+            !t.isCompleted && t.listId != null && listIds.contains(t.listId))) {
+          ids.add(t.id);
+        }
+      }
+    }
+    return ids.length;
+  }
+
+  Iterable<Task> _smartListTasks(String key) {
+    switch (key) {
+      case 'inbox':
+        return _topLevel.where((t) => t.listId == null && !t.isCompleted);
+      case 'today':
+        return todayTasks.where((t) => !t.isCompleted);
+      case 'tomorrow':
+        return tomorrowTasks.where((t) => !t.isCompleted);
+      case 'upcoming':
+        return upcomingTasks.where((t) => !t.isCompleted);
+      case 'allTasks':
+        return _topLevel.where((t) => !t.isCompleted);
+      default:
+        return const [];
+    }
+  }
+
   void _updateBadge() {
     if (!PlatformCapabilities.supportsAppBadge) return;
     final mode = _settings?.badgeMode ?? BadgeMode.todayTasks;
@@ -640,6 +695,14 @@ class TaskController with ChangeNotifier {
         count = inboxUncompletedCount;
       case BadgeMode.allUncompleted:
         count = _topLevel.where((t) => !t.isCompleted).length;
+      case BadgeMode.custom:
+        count = _customBadgeCount(_settings?.badgeCustomSources ?? const []);
+    }
+    // Optionally fold in today's uncompleted routines (not when the badge is
+    // off entirely).
+    if (mode != BadgeMode.none &&
+        (_settings?.badgeIncludeRoutines ?? false)) {
+      count += _routineCountToday?.call() ?? 0;
     }
     try {
       if (count > 0) {

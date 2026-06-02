@@ -240,7 +240,8 @@ class TabBarPagesView extends StatelessWidget {
           return const ImageIcon(
               AssetImage('assets/icons/tab_bar/routines.png'), size: 20);
         default:
-          return const Icon(CupertinoIcons.gear_alt, size: 20);
+          return const ImageIcon(
+              AssetImage('assets/icons/tab_bar/settings.png'), size: 20);
       }
     }
     switch (item.shortcutTarget) {

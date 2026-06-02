@@ -7,6 +7,7 @@ import '../localization/strings.dart';
 import '../tasks/task_field_prefs.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
+import '../theme/appearance_prefs.dart';
 import 'settings_service.dart';
 import 'smart_list_prefs.dart';
 import 'tab_bar_config.dart';
@@ -56,6 +57,18 @@ double animationSpeedScale(AnimationSpeed s) {
   }
 }
 
+/// How the Calendar tab lays out days.
+enum CalendarViewMode {
+  /// Default: each month is its own grid, starting on a fresh week row with
+  /// blank leading/trailing cells so weeks never straddle a month boundary.
+  months,
+
+  /// Continuous scroll: weeks flow into one another with no gap between
+  /// months, so the last day of a month sits next to the first day of the
+  /// next. Month boundaries are marked inline on the 1st of each month.
+  continuous,
+}
+
 /// What the app icon badge counts. Only the current space's data feeds in.
 enum BadgeMode {
   /// No badge at all.
@@ -72,6 +85,28 @@ enum BadgeMode {
 
   /// All uncompleted top-level tasks across every list.
   allUncompleted,
+
+  /// A user-chosen combination of smart lists, lists and folders. The
+  /// selected sources are stored in [SettingsController.badgeCustomSources].
+  custom,
+}
+
+/// Encodes a badge source token. Tokens are stored comma-joined in the
+/// `badge_custom_sources` setting. Forms:
+///   `smart:<inbox|today|tomorrow|upcoming|allTasks>`
+///   `list:<listId>`
+///   `folder:<folderId>`
+class BadgeSource {
+  const BadgeSource(this.token);
+  final String token;
+
+  static const smartPrefix = 'smart:';
+  static const listPrefix = 'list:';
+  static const folderPrefix = 'folder:';
+
+  static BadgeSource smart(String key) => BadgeSource('$smartPrefix$key');
+  static BadgeSource list(String id) => BadgeSource('$listPrefix$id');
+  static BadgeSource folder(String id) => BadgeSource('$folderPrefix$id');
 }
 
 class SettingsController with ChangeNotifier {
@@ -102,13 +137,61 @@ class SettingsController with ChangeNotifier {
   Color _completionColor = AppColors.systemGreen;
   Color get completionColor => _completionColor;
 
+  // Custom background + font-color overrides (per light/dark), incl. optional
+  // time-of-day dynamic colors. See [AppearancePrefs].
+  AppearancePrefs _appearancePrefs = AppearancePrefs();
+  AppearancePrefs get appearancePrefs => _appearancePrefs;
+
   // ISO weekday number for the first day of the week: 1=Monday … 7=Sunday.
   // Default is Monday to match the existing calendar grid.
   int _firstDayOfWeek = DateTime.monday;
   int get firstDayOfWeek => _firstDayOfWeek;
 
+  // How the Calendar tab lays out days. Defaults to the classic month grid.
+  CalendarViewMode _calendarViewMode = CalendarViewMode.months;
+  CalendarViewMode get calendarViewMode => _calendarViewMode;
+
+  // Whether the Calendar tab's + button can create Tasks / Events. Both
+  // default to true. If both are off the + button is hidden in Calendar; if
+  // exactly one is off the + button skips the picker and routes straight to
+  // the remaining option.
+  bool _calendarAllowCreatingTasks = true;
+  bool get calendarAllowCreatingTasks => _calendarAllowCreatingTasks;
+  bool _calendarAllowCreatingEvents = true;
+  bool get calendarAllowCreatingEvents => _calendarAllowCreatingEvents;
+
   BadgeMode _badgeMode = BadgeMode.todayTasks;
   BadgeMode get badgeMode => _badgeMode;
+
+  // Source tokens counted by [BadgeMode.custom] (see [BadgeSource]).
+  List<String> _badgeCustomSources = [];
+  List<String> get badgeCustomSources => List.unmodifiable(_badgeCustomSources);
+
+  // When true, today's uncompleted routines are added to the app icon badge
+  // count (on top of whatever [badgeMode] counts). Ignored when the badge is
+  // off ([BadgeMode.none]).
+  bool _badgeIncludeRoutines = false;
+  bool get badgeIncludeRoutines => _badgeIncludeRoutines;
+
+  // Surface today's routines as a collapsible section in Tasks → Today, and in
+  // the Calendar day view. Both default off and are mirrored between the
+  // Routines / Tasks / Calendar settings pages.
+  bool _showRoutinesInToday = false;
+  bool get showRoutinesInToday => _showRoutinesInToday;
+  bool _showRoutinesInCalendar = false;
+  bool get showRoutinesInCalendar => _showRoutinesInCalendar;
+
+  // Whether today's routines feed the Today smart-list count badge (only
+  // relevant when [showRoutinesInToday] is on).
+  bool _countRoutinesInToday = false;
+  bool get countRoutinesInToday => _countRoutinesInToday;
+
+  // Surface today's events as a section in Tasks → Today, and optionally fold
+  // them into the Today count badge. Both default off.
+  bool _showEventsInToday = false;
+  bool get showEventsInToday => _showEventsInToday;
+  bool _countEventsInToday = false;
+  bool get countEventsInToday => _countEventsInToday;
 
   AnimationSpeed _animationSpeed = AnimationSpeed.normal;
   AnimationSpeed get animationSpeed => _animationSpeed;
@@ -244,8 +327,32 @@ class SettingsController with ChangeNotifier {
       } else if (key == 'first_day_of_week') {
         final v = int.tryParse(value);
         if (v != null && v >= 1 && v <= 7) _firstDayOfWeek = v;
+      } else if (key == 'calendar_view_mode') {
+        _calendarViewMode = _decodeCalendarViewMode(value);
+      } else if (key == 'calendar_allow_tasks') {
+        _calendarAllowCreatingTasks = value != 'false';
+      } else if (key == 'calendar_allow_events') {
+        _calendarAllowCreatingEvents = value != 'false';
       } else if (key == 'badge_mode') {
         _badgeMode = _decodeBadgeMode(value);
+      } else if (key == 'badge_custom_sources') {
+        _badgeCustomSources = value
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+      } else if (key == 'badge_include_routines') {
+        _badgeIncludeRoutines = value == 'true';
+      } else if (key == 'show_routines_in_today') {
+        _showRoutinesInToday = value == 'true';
+      } else if (key == 'show_routines_in_calendar') {
+        _showRoutinesInCalendar = value == 'true';
+      } else if (key == 'count_routines_in_today') {
+        _countRoutinesInToday = value == 'true';
+      } else if (key == 'show_events_in_today') {
+        _showEventsInToday = value == 'true';
+      } else if (key == 'count_events_in_today') {
+        _countEventsInToday = value == 'true';
       } else if (key == 'animation_speed') {
         _animationSpeed = _decodeAnimationSpeed(value);
       } else if (key == 'default_task_icon') {
@@ -266,6 +373,8 @@ class SettingsController with ChangeNotifier {
         if (parsed != null) _tabBarConfig = parsed;
       } else if (key == TaskFieldPrefs.storageKey) {
         _taskFieldPrefs = TaskFieldPrefs.fromJson(value);
+      } else if (key == kAppearancePrefsKey) {
+        _appearancePrefs = AppearancePrefs.fromJsonString(value);
       }
     }
 
@@ -347,11 +456,81 @@ class SettingsController with ChangeNotifier {
     await _db.setAppSetting('first_day_of_week', isoDay.toString());
   }
 
+  Future<void> updateCalendarViewMode(CalendarViewMode mode) async {
+    if (mode == _calendarViewMode) return;
+    _calendarViewMode = mode;
+    notifyListeners();
+    await _db.setAppSetting(
+        'calendar_view_mode', _encodeCalendarViewMode(mode));
+  }
+
+  Future<void> updateCalendarAllowCreatingTasks(bool value) async {
+    if (value == _calendarAllowCreatingTasks) return;
+    _calendarAllowCreatingTasks = value;
+    notifyListeners();
+    await _db.setAppSetting('calendar_allow_tasks', value.toString());
+  }
+
+  Future<void> updateCalendarAllowCreatingEvents(bool value) async {
+    if (value == _calendarAllowCreatingEvents) return;
+    _calendarAllowCreatingEvents = value;
+    notifyListeners();
+    await _db.setAppSetting('calendar_allow_events', value.toString());
+  }
+
   Future<void> updateBadgeMode(BadgeMode mode) async {
     if (mode == _badgeMode) return;
     _badgeMode = mode;
     notifyListeners();
     await _db.setAppSetting('badge_mode', _encodeBadgeMode(mode));
+  }
+
+  Future<void> updateBadgeCustomSources(List<String> sources) async {
+    _badgeCustomSources = List.of(sources);
+    notifyListeners();
+    await _db.setAppSetting('badge_custom_sources', _badgeCustomSources.join(','));
+  }
+
+  Future<void> updateBadgeIncludeRoutines(bool value) async {
+    if (value == _badgeIncludeRoutines) return;
+    _badgeIncludeRoutines = value;
+    notifyListeners();
+    await _db.setAppSetting('badge_include_routines', value.toString());
+  }
+
+  Future<void> updateShowRoutinesInToday(bool value) async {
+    if (value == _showRoutinesInToday) return;
+    _showRoutinesInToday = value;
+    notifyListeners();
+    await _db.setAppSetting('show_routines_in_today', value.toString());
+  }
+
+  Future<void> updateShowRoutinesInCalendar(bool value) async {
+    if (value == _showRoutinesInCalendar) return;
+    _showRoutinesInCalendar = value;
+    notifyListeners();
+    await _db.setAppSetting('show_routines_in_calendar', value.toString());
+  }
+
+  Future<void> updateCountRoutinesInToday(bool value) async {
+    if (value == _countRoutinesInToday) return;
+    _countRoutinesInToday = value;
+    notifyListeners();
+    await _db.setAppSetting('count_routines_in_today', value.toString());
+  }
+
+  Future<void> updateShowEventsInToday(bool value) async {
+    if (value == _showEventsInToday) return;
+    _showEventsInToday = value;
+    notifyListeners();
+    await _db.setAppSetting('show_events_in_today', value.toString());
+  }
+
+  Future<void> updateCountEventsInToday(bool value) async {
+    if (value == _countEventsInToday) return;
+    _countEventsInToday = value;
+    notifyListeners();
+    await _db.setAppSetting('count_events_in_today', value.toString());
   }
 
   Future<void> updateAnimationSpeed(AnimationSpeed speed) async {
@@ -434,6 +613,8 @@ class SettingsController with ChangeNotifier {
         return 'inboxTasks';
       case BadgeMode.allUncompleted:
         return 'allUncompleted';
+      case BadgeMode.custom:
+        return 'custom';
     }
   }
 
@@ -464,6 +645,25 @@ class SettingsController with ChangeNotifier {
     }
   }
 
+  static String _encodeCalendarViewMode(CalendarViewMode m) {
+    switch (m) {
+      case CalendarViewMode.months:
+        return 'months';
+      case CalendarViewMode.continuous:
+        return 'continuous';
+    }
+  }
+
+  static CalendarViewMode _decodeCalendarViewMode(String v) {
+    switch (v) {
+      case 'continuous':
+        return CalendarViewMode.continuous;
+      case 'months':
+      default:
+        return CalendarViewMode.months;
+    }
+  }
+
   static BadgeMode _decodeBadgeMode(String v) {
     switch (v) {
       case 'none':
@@ -474,6 +674,8 @@ class SettingsController with ChangeNotifier {
         return BadgeMode.inboxTasks;
       case 'allUncompleted':
         return BadgeMode.allUncompleted;
+      case 'custom':
+        return BadgeMode.custom;
       case 'todayTasks':
       default:
         return BadgeMode.todayTasks;
@@ -509,6 +711,15 @@ class SettingsController with ChangeNotifier {
     _completionColor = color;
     colorRevision.value++;
     await _db.setAppSetting('completion_color', color.value.toString());
+  }
+
+  /// Replaces the appearance overrides (background + font color) and persists.
+  /// Fires the main notifier because these feed the CupertinoApp theme
+  /// (scaffold background + text theme), which lives above the content subtree.
+  Future<void> updateAppearancePrefs(AppearancePrefs prefs) async {
+    _appearancePrefs = prefs;
+    notifyListeners();
+    await _db.setAppSetting(kAppearancePrefsKey, prefs.toJsonString());
   }
 
   Future<void> updateHideTabLabels(bool value) async {

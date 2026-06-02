@@ -62,12 +62,18 @@ class SettingsNavRow extends StatelessWidget {
               ),
             ),
             if (trailingLabel != null) ...[
-              Text(
-                trailingLabel!,
-                style: TextStyle(
-                  fontSize: 15,
-                  color:
-                      CupertinoColors.secondaryLabel.resolveFrom(context),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  trailingLabel!,
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color:
+                        CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
