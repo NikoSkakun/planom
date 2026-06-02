@@ -50,6 +50,7 @@ class TasksView extends StatefulWidget {
     required this.activeListId,
     required this.activeDueDate,
     required this.collapseSignal,
+    this.activeFolderId,
     this.routineController,
     this.backupService,
     this.db,
@@ -65,6 +66,9 @@ class TasksView extends StatefulWidget {
   final ValueNotifier<String?> activeListId;
   final ValueNotifier<DateTime?> activeDueDate;
   final ValueNotifier<int> collapseSignal;
+  // Tracks the folder the user is currently viewing so the floating + button
+  // can target that folder's default list. Set by [FolderView].
+  final ValueNotifier<String?>? activeFolderId;
   final BackupService? backupService;
   // Optional: when provided, the nav bar shows a global-search button that
   // queries all three (tasks, notes, events) via FTS5.
@@ -298,6 +302,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     taskController: widget.controller,
                     contactController: widget.contactController,
                     activeListId: widget.activeListId,
+                    activeFolderId: widget.activeFolderId,
                     settingsController: widget.settingsController,
                   ),
                 ),
@@ -732,6 +737,8 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                                   widget.contactController,
                                               activeListId:
                                                   widget.activeListId,
+                                              activeFolderId:
+                                                  widget.activeFolderId,
                                               settingsController:
                                                   widget.settingsController,
                                             ),

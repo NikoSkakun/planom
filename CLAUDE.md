@@ -19,7 +19,7 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 ## Tech stack
 
 - **Framework**: Flutter / Dart, Cupertino (iOS-native) widgets throughout — no Material widgets in UI except `showModalBottomSheet` (which requires `GlobalMaterialLocalizations.delegate` already registered)
-- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **30**. FTS5 virtual tables for search.
+- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **31**. FTS5 virtual tables for search.
 - **Multi-space**: `SpaceManager` (`lib/src/spaces/`) owns a list of `Space`s and swaps the active space's controllers; the default space shares the global `planom.db` handle.
 - **App lock**: `SecurityService` (`lib/src/security/`) — optional PIN (4–8 digit) / custom password + optional biometric (Face ID, Touch ID, Windows Hello via `local_auth`); salted + key-stretched PBKDF2/HMAC-SHA256 hash in `app_settings` (`auth_*` keys), excluded from backups.
 - **Local notifications**: `NotificationService` (`lib/src/notifications/`) — `flutter_local_notifications` + `timezone`; per-task / per-event reminder scheduling via slot-based IDs. iOS + macOS only today.
@@ -109,11 +109,15 @@ RoutineReminder (lib/src/models/routine_reminder.dart)  ← NOT an AppItem
 
 AppFolder (lib/src/models/app_folder.dart)
   name, parentFolderId?, sortOrder, iconId?, iconColor? (ARGB override)
+  description?                        ← shown atop the inside-folder view
+  defaultListId?                     ← list used when creating from this
+                                       folder's + button (null → first list)
   isDeleted, deletedDate?
 
 AppList (lib/src/models/app_list.dart)
   name, folderId?, sortOrder
   color? (ARGB accent), iconId?, iconColor? (ARGB override)
+  description?                        ← shown atop the inside-list view
   listType: ListType                 ← 'tasks' | 'birthdays' | 'shopping'
   isDeleted, deletedDate?
 
@@ -185,13 +189,14 @@ Custom photo icons for folders, lists, and routines are stored as **relative pat
 
 - `initFolderIconService()` — called once in `main.dart` before `runApp`; caches `getApplicationDocumentsDirectory()` so path resolution is synchronous during widget builds.
 - `isCustomIconId(iconId)` — `true` for relative paths (`icons/…`) and legacy absolute paths (`/…`).
+- Folder/list icons may also be an **emoji / unicode character**, stored as `emoji:<char>` (`isEmojiIconId` / `emojiFromIconId`). `buildFolderItemIcon` renders these as centered text; they carry no color tint. The icon picker exposes a text field to set one.
 - `resolveCustomIconPath(iconId)` — runtime absolute path; handles new relative + legacy absolute (graceful fallback).
 - `buildFolderItemIcon(iconId, isFolder)` — synchronous widget builder; falls back to the default PNG on error.
 - Backups inline icon bytes as base64 in a top-level `customIcons` map keyed by relative path; on import they're written back to `<docsDir>/icons/`.
 
 ### Database (`lib/src/database/database_service.dart`)
 
-Single `DatabaseService` class, lazy-opens its DB file (`dbName`, default `planom.db`) via sqflite. Current version: **25**. One `DatabaseService` instance per file — never open the same file with two handles (the default space reuses the global handle; see Spaces).
+Single `DatabaseService` class, lazy-opens its DB file (`dbName`, default `planom.db`) via sqflite. Current version: **31**. One `DatabaseService` instance per file — never open the same file with two handles (the default space reuses the global handle; see Spaces).
 
 Migration history:
 | Version | Changes |
@@ -225,6 +230,7 @@ Migration history:
 | v28 | `routines.startDate INTEGER`, `routines.intervalDays INTEGER`, `routines.waitForCompletion INTEGER NOT NULL DEFAULT 0`, `routines.reminders TEXT` — start date, `interval` ("every N days") scheduling with optional wait-for-completion, and per-routine reminders (JSON) |
 | v29 | `routines.sortOrder INTEGER NOT NULL DEFAULT 0` — manual routine ordering (drag-reorder); seeded from the existing creation-date order on upgrade |
 | v30 | `routines.manualEntry INTEGER NOT NULL DEFAULT 0` — `certain_amount` routines where checking prompts for a typed amount instead of stepping by `recordAmount` |
+| v31 | `folders.description TEXT`, `folders.defaultListId TEXT`, `app_lists.description TEXT` — folder/list descriptions (shown atop the inside views) + a folder's default list used when creating a task from inside it (+ button / Plus drop) |
 
 When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 
@@ -240,7 +246,7 @@ When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 - `appearance_prefs` — JSON `AppearancePrefs` (`lib/src/theme/appearance_prefs.dart`): per light/dark theme background override (default / solid color / user image / time-of-day dynamic gradient) + font-color override (default / solid / dynamic) + auto-contrast-to-background toggle. Applied in `app.dart` through the CupertinoApp theme (`scaffoldBackgroundColor` + `textTheme` color) for solid/dynamic, and an `AppBackground` painter (`lib/src/theme/app_background.dart`) for images; dynamic colors refresh on a per-minute timer in `_MyAppState`. Background images are stored under `<docs>/backgrounds/` (relative path, like custom icons). Edited via Settings → Appearance → Background / Text Color (`appearance_custom_view.dart` + `dynamic_color_editor.dart`); the Font picker also now lives under Appearance
 - `locale` — BCP-47 language code (`en`, `uk`, `es`, `fr`, `de`, `it`, `pt`, `ru`, `zh`, `ja`)
 - `task_field_prefs` — JSON-serialised `TaskFieldPrefs`
-- `badge_mode`, `badge_include_routines` — app-icon-badge mode + whether today's uncompleted routines are added
+- `badge_mode`, `badge_include_routines` — app-icon-badge mode + whether today's uncompleted routines are added. `badge_mode = custom` counts a user-chosen combination of smart lists / lists / folders stored in `badge_custom_sources` (comma-joined `BadgeSource` tokens: `smart:<key>` / `list:<id>` / `folder:<id>`); de-duplicated by task id in `TaskController._customBadgeCount`. Edited via Settings → Notifications → Badge sources (`badge_sources_view.dart`)
 - `show_routines_in_today`, `show_routines_in_calendar` — surface today's routines in Tasks → Today / the Calendar day view
 - `count_routines_in_today`, `show_events_in_today`, `count_events_in_today` — fold today's routines into the Today count badge; show today's events as a Today section + optionally fold them into the Today count
 - `auth_type`, `auth_hash`, `auth_salt`, `auth_biometric` — passcode + biometric flag (owned by `SecurityService.authSettingKeys`; **excluded from backup export and never overwritten on import**)

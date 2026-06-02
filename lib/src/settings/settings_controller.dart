@@ -85,6 +85,28 @@ enum BadgeMode {
 
   /// All uncompleted top-level tasks across every list.
   allUncompleted,
+
+  /// A user-chosen combination of smart lists, lists and folders. The
+  /// selected sources are stored in [SettingsController.badgeCustomSources].
+  custom,
+}
+
+/// Encodes a badge source token. Tokens are stored comma-joined in the
+/// `badge_custom_sources` setting. Forms:
+///   `smart:<inbox|today|tomorrow|upcoming|allTasks>`
+///   `list:<listId>`
+///   `folder:<folderId>`
+class BadgeSource {
+  const BadgeSource(this.token);
+  final String token;
+
+  static const smartPrefix = 'smart:';
+  static const listPrefix = 'list:';
+  static const folderPrefix = 'folder:';
+
+  static BadgeSource smart(String key) => BadgeSource('$smartPrefix$key');
+  static BadgeSource list(String id) => BadgeSource('$listPrefix$id');
+  static BadgeSource folder(String id) => BadgeSource('$folderPrefix$id');
 }
 
 class SettingsController with ChangeNotifier {
@@ -140,6 +162,10 @@ class SettingsController with ChangeNotifier {
 
   BadgeMode _badgeMode = BadgeMode.todayTasks;
   BadgeMode get badgeMode => _badgeMode;
+
+  // Source tokens counted by [BadgeMode.custom] (see [BadgeSource]).
+  List<String> _badgeCustomSources = [];
+  List<String> get badgeCustomSources => List.unmodifiable(_badgeCustomSources);
 
   // When true, today's uncompleted routines are added to the app icon badge
   // count (on top of whatever [badgeMode] counts). Ignored when the badge is
@@ -309,6 +335,12 @@ class SettingsController with ChangeNotifier {
         _calendarAllowCreatingEvents = value != 'false';
       } else if (key == 'badge_mode') {
         _badgeMode = _decodeBadgeMode(value);
+      } else if (key == 'badge_custom_sources') {
+        _badgeCustomSources = value
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
       } else if (key == 'badge_include_routines') {
         _badgeIncludeRoutines = value == 'true';
       } else if (key == 'show_routines_in_today') {
@@ -453,6 +485,12 @@ class SettingsController with ChangeNotifier {
     await _db.setAppSetting('badge_mode', _encodeBadgeMode(mode));
   }
 
+  Future<void> updateBadgeCustomSources(List<String> sources) async {
+    _badgeCustomSources = List.of(sources);
+    notifyListeners();
+    await _db.setAppSetting('badge_custom_sources', _badgeCustomSources.join(','));
+  }
+
   Future<void> updateBadgeIncludeRoutines(bool value) async {
     if (value == _badgeIncludeRoutines) return;
     _badgeIncludeRoutines = value;
@@ -575,6 +613,8 @@ class SettingsController with ChangeNotifier {
         return 'inboxTasks';
       case BadgeMode.allUncompleted:
         return 'allUncompleted';
+      case BadgeMode.custom:
+        return 'custom';
     }
   }
 
@@ -634,6 +674,8 @@ class SettingsController with ChangeNotifier {
         return BadgeMode.inboxTasks;
       case 'allUncompleted':
         return BadgeMode.allUncompleted;
+      case 'custom':
+        return BadgeMode.custom;
       case 'todayTasks':
       default:
         return BadgeMode.todayTasks;

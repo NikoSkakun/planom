@@ -63,11 +63,25 @@ Future<void> initFolderIconService() async {
   _docsPath = (await getApplicationDocumentsDirectory()).path;
 }
 
+/// Prefix used to encode an emoji / unicode character as an iconId
+/// (e.g. `emoji:🎯`). Stored like any other iconId string.
+const String kEmojiIconPrefix = 'emoji:';
+
 /// Returns true for custom-image iconIds (relative or legacy absolute paths).
 bool isCustomIconId(String? iconId) {
   if (iconId == null) return false;
   return iconId.startsWith('icons/') || iconId.startsWith('/');
 }
+
+/// Returns true for emoji / unicode-character iconIds (`emoji:…`).
+bool isEmojiIconId(String? iconId) =>
+    iconId != null && iconId.startsWith(kEmojiIconPrefix);
+
+/// Extracts the raw character(s) from an emoji iconId.
+String emojiFromIconId(String iconId) =>
+    iconId.startsWith(kEmojiIconPrefix)
+        ? iconId.substring(kEmojiIconPrefix.length)
+        : iconId;
 
 /// Resolves a custom iconId to an absolute file path.
 /// Returns null if the docs dir isn't cached yet or the format is unrecognised.
@@ -93,6 +107,20 @@ Widget buildFolderItemIcon(
 
   if (iconId == null) {
     return Image.asset(defaultAsset, width: 22, height: 22);
+  }
+
+  if (isEmojiIconId(iconId)) {
+    return SizedBox(
+      width: 22,
+      height: 22,
+      child: Center(
+        child: Text(
+          emojiFromIconId(iconId),
+          style: const TextStyle(fontSize: 18),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
   }
 
   final filePath = resolveCustomIconPath(iconId);
@@ -302,12 +330,22 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
   late String? _selected;
   int? _color;
   bool _picking = false;
+  late final TextEditingController _emojiCtrl;
 
   @override
   void initState() {
     super.initState();
     _selected = widget.currentIconId;
     _color = widget.currentIconColor;
+    _emojiCtrl = TextEditingController(
+      text: isEmojiIconId(_selected) ? emojiFromIconId(_selected!) : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _emojiCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _pickFromLibrary() async {
@@ -333,10 +371,24 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
   void _selectColor(int? color) {
     setState(() => _color = color);
     // If no icon is set yet (default/photo tile), don't propagate — the color
-    // only matters once the user has picked an SF-symbol icon.
-    if (_selected != null && !isCustomIconId(_selected)) {
+    // only matters once the user has picked an SF-symbol icon. Custom images
+    // and emoji icons can't be tinted.
+    if (_selected != null &&
+        !isCustomIconId(_selected) &&
+        !isEmojiIconId(_selected)) {
       widget.onSelected(_selected, color);
     }
+  }
+
+  void _selectEmoji(String raw) {
+    final char = raw.trim();
+    if (char.isEmpty) {
+      _resetToDefault();
+      return;
+    }
+    setState(() => _selected = '$kEmojiIconPrefix$char');
+    // Emoji icons carry no color tint.
+    widget.onSelected(_selected, null);
   }
 
   void _resetToDefault() {
@@ -470,6 +522,62 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            s.emojiOrSymbol,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: CupertinoColors.tertiarySystemFill
+                      .resolveFrom(context),
+                  borderRadius: BorderRadius.circular(12),
+                  border: isEmojiIconId(_selected)
+                      ? Border.all(
+                          color: CupertinoColors.label.resolveFrom(context),
+                          width: 2.5,
+                        )
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    isEmojiIconId(_selected)
+                        ? emojiFromIconId(_selected!)
+                        : '🙂',
+                    style: TextStyle(
+                      fontSize: 24,
+                      color: isEmojiIconId(_selected)
+                          ? null
+                          : CupertinoColors.tertiaryLabel.resolveFrom(context),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: CupertinoTextField(
+                  controller: _emojiCtrl,
+                  placeholder: s.emojiOrSymbolPlaceholder,
+                  textAlign: TextAlign.center,
+                  maxLength: 4,
+                  style: const TextStyle(fontSize: 22),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.tertiarySystemFill
+                        .resolveFrom(context),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  onChanged: _selectEmoji,
+                ),
+              ),
+            ],
           ),
         ],
       ),

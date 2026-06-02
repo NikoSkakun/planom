@@ -225,7 +225,16 @@ class S {
   String get appBadgeTodayTasksAndEvents => t('appBadgeTodayTasksAndEvents');
   String get appBadgeInbox => t('appBadgeInbox');
   String get appBadgeAllUncompleted => t('appBadgeAllUncompleted');
+  String get appBadgeCustom => t('appBadgeCustom');
+  String get appBadgeSources => t('appBadgeSources');
+  String get smartListsHeader => t('smartListsHeader');
+  String get listsAndFoldersHeader => t('listsAndFoldersHeader');
   String get appBadgeIncludeRoutines => t('appBadgeIncludeRoutines');
+  String get emojiOrSymbol => t('emojiOrSymbol');
+  String get emojiOrSymbolPlaceholder => t('emojiOrSymbolPlaceholder');
+  String get descriptionPlaceholder => t('descriptionPlaceholder');
+  String get defaultList => t('defaultList');
+  String get defaultListNone => t('defaultListNone');
   String get showRoutinesInToday => t('showRoutinesInToday');
   String get showRoutinesInCalendar => t('showRoutinesInCalendar');
   String get showRoutinesHint => t('showRoutinesHint');
@@ -851,6 +860,15 @@ const Map<String, String> _en = {
   'appBadgeTodayTasksAndEvents': "Today's tasks + upcoming events",
   'appBadgeInbox': 'Inbox uncompleted',
   'appBadgeAllUncompleted': 'All uncompleted tasks',
+  'appBadgeCustom': 'Custom…',
+  'appBadgeSources': 'Badge sources',
+  'smartListsHeader': 'SMART LISTS',
+  'listsAndFoldersHeader': 'LISTS & FOLDERS',
+  'emojiOrSymbol': 'Emoji or symbol',
+  'emojiOrSymbolPlaceholder': 'Type an emoji',
+  'descriptionPlaceholder': 'Add a description (optional)',
+  'defaultList': 'Default list',
+  'defaultListNone': 'None',
   'sectionDefaults': 'DEFAULTS',
   'defaultTaskIcon': 'Default task icon',
   'defaultListIcon': 'Default list icon',

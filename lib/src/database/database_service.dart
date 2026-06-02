@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 30;
+  static const _dbVersion = 31;
 
   Database? _db;
 
@@ -88,6 +88,8 @@ class DatabaseService {
             sortOrder INTEGER NOT NULL DEFAULT 0,
             iconId TEXT,
             iconColor INTEGER,
+            description TEXT,
+            defaultListId TEXT,
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER
           )
@@ -102,6 +104,7 @@ class DatabaseService {
             color INTEGER,
             iconId TEXT,
             iconColor INTEGER,
+            description TEXT,
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
             listType TEXT NOT NULL DEFAULT 'tasks'
@@ -556,6 +559,13 @@ class DatabaseService {
           // Manual amount entry for certain_amount routines.
           await db.execute(
               'ALTER TABLE routines ADD COLUMN manualEntry INTEGER NOT NULL DEFAULT 0');
+        }
+        if (oldVersion < 31) {
+          // Folder/list descriptions + a folder's default list (used when
+          // creating a task from inside the folder via the + button).
+          await db.execute('ALTER TABLE folders ADD COLUMN description TEXT');
+          await db.execute('ALTER TABLE folders ADD COLUMN defaultListId TEXT');
+          await db.execute('ALTER TABLE app_lists ADD COLUMN description TEXT');
         }
       },
     );

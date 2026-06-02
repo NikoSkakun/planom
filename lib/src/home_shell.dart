@@ -83,6 +83,7 @@ class _HomeShellState extends State<HomeShell> {
   final _navigatorKeys = List.generate(5, (_) => GlobalKey<NavigatorState>());
   late final List<_DepthObserver> _depthObservers;
   final _activeListId = ValueNotifier<String?>(null);
+  final _activeFolderId = ValueNotifier<String?>(null);
   final _activeDueDate = ValueNotifier<DateTime?>(null);
   final _tasksCollapseSignal = ValueNotifier<int>(0);
   final _notesCollapseSignal = ValueNotifier<int>(0);
@@ -273,15 +274,37 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _handleDropOnFolder(String folderId) {
-    // Dropping on a folder opens the standard task-creation sheet with no
-    // list pre-filled — the user can still pick a list inside that folder
-    // from the sheet's list picker if they want.
+    // Dropping on a folder pre-fills the new task with the folder's chosen
+    // default list — or, failing that, the first list inside it. The user can
+    // still change the list from the sheet's list picker.
+    final resolved = _resolveFolderDefaultList(folderId);
+    if (resolved != null) {
+      // Route through the list handler so Birthdays lists open the contact
+      // creator instead of the task sheet.
+      _handleDropOnList(resolved);
+      return;
+    }
     showTaskCreationSheet(
       context,
       widget.taskController,
       widget.folderController,
       settingsController: widget.settingsController,
     );
+  }
+
+  /// Resolves the list a new task should land in when created from inside
+  /// [folderId]: the folder's configured `defaultListId` when it still points
+  /// at a list in that folder, otherwise the first list directly inside it.
+  /// Returns null when the folder has no lists (→ Inbox).
+  String? _resolveFolderDefaultList(String folderId) {
+    final lists = widget.folderController.listsIn(folderId);
+    if (lists.isEmpty) return null;
+    final folder = widget.folderController.folderById(folderId);
+    final preferred = folder?.defaultListId;
+    if (preferred != null && lists.any((l) => l.id == preferred)) {
+      return preferred;
+    }
+    return lists.first.id;
   }
 
   void _handleDropOnSection(String listId, String sectionId) {
@@ -342,6 +365,7 @@ class _HomeShellState extends State<HomeShell> {
     widget.settingsController.removeListener(_onSettingsChanged);
     _tabController.dispose();
     _activeListId.dispose();
+    _activeFolderId.dispose();
     _activeDueDate.dispose();
     _tasksCollapseSignal.dispose();
     _notesCollapseSignal.dispose();
@@ -454,16 +478,22 @@ class _HomeShellState extends State<HomeShell> {
       return;
     }
 
-    // When the active list is a Birthdays list, open the contact creator
-    // instead of the standard task sheet.
-    final listId = _activeListId.value;
-    if (listId != null) {
-      final list = widget.folderController.listById(listId);
+    // Resolve the target list: the active list if any, otherwise the active
+    // folder's default (or first) list when we're browsing inside a folder.
+    var initialListId = _activeListId.value;
+    if (initialListId == null && _activeFolderId.value != null) {
+      initialListId = _resolveFolderDefaultList(_activeFolderId.value!);
+    }
+
+    // When the target is a Birthdays list, open the contact creator instead
+    // of the standard task sheet.
+    if (initialListId != null) {
+      final list = widget.folderController.listById(initialListId);
       if (list?.listType == ListType.birthdays) {
         showContactCreationSheet(
           context,
           widget.contactController,
-          listId: listId,
+          listId: initialListId,
         );
         return;
       }
@@ -473,7 +503,7 @@ class _HomeShellState extends State<HomeShell> {
       context,
       widget.taskController,
       widget.folderController,
-      initialListId: _activeListId.value,
+      initialListId: initialListId,
       initialDueDate: _activeDueDate.value,
       settingsController: widget.settingsController,
     );
@@ -827,6 +857,7 @@ class _HomeShellState extends State<HomeShell> {
           routineController: widget.routineController,
           activeListId: _activeListId,
           activeDueDate: _activeDueDate,
+          activeFolderId: _activeFolderId,
           collapseSignal: _tasksCollapseSignal,
           backupService: widget.backupService,
           db: SpaceManagerProvider.of(context).db,

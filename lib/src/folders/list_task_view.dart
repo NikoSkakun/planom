@@ -30,6 +30,7 @@ import '../utils/selection_toolbar.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart';
 import 'folder_controller.dart';
+import 'item_description_block.dart';
 import 'kanban_board.dart';
 import 'list_picker_sheet.dart';
 import 'move_to_sheet.dart';
@@ -363,6 +364,7 @@ class _ListTaskViewState extends State<ListTaskView>
         color: _currentList.color,
         isFolder: false,
         supportsColor: true,
+        description: _currentList.description,
       ),
     );
     if (result == null || !mounted) return;
@@ -374,6 +376,8 @@ class _ListTaskViewState extends State<ListTaskView>
       clearIconColor: result.iconColor == null,
       color: result.color,
       clearColor: result.color == null,
+      description: result.description,
+      clearDescription: result.description == null,
     );
     await widget.folderController.updateList(updated);
     if (mounted) setState(() => _currentList = updated);
@@ -448,6 +452,11 @@ class _ListTaskViewState extends State<ListTaskView>
               bottom: !selecting,
               child: Column(
                 children: [
+                  if (!selecting &&
+                      (_currentList.description ?? '').trim().isNotEmpty)
+                    ItemDescriptionBlock(
+                      description: _currentList.description!.trim(),
+                    ),
                   Expanded(
                     child: _currentList.listType == ListType.birthdays
                         ? ContactListView(

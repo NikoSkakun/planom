@@ -178,11 +178,15 @@ class SpaceManager with ChangeNotifier {
         }).length;
       },
       routineCountToday: () => _routineController.todayUncompletedCount,
+      listIdsInFolder: (folderId) =>
+          _folderController.listIdsInRecursive(folderId),
     );
     // EventController / RoutineController changes don't drive the badge
     // automatically — pump it when they change so the count stays current.
     _eventController.addListener(_taskController.refreshBadge);
     _routineController.addListener(_taskController.refreshBadge);
+    // Folder/list structure changes can shift custom-badge folder counts.
+    _folderController.addListener(_taskController.refreshBadge);
 
     _backupService = BackupService(
       db: _db,

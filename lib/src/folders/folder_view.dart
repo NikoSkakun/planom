@@ -26,6 +26,7 @@ import 'create_folder_list_sheet.dart'
         showEditItemSheet;
 import 'folder_controller.dart';
 import 'folder_icon_picker.dart';
+import 'item_description_block.dart';
 import 'kanban_board.dart';
 import 'list_task_view.dart';
 import 'move_to_sheet.dart';
@@ -38,6 +39,7 @@ class FolderView extends StatefulWidget {
     required this.taskController,
     required this.contactController,
     required this.activeListId,
+    this.activeFolderId,
     this.settingsController,
   });
 
@@ -46,6 +48,9 @@ class FolderView extends StatefulWidget {
   final TaskController taskController;
   final ContactController contactController;
   final ValueNotifier<String?> activeListId;
+  // Tracks the folder currently on screen so the floating + button targets
+  // this folder's default list. Restored to the parent folder on pop.
+  final ValueNotifier<String?>? activeFolderId;
   final SettingsController? settingsController;
 
   @override
@@ -64,6 +69,20 @@ class _FolderViewState extends State<FolderView>
   void initState() {
     super.initState();
     _currentFolder = widget.folder;
+    final notifier = widget.activeFolderId;
+    if (notifier != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) notifier.value = _currentFolder.id;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    // Restore the active folder to this folder's parent so popping back to an
+    // ancestor folder keeps the + button targeting the right folder.
+    widget.activeFolderId?.value = _currentFolder.parentFolderId;
+    super.dispose();
   }
 
   void _toggle(String id) {
@@ -139,6 +158,7 @@ class _FolderViewState extends State<FolderView>
                     taskController: widget.taskController,
                     contactController: widget.contactController,
                     activeListId: widget.activeListId,
+                    activeFolderId: widget.activeFolderId,
                     settingsController: widget.settingsController,
                   ),
                 ),
@@ -238,6 +258,10 @@ class _FolderViewState extends State<FolderView>
           dismiss();
           _openEditSheet();
         },
+        onDefaultList: () {
+          dismiss();
+          _pickDefaultList();
+        },
         onMoveTo: () {
           dismiss();
           showMoveToSheet(
@@ -330,6 +354,32 @@ class _FolderViewState extends State<FolderView>
     );
   }
 
+  /// Lets the user pick which list inside this folder is used when creating a
+  /// task from the folder's + button (tap or drop). "None" falls back to the
+  /// first list in the folder at creation time.
+  Future<void> _pickDefaultList() async {
+    final s = S.of(context);
+    final lists = widget.folderController.listsIn(_currentFolder.id);
+    if (lists.isEmpty) return;
+    const noneSentinel = '__none__';
+    final picked = await showSelectionMenu<String>(
+      context: context,
+      title: s.defaultList,
+      current: _currentFolder.defaultListId ?? noneSentinel,
+      options: [
+        SelectionMenuOption(value: noneSentinel, label: s.defaultListNone),
+        for (final l in lists)
+          SelectionMenuOption(value: l.id, label: l.name),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    final updated = picked == noneSentinel
+        ? _currentFolder.copyWith(clearDefaultListId: true)
+        : _currentFolder.copyWith(defaultListId: picked);
+    await widget.folderController.updateFolder(updated);
+    if (mounted) setState(() => _currentFolder = updated);
+  }
+
   Future<void> _openEditSheet() async {
     final result = await showEditItemSheet(
       context,
@@ -340,6 +390,7 @@ class _FolderViewState extends State<FolderView>
         color: null,
         isFolder: true,
         supportsColor: false,
+        description: _currentFolder.description,
       ),
     );
     if (result == null || !mounted) return;
@@ -349,6 +400,8 @@ class _FolderViewState extends State<FolderView>
       clearIconId: result.iconId == null,
       iconColor: result.iconColor,
       clearIconColor: result.iconColor == null,
+      description: result.description,
+      clearDescription: result.description == null,
     );
     await widget.folderController.updateFolder(updated);
     if (mounted) setState(() => _currentFolder = updated);
@@ -405,18 +458,37 @@ class _FolderViewState extends State<FolderView>
                 final lists =
                     widget.folderController.listsIn(_currentFolder.id);
 
+                final hasDescription =
+                    (_currentFolder.description ?? '').trim().isNotEmpty;
                 if (subFolders.isEmpty && lists.isEmpty) {
-                  return Center(
-                    child: Text(
-                      S.of(context).noItems,
-                      style: const TextStyle(
-                          color: CupertinoColors.secondaryLabel),
-                    ),
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (hasDescription)
+                        ItemDescriptionBlock(
+                          description: _currentFolder.description!.trim(),
+                        ),
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            S.of(context).noItems,
+                            style: const TextStyle(
+                                color: CupertinoColors.secondaryLabel),
+                          ),
+                        ),
+                      ),
+                    ],
                   );
                 }
 
                 return CustomScrollView(
                   slivers: [
+                    if ((_currentFolder.description ?? '').trim().isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: ItemDescriptionBlock(
+                          description: _currentFolder.description!.trim(),
+                        ),
+                      ),
                     const SliverToBoxAdapter(
                         child: SizedBox(height: 8)),
 
@@ -498,6 +570,8 @@ class _FolderViewState extends State<FolderView>
                                                   widget.contactController,
                                               activeListId:
                                                   widget.activeListId,
+                                              activeFolderId:
+                                                  widget.activeFolderId,
                                               settingsController:
                                                   widget.settingsController,
                                             ),
@@ -666,6 +740,7 @@ class _FolderOptionsDropdown extends StatelessWidget {
     required this.onAddList,
     required this.onAddFolder,
     required this.onEdit,
+    required this.onDefaultList,
     required this.onMoveTo,
     required this.onInfo,
     required this.onDelete,
@@ -677,6 +752,7 @@ class _FolderOptionsDropdown extends StatelessWidget {
   final VoidCallback onAddList;
   final VoidCallback onAddFolder;
   final VoidCallback onEdit;
+  final VoidCallback onDefaultList;
   final VoidCallback onMoveTo;
   final VoidCallback onInfo;
   final VoidCallback onDelete;
@@ -714,6 +790,10 @@ class _FolderOptionsDropdown extends StatelessWidget {
                   label: S.of(context).editFolder,
                   icon: CupertinoIcons.pencil,
                   onTap: onEdit),
+              _DropdownItem(
+                  label: S.of(context).defaultList,
+                  icon: CupertinoIcons.list_bullet_below_rectangle,
+                  onTap: onDefaultList),
               _DropdownItem(
                   label: S.of(context).moveTo,
                   icon: CupertinoIcons.folder,
