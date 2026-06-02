@@ -346,7 +346,7 @@ class _BrightnessSelector extends StatelessWidget {
   }
 }
 
-class _ModeSelector<T> extends StatelessWidget {
+class _ModeSelector<T extends Object> extends StatelessWidget {
   const _ModeSelector({
     required this.value,
     required this.segments,
