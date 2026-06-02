@@ -7,6 +7,7 @@ import '../localization/strings.dart';
 import '../tasks/task_field_prefs.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
+import '../theme/appearance_prefs.dart';
 import 'settings_service.dart';
 import 'smart_list_prefs.dart';
 import 'tab_bar_config.dart';
@@ -113,6 +114,11 @@ class SettingsController with ChangeNotifier {
 
   Color _completionColor = AppColors.systemGreen;
   Color get completionColor => _completionColor;
+
+  // Custom background + font-color overrides (per light/dark), incl. optional
+  // time-of-day dynamic colors. See [AppearancePrefs].
+  AppearancePrefs _appearancePrefs = AppearancePrefs();
+  AppearancePrefs get appearancePrefs => _appearancePrefs;
 
   // ISO weekday number for the first day of the week: 1=Monday … 7=Sunday.
   // Default is Monday to match the existing calendar grid.
@@ -335,6 +341,8 @@ class SettingsController with ChangeNotifier {
         if (parsed != null) _tabBarConfig = parsed;
       } else if (key == TaskFieldPrefs.storageKey) {
         _taskFieldPrefs = TaskFieldPrefs.fromJson(value);
+      } else if (key == kAppearancePrefsKey) {
+        _appearancePrefs = AppearancePrefs.fromJsonString(value);
       }
     }
 
@@ -661,6 +669,15 @@ class SettingsController with ChangeNotifier {
     _completionColor = color;
     colorRevision.value++;
     await _db.setAppSetting('completion_color', color.value.toString());
+  }
+
+  /// Replaces the appearance overrides (background + font color) and persists.
+  /// Fires the main notifier because these feed the CupertinoApp theme
+  /// (scaffold background + text theme), which lives above the content subtree.
+  Future<void> updateAppearancePrefs(AppearancePrefs prefs) async {
+    _appearancePrefs = prefs;
+    notifyListeners();
+    await _db.setAppSetting(kAppearancePrefsKey, prefs.toJsonString());
   }
 
   Future<void> updateHideTabLabels(bool value) async {

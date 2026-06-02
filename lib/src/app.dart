@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -15,10 +17,12 @@ import 'security/security_service.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'tasks/task_controller.dart';
+import 'theme/app_background.dart';
 import 'theme/app_fonts.dart';
+import 'theme/appearance_prefs.dart';
 import 'utils/fast_route.dart';
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({
     super.key,
     required this.settingsController,
@@ -45,15 +49,73 @@ class MyApp extends StatelessWidget {
   final GoogleCalendarController googleCalendarController;
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  // Drives time-of-day dynamic colors. Only ticks while a dynamic appearance
+  // is active; otherwise no timer is scheduled.
+  Timer? _clock;
+  int _minuteOfDay = _nowMinuteOfDay();
+
+  SettingsController get _settings => widget.settingsController;
+
+  static int _nowMinuteOfDay() {
+    final now = DateTime.now();
+    return now.hour * 60 + now.minute;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _settings.addListener(_onSettingsChanged);
+    _syncClock();
+  }
+
+  @override
+  void dispose() {
+    _settings.removeListener(_onSettingsChanged);
+    _clock?.cancel();
+    super.dispose();
+  }
+
+  void _onSettingsChanged() => _syncClock();
+
+  /// Starts or stops the per-minute refresh timer to match whether any
+  /// time-of-day dynamic color is currently configured.
+  void _syncClock() {
+    final needsClock = _settings.appearancePrefs.usesDynamic;
+    if (needsClock && _clock == null) {
+      _clock = Timer.periodic(const Duration(seconds: 30), (_) {
+        final m = _nowMinuteOfDay();
+        if (m != _minuteOfDay && mounted) setState(() => _minuteOfDay = m);
+      });
+    } else if (!needsClock && _clock != null) {
+      _clock!.cancel();
+      _clock = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: settingsController,
+      listenable: _settings,
       builder: (context, _) {
+        final settingsController = _settings;
+        final prefs = settingsController.appearancePrefs;
         final brightness = switch (settingsController.themeMode) {
           ThemeMode.light => Brightness.light,
           ThemeMode.dark => Brightness.dark,
           _ => null,
         };
+
+        // Resolve the per-brightness scaffold background + font color overrides
+        // into brightness-aware dynamic colors so they apply correctly whether
+        // the user is on light, dark, or system-following mode.
+        final scaffoldColor = _scaffoldBackgroundColor(prefs, _minuteOfDay);
+        final fontColor = _fontColor(prefs, _minuteOfDay);
+        final barColor = _barBackgroundColor(prefs);
+
         return CupertinoApp(
           restorationScopeId: 'app',
           locale: settingsController.locale,
@@ -67,9 +129,22 @@ class MyApp extends StatelessWidget {
           onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
           theme: CupertinoThemeData(
             brightness: brightness,
-            barBackgroundColor: CupertinoColors.systemBackground,
-            textTheme: buildCupertinoTextTheme(settingsController.fontKey),
+            scaffoldBackgroundColor: scaffoldColor,
+            barBackgroundColor: barColor,
+            textTheme: buildCupertinoTextTheme(
+              settingsController.fontKey,
+              color: fontColor,
+            ),
           ),
+          builder: (context, child) {
+            // Image backgrounds need a real painter behind the (transparent)
+            // scaffolds. Solid / dynamic colors are handled by the theme above.
+            if (child == null) return const SizedBox.shrink();
+            final isDark = _isDark(settingsController.themeMode, context);
+            final appearance = prefs.forBrightness(isDark);
+            if (appearance.backgroundMode != BackgroundMode.image) return child;
+            return AppBackground(appearance: appearance, child: child);
+          },
           onGenerateRoute: (settings) => FastRoute<void>(
             settings: settings,
             // Accent/completion color changes bump colorRevision (not the main
@@ -92,18 +167,18 @@ class MyApp extends StatelessWidget {
                 return MediaQuery(
                   data: mq,
                   child: _SecurityGate(
-                    securityService: securityService,
+                    securityService: widget.securityService,
                     child: HomeShell(
                       settingsController: settingsController,
-                      taskController: taskController,
-                      folderController: folderController,
-                      noteController: noteController,
-                      routineController: routineController,
-                      eventController: eventController,
-                      contactController: contactController,
-                      backupService: backupService,
-                      securityService: securityService,
-                      googleCalendarController: googleCalendarController,
+                      taskController: widget.taskController,
+                      folderController: widget.folderController,
+                      noteController: widget.noteController,
+                      routineController: widget.routineController,
+                      eventController: widget.eventController,
+                      contactController: widget.contactController,
+                      backupService: widget.backupService,
+                      securityService: widget.securityService,
+                      googleCalendarController: widget.googleCalendarController,
                     ),
                   ),
                 );
@@ -114,6 +189,60 @@ class MyApp extends StatelessWidget {
       },
     );
   }
+}
+
+/// True when the effective brightness is dark, resolving [ThemeMode.system]
+/// against the platform brightness.
+bool _isDark(ThemeMode mode, BuildContext context) => switch (mode) {
+      ThemeMode.dark => true,
+      ThemeMode.light => false,
+      _ => MediaQuery.platformBrightnessOf(context) == Brightness.dark,
+    };
+
+/// Resolves the scaffold background override to a brightness-aware color, or
+/// null to keep the app default. Image backgrounds resolve to transparent so
+/// the painter ([AppBackground]) shows through; solid/dynamic resolve to the
+/// configured color at [minute].
+Color? _scaffoldBackgroundColor(AppearancePrefs prefs, int minute) {
+  final lightCustom = prefs.light.backgroundMode != BackgroundMode.defaultBg;
+  final darkCustom = prefs.dark.backgroundMode != BackgroundMode.defaultBg;
+  if (!lightCustom && !darkCustom) return null;
+
+  Color side(ThemeAppearance a) {
+    if (a.backgroundMode == BackgroundMode.image) return const Color(0x00000000);
+    return a.backgroundColorAt(minute) ??
+        (a.isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF));
+  }
+
+  return CupertinoDynamicColor.withBrightness(
+    color: side(prefs.light),
+    darkColor: side(prefs.dark),
+  );
+}
+
+/// Resolves the global font-color override to a brightness-aware color, or
+/// null to keep the app default ([CupertinoColors.label]).
+Color? _fontColor(AppearancePrefs prefs, int minute) {
+  final l = prefs.light.fontColorAt(minute);
+  final d = prefs.dark.fontColorAt(minute);
+  if (l == null && d == null) return null;
+  return CupertinoDynamicColor.withBrightness(
+    color: l ?? const Color(0xFF000000),
+    darkColor: d ?? const Color(0xFFFFFFFF),
+  );
+}
+
+/// Nav/tab bar background. Stays the opaque system background unless a custom
+/// app background is active, in which case it becomes a frosted translucent
+/// bar so the background shows through with the standard iOS blur.
+Color _barBackgroundColor(AppearancePrefs prefs) {
+  final custom = prefs.light.backgroundMode != BackgroundMode.defaultBg ||
+      prefs.dark.backgroundMode != BackgroundMode.defaultBg;
+  if (!custom) return CupertinoColors.systemBackground;
+  return const CupertinoDynamicColor.withBrightness(
+    color: Color(0xCCF8F8F8),
+    darkColor: Color(0xCC1C1C1E),
+  );
 }
 
 class _SecurityGate extends StatefulWidget {

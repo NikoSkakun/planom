@@ -238,6 +238,24 @@ class S {
   String get textSize => t('textSize');
   String get useSystemTextSize => t('useSystemTextSize');
   String get textSizeHint => t('textSizeHint');
+  // Appearance: background + text color overrides + dynamic colors.
+  String get background => t('background');
+  String get textColor => t('textColor');
+  String get appearanceModeDefault => t('appearanceModeDefault');
+  String get appearanceModeSolid => t('appearanceModeSolid');
+  String get appearanceModeImage => t('appearanceModeImage');
+  String get appearanceModeDynamic => t('appearanceModeDynamic');
+  String get chooseImage => t('chooseImage');
+  String get changeImage => t('changeImage');
+  String get removeImage => t('removeImage');
+  String get autoTextColor => t('autoTextColor');
+  String get autoTextColorHint => t('autoTextColorHint');
+  String get dynamicColors => t('dynamicColors');
+  String get dynamicColorsHint => t('dynamicColorsHint');
+  String get addColorStop => t('addColorStop');
+  String get backgroundHint => t('backgroundHint');
+  String get textColorHint => t('textColorHint');
+  String get timeLabel => t('timeLabel');
   String get animationSpeed => t('animationSpeed');
   String get animationSpeedHint => t('animationSpeedHint');
   String get animationSpeedOff => t('animationSpeedOff');
@@ -837,6 +855,23 @@ const Map<String, String> _en = {
   'textSize': 'Text size',
   'useSystemTextSize': 'Use system text size',
   'textSizeHint': 'Scales all text in the app. UI elements next to text grow with the chosen size.',
+  'background': 'Background',
+  'textColor': 'Text Color',
+  'appearanceModeDefault': 'Default',
+  'appearanceModeSolid': 'Color',
+  'appearanceModeImage': 'Image',
+  'appearanceModeDynamic': 'Dynamic',
+  'chooseImage': 'Choose Image',
+  'changeImage': 'Change Image',
+  'removeImage': 'Remove Image',
+  'autoTextColor': 'Adjust to background automatically',
+  'autoTextColorHint': 'Picks black or white text based on the brightness of the background.',
+  'dynamicColors': 'Dynamic Colors',
+  'dynamicColorsHint': 'The color blends smoothly between the stops you place across the day.',
+  'addColorStop': 'Add Color',
+  'backgroundHint': 'Override the app background for the light and dark themes, with a solid color, a photo, or colors that shift through the day.',
+  'textColorHint': 'Override the app text color for the light and dark themes.',
+  'timeLabel': 'Time',
   'animationSpeed': 'Animation speed',
   'animationSpeedHint': 'Controls how fast page transitions, list reorders, drag and other UI animations play. Choose Off for immediate, snap-style transitions.',
   'animationSpeedOff': 'Off',

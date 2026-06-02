@@ -2,8 +2,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 
 import '../localization/strings.dart';
+import '../theme/app_fonts.dart';
+import '../theme/appearance_prefs.dart';
 import '../utils/color_picker.dart';
+import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
+import 'appearance_custom_view.dart';
+import 'font_picker_view.dart';
 import 'settings_controller.dart';
 import 'settings_widgets.dart';
 
@@ -125,6 +130,51 @@ class AppearanceView extends StatelessWidget {
                   onSelect: controller.updateCompletionColor,
                 ),
 
+                // ── Font & custom colors ─────────────────────────────────
+                const SizedBox(height: 32),
+                Text(
+                  s.sectionCustomization,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: labelColor,
+                    letterSpacing: -0.08,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SettingsNavRow(
+                  label: s.font,
+                  trailingLabel: controller.fontKey == kSystemFontKey
+                      ? s.systemFont
+                      : fontDisplayName(controller.fontKey),
+                  onTap: () => Navigator.of(context).push(
+                    FastRoute<void>(
+                      builder: (_) => FontPickerView(controller: controller),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 1),
+                SettingsNavRow(
+                  label: s.background,
+                  trailingLabel: _backgroundSummary(s, controller),
+                  onTap: () => Navigator.of(context).push(
+                    FastRoute<void>(
+                      builder: (_) =>
+                          BackgroundSettingsView(controller: controller),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 1),
+                SettingsNavRow(
+                  label: s.textColor,
+                  trailingLabel: _textColorSummary(s, controller),
+                  onTap: () => Navigator.of(context).push(
+                    FastRoute<void>(
+                      builder: (_) =>
+                          TextColorSettingsView(controller: controller),
+                    ),
+                  ),
+                ),
+
                 // ── Text size ────────────────────────────────────────────
                 const SizedBox(height: 32),
                 Text(
@@ -220,6 +270,41 @@ class AppearanceView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _bgModeLabel(S s, BackgroundMode m) => switch (m) {
+        BackgroundMode.solid => s.appearanceModeSolid,
+        BackgroundMode.image => s.appearanceModeImage,
+        BackgroundMode.dynamicColor => s.appearanceModeDynamic,
+        BackgroundMode.defaultBg => s.appearanceModeDefault,
+      };
+
+  static String _backgroundSummary(S s, SettingsController controller) {
+    final p = controller.appearancePrefs;
+    final l = p.light.backgroundMode;
+    final d = p.dark.backgroundMode;
+    if (l == BackgroundMode.defaultBg && d == BackgroundMode.defaultBg) {
+      return s.appearanceModeDefault;
+    }
+    if (l == d) return _bgModeLabel(s, l);
+    // Light & dark differ — surface the non-default one (prefer the active-ish).
+    final shown = l != BackgroundMode.defaultBg ? l : d;
+    return _bgModeLabel(s, shown);
+  }
+
+  static String _textColorSummary(S s, SettingsController controller) {
+    final p = controller.appearancePrefs;
+    bool customized(ThemeAppearance a) =>
+        a.autoFontColorFromBackground ||
+        a.fontColorMode != FontColorMode.defaultColor;
+    if (!customized(p.light) && !customized(p.dark)) {
+      return s.appearanceModeDefault;
+    }
+    final a = customized(p.light) ? p.light : p.dark;
+    if (a.autoFontColorFromBackground) return s.autoTextColor;
+    return a.fontColorMode == FontColorMode.dynamicColor
+        ? s.appearanceModeDynamic
+        : s.appearanceModeSolid;
   }
 
   static String _firstDayLabel(S s, int day) {

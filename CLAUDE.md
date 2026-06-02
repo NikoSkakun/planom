@@ -237,6 +237,7 @@ When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 - `last_tab` — last logical tab opened (persisted for `default_tab = last`)
 - `accent_color`, `completion_color` — ARGB int as decimal string
 - `font` — Google Fonts camelCase key or `'__system__'`
+- `appearance_prefs` — JSON `AppearancePrefs` (`lib/src/theme/appearance_prefs.dart`): per light/dark theme background override (default / solid color / user image / time-of-day dynamic gradient) + font-color override (default / solid / dynamic) + auto-contrast-to-background toggle. Applied in `app.dart` through the CupertinoApp theme (`scaffoldBackgroundColor` + `textTheme` color) for solid/dynamic, and an `AppBackground` painter (`lib/src/theme/app_background.dart`) for images; dynamic colors refresh on a per-minute timer in `_MyAppState`. Background images are stored under `<docs>/backgrounds/` (relative path, like custom icons). Edited via Settings → Appearance → Background / Text Color (`appearance_custom_view.dart` + `dynamic_color_editor.dart`); the Font picker also now lives under Appearance
 - `locale` — BCP-47 language code (`en`, `uk`, `es`, `fr`, `de`, `it`, `pt`, `ru`, `zh`, `ja`)
 - `task_field_prefs` — JSON-serialised `TaskFieldPrefs`
 - `badge_mode`, `badge_include_routines` — app-icon-badge mode + whether today's uncompleted routines are added

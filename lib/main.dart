@@ -12,6 +12,7 @@ import 'src/security/security_service.dart';
 import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
 import 'src/spaces/space_manager.dart';
+import 'src/theme/app_background.dart';
 import 'src/utils/platform_capabilities.dart';
 
 void main() async {
@@ -37,6 +38,7 @@ void main() async {
   }
 
   await initFolderIconService();
+  await initBackgroundService();
   await NotificationService.initTimezone();
   await NotificationService.instance.init();
 
