@@ -337,6 +337,63 @@ void main() {
       expect(controller.eventsForDate(future).length, 1);
     });
 
+    test('disconnect turns it off and a relaunch stays off', () async {
+      final today = DateTime.now();
+      service.calendars.add(cal('work'));
+      service.events.add(ev('w1', 'work', today));
+      await controller.connect();
+      await settle();
+      expect(controller.isConnected, true);
+      expect(controller.eventsForDate(today).length, 1);
+
+      await controller.disconnect();
+      expect(controller.isConnected, false);
+      expect(controller.eventsForDate(today), isEmpty);
+
+      // Simulate a relaunch: a fresh controller on the same DB. The OS still
+      // grants calendar permission (fullAccess) and the device still has the
+      // calendar + event — but because the user disconnected, nothing should
+      // come back and no calendars should be auto-selected.
+      final service2 = _FakeEventKit()
+        ..status = EventKitAuthStatus.fullAccess
+        ..calendars.add(cal('work'))
+        ..events.add(ev('w1', 'work', today));
+      final controller2 = DeviceCalendarController(
+        db: db,
+        service: service2,
+        cache: _FakeCache(),
+      );
+      await controller2.load();
+      await settle();
+
+      expect(controller2.isConnected, false);
+      expect(controller2.eventsForDate(today), isEmpty);
+      expect(controller2.selectedCalendarIds, isEmpty);
+    });
+
+    test('relaunch while still connected restores events', () async {
+      final today = DateTime.now();
+      service.calendars.add(cal('work'));
+      service.events.add(ev('w1', 'work', today));
+      await controller.connect();
+      await settle();
+
+      final service2 = _FakeEventKit()
+        ..status = EventKitAuthStatus.fullAccess
+        ..calendars.add(cal('work'))
+        ..events.add(ev('w1', 'work', today));
+      final controller2 = DeviceCalendarController(
+        db: db,
+        service: service2,
+        cache: _FakeCache(),
+      );
+      await controller2.load();
+      await settle();
+
+      expect(controller2.isConnected, true);
+      expect(controller2.eventsForDate(today).length, 1);
+    });
+
     test('isReservedKey matches the ekcal_ prefix', () {
       expect(DeviceCalendarController.isReservedKey('ekcal_selected'), true);
       expect(DeviceCalendarController.isReservedKey('gcal_selected'), false);

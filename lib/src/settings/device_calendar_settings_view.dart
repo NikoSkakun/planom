@@ -69,7 +69,7 @@ class DeviceCalendarSettingsView extends StatelessWidget {
               return _Message(message: s.appleCalendarAccessDenied);
             }
 
-            if (!controller.isAuthorized) {
+            if (!controller.isConnected) {
               return ListView(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 16),

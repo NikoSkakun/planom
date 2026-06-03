@@ -181,7 +181,7 @@ class _CalendarViewState extends State<CalendarView> {
     final gcal = widget.googleCalendarController;
     final ekcal = widget.deviceCalendarController;
     final wantGoogle = gcal != null && gcal.isConnected;
-    final wantDevice = ekcal != null && ekcal.isAuthorized;
+    final wantDevice = ekcal != null && ekcal.isConnected;
     if (!wantGoogle && !wantDevice) return;
     _prefetchDebounce?.cancel();
     _prefetchDebounce = Timer(const Duration(milliseconds: 250), () {

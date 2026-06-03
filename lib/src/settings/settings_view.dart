@@ -361,7 +361,7 @@ class _SettingsViewState extends State<SettingsView> {
                   listenable: widget.deviceCalendarController!,
                   builder: (ctx, _) {
                     final ek = widget.deviceCalendarController!;
-                    final trailing = ek.isAuthorized
+                    final trailing = ek.isConnected
                         ? s.appleCalendarOn
                         : s.appleCalendarOff;
                     return _NavRow(

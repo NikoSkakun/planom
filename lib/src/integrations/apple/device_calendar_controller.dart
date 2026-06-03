@@ -37,6 +37,7 @@ class DeviceCalendarController with ChangeNotifier {
   final DeviceCalendarCache _cache;
 
   // ── Settings keys ──────────────────────────────────────────────────────
+  static const _kEnabled = 'ekcal_enabled';
   static const _kSelected = 'ekcal_selected';
   static const _kDefaultCalendar = 'ekcal_default_calendar';
   static const _kLastSyncAt = 'ekcal_last_sync_at';
@@ -53,6 +54,17 @@ class DeviceCalendarController with ChangeNotifier {
   /// service so a fake can enable it in tests; in production the real service
   /// reports `PlatformCapabilities.supportsEventKit`.
   bool get isAvailable => _service.isSupported;
+
+  /// Explicit user intent — whether the integration is turned on. Separate from
+  /// the OS calendar permission ([authorizationStatus]), which an app can't
+  /// revoke: once granted it stays granted, so it can't represent "connected".
+  /// Disconnect flips this off and it's persisted, so a relaunch stays off.
+  bool _enabled = false;
+
+  /// True when the integration is on *and* the OS still grants read access.
+  /// This is the "connected" state the UI and the calendar/event surfaces gate
+  /// on (not the raw OS permission).
+  bool get isConnected => _enabled && _authStatus.canRead;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -102,7 +114,7 @@ class DeviceCalendarController with ChangeNotifier {
   List<DeviceEvent> get events => List.unmodifiable(_events);
 
   List<DeviceEvent> eventsForDate(DateTime date) {
-    if (!isAuthorized) return const [];
+    if (!isConnected) return const [];
     return _events
         .where((e) =>
             e.date.year == date.year &&
@@ -155,14 +167,19 @@ class DeviceCalendarController with ChangeNotifier {
   Future<void> load() async {
     if (!isAvailable) return;
     await _readPrefs();
-    _events = await _cache.read();
-    _calendars = await _cache.readCalendars();
     _authStatus = await _service.authorizationStatus();
-    await _rescheduleEventReminders();
-    notifyListeners();
-    if (isAuthorized) {
+    // Only restore cached state while the integration is on. After a disconnect
+    // the cache is already cleared, but guarding here keeps a relaunch firmly
+    // off even if anything lingered.
+    if (isConnected) {
+      _events = await _cache.read();
+      _calendars = await _cache.readCalendars();
+      await _rescheduleEventReminders();
+      notifyListeners();
       // Paint from cache, refresh device calendars + events in the background.
       unawaited(refresh());
+    } else {
+      notifyListeners();
     }
   }
 
@@ -175,10 +192,12 @@ class DeviceCalendarController with ChangeNotifier {
     try {
       final granted = await _service.requestAccess();
       _authStatus = await _service.authorizationStatus();
-      if (!granted || !isAuthorized) {
+      if (!granted || !_authStatus.canRead) {
         notifyListeners();
         return false;
       }
+      _enabled = true;
+      await _persistEnabled();
       final cals = await _service.listCalendars();
       _calendars = cals;
       await _cache.writeCalendars(cals);
@@ -207,6 +226,8 @@ class DeviceCalendarController with ChangeNotifier {
   Future<void> disconnect() async {
     _setLoading(true);
     try {
+      _enabled = false;
+      await _persistEnabled();
       for (final key in _eventReminders.keys.toList()) {
         await NotificationService.instance.cancelRemoteEventReminders(key);
       }
@@ -235,6 +256,8 @@ class DeviceCalendarController with ChangeNotifier {
       final value = row['value'] as String?;
       if (value == null || value.isEmpty) continue;
       switch (key) {
+        case _kEnabled:
+          _enabled = value == 'true';
         case _kSelected:
           try {
             _selectedIds =
@@ -264,6 +287,9 @@ class DeviceCalendarController with ChangeNotifier {
       }
     }
   }
+
+  Future<void> _persistEnabled() =>
+      _db.setAppSetting(_kEnabled, _enabled ? 'true' : 'false');
 
   Future<void> _persistSelected() =>
       _db.setAppSetting(_kSelected, jsonEncode(_selectedIds.toList()));
@@ -387,7 +413,7 @@ class DeviceCalendarController with ChangeNotifier {
   }
 
   Future<void> _refreshLocked({DateTime? from, DateTime? to}) async {
-    if (!isAuthorized) return;
+    if (!isConnected) return;
     _setLoading(true);
     _lastError = null;
     try {
@@ -439,7 +465,7 @@ class DeviceCalendarController with ChangeNotifier {
   /// Ensures every event in the [from, to] window is loaded. No-op if already
   /// covered; otherwise fetches the missing slice(s).
   Future<void> ensureRangeLoaded(DateTime from, DateTime to) async {
-    if (!isAuthorized) return;
+    if (!isConnected) return;
     final wantFrom = DateTime(from.year, from.month, 1);
     final wantTo = DateTime(to.year, to.month + 1, 1);
     if (_rangeCovers(wantFrom, wantTo)) return;
