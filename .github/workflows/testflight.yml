@@ -49,7 +49,10 @@ jobs:
 
       # ── iOS prebuild ──────────────────────────────────────────────────────────
       - name: Build Flutter iOS (unsigned)
-        run: flutter build ios --release --no-codesign
+        # --split-debug-info strips Dart symbol/debug info out of the binary
+        # (smaller App.framework) and writes it to a side directory instead.
+        # This is behaviour-neutral — no codegen change, no runtime/loading impact.
+        run: flutter build ios --release --no-codesign --split-debug-info=build/debug-symbols
 
       - name: Install CocoaPods dependencies
         run: pod install --project-directory=ios --repo-update
@@ -73,3 +76,14 @@ jobs:
           MATCH_GITHUB_TOKEN:                  ${{ secrets.MATCH_GITHUB_TOKEN }}
 
         run: bundle exec fastlane beta
+
+      # ── Debug symbols ─────────────────────────────────────────────────────────
+      # split-debug-info moves Dart symbols out of the IPA, so retain them as an
+      # artifact to symbolicate release stack traces later via `flutter symbolize`.
+      - name: Upload Dart debug symbols
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-debug-symbols
+          path: build/debug-symbols
+          if-no-files-found: warn
