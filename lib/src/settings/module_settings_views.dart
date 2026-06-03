@@ -312,6 +312,25 @@ class RoutinesSettingsView extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 24),
+                  SettingsSectionHeader(s.tabRoutines),
+                  SettingsToggleRow(
+                    label: s.habitNaming,
+                    value: controller.useHabitNaming,
+                    onChanged: controller.updateUseHabitNaming,
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      s.habitNamingHint,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             );

@@ -55,9 +55,91 @@ class S {
     return S(locale);
   }
 
+  /// Visual-only override: when true, routine-feature strings are rewritten to
+  /// say "Habit"/"Habits" (in the active language) instead of "Routine". Set
+  /// from [SettingsController]; the underlying data model is unchanged.
+  static bool useHabitNaming = false;
+
   String t(String key) {
     final table = _translations[locale.languageCode] ?? _translations['en']!;
-    return table[key] ?? _translations['en']![key] ?? key;
+    final value = table[key] ?? _translations['en']![key] ?? key;
+    if (useHabitNaming && _habitNamingKeys.contains(key)) {
+      return _applyHabitNaming(value, locale.languageCode);
+    }
+    return value;
+  }
+
+  /// Keys whose user-facing value mentions the "routine" concept and should be
+  /// rewritten to "habit" wording when [useHabitNaming] is on.
+  static const Set<String> _habitNamingKeys = {
+    'tabRoutines',
+    'appBadgeIncludeRoutines',
+    'showRoutinesInToday',
+    'showRoutinesInCalendar',
+    'showRoutinesHint',
+    'sectionShowRoutines',
+    'resetAllDataBody',
+    'routineName',
+    'newRoutine',
+    'editRoutine',
+    'overdueRoutineTitle',
+    'recordManualInfo',
+    'noRoutinesToday',
+    'noRoutinesYet',
+    'tapPlusFirstAdd',
+    'tapPlusFirstCreate',
+    'deleteRoutine',
+  };
+
+  /// Ordered (plural/uppercase before singular) word substitutions per locale.
+  /// Locales whose tables already use habit wording (or where "routine" is
+  /// invariant) are intentionally absent → no rewrite.
+  static const Map<String, List<List<String>>> _habitSubstitutions = {
+    'en': [
+      ['Routines', 'Habits'],
+      ['ROUTINES', 'HABITS'],
+      ['routines', 'habits'],
+      ['Routine', 'Habit'],
+      ['routine', 'habit'],
+    ],
+    'es': [
+      ['Rutinas', 'Hábitos'],
+      ['RUTINAS', 'HÁBITOS'],
+      ['rutinas', 'hábitos'],
+      ['Rutina', 'Hábito'],
+      ['rutina', 'hábito'],
+    ],
+    'fr': [
+      ['Routines', 'Habitudes'],
+      ['ROUTINES', 'HABITUDES'],
+      ['routines', 'habitudes'],
+      ['Routine', 'Habitude'],
+      ['routine', 'habitude'],
+    ],
+    'de': [
+      ['Routinen', 'Gewohnheiten'],
+      ['ROUTINEN', 'GEWOHNHEITEN'],
+      ['routinen', 'gewohnheiten'],
+      ['Routine', 'Gewohnheit'],
+      ['routine', 'Gewohnheit'],
+    ],
+    'pt': [
+      ['Rotinas', 'Hábitos'],
+      ['ROTINAS', 'HÁBITOS'],
+      ['rotinas', 'hábitos'],
+      ['Rotina', 'Hábito'],
+      ['rotina', 'hábito'],
+    ],
+  };
+
+  static String _applyHabitNaming(String value, String code) {
+    final subs = _habitSubstitutions[code];
+    if (subs == null) return value;
+    var out = value;
+    for (final pair in subs) {
+      out = out.replaceAll(pair[0], pair[1]);
+    }
+    return out;
   }
 
   static bool _completenessChecked = false;
@@ -239,6 +321,8 @@ class S {
   String get showRoutinesInCalendar => t('showRoutinesInCalendar');
   String get showRoutinesHint => t('showRoutinesHint');
   String get sectionShowRoutines => t('sectionShowRoutines');
+  String get habitNaming => t('habitNaming');
+  String get habitNamingHint => t('habitNamingHint');
   String get sectionDefaults => t('sectionDefaults');
   String get defaultTaskIcon => t('defaultTaskIcon');
   String get defaultListIcon => t('defaultListIcon');
@@ -803,7 +887,7 @@ const Map<String, String> _en = {
   'exportFailedBody': 'An error occurred while creating the backup.',
   'newSpace': 'New Space', 'spaceName': 'Space name', 'spaces': 'Spaces',
   'noOptionsYet': 'No options yet.', 'sectionModules': 'MODULES',
-  'appBadgeIncludeRoutines': 'Include today\'s routines', 'showRoutinesInToday': 'Show routines in Today', 'showRoutinesInCalendar': 'Show routines in Calendar', 'showRoutinesHint': 'Today\'s routines appear as a collapsible section in Tasks → Today and in the Calendar day view.', 'sectionShowRoutines': 'SHOW ROUTINES IN',
+  'appBadgeIncludeRoutines': 'Include today\'s routines', 'showRoutinesInToday': 'Show routines in Today', 'showRoutinesInCalendar': 'Show routines in Calendar', 'showRoutinesHint': 'Today\'s routines appear as a collapsible section in Tasks → Today and in the Calendar day view.', 'sectionShowRoutines': 'SHOW ROUTINES IN', 'habitNaming': 'Use "Habit" naming', 'habitNamingHint': 'Show this feature as "Habits" instead of "Routines" everywhere in the app.',
   'sectionTaskFields': 'TASK FIELDS',
   'taskFieldsHint': 'Hidden fields are not shown when editing a task.',
   'sectionBody': 'BODY', 'useMarkdown': 'Format with Markdown',
@@ -1192,7 +1276,7 @@ const Map<String, String> _uk = {
   'exportFailedBody': 'Сталася помилка під час створення резервної копії.',
   'newSpace': 'Новий простір', 'spaceName': 'Назва простору', 'spaces': 'Простори',
   'noOptionsYet': 'Параметрів ще немає.', 'sectionModules': 'МОДУЛІ',
-  'appBadgeIncludeRoutines': 'Враховувати звички на сьогодні', 'showRoutinesInToday': 'Показувати звички в «Сьогодні»', 'showRoutinesInCalendar': 'Показувати звички в Календарі', 'showRoutinesHint': 'Звички на сьогодні зʼявляються окремою згортуваною секцією у «Завдання → Сьогодні» та в денному перегляді Календаря.', 'sectionShowRoutines': 'ПОКАЗУВАТИ ЗВИЧКИ В',
+  'appBadgeIncludeRoutines': 'Враховувати звички на сьогодні', 'showRoutinesInToday': 'Показувати звички в «Сьогодні»', 'showRoutinesInCalendar': 'Показувати звички в Календарі', 'showRoutinesHint': 'Звички на сьогодні зʼявляються окремою згортуваною секцією у «Завдання → Сьогодні» та в денному перегляді Календаря.', 'sectionShowRoutines': 'ПОКАЗУВАТИ ЗВИЧКИ В', 'habitNaming': 'Називати «Звичками»', 'habitNamingHint': 'Показувати цю функцію як «Звички» по всьому застосунку.',
   'sectionTaskFields': 'ПОЛЯ ЗАВДАННЯ',
   'taskFieldsHint': 'Приховані поля не показуються при редагуванні завдання.',
   'sectionBody': 'ТІЛО', 'useMarkdown': 'Форматувати з Markdown',
@@ -1339,7 +1423,7 @@ const Map<String, String> _es = {
   'exportFailedBody': 'Ocurrió un error al crear la copia.',
   'newSpace': 'Nuevo espacio', 'spaceName': 'Nombre del espacio', 'spaces': 'Espacios',
   'noOptionsYet': 'Aún no hay opciones.', 'sectionModules': 'MÓDULOS',
-  'appBadgeIncludeRoutines': 'Incluir las rutinas de hoy', 'showRoutinesInToday': 'Mostrar rutinas en Hoy', 'showRoutinesInCalendar': 'Mostrar rutinas en Calendario', 'showRoutinesHint': 'Las rutinas de hoy aparecen como una sección plegable en Tareas → Hoy y en la vista diaria del Calendario.', 'sectionShowRoutines': 'MOSTRAR RUTINAS EN',
+  'appBadgeIncludeRoutines': 'Incluir las rutinas de hoy', 'showRoutinesInToday': 'Mostrar rutinas en Hoy', 'showRoutinesInCalendar': 'Mostrar rutinas en Calendario', 'showRoutinesHint': 'Las rutinas de hoy aparecen como una sección plegable en Tareas → Hoy y en la vista diaria del Calendario.', 'sectionShowRoutines': 'MOSTRAR RUTINAS EN', 'habitNaming': 'Usar el nombre «Hábito»', 'habitNamingHint': 'Mostrar esta función como «Hábitos» en lugar de «Rutinas» en toda la app.',
   'sectionTaskFields': 'CAMPOS DE TAREA',
   'taskFieldsHint': 'Los campos ocultos no se muestran al editar una tarea.',
   'sectionBody': 'CUERPO', 'useMarkdown': 'Formatear con Markdown',
@@ -1486,7 +1570,7 @@ const Map<String, String> _fr = {
   'exportFailedBody': 'Une erreur est survenue lors de la création de la sauvegarde.',
   'newSpace': 'Nouvel espace', 'spaceName': 'Nom de l\'espace', 'spaces': 'Espaces',
   'noOptionsYet': 'Aucune option pour le moment.', 'sectionModules': 'MODULES',
-  'appBadgeIncludeRoutines': 'Inclure les routines du jour', 'showRoutinesInToday': 'Afficher les routines dans Aujourd\'hui', 'showRoutinesInCalendar': 'Afficher les routines dans le Calendrier', 'showRoutinesHint': 'Les routines du jour apparaissent dans une section repliable dans Tâches → Aujourd\'hui et dans la vue du jour du Calendrier.', 'sectionShowRoutines': 'AFFICHER LES ROUTINES DANS',
+  'appBadgeIncludeRoutines': 'Inclure les routines du jour', 'showRoutinesInToday': 'Afficher les routines dans Aujourd\'hui', 'showRoutinesInCalendar': 'Afficher les routines dans le Calendrier', 'showRoutinesHint': 'Les routines du jour apparaissent dans une section repliable dans Tâches → Aujourd\'hui et dans la vue du jour du Calendrier.', 'sectionShowRoutines': 'AFFICHER LES ROUTINES DANS', 'habitNaming': 'Utiliser le nom « Habitude »', 'habitNamingHint': 'Afficher cette fonction comme « Habitudes » au lieu de « Routines » partout dans l\'app.',
   'sectionTaskFields': 'CHAMPS DE TÂCHE',
   'taskFieldsHint': "Les champs masqués ne s'affichent pas lors de l'édition d'une tâche.",
   'sectionBody': 'CORPS', 'useMarkdown': 'Formater en Markdown',
@@ -1633,7 +1717,7 @@ const Map<String, String> _de = {
   'exportFailedBody': 'Beim Erstellen des Backups ist ein Fehler aufgetreten.',
   'newSpace': 'Neuer Bereich', 'spaceName': 'Bereichsname', 'spaces': 'Bereiche',
   'noOptionsYet': 'Noch keine Optionen.', 'sectionModules': 'MODULE',
-  'appBadgeIncludeRoutines': 'Heutige Routinen einbeziehen', 'showRoutinesInToday': 'Routinen in Heute anzeigen', 'showRoutinesInCalendar': 'Routinen im Kalender anzeigen', 'showRoutinesHint': 'Die heutigen Routinen erscheinen als einklappbarer Abschnitt in Aufgaben → Heute und in der Tagesansicht des Kalenders.', 'sectionShowRoutines': 'ROUTINEN ANZEIGEN IN',
+  'appBadgeIncludeRoutines': 'Heutige Routinen einbeziehen', 'showRoutinesInToday': 'Routinen in Heute anzeigen', 'showRoutinesInCalendar': 'Routinen im Kalender anzeigen', 'showRoutinesHint': 'Die heutigen Routinen erscheinen als einklappbarer Abschnitt in Aufgaben → Heute und in der Tagesansicht des Kalenders.', 'sectionShowRoutines': 'ROUTINEN ANZEIGEN IN', 'habitNaming': '„Gewohnheit“-Bezeichnung', 'habitNamingHint': 'Diese Funktion überall als „Gewohnheiten“ statt „Routinen“ anzeigen.',
   'sectionTaskFields': 'AUFGABENFELDER',
   'taskFieldsHint': 'Ausgeblendete Felder erscheinen nicht beim Bearbeiten einer Aufgabe.',
   'sectionBody': 'KÖRPER', 'useMarkdown': 'Mit Markdown formatieren',
@@ -1780,7 +1864,7 @@ const Map<String, String> _it = {
   'exportFailedBody': 'Si è verificato un errore durante la creazione del backup.',
   'newSpace': 'Nuovo spazio', 'spaceName': 'Nome dello spazio', 'spaces': 'Spazi',
   'noOptionsYet': 'Ancora nessuna opzione.', 'sectionModules': 'MODULI',
-  'appBadgeIncludeRoutines': 'Includi le routine di oggi', 'showRoutinesInToday': 'Mostra le routine in Oggi', 'showRoutinesInCalendar': 'Mostra le routine nel Calendario', 'showRoutinesHint': 'Le routine di oggi appaiono come sezione comprimibile in Attività → Oggi e nella vista giornaliera del Calendario.', 'sectionShowRoutines': 'MOSTRA LE ROUTINE IN',
+  'appBadgeIncludeRoutines': 'Includi le routine di oggi', 'showRoutinesInToday': 'Mostra le routine in Oggi', 'showRoutinesInCalendar': 'Mostra le routine nel Calendario', 'showRoutinesHint': 'Le routine di oggi appaiono come sezione comprimibile in Attività → Oggi e nella vista giornaliera del Calendario.', 'sectionShowRoutines': 'MOSTRA LE ROUTINE IN', 'habitNaming': 'Usa il nome «Abitudine»', 'habitNamingHint': 'Mostra questa funzione come «Abitudini» invece di «Routine» nell\'app.',
   'sectionTaskFields': 'CAMPI ATTIVITÀ',
   'taskFieldsHint': "I campi nascosti non vengono mostrati durante la modifica di un'attività.",
   'sectionBody': 'CORPO', 'useMarkdown': 'Formatta con Markdown',
@@ -1927,7 +2011,7 @@ const Map<String, String> _pt = {
   'exportFailedBody': 'Ocorreu um erro ao criar o backup.',
   'newSpace': 'Novo espaço', 'spaceName': 'Nome do espaço', 'spaces': 'Espaços',
   'noOptionsYet': 'Ainda sem opções.', 'sectionModules': 'MÓDULOS',
-  'appBadgeIncludeRoutines': 'Incluir as rotinas de hoje', 'showRoutinesInToday': 'Mostrar rotinas em Hoje', 'showRoutinesInCalendar': 'Mostrar rotinas no Calendário', 'showRoutinesHint': 'As rotinas de hoje aparecem como uma seção recolhível em Tarefas → Hoje e na vista diária do Calendário.', 'sectionShowRoutines': 'MOSTRAR ROTINAS EM',
+  'appBadgeIncludeRoutines': 'Incluir as rotinas de hoje', 'showRoutinesInToday': 'Mostrar rotinas em Hoje', 'showRoutinesInCalendar': 'Mostrar rotinas no Calendário', 'showRoutinesHint': 'As rotinas de hoje aparecem como uma seção recolhível em Tarefas → Hoje e na vista diária do Calendário.', 'sectionShowRoutines': 'MOSTRAR ROTINAS EM', 'habitNaming': 'Usar o nome «Hábito»', 'habitNamingHint': 'Mostrar esta função como «Hábitos» em vez de «Rotinas» no app.',
   'sectionTaskFields': 'CAMPOS DE TAREFA',
   'taskFieldsHint': 'Os campos ocultos não aparecem ao editar uma tarefa.',
   'sectionBody': 'CORPO', 'useMarkdown': 'Formatar com Markdown',
@@ -2074,7 +2158,7 @@ const Map<String, String> _ru = {
   'exportFailedBody': 'Произошла ошибка при создании резервной копии.',
   'newSpace': 'Новое пространство', 'spaceName': 'Название пространства', 'spaces': 'Пространства',
   'noOptionsYet': 'Пока нет параметров.', 'sectionModules': 'МОДУЛИ',
-  'appBadgeIncludeRoutines': 'Учитывать привычки на сегодня', 'showRoutinesInToday': 'Показывать привычки в «Сегодня»', 'showRoutinesInCalendar': 'Показывать привычки в Календаре', 'showRoutinesHint': 'Привычки на сегодня показываются отдельной сворачиваемой секцией в «Задачи → Сегодня» и в дневном виде Календаря.', 'sectionShowRoutines': 'ПОКАЗЫВАТЬ ПРИВЫЧКИ В',
+  'appBadgeIncludeRoutines': 'Учитывать привычки на сегодня', 'showRoutinesInToday': 'Показывать привычки в «Сегодня»', 'showRoutinesInCalendar': 'Показывать привычки в Календаре', 'showRoutinesHint': 'Привычки на сегодня показываются отдельной сворачиваемой секцией в «Задачи → Сегодня» и в дневном виде Календаря.', 'sectionShowRoutines': 'ПОКАЗЫВАТЬ ПРИВЫЧКИ В', 'habitNaming': 'Называть «Привычками»', 'habitNamingHint': 'Показывать эту функцию как «Привычки» во всём приложении.',
   'sectionTaskFields': 'ПОЛЯ ЗАДАЧИ',
   'taskFieldsHint': 'Скрытые поля не отображаются при редактировании задачи.',
   'sectionBody': 'ТЕЛО', 'useMarkdown': 'Форматировать с Markdown',
@@ -2220,7 +2304,7 @@ const Map<String, String> _zh = {
   'exportFailedBody': '创建备份时出错。',
   'newSpace': '新空间', 'spaceName': '空间名称', 'spaces': '空间',
   'noOptionsYet': '尚无选项。', 'sectionModules': '模块',
-  'appBadgeIncludeRoutines': '包含今天的习惯', 'showRoutinesInToday': '在“今天”中显示习惯', 'showRoutinesInCalendar': '在日历中显示习惯', 'showRoutinesHint': '今天的习惯会在“任务 → 今天”和日历的当日视图中以可折叠的分区显示。', 'sectionShowRoutines': '显示习惯于',
+  'appBadgeIncludeRoutines': '包含今天的习惯', 'showRoutinesInToday': '在“今天”中显示习惯', 'showRoutinesInCalendar': '在日历中显示习惯', 'showRoutinesHint': '今天的习惯会在“任务 → 今天”和日历的当日视图中以可折叠的分区显示。', 'sectionShowRoutines': '显示习惯于', 'habitNaming': '使用“习惯”称谓', 'habitNamingHint': '在整个应用中将此功能显示为“习惯”而非“惯例”。',
   'sectionTaskFields': '任务字段',
   'taskFieldsHint': '隐藏的字段在编辑任务时不会显示。',
   'sectionBody': '正文', 'useMarkdown': '使用 Markdown 格式',
@@ -2366,7 +2450,7 @@ const Map<String, String> _ja = {
   'exportFailedBody': 'バックアップの作成中にエラーが発生しました。',
   'newSpace': '新規スペース', 'spaceName': 'スペース名', 'spaces': 'スペース',
   'noOptionsYet': 'まだ設定はありません。', 'sectionModules': 'モジュール',
-  'appBadgeIncludeRoutines': '今日のルーティンを含める', 'showRoutinesInToday': '「今日」にルーティンを表示', 'showRoutinesInCalendar': 'カレンダーにルーティンを表示', 'showRoutinesHint': '今日のルーティンは、タスク → 今日 とカレンダーの日表示に折りたたみ可能なセクションとして表示されます。', 'sectionShowRoutines': 'ルーティンの表示先',
+  'appBadgeIncludeRoutines': '今日のルーティンを含める', 'showRoutinesInToday': '「今日」にルーティンを表示', 'showRoutinesInCalendar': 'カレンダーにルーティンを表示', 'showRoutinesHint': '今日のルーティンは、タスク → 今日 とカレンダーの日表示に折りたたみ可能なセクションとして表示されます。', 'sectionShowRoutines': 'ルーティンの表示先', 'habitNaming': '「習慣」表記を使う', 'habitNamingHint': 'この機能をアプリ全体で「ルーティン」ではなく「習慣」と表示します。',
   'sectionTaskFields': 'タスク項目',
   'taskFieldsHint': '非表示の項目はタスク編集時に表示されません。',
   'sectionBody': '本文', 'useMarkdown': 'Markdown でフォーマット',

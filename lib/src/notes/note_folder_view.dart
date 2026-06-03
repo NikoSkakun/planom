@@ -84,6 +84,24 @@ class _NoteFolderViewState extends State<NoteFolderView>
     _selection.cancel();
   }
 
+  Future<void> _batchMoveNotes() async {
+    final ids = _selection.selectedIds.toList();
+    if (ids.isEmpty) return;
+    var moved = false;
+    await showNoteMoveToSheet(
+      context,
+      noteController: widget.controller,
+      currentParentId: _currentFolder.id,
+      onMove: (folderId) async {
+        moved = true;
+        for (final id in ids) {
+          await widget.controller.moveNote(id, folderId);
+        }
+      },
+    );
+    if (moved) _selection.cancel();
+  }
+
   /// Wraps a NoteRow in selection mode so taps toggle selection.
   Widget _wrapNoteForSelection(Note n, Widget child) {
     if (!_selection.active) return child;
@@ -159,6 +177,11 @@ class _NoteFolderViewState extends State<NoteFolderView>
       ];
     }
     return [
+      SelectionAction(
+        label: s.moveTo,
+        icon: CupertinoIcons.folder,
+        onTap: empty ? () {} : _batchMoveNotes,
+      ),
       SelectionAction(
         label: s.duplicate,
         icon: CupertinoIcons.doc_on_doc,

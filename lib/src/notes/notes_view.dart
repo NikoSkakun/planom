@@ -23,6 +23,7 @@ import '../utils/selection_checkbox.dart';
 import '../utils/selection_controller.dart';
 import '../utils/selection_toolbar.dart';
 import '../utils/undo_controller.dart';
+import '../folders/move_to_sheet.dart';
 import 'create_note_folder_sheet.dart';
 import 'note_controller.dart';
 import 'note_detail_view.dart';
@@ -103,48 +104,21 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
   }
 
   Future<void> _batchMoveNotes() async {
-    final folders =
-        widget.controller.foldersIn(null).map((f) => f.id).toList();
-    // Build a flat list of selectable folder destinations.
-    String? picked;
-    bool cancelled = true;
-    await showCupertinoModalPopup<void>(
-      context: context,
-      builder: (ctx) {
-        final s = S.of(ctx);
-        return CupertinoActionSheet(
-          title: Text(s.moveTo),
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                cancelled = false;
-                picked = null;
-                Navigator.of(ctx).pop();
-              },
-              child: Text(s.inbox),
-            ),
-            for (final fid in folders)
-              CupertinoActionSheetAction(
-                onPressed: () {
-                  cancelled = false;
-                  picked = fid;
-                  Navigator.of(ctx).pop();
-                },
-                child: Text(widget.controller.folderById(fid)?.name ?? '—'),
-              ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(s.cancel),
-          ),
-        );
+    final ids = _selection.selectedIds.toList();
+    if (ids.isEmpty) return;
+    var moved = false;
+    await showNoteMoveToSheet(
+      context,
+      noteController: widget.controller,
+      currentParentId: null,
+      onMove: (folderId) async {
+        moved = true;
+        for (final id in ids) {
+          await widget.controller.moveNote(id, folderId);
+        }
       },
     );
-    if (cancelled || !mounted) return;
-    for (final id in _selection.selectedIds.toList()) {
-      await widget.controller.moveNote(id, picked);
-    }
-    _selection.cancel();
+    if (moved) _selection.cancel();
   }
 
   /// Wraps a NoteRow in selection mode so taps toggle selection rather

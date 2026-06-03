@@ -79,6 +79,11 @@ class _CalendarViewState extends State<CalendarView> {
   int _visibleMonthEpoch = 0;
   Timer? _prefetchDebounce;
 
+  /// The day whose inline preview panel is currently open (null = none). The
+  /// calendar above the panel stays interactive: tapping another day re-targets
+  /// the panel, tapping the same day again (or the nav-bar title) closes it.
+  DateTime? _selectedDate;
+
   // Mirrored from the settings controller so the sliver structure rebuilds
   // when the user switches view mode or first-day-of-week.
   late CalendarViewMode _viewMode;
@@ -200,9 +205,34 @@ class _CalendarViewState extends State<CalendarView> {
     return DateTime(e ~/ 12, e % 12 + 1, 1);
   }
 
+  bool _isSameDay(DateTime? a, DateTime? b) =>
+      a != null &&
+      b != null &&
+      a.year == b.year &&
+      a.month == b.month &&
+      a.day == b.day;
+
+  /// Tapping a day toggles its inline preview panel: a new day opens (and the
+  /// row scrolls into view), the already-open day closes.
+  void _openDay(DateTime date) {
+    if (_isSameDay(_selectedDate, date)) {
+      _closeDay();
+      return;
+    }
+    setState(() => _selectedDate = date);
+    widget.onDaySelected?.call(date);
+    _scrollToDate(date);
+  }
+
+  void _closeDay() {
+    if (_selectedDate == null) return;
+    setState(() => _selectedDate = null);
+    widget.onDaySelected?.call(null);
+  }
+
   /// Scrolls so that the row containing [date] sits near the top of the
-  /// visible calendar area, then opens the day sheet.
-  Future<void> _openDay(DateTime date) async {
+  /// visible calendar area.
+  void _scrollToDate(DateTime date) {
     final double target;
     if (_viewMode == CalendarViewMode.continuous) {
       final weekStart = DateTime(
@@ -232,23 +262,6 @@ class _CalendarViewState extends State<CalendarView> {
         curve: Curves.easeOut,
       );
     }
-    if (!mounted) return;
-
-    widget.onDaySelected?.call(date);
-
-    await showDayViewSheet(
-      context,
-      date: date,
-      taskController: widget.controller,
-      eventController: widget.eventController,
-      folderController: widget.folderController,
-      contactController: widget.contactController,
-      settingsController: widget.settingsController,
-      routineController: widget.routineController,
-      googleCalendarController: widget.googleCalendarController,
-    );
-    if (!mounted) return;
-    widget.onDaySelected?.call(null);
   }
 
   Listenable get _dataListenable => Listenable.merge([
@@ -266,6 +279,7 @@ class _CalendarViewState extends State<CalendarView> {
         builder: (context, _) => _MonthSection(
           month: month,
           today: _now,
+          selected: _selectedDate,
           firstDayOfWeek: _firstDay,
           controller: widget.controller,
           folderController: widget.folderController,
@@ -286,6 +300,7 @@ class _CalendarViewState extends State<CalendarView> {
               DateTime(weekStart.year, weekStart.month, weekStart.day + i),
           ],
           today: _now,
+          selected: _selectedDate,
           continuous: true,
           firstDayOfWeek: _firstDay,
           controller: widget.controller,
@@ -378,7 +393,13 @@ class _CalendarViewState extends State<CalendarView> {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
-        middle: Text('$_visibleYear'),
+        // Tapping the title closes an open day preview (one of the two ways to
+        // dismiss it, alongside re-tapping the selected day).
+        middle: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _selectedDate != null ? _closeDay : null,
+          child: Text('$_visibleYear'),
+        ),
         trailing: Semantics(
           label: S.of(context).calendarView,
           button: true,
@@ -414,6 +435,24 @@ class _CalendarViewState extends State<CalendarView> {
                     : _monthSlivers(),
               ),
             ),
+            if (_selectedDate != null)
+              SizedBox(
+                height: (MediaQuery.sizeOf(context).height * 0.42)
+                    .clamp(280.0, 560.0),
+                child: DayViewSheet(
+                  key: ValueKey(_selectedDate),
+                  date: _selectedDate!,
+                  embedded: true,
+                  onClose: _closeDay,
+                  taskController: widget.controller,
+                  eventController: widget.eventController,
+                  folderController: widget.folderController,
+                  contactController: widget.contactController,
+                  settingsController: widget.settingsController,
+                  routineController: widget.routineController,
+                  googleCalendarController: widget.googleCalendarController,
+                ),
+              ),
           ],
         ),
         ),
@@ -522,6 +561,7 @@ class _MonthSection extends StatelessWidget {
   const _MonthSection({
     required this.month,
     required this.today,
+    required this.selected,
     required this.firstDayOfWeek,
     required this.controller,
     required this.folderController,
@@ -533,6 +573,7 @@ class _MonthSection extends StatelessWidget {
 
   final DateTime month;
   final DateTime today;
+  final DateTime? selected;
   final int firstDayOfWeek;
   final TaskController controller;
   final FolderController folderController;
@@ -576,6 +617,7 @@ class _MonthSection extends StatelessWidget {
           _WeekRow(
             days: grid.sublist(w, w + 7),
             today: today,
+            selected: selected,
             controller: controller,
             folderController: folderController,
             eventController: eventController,
@@ -594,6 +636,7 @@ class _WeekRow extends StatelessWidget {
   const _WeekRow({
     required this.days,
     required this.today,
+    required this.selected,
     required this.controller,
     required this.folderController,
     required this.eventController,
@@ -606,6 +649,7 @@ class _WeekRow extends StatelessWidget {
 
   final List<DateTime?> days;
   final DateTime today;
+  final DateTime? selected;
   final TaskController controller;
   final FolderController folderController;
   final EventController eventController;
@@ -629,6 +673,7 @@ class _WeekRow extends StatelessWidget {
                   child: _DayCell(
                     date: day,
                     today: today,
+                    selected: selected,
                     continuous: continuous,
                     firstDayOfWeek: firstDayOfWeek,
                     controller: controller,
@@ -651,6 +696,7 @@ class _DayCell extends StatelessWidget {
   const _DayCell({
     required this.date,
     required this.today,
+    required this.selected,
     required this.controller,
     required this.folderController,
     required this.eventController,
@@ -663,6 +709,7 @@ class _DayCell extends StatelessWidget {
 
   final DateTime? date;
   final DateTime today;
+  final DateTime? selected;
   final bool continuous;
   final int firstDayOfWeek;
   final TaskController controller;
@@ -677,6 +724,13 @@ class _DayCell extends StatelessWidget {
       date!.year == today.year &&
       date!.month == today.month &&
       date!.day == today.day;
+
+  bool get _isSelected =>
+      date != null &&
+      selected != null &&
+      date!.year == selected!.year &&
+      date!.month == selected!.month &&
+      date!.day == selected!.day;
 
   /// Cell border. In the continuous view a semi-bold line marks the month
   /// boundary: the new month's first-week cells get a heavier top edge (the
@@ -708,11 +762,32 @@ class _DayCell extends StatelessWidget {
   /// continuous view, the 1st of each month is prefixed with the month's short
   /// name so month boundaries read clearly without a separating header.
   Widget _buildDayLabel(BuildContext context) {
+    // Highlight priority: the selected day gets the strong accent pill (moved
+    // off "today"); an unselected today gets a softer neutral fill so it still
+    // stands out without competing with the selection.
+    final selectedHere = _isSelected;
+    final Color? fillColor;
+    final Color textColor;
+    final FontWeight weight;
+    if (selectedHere) {
+      fillColor = AppColors.accent;
+      textColor = CupertinoColors.white;
+      weight = FontWeight.w700;
+    } else if (_isToday) {
+      fillColor = CupertinoColors.systemGrey4.resolveFrom(context);
+      textColor = CupertinoColors.label.resolveFrom(context);
+      weight = FontWeight.w700;
+    } else {
+      fillColor = null;
+      textColor = CupertinoColors.label.resolveFrom(context);
+      weight = FontWeight.normal;
+    }
+
     final numberPill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: _isToday
+      decoration: fillColor != null
           ? BoxDecoration(
-              color: AppColors.accent,
+              color: fillColor,
               borderRadius: BorderRadius.circular(20),
             )
           : null,
@@ -720,10 +795,8 @@ class _DayCell extends StatelessWidget {
         '${date!.day}',
         style: TextStyle(
           fontSize: 12,
-          fontWeight: _isToday ? FontWeight.w700 : FontWeight.normal,
-          color: _isToday
-              ? CupertinoColors.white
-              : CupertinoColors.label.resolveFrom(context),
+          fontWeight: weight,
+          color: textColor,
         ),
       ),
     );

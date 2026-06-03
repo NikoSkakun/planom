@@ -64,6 +64,8 @@ class DayViewSheet extends StatefulWidget {
     this.settingsController,
     this.routineController,
     this.googleCalendarController,
+    this.embedded = false,
+    this.onClose,
   });
 
   final DateTime date;
@@ -74,6 +76,13 @@ class DayViewSheet extends StatefulWidget {
   final SettingsController? settingsController;
   final RoutineController? routineController;
   final GoogleCalendarController? googleCalendarController;
+
+  /// When true the sheet renders as a panel embedded in the page (rounded top,
+  /// drop shadow, a close button instead of a drag handle, and no floating +
+  /// button — the host page's + handles creation). The calendar above it stays
+  /// interactive.
+  final bool embedded;
+  final VoidCallback? onClose;
 
   @override
   State<DayViewSheet> createState() => _DayViewSheetState();
@@ -212,8 +221,95 @@ class _DayViewSheetState extends State<DayViewSheet> {
     );
   }
 
+  Listenable get _listenable => Listenable.merge([
+        widget.taskController,
+        widget.eventController,
+        widget.folderController,
+        if (widget.routineController != null) widget.routineController!,
+        if (widget.settingsController != null) widget.settingsController!,
+        if (widget.googleCalendarController != null)
+          widget.googleCalendarController!,
+      ]);
+
+  Widget _buildEmbedded(BuildContext context) {
+    final bg = CupertinoColors.systemBackground.resolveFrom(context);
+    final monthsLongList = monthsLong(context);
+    final weekdaysLongList = weekdaysLong(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 16,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 12, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${widget.date.day}',
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Text(
+                    '${monthsLongList[widget.date.month - 1]}\n'
+                    '${weekdaysLongList[widget.date.weekday - 1]}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.2,
+                      color:
+                          CupertinoColors.secondaryLabel.resolveFrom(context),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                CupertinoButton(
+                  padding: const EdgeInsets.all(8),
+                  minSize: 0,
+                  onPressed: widget.onClose,
+                  child: Icon(
+                    CupertinoIcons.xmark_circle_fill,
+                    size: 26,
+                    color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 0.5,
+            color: CupertinoColors.separator.resolveFrom(context),
+          ),
+          Expanded(
+            child: ListenableBuilder(
+              listenable: _listenable,
+              builder: (ctx, _) => _buildList(ctx),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) return _buildEmbedded(context);
     final mq = MediaQuery.of(context);
     final height = mq.size.height * 0.78;
     final bg = CupertinoColors.systemBackground.resolveFrom(context);

@@ -181,6 +181,11 @@ class SettingsController with ChangeNotifier {
   bool _showRoutinesInCalendar = false;
   bool get showRoutinesInCalendar => _showRoutinesInCalendar;
 
+  // Visual-only: render the Routines feature as "Habits" throughout the UI.
+  // Under the hood everything is still routines (mirrored to S.useHabitNaming).
+  bool _useHabitNaming = false;
+  bool get useHabitNaming => _useHabitNaming;
+
   // Whether today's routines feed the Today smart-list count badge (only
   // relevant when [showRoutinesInToday] is on).
   bool _countRoutinesInToday = false;
@@ -347,6 +352,8 @@ class SettingsController with ChangeNotifier {
         _showRoutinesInToday = value == 'true';
       } else if (key == 'show_routines_in_calendar') {
         _showRoutinesInCalendar = value == 'true';
+      } else if (key == 'use_habit_naming') {
+        _useHabitNaming = value == 'true';
       } else if (key == 'count_routines_in_today') {
         _countRoutinesInToday = value == 'true';
       } else if (key == 'show_events_in_today') {
@@ -388,6 +395,7 @@ class SettingsController with ChangeNotifier {
     AppDefaults.folderIcon = _defaultFolderIcon;
     AppDefaults.noteFolderIcon = _defaultNoteFolderIcon;
     AppScale.factor = _textScale;
+    S.useHabitNaming = _useHabitNaming;
     _applyAnimationSpeed(_animationSpeed);
 
     // Migrate the legacy single-row tab layout to TabBarConfig the first time
@@ -503,6 +511,14 @@ class SettingsController with ChangeNotifier {
     _showRoutinesInToday = value;
     notifyListeners();
     await _db.setAppSetting('show_routines_in_today', value.toString());
+  }
+
+  Future<void> updateUseHabitNaming(bool value) async {
+    if (value == _useHabitNaming) return;
+    _useHabitNaming = value;
+    S.useHabitNaming = value;
+    notifyListeners();
+    await _db.setAppSetting('use_habit_naming', value.toString());
   }
 
   Future<void> updateShowRoutinesInCalendar(bool value) async {
