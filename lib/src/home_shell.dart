@@ -379,6 +379,13 @@ class _HomeShellState extends State<HomeShell> {
 
   void _onSettingsChanged() {
     if (!mounted) return;
+    // If the page being viewed was emptied (all its tabs removed in Settings),
+    // snap to the nearest non-empty page so the user is never stranded on one.
+    final navigable = _navigablePageIndices();
+    if (navigable.isNotEmpty && !navigable.contains(_currentPage)) {
+      _currentPage = navigable.lastWhere((i) => i <= _currentPage,
+          orElse: () => navigable.first);
+    }
     final visibleIndices = _computeVisibleIndices();
 
     // Settings tab just became visible while the user is viewing Settings via
@@ -652,6 +659,18 @@ class _HomeShellState extends State<HomeShell> {
     if (pages.isEmpty) return const [];
     final pageIdx = _currentPage.clamp(0, pages.length - 1);
     return pages[pageIdx];
+  }
+
+  /// Indices of pages that hold at least one tab — the only pages the user can
+  /// swipe to / that earn a page-indicator dot. Empty pages are skipped so the
+  /// dots never count a page the user can't actually reach.
+  List<int> _navigablePageIndices() {
+    final pages = widget.settingsController.tabBarConfig.pages;
+    final result = <int>[];
+    for (var i = 0; i < pages.length; i++) {
+      if (pages[i].isNotEmpty) result.add(i);
+    }
+    return result;
   }
 
   /// Returns the visual position (index into `_pageItems()`) of the first
@@ -949,18 +968,22 @@ class _HomeShellState extends State<HomeShell> {
         final isWide = PlatformCapabilities.isDesktop ||
             MediaQuery.sizeOf(context).width >= 700;
 
-        final pages = widget.settingsController.tabBarConfig.pages;
-        final multiPage = pages.length > 1;
+        final navigablePages = _navigablePageIndices();
+        // Only pages that actually hold tabs count toward the multi-page UI —
+        // empty pages get no dot and can't be swiped to.
+        final hasMultiplePages = navigablePages.length > 1;
         final pageItems = _pageItems();
-        // The bottom tab bar disappears entirely only when a single page holds
-        // a single tab — then the app reads as one screen. As soon as there is
-        // more than one page we always keep a bar so the user can swipe between
-        // pages, even when the current page has just one tab.
-        final singleNoBar = !isWide && pageItems.length <= 1 && !multiPage;
-        // A page that holds a single tab while other pages exist.
+        // The bottom tab bar disappears entirely only when there's a single
+        // reachable page holding a single tab — then the app reads as one
+        // screen. As soon as there's more than one non-empty page we keep a bar
+        // so the user can swipe between pages, even with just one tab on a page.
+        final singleNoBar =
+            !isWide && pageItems.length <= 1 && !hasMultiplePages;
+        // A page that holds a single tab while other non-empty pages exist.
         // CupertinoTabBar requires ≥2 items, so this case gets a bespoke
         // one-item bar instead of CupertinoTabScaffold.
-        final customSingleBar = !isWide && multiPage && pageItems.length < 2;
+        final customSingleBar =
+            !isWide && hasMultiplePages && pageItems.length < 2;
         final hasBottomBar = !isWide && !singleNoBar;
 
         // The lone item (and the built-in tab it drives) for the custom bar.
@@ -1096,10 +1119,10 @@ class _HomeShellState extends State<HomeShell> {
                 },
               ),
             // Multi-page tab bar swipe overlay — covers the tab bar area and
-            // detects horizontal pan to switch between pages. Active whenever
-            // there's more than one page configured and we're in the narrow
-            // (bottom tab bar) layout.
-            if (!isWide && multiPage)
+            // detects horizontal pan to switch between (non-empty) pages.
+            // Active whenever there's more than one non-empty page and we're in
+            // the narrow (bottom tab bar) layout.
+            if (!isWide && hasMultiplePages)
               Positioned(
                 left: 0,
                 right: 0,
@@ -1115,19 +1138,18 @@ class _HomeShellState extends State<HomeShell> {
                 ),
               ),
             // Page indicator dots, shown just above the tab bar when there's
-            // more than one page configured.
-            if (!isWide && multiPage)
+            // more than one non-empty page. Empty pages get no dot.
+            if (!isWide && hasMultiplePages)
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 50 + MediaQuery.paddingOf(context).bottom + 2,
                 child: IgnorePointer(
                   child: _PageDots(
-                    count: widget.settingsController.tabBarConfig.pages.length,
-                    current: _currentPage.clamp(
-                        0,
-                        widget.settingsController.tabBarConfig.pages.length -
-                            1),
+                    count: navigablePages.length,
+                    current: navigablePages
+                        .indexOf(_currentPage)
+                        .clamp(0, navigablePages.length - 1),
                   ),
                 ),
               ),
@@ -1169,9 +1191,14 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _switchPage(int delta) {
-    final pages = widget.settingsController.tabBarConfig.pages;
-    if (pages.length <= 1) return;
-    final next = (_currentPage + delta).clamp(0, pages.length - 1);
+    // Navigate only between non-empty pages so swiping can never land on an
+    // empty page — empty pages are simply skipped over.
+    final navigable = _navigablePageIndices();
+    if (navigable.length <= 1) return;
+    var pos = navigable.indexOf(_currentPage);
+    if (pos < 0) pos = 0; // current page emptied out — start from the first.
+    final nextPos = (pos + delta).clamp(0, navigable.length - 1);
+    final next = navigable[nextPos];
     if (next == _currentPage) return;
     setState(() => _currentPage = next);
     // Recompute initial visible tab so _tabController points to a valid index
