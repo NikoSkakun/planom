@@ -309,6 +309,34 @@ void main() {
       expect(controller.remindersForEvent(e), isEmpty);
     });
 
+    test('recurring events keep every occurrence (past + future)', () async {
+      final base = DateTime.now();
+      final present = DateTime(base.year, base.month, base.day);
+      final past = present.subtract(const Duration(days: 7));
+      final future = present.add(const Duration(days: 7));
+      service.calendars.add(cal('work'));
+      // Three occurrences of one recurring series — all share eventId 'r1',
+      // exactly as EventKit's events(matching:) returns them.
+      DeviceEvent occ(DateTime d) => DeviceEvent(
+            eventId: 'r1',
+            calendarId: 'work',
+            calendarName: 'work',
+            calendarColor: 0xFF112233,
+            title: 'Standup',
+            date: d,
+            doTime: 540,
+          );
+      service.events.addAll([occ(past), occ(present), occ(future)]);
+
+      await controller.connect();
+      await settle();
+
+      // Every occurrence survives — past ones must not be collapsed away.
+      expect(controller.eventsForDate(past).length, 1);
+      expect(controller.eventsForDate(present).length, 1);
+      expect(controller.eventsForDate(future).length, 1);
+    });
+
     test('isReservedKey matches the ekcal_ prefix', () {
       expect(DeviceCalendarController.isReservedKey('ekcal_selected'), true);
       expect(DeviceCalendarController.isReservedKey('gcal_selected'), false);

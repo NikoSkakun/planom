@@ -121,6 +121,14 @@ class DeviceCalendarController with ChangeNotifier {
 
   String _reminderKey(DeviceEvent e) => 'ek:${e.eventId}';
 
+  /// Identity used to de-duplicate events in memory. A recurring event expands
+  /// into many occurrences that all share one `eventId`, so the id alone would
+  /// collapse the whole series into a single row (the last-iterated occurrence,
+  /// i.e. the furthest-future one — which is exactly why past occurrences
+  /// disappeared). Keying by id + occurrence date/time keeps every occurrence.
+  String _occKey(DeviceEvent e) =>
+      '${e.eventId}|${e.date.year}-${e.date.month}-${e.date.day}|${e.doTime ?? -1}';
+
   List<int> remindersForEvent(DeviceEvent event) =>
       List.unmodifiable(_eventReminders[_reminderKey(event)] ?? const <int>[]);
 
@@ -396,12 +404,12 @@ class DeviceCalendarController with ChangeNotifier {
         return;
       }
       // Seed from out-of-window events so previously-loaded ranges survive.
-      final byId = <String, DeviceEvent>{
-        for (final e in _events) e.eventId: e,
+      final byKey = <String, DeviceEvent>{
+        for (final e in _events) _occKey(e): e,
       };
       // EventKit returns the full set for the window; authoritative in-window:
       // drop existing in-window events first (reflects deletions), then re-add.
-      byId.removeWhere((_, e) =>
+      byKey.removeWhere((_, e) =>
           !e.date.isBefore(timeMin) && !e.date.isAfter(timeMax));
       final fetched = await _service.fetchEvents(
         start: timeMin,
@@ -409,9 +417,9 @@ class DeviceCalendarController with ChangeNotifier {
         calendarIds: ids,
       );
       for (final ev in fetched) {
-        byId[ev.eventId] = ev;
+        byKey[_occKey(ev)] = ev;
       }
-      _events = byId.values.toList();
+      _events = byKey.values.toList();
       _expandLoadedRange(timeMin, timeMax);
       _lastSyncAt = DateTime.now();
       await _db.setAppSetting(
@@ -476,8 +484,8 @@ class DeviceCalendarController with ChangeNotifier {
 
     _setLoading(true);
     try {
-      final byId = <String, DeviceEvent>{
-        for (final e in _events) e.eventId: e,
+      final byKey = <String, DeviceEvent>{
+        for (final e in _events) _occKey(e): e,
       };
       for (final slice in slices) {
         try {
@@ -487,14 +495,14 @@ class DeviceCalendarController with ChangeNotifier {
             calendarIds: ids,
           );
           for (final ev in fetched) {
-            byId[ev.eventId] = ev;
+            byKey[_occKey(ev)] = ev;
           }
         } catch (e) {
           debugPrint('ensureRangeLoaded failed: $e');
           _lastError = e.toString();
         }
       }
-      _events = byId.values.toList();
+      _events = byKey.values.toList();
       _expandLoadedRange(wantFrom, wantTo);
       await _persistLoadedRange();
       await _cache.write(_events);
@@ -553,7 +561,10 @@ class DeviceCalendarController with ChangeNotifier {
     try {
       final patched = await _service.updateEvent(updated);
       if (patched == null) return null;
-      final i = _events.indexWhere((e) => e.eventId == updated.eventId);
+      // Replace the specific occurrence the user edited (matched by occurrence
+      // key, not bare id — a recurring series shares one id across occurrences).
+      final targetKey = _occKey(updated);
+      final i = _events.indexWhere((e) => _occKey(e) == targetKey);
       if (i >= 0) {
         _events = [..._events]..[i] = patched;
       } else {
@@ -589,7 +600,8 @@ class DeviceCalendarController with ChangeNotifier {
     try {
       final ok = await _service.deleteEvent(event);
       if (!ok) return false;
-      _events = _events.where((e) => e.eventId != event.eventId).toList();
+      final targetKey = _occKey(event);
+      _events = _events.where((e) => _occKey(e) != targetKey).toList();
       await _cache.write(_events);
       final rkey = _reminderKey(event);
       if (_eventReminders.remove(rkey) != null) {
