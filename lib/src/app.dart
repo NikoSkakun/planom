@@ -52,11 +52,12 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   // Drives time-of-day dynamic colors. Only ticks while a dynamic appearance
-  // is active; otherwise no timer is scheduled.
+  // is active AND the app is foregrounded; otherwise no timer is scheduled.
   Timer? _clock;
   int _minuteOfDay = _nowMinuteOfDay();
+  bool _foreground = true;
 
   SettingsController get _settings => widget.settingsController;
 
@@ -68,12 +69,14 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _settings.addListener(_onSettingsChanged);
     _syncClock();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _settings.removeListener(_onSettingsChanged);
     _clock?.cancel();
     super.dispose();
@@ -81,10 +84,33 @@ class _MyAppState extends State<MyApp> {
 
   void _onSettingsChanged() => _syncClock();
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    final foreground = state == AppLifecycleState.resumed;
+    if (foreground == _foreground) return;
+    _foreground = foreground;
+    if (foreground) {
+      // Catch up to the current minute before repainting, then restart the
+      // timer if a dynamic appearance is still configured. The visible result
+      // is identical to having ticked while backgrounded.
+      final m = _nowMinuteOfDay();
+      if (m != _minuteOfDay && mounted) {
+        setState(() => _minuteOfDay = m);
+      }
+      _syncClock();
+    } else {
+      // No point ticking/rebuilding while the app isn't on screen.
+      _clock?.cancel();
+      _clock = null;
+    }
+  }
+
   /// Starts or stops the per-minute refresh timer to match whether any
-  /// time-of-day dynamic color is currently configured.
+  /// time-of-day dynamic color is currently configured. Never runs while
+  /// backgrounded (see [didChangeAppLifecycleState]).
   void _syncClock() {
-    final needsClock = _settings.appearancePrefs.usesDynamic;
+    final needsClock = _foreground && _settings.appearancePrefs.usesDynamic;
     if (needsClock && _clock == null) {
       _clock = Timer.periodic(const Duration(seconds: 30), (_) {
         final m = _nowMinuteOfDay();
