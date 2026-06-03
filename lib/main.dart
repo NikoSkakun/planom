@@ -37,10 +37,16 @@ void main() async {
     ]);
   }
 
-  await initFolderIconService();
-  await initBackgroundService();
-  await NotificationService.initTimezone();
-  await NotificationService.instance.init();
+  // These four inits are independent (two cache the documents dir, one loads
+  // the timezone db, one sets up the notification plugin), so run them
+  // concurrently to shorten startup. Behaviour is identical to awaiting each
+  // in turn — they share no state and none reads another's result.
+  await Future.wait([
+    initFolderIconService(),
+    initBackgroundService(),
+    NotificationService.initTimezone(),
+    NotificationService.instance.init(),
+  ]);
 
   // Shared planom.db handle: holds app_settings (tab visibility, appearance,
   // passcode) read by SettingsController/SecurityService, and is reused as the

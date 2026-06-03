@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 31;
+  static const _dbVersion = 32;
 
   Database? _db;
 
@@ -196,6 +196,7 @@ class DatabaseService {
           )
         ''');
         await _createFtsTables(db);
+        await _createIndexes(db);
       },
       onUpgrade: (db, oldVersion, _) async {
         if (oldVersion < 2) {
@@ -567,8 +568,45 @@ class DatabaseService {
           await db.execute('ALTER TABLE folders ADD COLUMN defaultListId TEXT');
           await db.execute('ALTER TABLE app_lists ADD COLUMN description TEXT');
         }
+        if (oldVersion < 32) {
+          // Indexes on the columns controllers filter/join on. Purely a
+          // performance change — query results are unaffected.
+          await _createIndexes(db);
+        }
       },
     );
+  }
+
+  /// Creates indexes on the columns the controllers repeatedly filter on
+  /// (`WHERE listId = ?`, soft-delete scans, calendar/birthday date lookups,
+  /// routine-entry joins, …). Idempotent (`IF NOT EXISTS`) so it can be shared
+  /// by both `onCreate` and the v32 upgrade branch. Indexes are transparent to
+  /// query results — they only reduce per-query CPU (battery) and latency.
+  Future<void> _createIndexes(Database db) async {
+    const statements = [
+      'CREATE INDEX IF NOT EXISTS idx_tasks_listId ON tasks(listId)',
+      'CREATE INDEX IF NOT EXISTS idx_tasks_parentTaskId ON tasks(parentTaskId)',
+      'CREATE INDEX IF NOT EXISTS idx_tasks_isDeleted ON tasks(isDeleted)',
+      'CREATE INDEX IF NOT EXISTS idx_app_lists_folderId ON app_lists(folderId)',
+      'CREATE INDEX IF NOT EXISTS idx_app_lists_isDeleted ON app_lists(isDeleted)',
+      'CREATE INDEX IF NOT EXISTS idx_folders_parentFolderId ON folders(parentFolderId)',
+      'CREATE INDEX IF NOT EXISTS idx_folders_isDeleted ON folders(isDeleted)',
+      'CREATE INDEX IF NOT EXISTS idx_notes_folderId ON notes(folderId)',
+      'CREATE INDEX IF NOT EXISTS idx_notes_isDeleted ON notes(isDeleted)',
+      'CREATE INDEX IF NOT EXISTS idx_note_folders_parentFolderId ON note_folders(parentFolderId)',
+      'CREATE INDEX IF NOT EXISTS idx_note_folders_isDeleted ON note_folders(isDeleted)',
+      'CREATE INDEX IF NOT EXISTS idx_contacts_listId ON contacts(listId)',
+      'CREATE INDEX IF NOT EXISTS idx_contacts_isDeleted ON contacts(isDeleted)',
+      'CREATE INDEX IF NOT EXISTS idx_contacts_birthday ON contacts(birthMonth, birthDay)',
+      'CREATE INDEX IF NOT EXISTS idx_events_date ON events(date)',
+      'CREATE INDEX IF NOT EXISTS idx_events_isDeleted ON events(isDeleted)',
+      'CREATE INDEX IF NOT EXISTS idx_list_sections_listId ON list_sections(listId)',
+      'CREATE INDEX IF NOT EXISTS idx_routine_entries_routineId ON routine_entries(routineId)',
+      'CREATE INDEX IF NOT EXISTS idx_routine_entries_date ON routine_entries(date)',
+    ];
+    for (final stmt in statements) {
+      await db.execute(stmt);
+    }
   }
 
   // Tasks — active (non-deleted), sorted by manual order first, then newest first

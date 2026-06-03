@@ -143,23 +143,25 @@ class SpaceManager with ChangeNotifier {
         ? globalDb
         : DatabaseService(dbName: 'planom_$spaceId.db');
 
+    // The six controller loads are mutually independent (each reads its own
+    // tables; the badge wiring below runs only after all have loaded), so kick
+    // them off together. They share one DB connection so queries still
+    // serialise at the SQLite layer, but this removes the per-controller await
+    // round-trips and overlaps their work.
     _taskController = TaskController(_db);
-    await _taskController.load();
-
     _folderController = FolderController(_db);
-    await _folderController.load();
-
     _noteController = NoteController(_db);
-    await _noteController.load();
-
     _routineController = RoutineController(_db);
-    await _routineController.load();
-
     _eventController = EventController(_db);
-    await _eventController.load();
-
     _contactController = ContactController(_db);
-    await _contactController.load();
+    await Future.wait([
+      _taskController.load(),
+      _folderController.load(),
+      _noteController.load(),
+      _routineController.load(),
+      _eventController.load(),
+      _contactController.load(),
+    ]);
 
     // Wire the badge to the global settings + current space's events.
     // Counting "not-yet-started events today" gives the user a sense of
