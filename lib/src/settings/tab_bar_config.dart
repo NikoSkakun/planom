@@ -172,4 +172,18 @@ class TabBarConfig {
     page.removeAt(itemIndex);
     return setPage(pageIndex, page);
   }
+
+  /// Moves the item at [oldIndex] to [newIndex] within [pageIndex]. [newIndex]
+  /// is expected to already be adjusted for the removal (i.e. the standard
+  /// `ReorderableListView` convention where the caller decrements it when
+  /// moving an item further down the list).
+  TabBarConfig reorderItem(int pageIndex, int oldIndex, int newIndex) {
+    if (pageIndex < 0 || pageIndex >= pages.length) return this;
+    final page = [...pages[pageIndex]];
+    if (oldIndex < 0 || oldIndex >= page.length) return this;
+    final item = page.removeAt(oldIndex);
+    final insertAt = newIndex.clamp(0, page.length);
+    page.insert(insertAt, item);
+    return setPage(pageIndex, page);
+  }
 }

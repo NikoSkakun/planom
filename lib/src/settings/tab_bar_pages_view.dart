@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart'
+    show ReorderableDragStartListener, ReorderableListView;
 
 import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
@@ -184,6 +186,12 @@ class TabBarPagesEditor extends StatelessWidget {
     await controller.updateTabBarConfig(cfg.removeItem(pageIdx, itemIdx));
   }
 
+  void _reorderItem(int pageIdx, int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final cfg = controller.tabBarConfig;
+    controller.updateTabBarConfig(cfg.reorderItem(pageIdx, oldIndex, newIndex));
+  }
+
   String _itemLabel(BuildContext context, TabItem item) {
     final s = S.of(context);
     if (item.kind == TabKind.builtin) {
@@ -300,11 +308,23 @@ class TabBarPagesEditor extends StatelessWidget {
             onRemove: () => _removePage(context, p),
           ),
           const SizedBox(height: 6),
-          for (var i = 0; i < cfg.pages[p].length; i++)
-            _ItemRow(
-              label: _itemLabel(context, cfg.pages[p][i]),
-              icon: _itemIcon(context, cfg.pages[p][i]),
-              onRemove: () => _removeItem(p, i),
+          if (cfg.pages[p].isNotEmpty)
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              onReorder: (oldIndex, newIndex) =>
+                  _reorderItem(p, oldIndex, newIndex),
+              children: [
+                for (var i = 0; i < cfg.pages[p].length; i++)
+                  _ItemRow(
+                    key: ObjectKey(cfg.pages[p][i]),
+                    index: i,
+                    label: _itemLabel(context, cfg.pages[p][i]),
+                    icon: _itemIcon(context, cfg.pages[p][i]),
+                    onRemove: () => _removeItem(p, i),
+                  ),
+              ],
             ),
           if (cfg.pages[p].length < TabBarConfig.maxItemsPerPage) ...[
             const SizedBox(height: 6),
@@ -378,11 +398,14 @@ class _PageHeader extends StatelessWidget {
 
 class _ItemRow extends StatelessWidget {
   const _ItemRow({
+    super.key,
+    required this.index,
     required this.label,
     required this.icon,
     required this.onRemove,
   });
 
+  final int index;
   final String label;
   final Widget icon;
   final VoidCallback onRemove;
@@ -411,6 +434,15 @@ class _ItemRow extends StatelessWidget {
             onPressed: onRemove,
             child: Icon(
               CupertinoIcons.minus_circle,
+              size: 20,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ),
+          const SizedBox(width: 12),
+          ReorderableDragStartListener(
+            index: index,
+            child: Icon(
+              CupertinoIcons.line_horizontal_3,
               size: 20,
               color: CupertinoColors.tertiaryLabel.resolveFrom(context),
             ),

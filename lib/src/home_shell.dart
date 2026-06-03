@@ -595,7 +595,14 @@ class _HomeShellState extends State<HomeShell> {
       if (tappedIndex == 1) _notesCollapseSignal.value++;
       if (tappedIndex == 2) _calendarResetSignal.value++;
     }
-    switch (tappedIndex) {
+    _refreshPlusForTab(tappedIndex);
+    _lastTabIndex = tappedIndex;
+    widget.settingsController.setLastOpenedTab(tappedIndex);
+  }
+
+  /// Sets the floating + button visibility for the given built-in tab.
+  void _refreshPlusForTab(int tabIndex) {
+    switch (tabIndex) {
       case 0:
         _showPlusButton.value = _depthObservers[0].trackedCount == 0;
       case 1:
@@ -606,10 +613,18 @@ class _HomeShellState extends State<HomeShell> {
       case 4:
         _showPlusButton.value = false;
       default:
-        _showPlusButton.value = _depthObservers[tappedIndex].depth <= 1;
+        _showPlusButton.value = _depthObservers[tabIndex].depth <= 1;
     }
-    _lastTabIndex = tappedIndex;
-    widget.settingsController.setLastOpenedTab(tappedIndex);
+  }
+
+  /// Handles a tap on the bespoke single-item tab bar (shown for a one-tab
+  /// page when other pages exist).
+  void _handleSingleBarTap(TabItem item, int logicalIdx) {
+    if (item.kind == TabKind.shortcut) {
+      _openShortcut(item);
+      return;
+    }
+    _onTabTapped(item.builtinIndex ?? logicalIdx);
   }
 
   /// Whether the floating + button is allowed on the Calendar tab. Off when
@@ -934,6 +949,33 @@ class _HomeShellState extends State<HomeShell> {
         final isWide = PlatformCapabilities.isDesktop ||
             MediaQuery.sizeOf(context).width >= 700;
 
+        final pages = widget.settingsController.tabBarConfig.pages;
+        final multiPage = pages.length > 1;
+        final pageItems = _pageItems();
+        // The bottom tab bar disappears entirely only when a single page holds
+        // a single tab — then the app reads as one screen. As soon as there is
+        // more than one page we always keep a bar so the user can swipe between
+        // pages, even when the current page has just one tab.
+        final singleNoBar = !isWide && pageItems.length <= 1 && !multiPage;
+        // A page that holds a single tab while other pages exist.
+        // CupertinoTabBar requires ≥2 items, so this case gets a bespoke
+        // one-item bar instead of CupertinoTabScaffold.
+        final customSingleBar = !isWide && multiPage && pageItems.length < 2;
+        final hasBottomBar = !isWide && !singleNoBar;
+
+        // The lone item (and the built-in tab it drives) for the custom bar.
+        final singleBarItem = pageItems.isNotEmpty
+            ? pageItems.first
+            : TabItem.builtin(visibleIndices.first);
+        var singleBarLogical = visibleIndices.first;
+        if (singleBarItem.kind == TabKind.builtin &&
+            singleBarItem.builtinIndex != null) {
+          singleBarLogical = singleBarItem.builtinIndex!;
+        } else if (singleBarItem.kind == TabKind.shortcut) {
+          singleBarLogical =
+              singleBarItem.shortcutTarget == ShortcutTarget.noteFolder ? 1 : 0;
+        }
+
         return Stack(
           children: [
             if (isWide)
@@ -947,7 +989,7 @@ class _HomeShellState extends State<HomeShell> {
                 tabContent: _tabContent,
                 onTap: _onTabTapped,
               )
-            else if (visibleIndices.length <= 1)
+            else if (singleNoBar)
               // Single-tab mode: the tab bar disappears entirely so the user
               // perceives the app as a single screen, not "one tab of many".
               CupertinoTabView(
@@ -957,6 +999,26 @@ class _HomeShellState extends State<HomeShell> {
                 ],
                 builder: (ctx) =>
                     _tabContent(ctx, visibleIndices.first),
+              )
+            else if (customSingleBar)
+              // One tab on this page, but other pages exist — keep a bar at the
+              // bottom (drawn separately below) and reserve room for it so the
+              // content isn't hidden behind it.
+              Builder(
+                builder: (ctx) {
+                  final mq = MediaQuery.of(ctx);
+                  return MediaQuery(
+                    data: mq.copyWith(
+                      padding: mq.padding
+                          .copyWith(bottom: mq.padding.bottom + 50),
+                    ),
+                    child: CupertinoTabView(
+                      navigatorKey: _navigatorKeys[singleBarLogical],
+                      navigatorObservers: [_depthObservers[singleBarLogical]],
+                      builder: (c) => _tabContent(c, singleBarLogical),
+                    ),
+                  );
+                },
               )
             else
               ValueListenableBuilder<bool>(
@@ -1008,13 +1070,36 @@ class _HomeShellState extends State<HomeShell> {
                   );
                 },
               ),
+            // Bespoke one-item bar for a single-tab page when other pages
+            // exist. Drawn here (above the content, below the swipe overlay)
+            // so the user can still swipe to other pages.
+            if (customSingleBar)
+              ValueListenableBuilder<bool>(
+                valueListenable: _globalSettingsOpen,
+                builder: (context, overlayOpen, _) {
+                  final color = (overlayOpen
+                          ? CupertinoColors.secondaryLabel
+                          : CupertinoColors.label)
+                      .resolveFrom(context);
+                  return Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _SingleTabBar(
+                      item: _renderTabItem(
+                          context, singleBarItem, hideLabels, overlayOpen),
+                      color: color,
+                      onTap: () =>
+                          _handleSingleBarTap(singleBarItem, singleBarLogical),
+                    ),
+                  );
+                },
+              ),
             // Multi-page tab bar swipe overlay — covers the tab bar area and
-            // detects horizontal pan to switch between pages. Only active when
+            // detects horizontal pan to switch between pages. Active whenever
             // there's more than one page configured and we're in the narrow
             // (bottom tab bar) layout.
-            if (!isWide &&
-                visibleIndices.length > 1 &&
-                widget.settingsController.tabBarConfig.pages.length > 1)
+            if (!isWide && multiPage)
               Positioned(
                 left: 0,
                 right: 0,
@@ -1031,9 +1116,7 @@ class _HomeShellState extends State<HomeShell> {
               ),
             // Page indicator dots, shown just above the tab bar when there's
             // more than one page configured.
-            if (!isWide &&
-                visibleIndices.length > 1 &&
-                widget.settingsController.tabBarConfig.pages.length > 1)
+            if (!isWide && multiPage)
               Positioned(
                 left: 0,
                 right: 0,
@@ -1054,7 +1137,7 @@ class _HomeShellState extends State<HomeShell> {
                 if (!show) return const SizedBox.shrink();
                 final baseBottom = isWide
                     ? 24.0
-                    : visibleIndices.length <= 1
+                    : !hasBottomBar
                         ? MediaQuery.paddingOf(context).bottom + 16
                         : 50 + MediaQuery.paddingOf(context).bottom + 12;
                 return ValueListenableBuilder<double>(
@@ -1074,7 +1157,7 @@ class _HomeShellState extends State<HomeShell> {
               right: 0,
               bottom: isWide
                   ? 0
-                  : visibleIndices.length <= 1
+                  : !hasBottomBar
                       ? MediaQuery.paddingOf(context).bottom
                       : 50 + MediaQuery.paddingOf(context).bottom,
               child: UndoBanner(controller: _undoController),
@@ -1098,6 +1181,67 @@ class _HomeShellState extends State<HomeShell> {
       _lastTabIndex = visible.first;
     }
     _tabController.index = _visualForBuiltin(_lastTabIndex);
+    // Page swiping doesn't go through the tab-bar tap handler, so refresh the
+    // floating + button for whichever tab the new page lands on.
+    _refreshPlusForTab(_lastTabIndex);
+  }
+}
+
+/// A minimal bottom bar showing a single tab, used when the current page has
+/// only one tab but other pages exist (CupertinoTabBar requires ≥2 items).
+/// Mirrors CupertinoTabBar's look so it's indistinguishable from the real bar.
+class _SingleTabBar extends StatelessWidget {
+  const _SingleTabBar({
+    required this.item,
+    required this.color,
+    required this.onTap,
+  });
+
+  final BottomNavigationBarItem item;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    const bg = CupertinoDynamicColor.withBrightness(
+      color: Color(0xF0F9F9F9),
+      darkColor: Color(0xF01D1D1D),
+    );
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        height: 50 + bottom,
+        padding: EdgeInsets.only(bottom: bottom),
+        decoration: BoxDecoration(
+          color: bg.resolveFrom(context),
+          border: Border(
+            top: BorderSide(
+              color: CupertinoColors.separator.resolveFrom(context),
+              width: 0.0,
+            ),
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconTheme(
+                data: IconThemeData(color: color, size: 30),
+                child: item.activeIcon,
+              ),
+              if (item.label != null)
+                Text(
+                  item.label!,
+                  style: TextStyle(fontSize: 10, color: color),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
