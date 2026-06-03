@@ -8,6 +8,7 @@ import 'contacts/contact_controller.dart';
 import 'contacts/contact_creation_sheet.dart';
 import 'folders/create_folder_list_sheet.dart';
 import 'folders/folder_controller.dart';
+import 'integrations/apple/device_calendar_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
 import 'models/list_type.dart';
 import 'notes/create_note_folder_sheet.dart';
@@ -50,6 +51,7 @@ class HomeShell extends StatefulWidget {
     required this.backupService,
     this.securityService,
     required this.googleCalendarController,
+    required this.deviceCalendarController,
   });
 
   static const routeName = '/';
@@ -73,6 +75,7 @@ class HomeShell extends StatefulWidget {
   final BackupService backupService;
   final SecurityService? securityService;
   final GoogleCalendarController googleCalendarController;
+  final DeviceCalendarController deviceCalendarController;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -111,6 +114,7 @@ class _HomeShellState extends State<HomeShell> {
         backupService: widget.backupService,
         securityService: widget.securityService,
         googleCalendarController: widget.googleCalendarController,
+        deviceCalendarController: widget.deviceCalendarController,
       ),
     );
     _globalSettingsRoute = route;
@@ -444,6 +448,7 @@ class _HomeShellState extends State<HomeShell> {
         backupService: widget.backupService,
         securityService: widget.securityService,
         googleCalendarController: widget.googleCalendarController,
+        deviceCalendarController: widget.deviceCalendarController,
       ),
     );
     _globalSettingsRoute = base;
@@ -537,6 +542,7 @@ class _HomeShellState extends State<HomeShell> {
         widget.eventController,
         initialDate: date,
         googleCalendarController: widget.googleCalendarController,
+        deviceCalendarController: widget.deviceCalendarController,
       );
       return;
     }
@@ -565,6 +571,7 @@ class _HomeShellState extends State<HomeShell> {
         widget.eventController,
         initialDate: date,
         googleCalendarController: widget.googleCalendarController,
+        deviceCalendarController: widget.deviceCalendarController,
       );
     }
   }
@@ -921,6 +928,7 @@ class _HomeShellState extends State<HomeShell> {
           noteController: widget.noteController,
           routineController: widget.routineController,
           googleCalendarController: widget.googleCalendarController,
+          deviceCalendarController: widget.deviceCalendarController,
         ),
       3 => RoutinesView(
           controller: widget.routineController,
@@ -937,6 +945,7 @@ class _HomeShellState extends State<HomeShell> {
           backupService: widget.backupService,
           securityService: widget.securityService,
           googleCalendarController: widget.googleCalendarController,
+          deviceCalendarController: widget.deviceCalendarController,
         ),
     };
   }

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart' show showModalBottomSheet;
 import '../contacts/contact_controller.dart';
 import '../contacts/contact_detail_view.dart';
 import '../folders/folder_controller.dart';
+import '../integrations/apple/device_calendar_controller.dart';
+import '../integrations/apple/device_event.dart';
 import '../integrations/google/google_calendar_controller.dart';
 import '../integrations/google/remote_event.dart';
 import '../localization/strings.dart';
@@ -19,6 +21,7 @@ import '../tasks/task_creation_sheet.dart';
 import '../tasks/task_detail_view.dart';
 import '../theme/app_theme.dart';
 import '../utils/fast_route.dart';
+import 'device_event_detail_view.dart';
 import 'event_controller.dart';
 import 'event_creation_sheet.dart';
 import 'event_detail_view.dart';
@@ -34,6 +37,7 @@ Future<void> showDayViewSheet(
   SettingsController? settingsController,
   RoutineController? routineController,
   GoogleCalendarController? googleCalendarController,
+  DeviceCalendarController? deviceCalendarController,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -49,6 +53,7 @@ Future<void> showDayViewSheet(
       settingsController: settingsController,
       routineController: routineController,
       googleCalendarController: googleCalendarController,
+      deviceCalendarController: deviceCalendarController,
     ),
   );
 }
@@ -64,6 +69,7 @@ class DayViewSheet extends StatefulWidget {
     this.settingsController,
     this.routineController,
     this.googleCalendarController,
+    this.deviceCalendarController,
     this.embedded = false,
     this.onClose,
   });
@@ -76,6 +82,7 @@ class DayViewSheet extends StatefulWidget {
   final SettingsController? settingsController;
   final RoutineController? routineController;
   final GoogleCalendarController? googleCalendarController;
+  final DeviceCalendarController? deviceCalendarController;
 
   /// When true the sheet renders as a panel embedded in the page (rounded top,
   /// drop shadow, a close button instead of a drag handle, and no floating +
@@ -120,6 +127,7 @@ class _DayViewSheetState extends State<DayViewSheet> {
         widget.eventController,
         initialDate: widget.date,
         googleCalendarController: widget.googleCalendarController,
+        deviceCalendarController: widget.deviceCalendarController,
       );
       return;
     }
@@ -161,6 +169,7 @@ class _DayViewSheetState extends State<DayViewSheet> {
                   widget.eventController,
                   initialDate: widget.date,
                   googleCalendarController: widget.googleCalendarController,
+                  deviceCalendarController: widget.deviceCalendarController,
                 );
               },
             ),
@@ -221,6 +230,19 @@ class _DayViewSheetState extends State<DayViewSheet> {
     );
   }
 
+  void _openDeviceEvent(DeviceEvent event) {
+    final c = widget.deviceCalendarController;
+    if (c == null) return;
+    Navigator.of(context).push(
+      FastRoute<void>(
+        builder: (_) => DeviceEventDetailView(
+          event: event,
+          controller: c,
+        ),
+      ),
+    );
+  }
+
   Listenable get _listenable => Listenable.merge([
         widget.taskController,
         widget.eventController,
@@ -229,6 +251,8 @@ class _DayViewSheetState extends State<DayViewSheet> {
         if (widget.settingsController != null) widget.settingsController!,
         if (widget.googleCalendarController != null)
           widget.googleCalendarController!,
+        if (widget.deviceCalendarController != null)
+          widget.deviceCalendarController!,
       ]);
 
   Widget _buildEmbedded(BuildContext context) {
@@ -385,6 +409,8 @@ class _DayViewSheetState extends State<DayViewSheet> {
                       widget.settingsController!,
                     if (widget.googleCalendarController != null)
                       widget.googleCalendarController!,
+                    if (widget.deviceCalendarController != null)
+                      widget.deviceCalendarController!,
                   ]),
                   builder: (ctx, _) => _buildList(ctx),
                 ),
@@ -435,6 +461,9 @@ class _DayViewSheetState extends State<DayViewSheet> {
     final remoteEvents = widget.googleCalendarController
             ?.eventsForDate(widget.date) ??
         const <RemoteEvent>[];
+    final deviceEvents = widget.deviceCalendarController
+            ?.eventsForDate(widget.date) ??
+        const <DeviceEvent>[];
 
     final rc = widget.routineController;
     final showRoutines =
@@ -445,6 +474,7 @@ class _DayViewSheetState extends State<DayViewSheet> {
     final isEmpty = tasks.isEmpty &&
         events.isEmpty &&
         remoteEvents.isEmpty &&
+        deviceEvents.isEmpty &&
         birthdays.isEmpty &&
         !showRoutines;
 
@@ -468,11 +498,13 @@ class _DayViewSheetState extends State<DayViewSheet> {
       tasks: tasks.where((t) => !t.isCompleted),
       events: events.where((e) => !_EventCard._isPast(e)),
       remoteEvents: remoteEvents.where((e) => !_RemoteEventCard._isPast(e)),
+      deviceEvents: deviceEvents.where((e) => !_DeviceEventCard._isPast(e)),
     );
     final pastChildren = _buildGroup(
       tasks: tasks.where((t) => t.isCompleted),
       events: events.where((e) => _EventCard._isPast(e)),
       remoteEvents: remoteEvents.where((e) => _RemoteEventCard._isPast(e)),
+      deviceEvents: deviceEvents.where((e) => _DeviceEventCard._isPast(e)),
     );
 
     return ListView(
@@ -512,10 +544,12 @@ class _DayViewSheetState extends State<DayViewSheet> {
     required Iterable<Task> tasks,
     required Iterable<Event> events,
     required Iterable<RemoteEvent> remoteEvents,
+    required Iterable<DeviceEvent> deviceEvents,
   }) {
     final untimedTasks = tasks.where((t) => t.doTime == null).toList();
     final untimedEvents = events.where((e) => e.doTime == null).toList();
     final untimedRemote = remoteEvents.where((e) => e.doTime == null).toList();
+    final untimedDevice = deviceEvents.where((e) => e.doTime == null).toList();
     final timedItems = <_TimedItem>[
       for (final t in tasks.where((t) => t.doTime != null))
         _TimedItem.task(t),
@@ -523,11 +557,14 @@ class _DayViewSheetState extends State<DayViewSheet> {
         _TimedItem.event(e),
       for (final e in remoteEvents.where((e) => e.doTime != null))
         _TimedItem.remoteEvent(e),
+      for (final e in deviceEvents.where((e) => e.doTime != null))
+        _TimedItem.deviceEvent(e),
     ]..sort((a, b) => a.doTime.compareTo(b.doTime));
 
     final hasUntimed = untimedTasks.isNotEmpty ||
         untimedEvents.isNotEmpty ||
-        untimedRemote.isNotEmpty;
+        untimedRemote.isNotEmpty ||
+        untimedDevice.isNotEmpty;
 
     return [
       for (final t in untimedTasks) ...[
@@ -547,6 +584,10 @@ class _DayViewSheetState extends State<DayViewSheet> {
         _RemoteEventCard(event: e, onTap: () => _openRemoteEvent(e)),
         const SizedBox(height: 8),
       ],
+      for (final e in untimedDevice) ...[
+        _DeviceEventCard(event: e, onTap: () => _openDeviceEvent(e)),
+        const SizedBox(height: 8),
+      ],
       if (timedItems.isNotEmpty && hasUntimed) const SizedBox(height: 4),
       for (final item in timedItems) ...[
         if (item.task != null)
@@ -559,10 +600,15 @@ class _DayViewSheetState extends State<DayViewSheet> {
           )
         else if (item.event != null)
           _EventCard(event: item.event!, onTap: () => _openEvent(item.event!))
-        else
+        else if (item.remoteEvent != null)
           _RemoteEventCard(
             event: item.remoteEvent!,
             onTap: () => _openRemoteEvent(item.remoteEvent!),
+          )
+        else
+          _DeviceEventCard(
+            event: item.deviceEvent!,
+            onTap: () => _openDeviceEvent(item.deviceEvent!),
           ),
         const SizedBox(height: 8),
       ],
@@ -685,19 +731,28 @@ class _TimedItem {
   _TimedItem.task(this.task)
       : event = null,
         remoteEvent = null,
+        deviceEvent = null,
         doTime = task!.doTime!;
   _TimedItem.event(this.event)
       : task = null,
         remoteEvent = null,
+        deviceEvent = null,
         doTime = event!.doTime!;
   _TimedItem.remoteEvent(this.remoteEvent)
       : task = null,
         event = null,
+        deviceEvent = null,
         doTime = remoteEvent!.doTime!;
+  _TimedItem.deviceEvent(this.deviceEvent)
+      : task = null,
+        event = null,
+        remoteEvent = null,
+        doTime = deviceEvent!.doTime!;
 
   final Task? task;
   final Event? event;
   final RemoteEvent? remoteEvent;
+  final DeviceEvent? deviceEvent;
   final int doTime;
 }
 
@@ -1027,6 +1082,106 @@ class _RemoteEventCard extends StatelessWidget {
                       color: accent,
                     ),
                   ),
+                ),
+              ],
+            ),
+            if (event.doTime != null)
+              Text(
+                event.duration != null
+                    ? '${formatDoTime(event.doTime!)} · ${_dur(event.duration!)}'
+                    : formatDoTime(event.doTime!),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            Text(
+              event.calendarName,
+              style: TextStyle(
+                fontSize: 10,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Device (Apple Calendar) event card ─────────────────────────────────────
+
+class _DeviceEventCard extends StatelessWidget {
+  const _DeviceEventCard({required this.event, required this.onTap});
+
+  final DeviceEvent event;
+  final VoidCallback onTap;
+
+  static const _pastAccent = Color(0xFF8E8E93);
+
+  static String _dur(int m) {
+    if (m < 60) return '${m}m';
+    final h = m ~/ 60;
+    final r = m % 60;
+    if (r == 0) return '${h}h';
+    return '${h}h ${r}m';
+  }
+
+  static bool _isPast(DeviceEvent event) {
+    final now = DateTime.now();
+    if (event.doTime != null) {
+      final endMinutes = event.doTime! + (event.duration ?? 0);
+      return event.date.add(Duration(minutes: endMinutes)).isBefore(now);
+    }
+    final eventDay =
+        DateTime(event.date.year, event.date.month, event.date.day);
+    final today = DateTime(now.year, now.month, now.day);
+    return eventDay.isBefore(today);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isPast = _isPast(event);
+    final accent = isPast ? _pastAccent : Color(event.calendarColor);
+    final titleColor = isPast
+        ? CupertinoColors.secondaryLabel.resolveFrom(context)
+        : CupertinoColors.label.resolveFrom(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: accent.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border(left: BorderSide(color: accent, width: 3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    event.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: titleColor,
+                    ),
+                  ),
+                ),
+                // Apple-calendar source badge.
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Icon(CupertinoIcons.calendar, size: 11, color: accent),
                 ),
               ],
             ),

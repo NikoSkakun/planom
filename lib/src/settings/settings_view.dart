@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import 'package:flutter/material.dart' show ThemeMode;
 
+import '../integrations/apple/device_calendar_controller.dart';
 import '../integrations/google/google_calendar_controller.dart';
 import '../localization/strings.dart';
 import '../security/security_service.dart';
@@ -13,6 +14,8 @@ import 'about_legal_view.dart';
 import 'appearance_view.dart';
 import 'backup_service.dart';
 import 'data_view.dart';
+import '../utils/platform_capabilities.dart';
+import 'device_calendar_settings_view.dart';
 import 'google_calendar_settings_view.dart';
 import 'module_settings_views.dart';
 import 'notifications_view.dart';
@@ -30,12 +33,14 @@ class SettingsView extends StatefulWidget {
     this.backupService,
     this.securityService,
     this.googleCalendarController,
+    this.deviceCalendarController,
   });
 
   final SettingsController controller;
   final BackupService? backupService;
   final SecurityService? securityService;
   final GoogleCalendarController? googleCalendarController;
+  final DeviceCalendarController? deviceCalendarController;
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -315,7 +320,9 @@ class _SettingsViewState extends State<SettingsView> {
             ],
 
             // ── Integrations ──────────────────────────────────────
-            if (widget.googleCalendarController != null) ...[
+            if (widget.googleCalendarController != null ||
+                (widget.deviceCalendarController != null &&
+                    PlatformCapabilities.supportsEventKit)) ...[
               const SizedBox(height: 18),
               Text(
                 s.sectionIntegrations,
@@ -326,27 +333,51 @@ class _SettingsViewState extends State<SettingsView> {
                 ),
               ),
               const SizedBox(height: 6),
-              ListenableBuilder(
-                listenable: widget.googleCalendarController!,
-                builder: (ctx, _) {
-                  final gc = widget.googleCalendarController!;
-                  final trailing = gc.isConnected
-                      ? (gc.email ?? s.googleCalendarOn)
-                      : s.googleCalendarOff;
-                  return _NavRow(
-                    label: s.googleCalendar,
-                    icon: CupertinoIcons.calendar_badge_plus,
-                    trailingLabel: trailing,
-                    onTap: () => Navigator.of(context).push(
-                      FastRoute<void>(
-                        builder: (_) => GoogleCalendarSettingsView(
-                          controller: gc,
+              if (widget.googleCalendarController != null)
+                ListenableBuilder(
+                  listenable: widget.googleCalendarController!,
+                  builder: (ctx, _) {
+                    final gc = widget.googleCalendarController!;
+                    final trailing = gc.isConnected
+                        ? (gc.email ?? s.googleCalendarOn)
+                        : s.googleCalendarOff;
+                    return _NavRow(
+                      label: s.googleCalendar,
+                      icon: CupertinoIcons.calendar_badge_plus,
+                      trailingLabel: trailing,
+                      onTap: () => Navigator.of(context).push(
+                        FastRoute<void>(
+                          builder: (_) => GoogleCalendarSettingsView(
+                            controller: gc,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
+              if (widget.deviceCalendarController != null &&
+                  PlatformCapabilities.supportsEventKit)
+                ListenableBuilder(
+                  listenable: widget.deviceCalendarController!,
+                  builder: (ctx, _) {
+                    final ek = widget.deviceCalendarController!;
+                    final trailing = ek.isAuthorized
+                        ? s.appleCalendarOn
+                        : s.appleCalendarOff;
+                    return _NavRow(
+                      label: s.appleCalendar,
+                      icon: CupertinoIcons.calendar_today,
+                      trailingLabel: trailing,
+                      onTap: () => Navigator.of(context).push(
+                        FastRoute<void>(
+                          builder: (_) => DeviceCalendarSettingsView(
+                            controller: ek,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
             ],
 
             if (hasBackup) ...[

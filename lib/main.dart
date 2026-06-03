@@ -6,6 +6,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'src/app.dart';
 import 'src/database/database_service.dart';
 import 'src/folders/folder_icon_picker.dart';
+import 'src/integrations/apple/device_calendar_controller.dart';
 import 'src/integrations/google/google_calendar_controller.dart';
 import 'src/notifications/notification_service.dart';
 import 'src/security/security_service.dart';
@@ -68,6 +69,12 @@ void main() async {
       GoogleCalendarController(db: globalDb);
   await googleCalendarController.load();
 
+  // Native Apple Calendar (EventKit) integration — also global, iOS/macOS only.
+  // Off those platforms `load()` is a no-op and the controller stays inert.
+  final deviceCalendarController =
+      DeviceCalendarController(db: globalDb);
+  await deviceCalendarController.load();
+
   final spaceManager =
       SpaceManager(settingsController: settingsController, globalDb: globalDb);
   await spaceManager.load();
@@ -91,6 +98,7 @@ void main() async {
           backupService: spaceManager.backupService,
           securityService: securityService,
           googleCalendarController: googleCalendarController,
+          deviceCalendarController: deviceCalendarController,
         ),
       ),
     ),
