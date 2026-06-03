@@ -12,9 +12,12 @@ import 'settings_controller.dart';
 import 'settings_widgets.dart';
 import 'tab_bar_config.dart';
 
-/// Settings page for managing the multi-page tab bar layout.
-class TabBarPagesView extends StatelessWidget {
-  const TabBarPagesView({super.key, required this.controller});
+/// Inline editor for the multi-page tab bar layout. Renders every page
+/// (page 1 first), each with its tab items, an "Add tab" row when the page
+/// has free slots, plus an "Add page" row at the bottom. Embedded directly
+/// in the Tab Bar settings screen — there is no separate page for it.
+class TabBarPagesEditor extends StatelessWidget {
+  const TabBarPagesEditor({super.key, required this.controller});
 
   final SettingsController controller;
 
@@ -286,64 +289,48 @@ class TabBarPagesView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        border: null,
-        middle: Text(s.tabBarPages),
-      ),
-      child: SafeArea(
-        child: ListenableBuilder(
-          listenable: controller,
-          builder: (ctx, _) {
-            final cfg = controller.tabBarConfig;
-            return ListView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              children: [
-                for (var p = 0; p < cfg.pages.length; p++) ...[
-                  _PageHeader(
-                    pageNumber: p + 1,
-                    canRemove: cfg.pages.length > 1,
-                    onRemove: () => _removePage(ctx, p),
-                  ),
-                  const SizedBox(height: 6),
-                  for (var i = 0; i < cfg.pages[p].length; i++)
-                    _ItemRow(
-                      label: _itemLabel(ctx, cfg.pages[p][i]),
-                      icon: _itemIcon(ctx, cfg.pages[p][i]),
-                      onRemove: () => _removeItem(p, i),
-                    ),
-                  if (cfg.pages[p].length <
-                      TabBarConfig.maxItemsPerPage) ...[
-                    const SizedBox(height: 6),
-                    _AddRow(
-                      label: s.addTab,
-                      onTap: () => _addItem(ctx, p),
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                ],
-                SettingsNavRow(
-                  label: s.addPage,
-                  onTap: () => _addPage(context),
-                ),
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    s.tabBarPagesHint,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color:
-                          CupertinoColors.secondaryLabel.resolveFrom(context),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
+    final cfg = controller.tabBarConfig;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var p = 0; p < cfg.pages.length; p++) ...[
+          _PageHeader(
+            pageNumber: p + 1,
+            canRemove: cfg.pages.length > 1,
+            onRemove: () => _removePage(context, p),
+          ),
+          const SizedBox(height: 6),
+          for (var i = 0; i < cfg.pages[p].length; i++)
+            _ItemRow(
+              label: _itemLabel(context, cfg.pages[p][i]),
+              icon: _itemIcon(context, cfg.pages[p][i]),
+              onRemove: () => _removeItem(p, i),
+            ),
+          if (cfg.pages[p].length < TabBarConfig.maxItemsPerPage) ...[
+            const SizedBox(height: 6),
+            _AddRow(
+              label: s.addTab,
+              onTap: () => _addItem(context, p),
+            ),
+          ],
+          const SizedBox(height: 18),
+        ],
+        SettingsNavRow(
+          label: s.addPage,
+          onTap: () => _addPage(context),
         ),
-      ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            s.tabBarPagesHint,
+            style: TextStyle(
+              fontSize: 13,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

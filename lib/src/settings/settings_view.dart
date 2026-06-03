@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
-import 'package:flutter/material.dart' show ReorderableDragStartListener, ReorderableListView, ThemeMode;
+import 'package:flutter/material.dart' show ThemeMode;
 
 import '../integrations/google/google_calendar_controller.dart';
 import '../localization/strings.dart';
@@ -489,13 +489,6 @@ class TabBarSettingsView extends StatelessWidget {
         child: ListenableBuilder(
           listenable: controller,
           builder: (ctx, _) {
-            final visibleCount = controller.visibleOptionalTabCount;
-            final settingsVisible = controller.isTabVisible(4);
-            final tabOrder = controller.tabOrder;
-
-            bool isDisabled(int tabIndex) =>
-                visibleCount == 1 && controller.isTabVisible(tabIndex);
-
             return SingleChildScrollView(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -534,7 +527,7 @@ class TabBarSettingsView extends StatelessWidget {
                     onTap: () => showDefaultTabPicker(context, controller),
                   ),
                   const SizedBox(height: 18),
-                  // ── Visible Tabs (reorderable) ─────────────────────────
+                  // ── Visible Tabs (page 1 + additional pages) ───────────
                   Text(
                     s.visibleTabs,
                     style: TextStyle(
@@ -544,31 +537,8 @@ class TabBarSettingsView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  ReorderableListView(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    buildDefaultDragHandles: false,
-                    onReorder: (oldIndex, newIndex) {
-                      final newOrder = List.of(tabOrder);
-                      if (newIndex > oldIndex) newIndex--;
-                      final item = newOrder.removeAt(oldIndex);
-                      newOrder.insert(newIndex, item);
-                      controller.updateTabOrder(newOrder);
-                    },
-                    children: [
-                      for (int i = 0; i < tabOrder.length; i++)
-                        _TabOrderRow(
-                          key: ValueKey(tabOrder[i]),
-                          index: i,
-                          label: _tabLabel(s, tabOrder[i]),
-                          isVisible: controller.isTabVisible(tabOrder[i]),
-                          isDisabled: isDisabled(tabOrder[i]),
-                          onVisibilityChanged: (v) =>
-                              controller.setTabVisible(tabOrder[i], v),
-                        ),
-                    ],
-                  ),
-                  if (!settingsVisible) ...[
+                  TabBarPagesEditor(controller: controller),
+                  if (!controller.isTabVisible(4)) ...[
                     const SizedBox(height: 6),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -578,105 +548,10 @@ class TabBarSettingsView extends StatelessWidget {
                       ),
                     ),
                   ],
-                  // ── Pages (multi-page tab bar) ─────────────────────────
-                  const SizedBox(height: 18),
-                  Text(
-                    s.tabBarPages,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: labelColor,
-                      letterSpacing: -0.08,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  _NavRow(
-                    label: s.tabBarPages,
-                    trailingLabel:
-                        '${controller.tabBarConfig.pages.length}',
-                    onTap: () => Navigator.of(context).push(
-                      FastRoute<void>(
-                        builder: (_) =>
-                            TabBarPagesView(controller: controller),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      s.tabBarPagesHint,
-                      style: TextStyle(fontSize: 13, color: labelColor),
-                    ),
-                  ),
                 ],
               ),
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-// ── Tab order row ─────────────────────────────────────────────────────────────
-
-class _TabOrderRow extends StatelessWidget {
-  const _TabOrderRow({
-    super.key,
-    required this.index,
-    required this.label,
-    required this.isVisible,
-    required this.isDisabled,
-    required this.onVisibilityChanged,
-  });
-
-  final int index;
-  final String label;
-  final bool isVisible;
-  final bool isDisabled;
-  final ValueChanged<bool> onVisibilityChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = CupertinoDynamicColor.resolve(
-      CupertinoColors.tertiarySystemBackground,
-      context,
-    );
-    return Opacity(
-      opacity: isDisabled ? 0.4 : 1.0,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 1),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 17,
-                  color: CupertinoColors.label.resolveFrom(context),
-                ),
-              ),
-            ),
-            CupertinoSwitch(
-              value: isVisible,
-              onChanged: isDisabled ? null : onVisibilityChanged,
-              activeColor: AppColors.accent,
-            ),
-            const SizedBox(width: 12),
-            ReorderableDragStartListener(
-              index: index,
-              child: Icon(
-                CupertinoIcons.line_horizontal_3,
-                size: 20,
-                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-              ),
-            ),
-          ],
         ),
       ),
     );

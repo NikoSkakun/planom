@@ -257,11 +257,17 @@ class SettingsController with ChangeNotifier {
     3: true,
     4: true,
   };
-  bool isTabVisible(int index) => _tabVisibility[index] ?? true;
+  /// Whether the built-in tab [index] (0–4) appears anywhere in the live
+  /// [tabBarConfig]. Derived from the config — the source of truth for the
+  /// rendered tab bar — so callers (e.g. the Settings ⋯ fallback) stay in
+  /// sync with what the user actually sees. The legacy `_tabVisibility` map
+  /// is retained only to migrate old persisted layouts on first load.
+  bool isTabVisible(int index) => _tabBarConfig.flattened.any(
+      (it) => it.kind == TabKind.builtin && it.builtinIndex == index);
 
-  /// Returns the count of tabs (0–4) that are currently visible.
+  /// Returns the count of built-in tabs (0–4) present in the live config.
   int get visibleOptionalTabCount =>
-      [0, 1, 2, 3, 4].where((i) => _tabVisibility[i] == true).length;
+      [0, 1, 2, 3, 4].where(isTabVisible).length;
 
   List<int> _tabOrder = [0, 1, 2, 3, 4];
 
