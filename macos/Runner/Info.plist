@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Planom shows your calendar events alongside your tasks and lets you add events to your calendars.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Planom shows your calendar events alongside your tasks and lets you add events to your calendars.</string>
 </dict>
 </plist>

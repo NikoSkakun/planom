@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
 
+import '../integrations/apple/device_calendar_controller.dart';
+import '../integrations/apple/device_event.dart';
 import '../integrations/google/google_calendar_controller.dart';
 import '../integrations/google/remote_event.dart';
 import '../localization/strings.dart';
@@ -12,14 +14,19 @@ import '../utils/selection_menu.dart';
 import 'event_controller.dart';
 
 /// Sentinel calendar id used by the creation sheet to mean "save as a local
-/// Planom event" (i.e. not a Google calendar).
+/// Planom event" (i.e. not a Google or Apple calendar).
 const String kLocalCalendarId = '__planom_local__';
+
+/// Prefix marking a device (Apple Calendar) target in the picker, so its ids
+/// can't collide with Google calendar keys.
+const String _kDevicePrefix = 'ek:';
 
 void showEventCreationSheet(
   BuildContext context,
   EventController controller, {
   required DateTime initialDate,
   GoogleCalendarController? googleCalendarController,
+  DeviceCalendarController? deviceCalendarController,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -30,6 +37,7 @@ void showEventCreationSheet(
       controller: controller,
       initialDate: initialDate,
       googleCalendarController: googleCalendarController,
+      deviceCalendarController: deviceCalendarController,
     ),
   );
 }
@@ -40,11 +48,13 @@ class EventCreationSheet extends StatefulWidget {
     required this.controller,
     required this.initialDate,
     this.googleCalendarController,
+    this.deviceCalendarController,
   });
 
   final EventController controller;
   final DateTime initialDate;
   final GoogleCalendarController? googleCalendarController;
+  final DeviceCalendarController? deviceCalendarController;
 
   @override
   State<EventCreationSheet> createState() => _EventCreationSheetState();
@@ -61,9 +71,13 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
   int? _duration; // minutes
   bool _titleEmpty = true;
 
-  /// The Google calendar new events go to; null means save as a local Planom
-  /// event.
+  /// The Google calendar new events go to; null means not a Google target.
   GoogleCalendarMeta? _targetCal;
+
+  /// The Apple (device) calendar new events go to; null means not a device
+  /// target. At most one of [_targetCal] / [_targetDeviceCal] is non-null;
+  /// both null means save as a local Planom event.
+  DeviceCalendarMeta? _targetDeviceCal;
 
   @override
   void initState() {
@@ -71,13 +85,24 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
     _date = DateTime(
         widget.initialDate.year, widget.initialDate.month, widget.initialDate.day);
     // Default to the user's chosen Google default calendar when they're
-    // connected and it's writable + selected; otherwise create locally.
+    // connected and it's writable + selected; otherwise fall back to the
+    // device default calendar; otherwise create locally.
     final gc = widget.googleCalendarController;
     if (gc != null && gc.isConnected) {
       final def = gc.defaultCalendar;
       if (def != null &&
           gc.writableSelectedCalendars.any((c) => c.key == def.key)) {
         _targetCal = def;
+      }
+    }
+    if (_targetCal == null) {
+      final ek = widget.deviceCalendarController;
+      if (ek != null && ek.isAuthorized) {
+        final def = ek.defaultCalendar;
+        if (def != null &&
+            ek.writableSelectedCalendars.any((c) => c.id == def.id)) {
+          _targetDeviceCal = def;
+        }
       }
     }
     _titleCtrl.addListener(() {
@@ -110,15 +135,8 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
     final note = _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
 
     final target = _targetCal;
-    if (target == null || widget.googleCalendarController == null) {
-      await widget.controller.addEvent(Event(
-        title: title,
-        note: note,
-        date: _date,
-        doTime: _doTime,
-        duration: _duration,
-      ));
-    } else {
+    final deviceTarget = _targetDeviceCal;
+    if (target != null && widget.googleCalendarController != null) {
       // Goes directly to Google. No local Event is created — source of truth
       // lives in Google and the calendar view picks it up from the next
       // controller refresh (which createEvent triggers in-memory immediately).
@@ -133,38 +151,90 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
         accountId: target.accountId,
         calendarId: target.id,
       );
+    } else if (deviceTarget != null &&
+        widget.deviceCalendarController != null) {
+      // Goes directly to the device's Apple Calendar. Same no-duplication
+      // invariant as Google — never written to the local `events` table.
+      await widget.deviceCalendarController!.createEvent(
+        DeviceEventDraft(
+          title: title,
+          note: note,
+          date: _date,
+          doTime: _doTime,
+          duration: _duration,
+        ),
+        calendarId: deviceTarget.id,
+      );
+    } else {
+      await widget.controller.addEvent(Event(
+        title: title,
+        note: note,
+        date: _date,
+        doTime: _doTime,
+        duration: _duration,
+      ));
     }
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
 
+  List<GoogleCalendarMeta> get _googleWritable {
+    final gc = widget.googleCalendarController;
+    return (gc != null && gc.isConnected)
+        ? gc.writableSelectedCalendars
+        : const [];
+  }
+
+  List<DeviceCalendarMeta> get _deviceWritable {
+    final ek = widget.deviceCalendarController;
+    return (ek != null && ek.isAuthorized)
+        ? ek.writableSelectedCalendars
+        : const [];
+  }
+
+  /// True when there's any non-local target the user could pick.
+  bool get _hasCalendarChoices =>
+      _googleWritable.isNotEmpty || _deviceWritable.isNotEmpty;
+
   Future<void> _pickCalendar() async {
     final s = S.of(context);
     final gc = widget.googleCalendarController;
-    final writable =
-        (gc != null && gc.isConnected) ? gc.writableSelectedCalendars : const [];
     final options = <SelectionMenuOption<String>>[
       SelectionMenuOption(value: kLocalCalendarId, label: s.planomLocal),
-      for (final cal in writable)
+      for (final cal in _googleWritable)
         SelectionMenuOption(value: cal.key, label: _calLabel(gc!, cal)),
+      for (final cal in _deviceWritable)
+        SelectionMenuOption(
+            value: '$_kDevicePrefix${cal.id}', label: cal.title),
     ];
     if (options.length == 1) return;
+    final current = _targetCal?.key ??
+        (_targetDeviceCal != null
+            ? '$_kDevicePrefix${_targetDeviceCal!.id}'
+            : kLocalCalendarId);
     final saved = _activeFocus;
     FocusManager.instance.primaryFocus?.unfocus();
     final pick = await showSelectionMenu<String>(
       context: context,
       title: s.eventCalendar,
-      current: _targetCal?.key ?? kLocalCalendarId,
+      current: current,
       options: options,
     );
     if (!mounted) return;
     if (pick != null) {
-      final matches =
-          gc == null ? const <GoogleCalendarMeta>[] : gc.writableSelectedCalendars
-              .where((c) => c.key == pick)
-              .toList();
       setState(() {
-        _targetCal =
-            (pick == kLocalCalendarId || matches.isEmpty) ? null : matches.first;
+        if (pick == kLocalCalendarId) {
+          _targetCal = null;
+          _targetDeviceCal = null;
+        } else if (pick.startsWith(_kDevicePrefix)) {
+          final id = pick.substring(_kDevicePrefix.length);
+          final m = _deviceWritable.where((c) => c.id == id).toList();
+          _targetDeviceCal = m.isEmpty ? null : m.first;
+          _targetCal = null;
+        } else {
+          final m = _googleWritable.where((c) => c.key == pick).toList();
+          _targetCal = m.isEmpty ? null : m.first;
+          _targetDeviceCal = null;
+        }
       });
     }
     saved?.requestFocus();
@@ -179,9 +249,9 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
 
   String _calendarLabel(S s) {
     final gc = widget.googleCalendarController;
-    final target = _targetCal;
-    if (gc == null || target == null) return s.planomLocal;
-    return _calLabel(gc, target);
+    if (_targetCal != null && gc != null) return _calLabel(gc, _targetCal!);
+    if (_targetDeviceCal != null) return _targetDeviceCal!.title;
+    return s.planomLocal;
   }
 
   Future<void> _pickDate() async {
@@ -258,12 +328,10 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
             textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: 16),
-          // Optional calendar picker — only meaningful when a Google account
-          // is connected with at least one writable, selected calendar.
-          if (widget.googleCalendarController != null &&
-              widget.googleCalendarController!.isConnected &&
-              widget.googleCalendarController!.writableSelectedCalendars
-                  .isNotEmpty) ...[
+          // Optional calendar picker — meaningful when a Google account or the
+          // device's Apple Calendar offers at least one writable, selected
+          // calendar.
+          if (_hasCalendarChoices) ...[
             GestureDetector(
               onTap: _pickCalendar,
               child: Row(

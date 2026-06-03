@@ -703,6 +703,30 @@ class S {
   String get planomLocal => t('planomLocal');
   String get eventCalendar => t('eventCalendar');
 
+  // ── Apple Calendar (EventKit) ──────────────────────────────────────────────
+  String get appleCalendar => t('appleCalendar');
+  String get appleCalendarOn => t('appleCalendarOn');
+  String get appleCalendarOff => t('appleCalendarOff');
+  String get appleCalendarNotAvailable => t('appleCalendarNotAvailable');
+  String get appleCalendarAccessDenied => t('appleCalendarAccessDenied');
+  String get appleCalendarConnect => t('appleCalendarConnect');
+  String get appleCalendarConnectDesc => t('appleCalendarConnectDesc');
+  String get appleCalendarDisconnect => t('appleCalendarDisconnect');
+  String get appleCalendarCalendarsSection =>
+      t('appleCalendarCalendarsSection');
+  String get appleCalendarNoCalendars => t('appleCalendarNoCalendars');
+  String get appleCalendarReadOnly => t('appleCalendarReadOnly');
+  String get appleCalendarDefaultBadge => t('appleCalendarDefaultBadge');
+  String get appleCalendarDefault => t('appleCalendarDefault');
+  String get appleCalendarDefaultSection => t('appleCalendarDefaultSection');
+  String get appleCalendarSyncSection => t('appleCalendarSyncSection');
+  String get appleCalendarSyncNow => t('appleCalendarSyncNow');
+  String get appleCalendarNeverSynced => t('appleCalendarNeverSynced');
+  String get appleCalendarLastSynced => t('appleCalendarLastSynced');
+  String get appleCalendarReadOnlyHint => t('appleCalendarReadOnlyHint');
+  String get deviceCalendarReminderHint => t('deviceCalendarReminderHint');
+  String get deviceCalendarDeleteBody => t('deviceCalendarDeleteBody');
+
   // ── About / Legal ─────────────────────────────────────────────────────────
   String get sectionAbout => t('sectionAbout');
   String get legal => t('legal');
@@ -1228,6 +1252,34 @@ const Map<String, String> _en = {
   'googleCalendarReadOnlyDesc': 'View events only — never change Google',
   'planomLocal': 'Planom (local)',
   'eventCalendar': 'Calendar',
+  // ── Apple Calendar (EventKit) integration ──────────────────────────────
+  'appleCalendar': 'Apple Calendar',
+  'appleCalendarOn': 'On',
+  'appleCalendarOff': 'Off',
+  'appleCalendarNotAvailable':
+      'Apple Calendar is only available on iPhone, iPad and Mac.',
+  'appleCalendarAccessDenied':
+      'Calendar access is turned off. Enable it for Planom in your device Settings to show and add events.',
+  'appleCalendarConnect': 'Connect Apple Calendar',
+  'appleCalendarConnectDesc':
+      'Show your device calendar events alongside your tasks, and add events to your calendars.',
+  'appleCalendarDisconnect': 'Disconnect',
+  'appleCalendarCalendarsSection': 'Calendars',
+  'appleCalendarNoCalendars': 'No calendars found.',
+  'appleCalendarReadOnly': 'Read-only',
+  'appleCalendarDefaultBadge': 'Default for new events',
+  'appleCalendarDefault': 'Default calendar',
+  'appleCalendarDefaultSection': 'New events',
+  'appleCalendarSyncSection': 'Sync',
+  'appleCalendarSyncNow': 'Sync now',
+  'appleCalendarNeverSynced': 'Never synced',
+  'appleCalendarLastSynced': 'Last synced {when}',
+  'appleCalendarReadOnlyHint':
+      'This event is on a calendar you only have read access to. To edit it, open the Calendar app.',
+  'deviceCalendarReminderHint':
+      'Reminders are saved on this device only — they notify you in Planom and are not added to the event in your calendar.',
+  'deviceCalendarDeleteBody':
+      'This event will be permanently removed from your calendar.',
 };
 
 const Map<String, String> _uk = {

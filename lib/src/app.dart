@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'calendar/event_controller.dart';
 import 'contacts/contact_controller.dart';
 import 'folders/folder_controller.dart';
+import 'integrations/apple/device_calendar_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
 import 'localization/app_localizations.dart';
 import 'home_shell.dart';
@@ -35,6 +36,7 @@ class MyApp extends StatefulWidget {
     required this.backupService,
     this.securityService,
     required this.googleCalendarController,
+    required this.deviceCalendarController,
   });
 
   final SettingsController settingsController;
@@ -47,6 +49,7 @@ class MyApp extends StatefulWidget {
   final BackupService backupService;
   final SecurityService? securityService;
   final GoogleCalendarController googleCalendarController;
+  final DeviceCalendarController deviceCalendarController;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -205,6 +208,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                       backupService: widget.backupService,
                       securityService: widget.securityService,
                       googleCalendarController: widget.googleCalendarController,
+                      deviceCalendarController: widget.deviceCalendarController,
                     ),
                   ),
                 );

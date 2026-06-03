@@ -9,6 +9,8 @@ import '../database/database_service.dart';
 import '../routines/routine_controller.dart';
 import '../folders/folder_controller.dart';
 import '../home_shell.dart';
+import '../integrations/apple/device_calendar_controller.dart';
+import '../integrations/apple/device_event.dart';
 import '../integrations/google/google_calendar_controller.dart';
 import '../integrations/google/remote_event.dart';
 import '../localization/strings.dart';
@@ -41,6 +43,7 @@ class CalendarView extends StatefulWidget {
     this.noteController,
     this.routineController,
     this.googleCalendarController,
+    this.deviceCalendarController,
   });
 
   final TaskController controller;
@@ -55,6 +58,7 @@ class CalendarView extends StatefulWidget {
   final NoteController? noteController;
   final RoutineController? routineController;
   final GoogleCalendarController? googleCalendarController;
+  final DeviceCalendarController? deviceCalendarController;
 
   @override
   State<CalendarView> createState() => _CalendarViewState();
@@ -175,15 +179,19 @@ class _CalendarViewState extends State<CalendarView> {
   /// dozens of fetches; the trailing call wins.
   void _requestPrefetch(int centerMonthEpoch) {
     final gcal = widget.googleCalendarController;
-    if (gcal == null || !gcal.isConnected) return;
+    final ekcal = widget.deviceCalendarController;
+    final wantGoogle = gcal != null && gcal.isConnected;
+    final wantDevice = ekcal != null && ekcal.isAuthorized;
+    if (!wantGoogle && !wantDevice) return;
     _prefetchDebounce?.cancel();
     _prefetchDebounce = Timer(const Duration(milliseconds: 250), () {
       final startEpoch = centerMonthEpoch - _prefetchBufferMonths;
       final endEpoch = centerMonthEpoch + _prefetchBufferMonths;
       final from = DateTime(startEpoch ~/ 12, startEpoch % 12 + 1, 1);
       final to = DateTime(endEpoch ~/ 12, endEpoch % 12 + 1 + 1, 1);
-      // Fire and forget; the controller notifies listeners after merging.
-      unawaited(gcal.ensureRangeLoaded(from, to));
+      // Fire and forget; the controllers notify listeners after merging.
+      if (wantGoogle) unawaited(gcal.ensureRangeLoaded(from, to));
+      if (wantDevice) unawaited(ekcal.ensureRangeLoaded(from, to));
     });
   }
 
@@ -271,6 +279,8 @@ class _CalendarViewState extends State<CalendarView> {
         widget.contactController,
         if (widget.googleCalendarController != null)
           widget.googleCalendarController!,
+        if (widget.deviceCalendarController != null)
+          widget.deviceCalendarController!,
         if (widget.settingsController != null) widget.settingsController!,
       ]);
 
@@ -286,6 +296,7 @@ class _CalendarViewState extends State<CalendarView> {
           eventController: widget.eventController,
           contactController: widget.contactController,
           googleCalendarController: widget.googleCalendarController,
+          deviceCalendarController: widget.deviceCalendarController,
           onDayTap: _openDay,
         ),
       );
@@ -308,6 +319,7 @@ class _CalendarViewState extends State<CalendarView> {
           eventController: widget.eventController,
           contactController: widget.contactController,
           googleCalendarController: widget.googleCalendarController,
+          deviceCalendarController: widget.deviceCalendarController,
           onDayTap: _openDay,
         ),
       );
@@ -451,6 +463,7 @@ class _CalendarViewState extends State<CalendarView> {
                   settingsController: widget.settingsController,
                   routineController: widget.routineController,
                   googleCalendarController: widget.googleCalendarController,
+                  deviceCalendarController: widget.deviceCalendarController,
                 ),
               ),
           ],
@@ -568,6 +581,7 @@ class _MonthSection extends StatelessWidget {
     required this.eventController,
     required this.contactController,
     required this.googleCalendarController,
+    required this.deviceCalendarController,
     required this.onDayTap,
   });
 
@@ -580,6 +594,7 @@ class _MonthSection extends StatelessWidget {
   final EventController eventController;
   final ContactController contactController;
   final GoogleCalendarController? googleCalendarController;
+  final DeviceCalendarController? deviceCalendarController;
   final ValueChanged<DateTime> onDayTap;
 
   List<DateTime?> _buildGrid() {
@@ -623,6 +638,7 @@ class _MonthSection extends StatelessWidget {
             eventController: eventController,
             contactController: contactController,
             googleCalendarController: googleCalendarController,
+            deviceCalendarController: deviceCalendarController,
             onDayTap: onDayTap,
           ),
       ],
@@ -642,6 +658,7 @@ class _WeekRow extends StatelessWidget {
     required this.eventController,
     required this.contactController,
     required this.googleCalendarController,
+    required this.deviceCalendarController,
     required this.onDayTap,
     this.continuous = false,
     this.firstDayOfWeek = DateTime.monday,
@@ -655,6 +672,7 @@ class _WeekRow extends StatelessWidget {
   final EventController eventController;
   final ContactController contactController;
   final GoogleCalendarController? googleCalendarController;
+  final DeviceCalendarController? deviceCalendarController;
   final ValueChanged<DateTime> onDayTap;
 
   /// In the continuous (gap-free) view, day cells mark the 1st of each month
@@ -681,6 +699,7 @@ class _WeekRow extends StatelessWidget {
                     eventController: eventController,
                     contactController: contactController,
                     googleCalendarController: googleCalendarController,
+                    deviceCalendarController: deviceCalendarController,
                     onTap: day == null ? null : () => onDayTap(day),
                   ),
                 ))
@@ -702,6 +721,7 @@ class _DayCell extends StatelessWidget {
     required this.eventController,
     required this.contactController,
     required this.googleCalendarController,
+    required this.deviceCalendarController,
     required this.onTap,
     this.continuous = false,
     this.firstDayOfWeek = DateTime.monday,
@@ -717,6 +737,7 @@ class _DayCell extends StatelessWidget {
   final EventController eventController;
   final ContactController contactController;
   final GoogleCalendarController? googleCalendarController;
+  final DeviceCalendarController? deviceCalendarController;
   final VoidCallback? onTap;
 
   bool get _isToday =>
@@ -845,13 +866,17 @@ class _DayCell extends StatelessWidget {
     final events = eventController.eventsForDate(date!);
     final remoteEvents =
         googleCalendarController?.eventsForDate(date!) ?? const <RemoteEvent>[];
+    final deviceEvents =
+        deviceCalendarController?.eventsForDate(date!) ?? const <DeviceEvent>[];
 
-    // Order: events first (local + Google), then birthdays, then incomplete
-    // tasks, then completed tasks. Remote events render with their calendar
-    // color so different Google calendars stay visually distinct.
+    // Order: events first (local Planom, then Google, then Apple Calendar),
+    // then birthdays, then incomplete tasks, then completed tasks. Remote and
+    // device events render with their calendar color so different calendars
+    // stay visually distinct.
     final chips = <_ChipData>[
       for (final e in events) _ChipData.event(e),
       for (final e in remoteEvents) _ChipData.remoteEvent(e),
+      for (final e in deviceEvents) _ChipData.deviceEvent(e),
       for (final b in birthdays) _ChipData.birthday(b),
       for (final t in uncompleted) _ChipData.task(t, false),
       for (final t in completed) _ChipData.task(t, true),
@@ -892,6 +917,13 @@ class _DayCell extends StatelessWidget {
                   isPast: _remoteEventIsPast(c.remoteEvent!),
                 );
               }
+              if (c.isDeviceEvent) {
+                return _RemoteEventChip(
+                  title: c.deviceEvent!.title,
+                  color: Color(c.deviceEvent!.calendarColor),
+                  isPast: _deviceEventIsPast(c.deviceEvent!),
+                );
+              }
               if (c.isBirthday) {
                 return _BirthdayChip(title: c.birthday!.name);
               }
@@ -930,35 +962,48 @@ class _ChipData {
       : task = t,
         event = null,
         remoteEvent = null,
+        deviceEvent = null,
         birthday = null,
         completed = c;
   _ChipData.event(Event e)
       : task = null,
         event = e,
         remoteEvent = null,
+        deviceEvent = null,
         birthday = null,
         completed = false;
   _ChipData.remoteEvent(RemoteEvent e)
       : task = null,
         event = null,
         remoteEvent = e,
+        deviceEvent = null,
+        birthday = null,
+        completed = false;
+  _ChipData.deviceEvent(DeviceEvent e)
+      : task = null,
+        event = null,
+        remoteEvent = null,
+        deviceEvent = e,
         birthday = null,
         completed = false;
   _ChipData.birthday(Contact b)
       : task = null,
         event = null,
         remoteEvent = null,
+        deviceEvent = null,
         birthday = b,
         completed = false;
 
   final Task? task;
   final Event? event;
   final RemoteEvent? remoteEvent;
+  final DeviceEvent? deviceEvent;
   final Contact? birthday;
   final bool completed;
 
   bool get isEvent => event != null;
   bool get isRemoteEvent => remoteEvent != null;
+  bool get isDeviceEvent => deviceEvent != null;
   bool get isBirthday => birthday != null;
 }
 
@@ -1078,6 +1123,17 @@ bool _eventIsPast(Event event) {
 }
 
 bool _remoteEventIsPast(RemoteEvent event) {
+  final now = DateTime.now();
+  if (event.doTime != null) {
+    final endMinutes = event.doTime! + (event.duration ?? 0);
+    return event.date.add(Duration(minutes: endMinutes)).isBefore(now);
+  }
+  final eventDay = DateTime(event.date.year, event.date.month, event.date.day);
+  final today = DateTime(now.year, now.month, now.day);
+  return eventDay.isBefore(today);
+}
+
+bool _deviceEventIsPast(DeviceEvent event) {
   final now = DateTime.now();
   if (event.doTime != null) {
     final endMinutes = event.doTime! + (event.duration ?? 0);

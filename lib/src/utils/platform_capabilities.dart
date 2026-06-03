@@ -55,4 +55,9 @@ class PlatformCapabilities {
   /// have init wiring for iOS + macOS today; Android/Linux/Windows would each
   /// need their own InitializationSettings entry before scheduling.
   static bool get supportsLocalNotifications => isIOS || isMacOS;
+
+  /// Whether Apple's EventKit framework is available — the native device
+  /// calendar integration (`app.planom/eventkit` MethodChannel + Swift bridge).
+  /// iOS and macOS only; every other platform has no calendar store to read.
+  static bool get supportsEventKit => isIOS || isMacOS;
 }

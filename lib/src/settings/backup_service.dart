@@ -12,6 +12,7 @@ import '../contacts/contact_controller.dart';
 import '../database/database_service.dart';
 import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
+import '../integrations/apple/device_calendar_controller.dart';
 import '../integrations/google/google_calendar_controller.dart';
 import '../models/routine.dart';
 import '../notes/note_controller.dart';
@@ -79,7 +80,8 @@ class BackupService {
       'app_settings': (await db.exportAppSettings())
           .where((r) =>
               !SecurityService.authSettingKeys.contains(r['key']) &&
-              !GoogleCalendarController.isReservedKey(r['key'] as String))
+              !GoogleCalendarController.isReservedKey(r['key'] as String) &&
+              !DeviceCalendarController.isReservedKey(r['key'] as String))
           .toList(),
       'smart_list_prefs': settingsController.smartListPrefs.toJson(),
     };
@@ -204,15 +206,19 @@ class BackupService {
           .toList();
     }
 
-    // Keep the device's local passcode and Google Calendar connection state
-    // and never let an imported payload change them: preserve our own auth_*
-    // and gcal_* rows and drop any the payload carries.
+    // Keep the device's local passcode and calendar-integration connection
+    // state and never let an imported payload change them: preserve our own
+    // auth_*, gcal_* and ekcal_* rows and drop any the payload carries.
     final localAuth = (await db.exportAppSettings())
         .where((r) => SecurityService.authSettingKeys.contains(r['key']))
         .toList();
     final localGcal = (await db.exportAppSettings())
         .where((r) =>
             GoogleCalendarController.isReservedKey(r['key'] as String))
+        .toList();
+    final localDeviceCal = (await db.exportAppSettings())
+        .where((r) =>
+            DeviceCalendarController.isReservedKey(r['key'] as String))
         .toList();
 
     final Map<String, dynamic> customIcons;
@@ -238,9 +244,11 @@ class BackupService {
         'app_settings': [
           ...asMaps(data['app_settings']).where((r) =>
               !SecurityService.authSettingKeys.contains(r['key']) &&
-              !GoogleCalendarController.isReservedKey(r['key'] as String)),
+              !GoogleCalendarController.isReservedKey(r['key'] as String) &&
+              !DeviceCalendarController.isReservedKey(r['key'] as String)),
           ...localAuth,
           ...localGcal,
+          ...localDeviceCal,
         ],
       };
     } catch (_) {
