@@ -53,6 +53,14 @@ class _NoteDetailViewState extends State<NoteDetailView>
   bool _isEditing = false;
   Timer? _autosaveTimer;
 
+  // Tracks whether this editor is the active (onstage) tab. When hosted inside
+  // a CupertinoTabScaffold, switching to another tab keeps this subtree alive
+  // but moves it offstage (TickerMode disabled). A focused text field that
+  // goes offstage holds a stale text-input connection: text typed after the
+  // user returns to this tab can fail to reach the controller and is then
+  // silently dropped on the next save. See [_handleTabActiveChange].
+  bool _tabActive = true;
+
   // Single-flight guard for the async save. `_saving` is true while a write
   // is in flight; `_resaveRequested` records that the text changed again
   // during that write so we loop and persist the newest text once it lands.
@@ -137,6 +145,27 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   void _onTitleFocusChanged() {
     if (!_titleFocus.hasFocus) _flushSave();
+  }
+
+  /// Called from [build] whenever the hosting tab's active state flips. When
+  /// the tab goes offstage (the user switched to another tab), commit any
+  /// pending text and drop focus, so the keyboard's input connection is torn
+  /// down cleanly. Returning to the tab then re-opens the editor with a fresh
+  /// connection (via a tap → [_startEditing]) instead of typing into a stale
+  /// one whose characters never reach the controller — the root cause of
+  /// edits being lost after a tab switch.
+  void _handleTabActiveChange(bool active) {
+    if (active == _tabActive) return;
+    _tabActive = active;
+    if (active) return;
+    // Defer to a post-frame callback: we can't call unfocus()/setState while
+    // the offstage transition is mid-build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _titleFocus.unfocus();
+      _contentFocus.unfocus();
+      _flushSave();
+    });
   }
 
   void _scheduleAutosave() {
@@ -234,6 +263,17 @@ class _NoteDetailViewState extends State<NoteDetailView>
     }
   }
 
+  /// Entry point for the ⋯ menu. For a not-yet-persisted new note, commit it
+  /// first so the menu's actions (Move / Info / Delete) operate on a real
+  /// stored note rather than the empty placeholder.
+  Future<void> _onMenuPressed() async {
+    if (widget.isNew && !_persistedNew) {
+      await _flushSave();
+    }
+    if (!mounted) return;
+    _showDropdown(context);
+  }
+
   void _showDropdown(BuildContext context) {
     showDropdown(context, (dismiss) {
       return _NoteOptionsDropdown(
@@ -264,10 +304,14 @@ class _NoteDetailViewState extends State<NoteDetailView>
         },
         onInfo: () {
           dismiss();
+          // Prefer the persisted copy so the timestamps reflect the latest
+          // save (widget.note is the stale placeholder for a new note).
+          final latest =
+              widget.controller.noteById(widget.note.id) ?? widget.note;
           showItemInfoSheet(
             context,
-            creationDate: widget.note.creationDate,
-            modifiedDate: widget.note.modifiedDate,
+            creationDate: latest.creationDate,
+            modifiedDate: latest.modifiedDate,
           );
         },
         onDelete: () {
@@ -477,6 +521,10 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   @override
   Widget build(BuildContext context) {
+    // Detect onstage/offstage transitions of the hosting tab (see
+    // [_handleTabActiveChange]). Reading TickerMode here registers the
+    // dependency so build re-runs when the tab is switched.
+    _handleTabActiveChange(TickerMode.of(context));
     final settingsCtl =
         SpaceManagerProvider.maybeOf(context)?.settingsController;
     return ListenableBuilder(
@@ -499,13 +547,30 @@ class _NoteDetailViewState extends State<NoteDetailView>
           child: CupertinoPageScaffold(
             navigationBar: CupertinoNavigationBar(
               border: null,
-              trailing: widget.isNew
-                  ? null
-                  : CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () => _showDropdown(context),
-                      child: const Icon(CupertinoIcons.ellipsis, size: 26),
+              trailing: ListenableBuilder(
+                // Rebuild only this button as the user types so its
+                // enabled/grayed state tracks whether the note has any text.
+                listenable: Listenable.merge([_title, _content]),
+                builder: (context, _) {
+                  // For an existing note the menu is always available; for a
+                  // brand-new note it stays grayed out and inert until the
+                  // user has entered a title or some body text.
+                  final hasText = _title.text.trim().isNotEmpty ||
+                      _content.text.trim().isNotEmpty;
+                  final enabled = !widget.isNew || hasText;
+                  return CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: enabled ? _onMenuPressed : null,
+                    child: Icon(
+                      CupertinoIcons.ellipsis,
+                      size: 26,
+                      color: enabled
+                          ? CupertinoColors.label.resolveFrom(context)
+                          : CupertinoColors.tertiaryLabel.resolveFrom(context),
                     ),
+                  );
+                },
+              ),
             ),
             child: Column(
               children: [
