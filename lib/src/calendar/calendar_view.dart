@@ -779,13 +779,13 @@ class _DayCell extends StatelessWidget {
     );
   }
 
-  /// The day number, wrapped in the "today" accent pill when applicable. In the
+  /// The day number, wrapped in the highlight band when applicable. In the
   /// continuous view, the 1st of each month is prefixed with the month's short
   /// name so month boundaries read clearly without a separating header.
   Widget _buildDayLabel(BuildContext context) {
-    // Highlight priority: the selected day gets the strong accent pill (moved
-    // off "today"); an unselected today gets a softer neutral fill so it still
-    // stands out without competing with the selection.
+    // Highlight priority: the selected day gets the strong accent band; an
+    // unselected today gets a blue band so it still stands out without
+    // competing with the selection.
     final selectedHere = _isSelected;
     final Color? fillColor;
     final Color textColor;
@@ -795,8 +795,8 @@ class _DayCell extends StatelessWidget {
       textColor = CupertinoColors.white;
       weight = FontWeight.w700;
     } else if (_isToday) {
-      fillColor = CupertinoColors.systemGrey4.resolveFrom(context);
-      textColor = CupertinoColors.label.resolveFrom(context);
+      fillColor = CupertinoColors.systemBlue.resolveFrom(context);
+      textColor = CupertinoColors.white;
       weight = FontWeight.w700;
     } else {
       fillColor = null;
@@ -804,25 +804,25 @@ class _DayCell extends StatelessWidget {
       weight = FontWeight.normal;
     }
 
-    final numberPill = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: fillColor != null
-          ? BoxDecoration(
-              color: fillColor,
-              borderRadius: BorderRadius.circular(20),
-            )
-          : null,
-      child: Text(
-        '${date!.day}',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: weight,
-          color: textColor,
-        ),
-      ),
+    final numberStyle = TextStyle(
+      fontSize: 12,
+      fontWeight: weight,
+      color: textColor,
     );
 
+    // Continuous view marks the 1st of each month with an inline month label;
+    // keep a compact pill there so the month name still fits beside the number.
     if (continuous && date!.day == 1) {
+      final numberPill = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: fillColor != null
+            ? BoxDecoration(
+                color: fillColor,
+                borderRadius: BorderRadius.circular(8),
+              )
+            : null,
+        child: Text('${date!.day}', style: numberStyle),
+      );
       return Align(
         alignment: Alignment.topCenter,
         child: Row(
@@ -847,7 +847,22 @@ class _DayCell extends StatelessWidget {
       );
     }
 
-    return Align(alignment: Alignment.topCenter, child: numberPill);
+    // Standard cell: the highlight band stretches to (nearly) the full cell
+    // width — keeping a small horizontal gap from neighbouring cells — and is
+    // kept short vertically so it frees room for more chips below.
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 1),
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      alignment: Alignment.center,
+      decoration: fillColor != null
+          ? BoxDecoration(
+              color: fillColor,
+              borderRadius: BorderRadius.circular(6),
+            )
+          : null,
+      child: Text('${date!.day}', style: numberStyle),
+    );
   }
 
   @override
@@ -882,6 +897,12 @@ class _DayCell extends StatelessWidget {
       for (final t in completed) _ChipData.task(t, true),
     ];
 
+    // Up to 5 chips fit in a cell. Showing 5 means at most one would be hidden,
+    // so we only collapse into "4 + N" once there is more than one extra chip
+    // (i.e. 6 or more): then 4 chips render plus a "+N" overflow indicator.
+    final visibleCount = chips.length <= 5 ? chips.length : 4;
+    final overflowCount = chips.length - visibleCount;
+
     return DragTarget<PlusDragPayload>(
       onWillAcceptWithDetails: (_) => true,
       onAcceptWithDetails: (_) =>
@@ -903,7 +924,7 @@ class _DayCell extends StatelessWidget {
           children: [
             _buildDayLabel(context),
             const SizedBox(height: 2),
-            ...chips.take(3).map((c) {
+            ...chips.take(visibleCount).map((c) {
               if (c.isEvent) {
                 return _EventChip(
                   title: c.event!.title,
@@ -936,11 +957,11 @@ class _DayCell extends StatelessWidget {
                 listColor: listColor != null ? Color(listColor) : null,
               );
             }),
-            if (chips.length > 3)
+            if (overflowCount > 0)
               Padding(
                 padding: const EdgeInsets.only(left: 2),
                 child: Text(
-                  '+${chips.length - 3}',
+                  '+$overflowCount',
                   style: TextStyle(
                     fontSize: 9,
                     color:
