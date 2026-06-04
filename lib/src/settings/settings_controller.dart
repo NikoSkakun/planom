@@ -181,6 +181,15 @@ class SettingsController with ChangeNotifier {
   bool _showRoutinesInCalendar = false;
   bool get showRoutinesInCalendar => _showRoutinesInCalendar;
 
+  // Sub-toggles of [showRoutinesInCalendar]: whether routines also surface on
+  // non-today past / future days in the Calendar. Both default on, so the base
+  // behaviour (routines on every day) is unchanged. With both off, routines
+  // appear only on the present day.
+  bool _showPastRoutinesInCalendar = true;
+  bool get showPastRoutinesInCalendar => _showPastRoutinesInCalendar;
+  bool _showFutureRoutinesInCalendar = true;
+  bool get showFutureRoutinesInCalendar => _showFutureRoutinesInCalendar;
+
   // Visual-only: render the Routines feature as "Habits" throughout the UI.
   // Under the hood everything is still routines (mirrored to S.useHabitNaming).
   bool _useHabitNaming = false;
@@ -358,6 +367,10 @@ class SettingsController with ChangeNotifier {
         _showRoutinesInToday = value == 'true';
       } else if (key == 'show_routines_in_calendar') {
         _showRoutinesInCalendar = value == 'true';
+      } else if (key == 'show_past_routines_in_calendar') {
+        _showPastRoutinesInCalendar = value != 'false';
+      } else if (key == 'show_future_routines_in_calendar') {
+        _showFutureRoutinesInCalendar = value != 'false';
       } else if (key == 'use_habit_naming') {
         _useHabitNaming = value == 'true';
       } else if (key == 'count_routines_in_today') {
@@ -532,6 +545,21 @@ class SettingsController with ChangeNotifier {
     _showRoutinesInCalendar = value;
     notifyListeners();
     await _db.setAppSetting('show_routines_in_calendar', value.toString());
+  }
+
+  Future<void> updateShowPastRoutinesInCalendar(bool value) async {
+    if (value == _showPastRoutinesInCalendar) return;
+    _showPastRoutinesInCalendar = value;
+    notifyListeners();
+    await _db.setAppSetting('show_past_routines_in_calendar', value.toString());
+  }
+
+  Future<void> updateShowFutureRoutinesInCalendar(bool value) async {
+    if (value == _showFutureRoutinesInCalendar) return;
+    _showFutureRoutinesInCalendar = value;
+    notifyListeners();
+    await _db.setAppSetting(
+        'show_future_routines_in_calendar', value.toString());
   }
 
   Future<void> updateCountRoutinesInToday(bool value) async {

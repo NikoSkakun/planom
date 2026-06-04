@@ -29,6 +29,7 @@ class RoutinesView extends StatefulWidget {
   const RoutinesView({
     super.key,
     required this.controller,
+    this.resetSignal,
     this.settingsController,
     this.backupService,
     this.db,
@@ -39,6 +40,9 @@ class RoutinesView extends StatefulWidget {
   });
 
   final RoutineController controller;
+  // Bumped when the Routines tab is re-tapped — resets the view to its default
+  // state (Day segment, today selected), mirroring the other tabs.
+  final ValueNotifier<int>? resetSignal;
   final SettingsController? settingsController;
   final BackupService? backupService;
   final DatabaseService? db;
@@ -54,6 +58,35 @@ class RoutinesView extends StatefulWidget {
 class _RoutinesViewState extends State<RoutinesView>
     with DropdownOverlayMixin {
   int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.resetSignal?.addListener(_onResetSignal);
+  }
+
+  @override
+  void didUpdateWidget(covariant RoutinesView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.resetSignal != widget.resetSignal) {
+      oldWidget.resetSignal?.removeListener(_onResetSignal);
+      widget.resetSignal?.addListener(_onResetSignal);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.resetSignal?.removeListener(_onResetSignal);
+    super.dispose();
+  }
+
+  // Re-tapping the Routines tab returns to the Day segment (the Day content's
+  // selected day is reset to today by _DayContent, which listens to the same
+  // signal).
+  void _onResetSignal() {
+    if (!mounted) return;
+    if (_tab != 0) setState(() => _tab = 0);
+  }
 
   void _openSettings(BuildContext context) {
     HomeShell.openGlobalSettings(context);
@@ -113,7 +146,10 @@ class _RoutinesViewState extends State<RoutinesView>
           child: ListenableBuilder(
             listenable: widget.controller,
             builder: (context, _) => _tab == 0
-                ? _DayContent(controller: widget.controller)
+                ? _DayContent(
+                    controller: widget.controller,
+                    resetSignal: widget.resetSignal,
+                  )
                 : _AllContent(controller: widget.controller),
           ),
         ),
@@ -143,8 +179,9 @@ class _RoutinesViewState extends State<RoutinesView>
 // ── Day tab (per-day checklist with history navigation) ──────────────────────
 
 class _DayContent extends StatefulWidget {
-  const _DayContent({required this.controller});
+  const _DayContent({required this.controller, this.resetSignal});
   final RoutineController controller;
+  final ValueNotifier<int>? resetSignal;
 
   @override
   State<_DayContent> createState() => _DayContentState();
@@ -154,19 +191,37 @@ class _DayContentState extends State<_DayContent> {
   DateTime _selected = RoutineController.normalizeDate(DateTime.now());
   bool _completedExpanded = false;
 
-  bool get _isToday =>
-      _selected == RoutineController.normalizeDate(DateTime.now());
-
-  void _shiftDay(int delta) {
-    final next = DateTime(_selected.year, _selected.month, _selected.day + delta);
-    // Don't allow navigating into the future — routines reset daily and
-    // future days have no meaning yet.
-    if (next.isAfter(RoutineController.normalizeDate(DateTime.now()))) return;
-    setState(() => _selected = next);
+  @override
+  void initState() {
+    super.initState();
+    widget.resetSignal?.addListener(_onResetSignal);
   }
 
-  void _jumpToToday() {
-    setState(() => _selected = RoutineController.normalizeDate(DateTime.now()));
+  @override
+  void didUpdateWidget(covariant _DayContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.resetSignal != widget.resetSignal) {
+      oldWidget.resetSignal?.removeListener(_onResetSignal);
+      widget.resetSignal?.addListener(_onResetSignal);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.resetSignal?.removeListener(_onResetSignal);
+    super.dispose();
+  }
+
+  void _onResetSignal() {
+    if (!mounted) return;
+    final today = RoutineController.normalizeDate(DateTime.now());
+    if (_selected != today) setState(() => _selected = today);
+    // The selector handles scrolling itself via the same signal.
+  }
+
+  void _onDaySelected(DateTime day) {
+    final normalized = RoutineController.normalizeDate(day);
+    if (normalized != _selected) setState(() => _selected = normalized);
   }
 
   @override
@@ -182,14 +237,23 @@ class _DayContentState extends State<_DayContent> {
         .where((r) => widget.controller.isCompletedOnDate(r, _selected))
         .toList();
 
+    final today = RoutineController.normalizeDate(DateTime.now());
+    // Left bound of the selector: the first day with any recorded progress,
+    // but always at least the last 7 days (today + 6 past days).
+    final weekFloor = DateTime(today.year, today.month, today.day - 6);
+    final earliest = widget.controller.earliestEntryDate;
+    final firstDate = (earliest != null && earliest.isBefore(weekFloor))
+        ? earliest
+        : weekFloor;
+
     return Column(
       children: [
-        _DayNavigator(
-          date: _selected,
-          isToday: _isToday,
-          onPrev: () => _shiftDay(-1),
-          onNext: _isToday ? null : () => _shiftDay(1),
-          onToday: _isToday ? null : _jumpToToday,
+        _DaySelector(
+          firstDate: firstDate,
+          today: today,
+          selected: _selected,
+          onSelected: _onDaySelected,
+          resetSignal: widget.resetSignal,
         ),
         Expanded(
           child: (incomplete.isEmpty && completed.isEmpty)
@@ -283,26 +347,120 @@ class _CompletedHeader extends StatelessWidget {
   }
 }
 
-class _DayNavigator extends StatelessWidget {
-  const _DayNavigator({
-    required this.date,
-    required this.isToday,
-    required this.onPrev,
-    required this.onNext,
-    required this.onToday,
+/// Horizontally scrollable day picker for the Day view. Shows 7 days at a time
+/// — today at the right edge with the six previous days to its left — and can
+/// be scrolled back to the day of the very first recorded routine progress.
+///
+/// While the user scrolls, the active day follows the right-most fully visible
+/// cell; when the fling settles the row snaps to whole-day boundaries so a
+/// clean set of 7 days is always shown.
+class _DaySelector extends StatefulWidget {
+  const _DaySelector({
+    required this.firstDate,
+    required this.today,
+    required this.selected,
+    required this.onSelected,
+    this.resetSignal,
   });
 
-  final DateTime date;
-  final bool isToday;
-  final VoidCallback onPrev;
-  final VoidCallback? onNext;
-  final VoidCallback? onToday;
+  final DateTime firstDate; // normalized; left bound (oldest day)
+  final DateTime today; // normalized; right bound (newest day)
+  final DateTime selected; // normalized
+  final ValueChanged<DateTime> onSelected;
+  final ValueNotifier<int>? resetSignal;
+
+  @override
+  State<_DaySelector> createState() => _DaySelectorState();
+}
+
+class _DaySelectorState extends State<_DaySelector> {
+  static const int _visibleCount = 7;
+  final ScrollController _controller = ScrollController();
+  late List<DateTime> _days;
+  double _cellWidth = 0;
+  bool _pendingScrollToEnd = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuildDays();
+    widget.resetSignal?.addListener(_scrollToEndAnimated);
+  }
+
+  @override
+  void didUpdateWidget(covariant _DaySelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.resetSignal != widget.resetSignal) {
+      oldWidget.resetSignal?.removeListener(_scrollToEndAnimated);
+      widget.resetSignal?.addListener(_scrollToEndAnimated);
+    }
+    if (oldWidget.firstDate != widget.firstDate ||
+        oldWidget.today != widget.today) {
+      _rebuildDays();
+      // Date range changed — re-anchor today at the right edge.
+      _pendingScrollToEnd = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.resetSignal?.removeListener(_scrollToEndAnimated);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _rebuildDays() {
+    _days = [];
+    var d = widget.firstDate;
+    while (!d.isAfter(widget.today)) {
+      _days.add(d);
+      d = DateTime(d.year, d.month, d.day + 1);
+    }
+  }
+
+  void _scrollToEndAnimated() {
+    if (!_controller.hasClients) {
+      _pendingScrollToEnd = true;
+      return;
+    }
+    _controller.animateTo(
+      _controller.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
+
+  /// Right-most fully visible day index for the current scroll offset.
+  int _rightmostIndex() {
+    if (_cellWidth <= 0) return _days.length - 1;
+    final leftIndex = (_controller.offset / _cellWidth).round();
+    return (leftIndex + _visibleCount - 1).clamp(0, _days.length - 1);
+  }
+
+  void _updateSelectionFromScroll() {
+    if (_cellWidth <= 0 || !_controller.hasClients) return;
+    final day = _days[_rightmostIndex()];
+    if (day != widget.selected) widget.onSelected(day);
+  }
+
+  // After a fling settles, snap so only whole day cells are visible.
+  void _snap() {
+    if (_cellWidth <= 0 || !_controller.hasClients) return;
+    final target = (_controller.offset / _cellWidth).round() * _cellWidth;
+    final clamped =
+        target.clamp(0.0, _controller.position.maxScrollExtent);
+    if ((clamped - _controller.offset).abs() > 0.5) {
+      _controller.animateTo(
+        clamped,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final label = formatTaskDateRelative(context, date);
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
@@ -311,31 +469,114 @@ class _DayNavigator extends StatelessWidget {
           ),
         ),
       ),
-      child: Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          _cellWidth = constraints.maxWidth / _visibleCount;
+          // Anchor today at the right edge once the list has laid out (or after
+          // the date range changed).
+          if (_pendingScrollToEnd) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || !_controller.hasClients) return;
+              _controller.jumpTo(_controller.position.maxScrollExtent);
+              _pendingScrollToEnd = false;
+            });
+          }
+          return SizedBox(
+            height: 64,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (n) {
+                if (n is ScrollUpdateNotification) {
+                  _updateSelectionFromScroll();
+                } else if (n is ScrollEndNotification) {
+                  _snap();
+                }
+                return false;
+              },
+              child: ListView.builder(
+                controller: _controller,
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemExtent: _cellWidth,
+                itemCount: _days.length,
+                itemBuilder: (context, i) {
+                  final day = _days[i];
+                  return _DayCell(
+                    day: day,
+                    selected: day == widget.selected,
+                    isToday: day == widget.today,
+                    onTap: () => widget.onSelected(day),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DayCell extends StatelessWidget {
+  const _DayCell({
+    required this.day,
+    required this.selected,
+    required this.isToday,
+    required this.onTap,
+  });
+
+  final DateTime day;
+  final bool selected;
+  final bool isToday;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // weekdaysShort is Monday-first (0=Mon … 6=Sun); DateTime.weekday is 1=Mon.
+    final weekday = weekdaysShort(context)[day.weekday - 1];
+    final accent = AppColors.accent;
+    final Color numberColor;
+    if (selected) {
+      numberColor = CupertinoColors.white;
+    } else if (isToday) {
+      numberColor = accent;
+    } else {
+      numberColor = CupertinoColors.label.resolveFrom(context);
+    }
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            minSize: 0,
-            onPressed: onPrev,
-            child: const Icon(CupertinoIcons.chevron_left, size: 20),
-          ),
-          Expanded(
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          Text(
+            weekday,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: selected
+                  ? accent
+                  : CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            minSize: 0,
-            onPressed: onNext,
-            child: Icon(
-              CupertinoIcons.chevron_right,
-              size: 20,
-              color: onNext == null
-                  ? CupertinoColors.quaternaryLabel.resolveFrom(context)
+          const SizedBox(height: 6),
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: selected ? accent : null,
+              border: (!selected && isToday)
+                  ? Border.all(color: accent, width: 1.5)
                   : null,
+            ),
+            child: Text(
+              '${day.day}',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: numberColor,
+              ),
             ),
           ),
         ],

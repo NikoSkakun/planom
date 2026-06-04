@@ -166,6 +166,18 @@ class RoutineController with ChangeNotifier {
   RoutineEntry? entryForToday(String routineId) =>
       entryForDate(routineId, DateTime.now());
 
+  /// The earliest day on which any routine progress was recorded, or null when
+  /// there is no history. Used by the Day view's day selector to know how far
+  /// back the user can scroll.
+  DateTime? get earliestEntryDate {
+    DateTime? min;
+    for (final e in _entries) {
+      final d = normalizeDate(e.date);
+      if (min == null || d.isBefore(min)) min = d;
+    }
+    return min;
+  }
+
   int progressForDate(String routineId, DateTime date) =>
       entryForDate(routineId, date)?.amount ?? 0;
 

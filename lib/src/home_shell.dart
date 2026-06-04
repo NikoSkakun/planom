@@ -91,6 +91,7 @@ class _HomeShellState extends State<HomeShell> {
   final _tasksCollapseSignal = ValueNotifier<int>(0);
   final _notesCollapseSignal = ValueNotifier<int>(0);
   final _calendarResetSignal = ValueNotifier<int>(0);
+  final _routinesResetSignal = ValueNotifier<int>(0);
   final _showPlusButton = ValueNotifier<bool>(true);
   final _plusButtonInset = ValueNotifier<double>(0);
   final _undoController = UndoController();
@@ -374,6 +375,7 @@ class _HomeShellState extends State<HomeShell> {
     _tasksCollapseSignal.dispose();
     _notesCollapseSignal.dispose();
     _calendarResetSignal.dispose();
+    _routinesResetSignal.dispose();
     _showPlusButton.dispose();
     _plusButtonInset.dispose();
     _globalSettingsOpen.dispose();
@@ -608,6 +610,7 @@ class _HomeShellState extends State<HomeShell> {
       if (tappedIndex == 0) _tasksCollapseSignal.value++;
       if (tappedIndex == 1) _notesCollapseSignal.value++;
       if (tappedIndex == 2) _calendarResetSignal.value++;
+      if (tappedIndex == 3) _routinesResetSignal.value++;
     }
     _refreshPlusForTab(tappedIndex);
     _lastTabIndex = tappedIndex;
@@ -932,6 +935,7 @@ class _HomeShellState extends State<HomeShell> {
         ),
       3 => RoutinesView(
           controller: widget.routineController,
+          resetSignal: _routinesResetSignal,
           settingsController: widget.settingsController,
           backupService: widget.backupService,
           db: SpaceManagerProvider.of(context).db,

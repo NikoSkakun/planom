@@ -453,6 +453,20 @@ class _DayViewSheetState extends State<DayViewSheet> {
     );
   }
 
+  /// Whether routines may surface for [widget.date] given the past/future
+  /// Calendar sub-toggles. Today is always allowed; past/future days are gated
+  /// by [showPastRoutinesInCalendar] / [showFutureRoutinesInCalendar].
+  bool _routinesAllowedForDate() {
+    final sc = widget.settingsController;
+    if (sc == null) return true;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(widget.date.year, widget.date.month, widget.date.day);
+    if (day.isBefore(today)) return sc.showPastRoutinesInCalendar;
+    if (day.isAfter(today)) return sc.showFutureRoutinesInCalendar;
+    return true;
+  }
+
   Widget _buildList(BuildContext context) {
     final tasks = widget.taskController.tasksForDate(widget.date);
     final birthdays =
@@ -468,6 +482,7 @@ class _DayViewSheetState extends State<DayViewSheet> {
     final rc = widget.routineController;
     final showRoutines =
         (widget.settingsController?.showRoutinesInCalendar ?? false) &&
+            _routinesAllowedForDate() &&
             rc != null &&
             rc.routinesForDate(widget.date).isNotEmpty;
 

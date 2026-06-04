@@ -252,6 +252,22 @@ class CalendarSettingsView extends StatelessWidget {
                     value: controller.showRoutinesInCalendar,
                     onChanged: controller.updateShowRoutinesInCalendar,
                   ),
+                  if (controller.showRoutinesInCalendar) ...[
+                    const SizedBox(height: 1),
+                    SettingsToggleRow(
+                      label: s.showPastRoutines,
+                      value: controller.showPastRoutinesInCalendar,
+                      onChanged:
+                          controller.updateShowPastRoutinesInCalendar,
+                    ),
+                    const SizedBox(height: 1),
+                    SettingsToggleRow(
+                      label: s.showFutureRoutines,
+                      value: controller.showFutureRoutinesInCalendar,
+                      onChanged:
+                          controller.updateShowFutureRoutinesInCalendar,
+                    ),
+                  ],
                 ],
               ),
             );
@@ -300,6 +316,22 @@ class RoutinesSettingsView extends StatelessWidget {
                     value: controller.showRoutinesInCalendar,
                     onChanged: controller.updateShowRoutinesInCalendar,
                   ),
+                  if (controller.showRoutinesInCalendar) ...[
+                    const SizedBox(height: 1),
+                    SettingsToggleRow(
+                      label: s.showPastRoutines,
+                      value: controller.showPastRoutinesInCalendar,
+                      onChanged:
+                          controller.updateShowPastRoutinesInCalendar,
+                    ),
+                    const SizedBox(height: 1),
+                    SettingsToggleRow(
+                      label: s.showFutureRoutines,
+                      value: controller.showFutureRoutinesInCalendar,
+                      onChanged:
+                          controller.updateShowFutureRoutinesInCalendar,
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
