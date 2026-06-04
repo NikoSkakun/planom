@@ -740,6 +740,10 @@ class _DayCell extends StatelessWidget {
   final DeviceCalendarController? deviceCalendarController;
   final VoidCallback? onTap;
 
+  /// Fixed height for every day cell so all calendar rows are uniform. Sized to
+  /// hold the day label plus four content rows (3 chips + a "+N" indicator).
+  static const _cellHeight = 88.0;
+
   bool get _isToday =>
       date != null &&
       date!.year == today.year &&
@@ -818,7 +822,7 @@ class _DayCell extends StatelessWidget {
         decoration: fillColor != null
             ? BoxDecoration(
                 color: fillColor,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(100),
               )
             : null,
         child: Text('${date!.day}', style: numberStyle),
@@ -849,7 +853,8 @@ class _DayCell extends StatelessWidget {
 
     // Standard cell: the highlight band stretches to (nearly) the full cell
     // width — keeping a small horizontal gap from neighbouring cells — and is
-    // kept short vertically so it frees room for more chips below.
+    // kept short vertically. A very large radius gives full semicircular caps
+    // at the left and right ends (stadium shape).
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 1),
@@ -858,7 +863,7 @@ class _DayCell extends StatelessWidget {
       decoration: fillColor != null
           ? BoxDecoration(
               color: fillColor,
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(100),
             )
           : null,
       child: Text('${date!.day}', style: numberStyle),
@@ -869,7 +874,7 @@ class _DayCell extends StatelessWidget {
   Widget build(BuildContext context) {
     if (date == null) {
       return Container(
-        constraints: const BoxConstraints(minHeight: 88),
+        height: _cellHeight,
         decoration: BoxDecoration(border: _cellBorder(context)),
       );
     }
@@ -897,10 +902,9 @@ class _DayCell extends StatelessWidget {
       for (final t in completed) _ChipData.task(t, true),
     ];
 
-    // Up to 5 chips fit in a cell. Showing 5 means at most one would be hidden,
-    // so we only collapse into "4 + N" once there is more than one extra chip
-    // (i.e. 6 or more): then 4 chips render plus a "+N" overflow indicator.
-    final visibleCount = chips.length <= 5 ? chips.length : 4;
+    // All cells are a fixed height, so a day holds at most 4 content rows:
+    // 3 chips plus a "+N" overflow indicator once there are more than 3 items.
+    final visibleCount = chips.length <= 3 ? chips.length : 3;
     final overflowCount = chips.length - visibleCount;
 
     return DragTarget<PlusDragPayload>(
@@ -913,7 +917,8 @@ class _DayCell extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 88),
+        height: _cellHeight,
+        clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
           color: highlighted ? AppColors.accent.withOpacity(0.15) : null,
           border: _cellBorder(context),
