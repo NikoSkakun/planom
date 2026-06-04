@@ -238,10 +238,18 @@ class _DayContentState extends State<_DayContent> {
         .toList();
 
     final today = RoutineController.normalizeDate(DateTime.now());
-    // Left bound of the selector: the first day with any recorded progress,
-    // but always at least the last 7 days (today + 6 past days).
+    // Left bound of the selector: far enough back to reach either the first
+    // recorded progress OR the earliest routine's start date (so an old,
+    // never-completed routine is still reachable), but always at least the
+    // last 7 days (today + 6 past days).
     final weekFloor = DateTime(today.year, today.month, today.day - 6);
-    final earliest = widget.controller.earliestEntryDate;
+    DateTime? earliest;
+    for (final d in [
+      widget.controller.earliestEntryDate,
+      widget.controller.earliestStartDate,
+    ]) {
+      if (d != null && (earliest == null || d.isBefore(earliest))) earliest = d;
+    }
     final firstDate = (earliest != null && earliest.isBefore(weekFloor))
         ? earliest
         : weekFloor;
@@ -461,20 +469,12 @@ class _DaySelectorState extends State<_DaySelector> {
     if (right != _focused.value) _focused.value = right;
   }
 
-  // When the fling settles, snap so only whole day cells are visible, then
-  // commit the right-most visible day to the parent (drives the routine list).
+  // Alignment itself is handled by [_SnapScrollPhysics] (the magnet effect);
+  // once the motion settles on a whole-cell boundary we commit the right-most
+  // visible day to the parent (which drives the routine list).
   void _onScrollEnd() {
     if (_cellWidth <= 0 || !_controller.hasClients) return;
     final leftIndex = (_controller.offset / _cellWidth).round();
-    final snapped =
-        (leftIndex * _cellWidth).clamp(0.0, _controller.position.maxScrollExtent);
-    if ((snapped - _controller.offset).abs() > 0.5) {
-      _controller.animateTo(
-        snapped,
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-      );
-    }
     final right = _rightmostFor(leftIndex);
     _focused.value = right;
     final day = _days[right];
@@ -514,8 +514,11 @@ class _DaySelectorState extends State<_DaySelector> {
               child: ListView.builder(
                 controller: _controller,
                 scrollDirection: Axis.horizontal,
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
+                physics: _SnapScrollPhysics(
+                  itemExtent: _cellWidth,
+                  parent: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
                 ),
                 itemExtent: _cellWidth,
                 itemCount: _days.length,
@@ -538,6 +541,54 @@ class _DaySelectorState extends State<_DaySelector> {
       ),
     );
   }
+}
+
+/// Scroll physics that snaps the day row to whole [itemExtent] boundaries when
+/// the fling settles — a magnet effect that always ends aligned to exactly 7
+/// cells, no matter where the finger is released.
+class _SnapScrollPhysics extends ScrollPhysics {
+  const _SnapScrollPhysics({required this.itemExtent, super.parent});
+
+  final double itemExtent;
+
+  @override
+  _SnapScrollPhysics applyTo(ScrollPhysics? ancestor) =>
+      _SnapScrollPhysics(itemExtent: itemExtent, parent: buildParent(ancestor));
+
+  double _snapTarget(
+      ScrollMetrics position, double velocity, Tolerance tolerance) {
+    if (itemExtent <= 0) return position.pixels;
+    var page = position.pixels / itemExtent;
+    // Bias toward the fling direction so a flick advances rather than snapping
+    // back to where it started; a gentle release rounds to the nearest cell.
+    if (velocity < -tolerance.velocity) {
+      page = page.floorToDouble();
+    } else if (velocity > tolerance.velocity) {
+      page = page.ceilToDouble();
+    } else {
+      page = page.roundToDouble();
+    }
+    return (page * itemExtent)
+        .clamp(position.minScrollExtent, position.maxScrollExtent);
+  }
+
+  @override
+  Simulation? createBallisticSimulation(
+      ScrollMetrics position, double velocity) {
+    final tolerance = toleranceFor(position);
+    // Past either edge: let the parent handle the bounce-back.
+    if ((velocity <= 0.0 && position.pixels <= position.minScrollExtent) ||
+        (velocity >= 0.0 && position.pixels >= position.maxScrollExtent)) {
+      return super.createBallisticSimulation(position, velocity);
+    }
+    final target = _snapTarget(position, velocity, tolerance);
+    if ((target - position.pixels).abs() < tolerance.distance) return null;
+    return ScrollSpringSimulation(spring, position.pixels, target, velocity,
+        tolerance: tolerance);
+  }
+
+  @override
+  bool get allowImplicitScrolling => false;
 }
 
 class _DayCell extends StatelessWidget {

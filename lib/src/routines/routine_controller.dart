@@ -178,6 +178,18 @@ class RoutineController with ChangeNotifier {
     return min;
   }
 
+  /// The earliest start day (start date, falling back to creation date) across
+  /// all routines, or null when there are none. Lets the Day view scroll back
+  /// far enough to reach an old, never-completed routine's first occurrence.
+  DateTime? get earliestStartDate {
+    DateTime? min;
+    for (final r in _routines) {
+      final d = startFloor(r);
+      if (min == null || d.isBefore(min)) min = d;
+    }
+    return min;
+  }
+
   int progressForDate(String routineId, DateTime date) =>
       entryForDate(routineId, date)?.amount ?? 0;
 
