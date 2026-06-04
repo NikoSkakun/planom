@@ -376,6 +376,10 @@ class _DaySelector extends StatefulWidget {
 class _DaySelectorState extends State<_DaySelector> {
   static const int _visibleCount = 7;
   final ScrollController _controller = ScrollController();
+  // The highlighted day index. Updated live while scrolling via a notifier so
+  // only the day cells repaint — the ListView itself (and the parent) is NOT
+  // rebuilt mid-drag, which would otherwise drop the scroll gesture.
+  late final ValueNotifier<int> _focused;
   late List<DateTime> _days;
   double _cellWidth = 0;
   bool _pendingScrollToEnd = true;
@@ -384,6 +388,8 @@ class _DaySelectorState extends State<_DaySelector> {
   void initState() {
     super.initState();
     _rebuildDays();
+    _focused = ValueNotifier<int>(_indexOf(widget.selected));
+    _controller.addListener(_onScroll);
     widget.resetSignal?.addListener(_scrollToEndAnimated);
   }
 
@@ -400,12 +406,19 @@ class _DaySelectorState extends State<_DaySelector> {
       // Date range changed — re-anchor today at the right edge.
       _pendingScrollToEnd = true;
     }
+    // Keep the highlight in sync when the parent changes the selection (tap,
+    // reset, etc.).
+    if (oldWidget.selected != widget.selected) {
+      _focused.value = _indexOf(widget.selected);
+    }
   }
 
   @override
   void dispose() {
     widget.resetSignal?.removeListener(_scrollToEndAnimated);
+    _controller.removeListener(_onScroll);
     _controller.dispose();
+    _focused.dispose();
     super.dispose();
   }
 
@@ -416,6 +429,11 @@ class _DaySelectorState extends State<_DaySelector> {
       _days.add(d);
       d = DateTime(d.year, d.month, d.day + 1);
     }
+  }
+
+  int _indexOf(DateTime day) {
+    final i = _days.indexWhere((d) => d == day);
+    return i < 0 ? _days.length - 1 : i;
   }
 
   void _scrollToEndAnimated() {
@@ -430,32 +448,37 @@ class _DaySelectorState extends State<_DaySelector> {
     );
   }
 
-  /// Right-most fully visible day index for the current scroll offset.
-  int _rightmostIndex() {
-    if (_cellWidth <= 0) return _days.length - 1;
+  /// Right-most fully visible day index for a given left-edge cell index.
+  int _rightmostFor(int leftIndex) =>
+      (leftIndex + _visibleCount - 1).clamp(0, _days.length - 1);
+
+  // Live highlight follow as the offset changes (drag + fling). Cheap: only
+  // updates a ValueNotifier, repainting the cells, never the ListView/parent.
+  void _onScroll() {
+    if (_cellWidth <= 0) return;
     final leftIndex = (_controller.offset / _cellWidth).round();
-    return (leftIndex + _visibleCount - 1).clamp(0, _days.length - 1);
+    final right = _rightmostFor(leftIndex);
+    if (right != _focused.value) _focused.value = right;
   }
 
-  void _updateSelectionFromScroll() {
+  // When the fling settles, snap so only whole day cells are visible, then
+  // commit the right-most visible day to the parent (drives the routine list).
+  void _onScrollEnd() {
     if (_cellWidth <= 0 || !_controller.hasClients) return;
-    final day = _days[_rightmostIndex()];
-    if (day != widget.selected) widget.onSelected(day);
-  }
-
-  // After a fling settles, snap so only whole day cells are visible.
-  void _snap() {
-    if (_cellWidth <= 0 || !_controller.hasClients) return;
-    final target = (_controller.offset / _cellWidth).round() * _cellWidth;
-    final clamped =
-        target.clamp(0.0, _controller.position.maxScrollExtent);
-    if ((clamped - _controller.offset).abs() > 0.5) {
+    final leftIndex = (_controller.offset / _cellWidth).round();
+    final snapped =
+        (leftIndex * _cellWidth).clamp(0.0, _controller.position.maxScrollExtent);
+    if ((snapped - _controller.offset).abs() > 0.5) {
       _controller.animateTo(
-        clamped,
+        snapped,
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
       );
     }
+    final right = _rightmostFor(leftIndex);
+    _focused.value = right;
+    final day = _days[right];
+    if (day != widget.selected) widget.onSelected(day);
   }
 
   @override
@@ -485,26 +508,27 @@ class _DaySelectorState extends State<_DaySelector> {
             height: 64,
             child: NotificationListener<ScrollNotification>(
               onNotification: (n) {
-                if (n is ScrollUpdateNotification) {
-                  _updateSelectionFromScroll();
-                } else if (n is ScrollEndNotification) {
-                  _snap();
-                }
+                if (n is ScrollEndNotification) _onScrollEnd();
                 return false;
               },
               child: ListView.builder(
                 controller: _controller,
                 scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
                 itemExtent: _cellWidth,
                 itemCount: _days.length,
                 itemBuilder: (context, i) {
                   final day = _days[i];
-                  return _DayCell(
-                    day: day,
-                    selected: day == widget.selected,
-                    isToday: day == widget.today,
-                    onTap: () => widget.onSelected(day),
+                  return ValueListenableBuilder<int>(
+                    valueListenable: _focused,
+                    builder: (context, focused, _) => _DayCell(
+                      day: day,
+                      selected: i == focused,
+                      isToday: day == widget.today,
+                      onTap: () => widget.onSelected(day),
+                    ),
                   );
                 },
               ),
