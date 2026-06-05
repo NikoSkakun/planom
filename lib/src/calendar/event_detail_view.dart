@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 
 import '../models/event.dart';
+import '../models/recurrence.dart';
 import '../localization/strings.dart';
 import '../tasks/calendar_date_picker.dart';
+import '../tasks/recurrence_picker.dart';
 import '../theme/app_theme.dart';
 import '../utils/duration_picker.dart';
 import '../utils/reminder_picker.dart';
@@ -30,6 +32,7 @@ class _EventDetailViewState extends State<EventDetailView> {
   late int? _doTime;
   late int? _duration;
   late List<int> _reminderOffsets;
+  late Recurrence? _recurrence;
   bool _deleted = false;
 
   @override
@@ -41,6 +44,7 @@ class _EventDetailViewState extends State<EventDetailView> {
     _doTime = widget.event.doTime;
     _duration = widget.event.duration;
     _reminderOffsets = List.of(widget.event.reminderOffsets);
+    _recurrence = Recurrence.parse(widget.event.recurrence);
   }
 
   @override
@@ -58,6 +62,8 @@ class _EventDetailViewState extends State<EventDetailView> {
           duration: _duration,
           clearDuration: _duration == null,
           reminderOffsets: _reminderOffsets,
+          recurrence: _recurrence?.toJson(),
+          clearRecurrence: _recurrence == null,
         ));
       }
     }
@@ -89,6 +95,12 @@ class _EventDetailViewState extends State<EventDetailView> {
     final result = await showReminderPicker(context, _reminderOffsets);
     if (!mounted || result == null) return;
     setState(() => _reminderOffsets = result);
+  }
+
+  Future<void> _pickRecurrence() async {
+    final result = await showRecurrencePicker(context, _recurrence);
+    if (!mounted || result == null) return;
+    setState(() => _recurrence = result.value);
   }
 
   Future<void> _delete() async {
@@ -222,6 +234,27 @@ class _EventDetailViewState extends State<EventDetailView> {
                       color: _reminderOffsets.isNotEmpty
                           ? AppColors.accent
                           : secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SectionCard(
+              onTap: _pickRecurrence,
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.repeat,
+                    size: 18,
+                    color: _recurrence != null ? AppColors.accent : secondary,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    formatRecurrence(context, _recurrence),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: _recurrence != null ? AppColors.accent : secondary,
                     ),
                   ),
                 ],

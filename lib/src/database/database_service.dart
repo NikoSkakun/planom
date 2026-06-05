@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 32;
+  static const _dbVersion = 33;
 
   Database? _db;
 
@@ -182,7 +182,8 @@ class DatabaseService {
             duration INTEGER,
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
-            reminderOffsets TEXT
+            reminderOffsets TEXT,
+            recurrence TEXT
           )
         ''');
         await db.execute('''
@@ -572,6 +573,11 @@ class DatabaseService {
           // Indexes on the columns controllers filter/join on. Purely a
           // performance change — query results are unaffected.
           await _createIndexes(db);
+        }
+        if (oldVersion < 33) {
+          // Recurring events: a JSON-encoded Recurrence rule on the event,
+          // expanded onto each repeat day in the view layer.
+          await db.execute('ALTER TABLE events ADD COLUMN recurrence TEXT');
         }
       },
     );

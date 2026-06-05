@@ -234,14 +234,14 @@ bool _isDark(ThemeMode mode, BuildContext context) => switch (mode) {
 /// the painter ([AppBackground]) shows through; solid/dynamic resolve to the
 /// configured color at [minute].
 Color? _scaffoldBackgroundColor(AppearancePrefs prefs, int minute) {
-  final lightCustom = prefs.light.backgroundMode != BackgroundMode.defaultBg;
-  final darkCustom = prefs.dark.backgroundMode != BackgroundMode.defaultBg;
-  if (!lightCustom && !darkCustom) return null;
-
+  // The dark-mode default background is a dark gray (matching the dark tab-bar
+  // background) rather than pure black — softer and easier on the eyes. Light
+  // mode keeps its white default. Because the dark default is no longer the
+  // Cupertino system default, we always resolve an explicit color here.
   Color side(ThemeAppearance a) {
     if (a.backgroundMode == BackgroundMode.image) return const Color(0x00000000);
     return a.backgroundColorAt(minute) ??
-        (a.isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF));
+        (a.isDark ? const Color(0xFF1C1C1E) : const Color(0xFFFFFFFF));
   }
 
   return CupertinoDynamicColor.withBrightness(

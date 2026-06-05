@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../database/database_service.dart';
 import '../models/event.dart';
+import '../models/recurrence.dart';
 import '../notifications/notification_service.dart';
 
 class EventController with ChangeNotifier {
@@ -19,12 +20,26 @@ class EventController with ChangeNotifier {
     return null;
   }
 
-  List<Event> eventsForDate(DateTime date) => _events
-      .where((e) =>
-          e.date.year == date.year &&
+  List<Event> eventsForDate(DateTime date) {
+    final result = <Event>[];
+    for (final e in _events) {
+      final onAnchor = e.date.year == date.year &&
           e.date.month == date.month &&
-          e.date.day == date.day)
-      .toList();
+          e.date.day == date.day;
+      final rec = Recurrence.parse(e.recurrence);
+      if (rec == null) {
+        if (onAnchor) result.add(e);
+        continue;
+      }
+      if (!rec.occursOn(e.date, date)) continue;
+      // Repeat days other than the anchor get a virtual occurrence carrying
+      // the same id (so taps open the master event) but the occurrence's date.
+      result.add(onAnchor
+          ? e
+          : e.copyWith(date: DateTime(date.year, date.month, date.day)));
+    }
+    return result;
+  }
 
   Future<void> load() async {
     _events = await _db.getEvents();

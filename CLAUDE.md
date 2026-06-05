@@ -19,7 +19,7 @@ Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
 ## Tech stack
 
 - **Framework**: Flutter / Dart, Cupertino (iOS-native) widgets throughout — no Material widgets in UI except `showModalBottomSheet` (which requires `GlobalMaterialLocalizations.delegate` already registered)
-- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **32**. FTS5 virtual tables for search.
+- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **33**. FTS5 virtual tables for search.
 - **Multi-space**: `SpaceManager` (`lib/src/spaces/`) owns a list of `Space`s and swaps the active space's controllers; the default space shares the global `planom.db` handle.
 - **App lock**: `SecurityService` (`lib/src/security/`) — optional PIN (4–8 digit) / custom password + optional biometric (Face ID, Touch ID, Windows Hello via `local_auth`); salted + key-stretched PBKDF2/HMAC-SHA256 hash in `app_settings` (`auth_*` keys), excluded from backups.
 - **Local notifications**: `NotificationService` (`lib/src/notifications/`) — `flutter_local_notifications` + `timezone`; per-task / per-event reminder scheduling via slot-based IDs. iOS + macOS only today.
@@ -136,6 +136,8 @@ Note (lib/src/models/note.dart)                  ← NOT an AppItem
 
 Event (lib/src/models/event.dart)                ← calendar entity
   id, title, note?, date, doTime?, duration?, reminderOffsets
+  recurrence?                        ← JSON-encoded Recurrence rule (repeating
+                                       events; expanded per-day in the view)
   isDeleted, deletedDate?
 
 Contact (lib/src/models/contact.dart)            ← belongs to a Birthdays list
@@ -151,7 +153,10 @@ Tag (lib/src/models/tag.dart)
 Recurrence (lib/src/models/recurrence.dart)
   type ('daily'|'weekly'|'monthly'|'yearly'), interval, weekdays? (weekly)
   nextAfter(DateTime) → DateTime     ← month-length edge cases handled
-  JSON-encoded into Task.recurrence
+  occursOn(start, date) → bool       ← is `date` a repeat of a series anchored
+                                       at `start` (used to expand recurring
+                                       Events onto each repeat day)
+  JSON-encoded into Task.recurrence / Event.recurrence
 
 RoutineEntry (lib/src/models/routine_entry.dart) ← per-day progress
   id, routineId, date (midnight), amount (cumulative for the day)
@@ -196,7 +201,7 @@ Custom photo icons for folders, lists, and routines are stored as **relative pat
 
 ### Database (`lib/src/database/database_service.dart`)
 
-Single `DatabaseService` class, lazy-opens its DB file (`dbName`, default `planom.db`) via sqflite. Current version: **32**. One `DatabaseService` instance per file — never open the same file with two handles (the default space reuses the global handle; see Spaces).
+Single `DatabaseService` class, lazy-opens its DB file (`dbName`, default `planom.db`) via sqflite. Current version: **33**. One `DatabaseService` instance per file — never open the same file with two handles (the default space reuses the global handle; see Spaces).
 
 Migration history:
 | Version | Changes |
@@ -232,6 +237,7 @@ Migration history:
 | v30 | `routines.manualEntry INTEGER NOT NULL DEFAULT 0` — `certain_amount` routines where checking prompts for a typed amount instead of stepping by `recordAmount` |
 | v31 | `folders.description TEXT`, `folders.defaultListId TEXT`, `app_lists.description TEXT` — folder/list descriptions (shown atop the inside views) + a folder's default list used when creating a task from inside it (+ button / Plus drop) |
 | v32 | Performance-only: adds indexes (via `_createIndexes`, idempotent) on the columns controllers filter/join on — `tasks(listId/parentTaskId/isDeleted)`, `app_lists(folderId/isDeleted)`, `folders(parentFolderId/isDeleted)`, `notes(folderId/isDeleted)`, `note_folders(parentFolderId/isDeleted)`, `contacts(listId/isDeleted/(birthMonth,birthDay))`, `events(date/isDeleted)`, `list_sections(listId)`, `routine_entries(routineId/date)`. No schema/data change |
+| v33 | `events.recurrence TEXT` — JSON-encoded `Recurrence` rule for repeating events. A recurring event is stored once (anchored at its `date`) and expanded onto each repeat day in the view layer (`EventController.eventsForDate` via `Recurrence.occursOn`) |
 
 When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 

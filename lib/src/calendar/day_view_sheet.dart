@@ -21,6 +21,7 @@ import '../tasks/task_creation_sheet.dart';
 import '../tasks/task_detail_view.dart';
 import '../theme/app_theme.dart';
 import '../utils/fast_route.dart';
+import '../utils/undo_controller.dart';
 import 'device_event_detail_view.dart';
 import 'event_controller.dart';
 import 'event_creation_sheet.dart';
@@ -207,10 +208,14 @@ class _DayViewSheetState extends State<DayViewSheet> {
   }
 
   void _openEvent(Event event) {
+    // For a recurring event, [event] may be a virtual occurrence whose date is
+    // the viewed day rather than the series anchor. Always edit the master so
+    // saving never silently shifts the whole series onto this day.
+    final master = widget.eventController.eventById(event.id) ?? event;
     Navigator.of(context).push(
       FastRoute<void>(
         builder: (_) => EventDetailView(
-          event: event,
+          event: master,
           controller: widget.eventController,
         ),
       ),
@@ -240,6 +245,64 @@ class _DayViewSheetState extends State<DayViewSheet> {
           controller: c,
         ),
       ),
+    );
+  }
+
+  // ── Swipe-to-delete ────────────────────────────────────────────────────────
+  // Local items (tasks, events, birthdays) can be removed with a left swipe.
+  // Each delete is reversible through the Undo banner when an UndoScope is
+  // available. Remote (Google) / device (Apple) calendar events are left
+  // read-only here — they're managed from their own detail screens.
+
+  Widget _swipeToDelete({
+    required Key key,
+    required VoidCallback onDelete,
+    required Widget child,
+  }) {
+    return Dismissible(
+      key: key,
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => onDelete(),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: CupertinoColors.destructiveRed,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(CupertinoIcons.delete,
+            color: CupertinoColors.white, size: 20),
+      ),
+      child: child,
+    );
+  }
+
+  void _deleteTask(Task task) {
+    final savedListId = task.listId;
+    widget.taskController.deleteTask(task.id);
+    UndoScope.maybeOf(context)?.show(
+      label: S.of(context).taskTrashedToast,
+      onUndo: () => widget.taskController.restoreTask(task.id, savedListId),
+    );
+  }
+
+  void _deleteEvent(Event event) {
+    // Snapshot the master (not a virtual recurring occurrence) so Undo restores
+    // the series with its original anchor date intact.
+    final master = widget.eventController.eventById(event.id) ?? event;
+    widget.eventController.deleteEvent(master.id);
+    UndoScope.maybeOf(context)?.show(
+      label: S.of(context).eventDeletedToast,
+      onUndo: () => widget.eventController.addEvent(master),
+    );
+  }
+
+  void _deleteBirthday(Contact contact) {
+    final savedListId = contact.listId;
+    widget.contactController.deleteContact(contact.id);
+    UndoScope.maybeOf(context)?.show(
+      label: S.of(context).taskTrashedToast,
+      onUndo: () => widget.contactController.restoreContact(contact.id, savedListId),
     );
   }
 
@@ -526,10 +589,14 @@ class _DayViewSheetState extends State<DayViewSheet> {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       children: [
         for (final b in birthdays) ...[
-          _BirthdayCard(
-            contact: b,
-            celebrationDate: widget.date,
-            onTap: () => _openContact(b),
+          _swipeToDelete(
+            key: ValueKey('birthday-${b.id}'),
+            onDelete: () => _deleteBirthday(b),
+            child: _BirthdayCard(
+              contact: b,
+              celebrationDate: widget.date,
+              onTap: () => _openContact(b),
+            ),
           ),
           const SizedBox(height: 8),
         ],
@@ -583,16 +650,24 @@ class _DayViewSheetState extends State<DayViewSheet> {
 
     return [
       for (final t in untimedTasks) ...[
-        _TaskCard(
-          task: t,
-          folderController: widget.folderController,
-          onTap: () => _openTask(t),
-          onToggle: () => widget.taskController.toggleCompleted(t.id),
+        _swipeToDelete(
+          key: ValueKey('task-${t.id}'),
+          onDelete: () => _deleteTask(t),
+          child: _TaskCard(
+            task: t,
+            folderController: widget.folderController,
+            onTap: () => _openTask(t),
+            onToggle: () => widget.taskController.toggleCompleted(t.id),
+          ),
         ),
         const SizedBox(height: 8),
       ],
       for (final e in untimedEvents) ...[
-        _EventCard(event: e, onTap: () => _openEvent(e)),
+        _swipeToDelete(
+          key: ValueKey('event-${e.id}'),
+          onDelete: () => _deleteEvent(e),
+          child: _EventCard(event: e, onTap: () => _openEvent(e)),
+        ),
         const SizedBox(height: 8),
       ],
       for (final e in untimedRemote) ...[
@@ -606,15 +681,24 @@ class _DayViewSheetState extends State<DayViewSheet> {
       if (timedItems.isNotEmpty && hasUntimed) const SizedBox(height: 4),
       for (final item in timedItems) ...[
         if (item.task != null)
-          _TaskCard(
-            task: item.task!,
-            folderController: widget.folderController,
-            onTap: () => _openTask(item.task!),
-            onToggle: () =>
-                widget.taskController.toggleCompleted(item.task!.id),
+          _swipeToDelete(
+            key: ValueKey('task-${item.task!.id}'),
+            onDelete: () => _deleteTask(item.task!),
+            child: _TaskCard(
+              task: item.task!,
+              folderController: widget.folderController,
+              onTap: () => _openTask(item.task!),
+              onToggle: () =>
+                  widget.taskController.toggleCompleted(item.task!.id),
+            ),
           )
         else if (item.event != null)
-          _EventCard(event: item.event!, onTap: () => _openEvent(item.event!))
+          _swipeToDelete(
+            key: ValueKey('event-${item.event!.id}'),
+            onDelete: () => _deleteEvent(item.event!),
+            child: _EventCard(
+                event: item.event!, onTap: () => _openEvent(item.event!)),
+          )
         else if (item.remoteEvent != null)
           _RemoteEventCard(
             event: item.remoteEvent!,
