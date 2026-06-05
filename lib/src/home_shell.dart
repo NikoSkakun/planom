@@ -1391,11 +1391,22 @@ class _WideLayout extends StatelessWidget {
           child: IndexedStack(
             index: safeActive,
             children: [
-              for (final logicalIdx in visibleIndices)
-                CupertinoTabView(
-                  navigatorKey: navigatorKeys[logicalIdx],
-                  navigatorObservers: [depthObservers[logicalIdx]],
-                  builder: (ctx) => tabContent(ctx, logicalIdx),
+              for (int i = 0; i < visibleIndices.length; i++)
+                // Disable TickerMode for the inactive (hidden) tabs. Unlike
+                // CupertinoTabScaffold, IndexedStack keeps every child alive
+                // with TickerMode enabled, so subtrees can't tell they've been
+                // hidden. Flipping it here lets visibility-sensitive children
+                // react when this layout swaps tabs — notably the note editor,
+                // which drops focus when hidden so a focused text field doesn't
+                // keep a stale IME connection (lost edits after a tab switch).
+                // It also pauses animations in hidden tabs.
+                TickerMode(
+                  enabled: i == safeActive,
+                  child: CupertinoTabView(
+                    navigatorKey: navigatorKeys[visibleIndices[i]],
+                    navigatorObservers: [depthObservers[visibleIndices[i]]],
+                    builder: (ctx) => tabContent(ctx, visibleIndices[i]),
+                  ),
                 ),
             ],
           ),
