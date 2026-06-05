@@ -346,11 +346,14 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _handleDropOnNoteFolder(String folderId) {
+    // Build the placeholder once, outside the route builder, so a route
+    // rebuild can't mint a new Note (with a new id) and redirect saves.
+    final draft = Note(title: '', content: '', folderId: folderId);
     _navigatorKeys[1].currentState?.push(
       FastRoute<void>(
         settings: const RouteSettings(name: NoteDetailView.routeName),
         builder: (_) => NoteDetailView(
-          note: Note(title: '', content: '', folderId: folderId),
+          note: draft,
           controller: widget.noteController,
           isNew: true,
         ),
@@ -359,11 +362,12 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _handleDropOnNotesRoot() {
+    final draft = Note(title: '', content: '');
     _navigatorKeys[1].currentState?.push(
       FastRoute<void>(
         settings: const RouteSettings(name: NoteDetailView.routeName),
         builder: (_) => NoteDetailView(
-          note: Note(title: '', content: ''),
+          note: draft,
           controller: widget.noteController,
           isNew: true,
         ),
@@ -1391,22 +1395,11 @@ class _WideLayout extends StatelessWidget {
           child: IndexedStack(
             index: safeActive,
             children: [
-              for (int i = 0; i < visibleIndices.length; i++)
-                // Disable TickerMode for the inactive (hidden) tabs. Unlike
-                // CupertinoTabScaffold, IndexedStack keeps every child alive
-                // with TickerMode enabled, so subtrees can't tell they've been
-                // hidden. Flipping it here lets visibility-sensitive children
-                // react when this layout swaps tabs — notably the note editor,
-                // which drops focus when hidden so a focused text field doesn't
-                // keep a stale IME connection (lost edits after a tab switch).
-                // It also pauses animations in hidden tabs.
-                TickerMode(
-                  enabled: i == safeActive,
-                  child: CupertinoTabView(
-                    navigatorKey: navigatorKeys[visibleIndices[i]],
-                    navigatorObservers: [depthObservers[visibleIndices[i]]],
-                    builder: (ctx) => tabContent(ctx, visibleIndices[i]),
-                  ),
+              for (final logicalIdx in visibleIndices)
+                CupertinoTabView(
+                  navigatorKey: navigatorKeys[logicalIdx],
+                  navigatorObservers: [depthObservers[logicalIdx]],
+                  builder: (ctx) => tabContent(ctx, logicalIdx),
                 ),
             ],
           ),

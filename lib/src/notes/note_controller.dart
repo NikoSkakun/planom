@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../database/database_service.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
-import 'note_debug.dart';
 
 class NoteController with ChangeNotifier {
   NoteController(this._db);
@@ -60,23 +59,14 @@ class NoteController with ChangeNotifier {
   }
 
   Future<void> addNote(Note note) async {
-    noteDbg('CTRL.addNote id=${noteId(note.id)} '
-        'c=${note.content.length} notesLen=${_notes.length}');
-    final rowid = await _db.insertNote(note);
+    await _db.insertNote(note);
     _notes = [note, ..._notes];
-    kNoteLastAdd = 'id=${noteId(note.id)} rowid=$rowid '
-        'c=${note.content.length} len=${_notes.length}';
-    noteDbg('CTRL.addNote done rowid=$rowid notesLen=${_notes.length}');
     notifyListeners();
   }
 
   Future<void> updateNote(Note updated) async {
-    final rows = await _db.updateNote(updated);
+    await _db.updateNote(updated);
     final i = _notes.indexWhere((n) => n.id == updated.id);
-    kNoteLastUpd = 'id=${noteId(updated.id)} rows=$rows i=$i '
-        'c=${updated.content.length} len=${_notes.length}';
-    noteDbg('CTRL.updateNote id=${noteId(updated.id)} '
-        'c=${updated.content.length} rows=$rows i=$i notesLen=${_notes.length}');
     if (i == -1) return;
     _notes = [..._notes]..[i] = updated;
     notifyListeners();

@@ -16,7 +16,6 @@ import '../utils/undo_controller.dart';
 import 'markdown_toolbar.dart';
 import 'markdown_view.dart';
 import 'note_controller.dart';
-import 'note_debug.dart';
 import 'note_share.dart';
 
 class NoteDetailView extends StatefulWidget {
@@ -39,6 +38,10 @@ class NoteDetailView extends StatefulWidget {
 
 class _NoteDetailViewState extends State<NoteDetailView>
     with DropdownOverlayMixin, WidgetsBindingObserver {
+  // Stable snapshot of the note this editor was opened with (see initState).
+  // All persistence + menu actions key off this, never the live widget.note,
+  // whose id can change if the route rebuilds the new-note placeholder.
+  late final Note _note;
   late final TextEditingController _title;
   late final TextEditingController _content;
   final FocusNode _contentFocus = FocusNode();
@@ -85,21 +88,27 @@ class _NoteDetailViewState extends State<NoteDetailView>
   @override
   void initState() {
     super.initState();
+    // Snapshot the note ONCE. The new-note placeholder is built inside the
+    // route's builder closure, so a route rebuild (e.g. the offstage→onstage
+    // flip when switching tabs) mints a fresh Note with a new id and swaps it
+    // into widget.note. Persisting against the live widget.note would then
+    // write to a never-inserted id (updateNote matches 0 rows) and silently
+    // drop the edit. Pinning the id here keeps every save aimed at the row we
+    // actually created.
+    _note = widget.note;
     _isEditing = widget.isNew;
-    _title = TextEditingController(text: widget.note.title);
-    _content = TextEditingController(text: widget.note.content);
-    _folderId = widget.note.folderId;
-    _savedTitle = widget.note.title;
-    _savedContent = widget.note.content;
-    _savedFolderId = widget.note.folderId;
+    _title = TextEditingController(text: _note.title);
+    _content = TextEditingController(text: _note.content);
+    _folderId = _note.folderId;
+    _savedTitle = _note.title;
+    _savedContent = _note.content;
+    _savedFolderId = _note.folderId;
     _title.addListener(_scheduleAutosave);
     _content.addListener(_scheduleAutosave);
     _content.addListener(_onContentSelectionChanged);
     _contentFocus.addListener(_onContentFocusChanged);
     _titleFocus.addListener(_onTitleFocusChanged);
     WidgetsBinding.instance.addObserver(this);
-    noteDbg('INIT isNew=${widget.isNew} '
-        'c=${widget.note.content.length}:"${noteTail(widget.note.content)}"');
   }
 
   /// Detects the "Select All" gesture (tap empty space → toolbar with the
@@ -131,8 +140,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
   }
 
   void _onContentFocusChanged() {
-    noteDbg('focus content=${_contentFocus.hasFocus} '
-        'c=${_content.text.length}:"${noteTail(_content.text)}"');
     if (!mounted) return;
     if (_contentFocus.hasFocus) {
       // Gaining focus (e.g. via the title's "Next" key, tapping the body, or
@@ -154,21 +161,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   /// Called from [build] whenever the hosting tab's active state flips. When
   /// the tab goes offstage (the user switched to another tab), commit any
-  /// pending text, drop focus, and force the body back to preview mode, so the
-  /// keyboard's input connection is torn down cleanly. Returning to the tab
-  /// then re-opens the editor with a fresh connection (via a tap →
-  /// [_startEditing]) instead of typing into a stale one whose characters never
-  /// reach the controller — the root cause of edits being lost after a tab
-  /// switch.
-  ///
-  /// This fires in both hosting layouts: CupertinoTabScaffold (phone) wraps the
-  /// inactive tab in `TickerMode(enabled: false)`, and HomeShell's sidebar
-  /// IndexedStack does the same for its inactive children — so [TickerMode] is
-  /// a layout-independent "am I hidden?" signal.
+  /// pending text and drop focus, so the keyboard's input connection is torn
+  /// down cleanly. Returning to the tab then re-opens the editor with a fresh
+  /// connection (via a tap → [_startEditing]) instead of typing into a stale
+  /// one whose characters never reach the controller — the root cause of
+  /// edits being lost after a tab switch.
   void _handleTabActiveChange(bool active) {
     if (active == _tabActive) return;
-    noteDbg('tabActive $active (was $_tabActive) '
-        'ed=$_isEditing focus=${_contentFocus.hasFocus}');
     _tabActive = active;
     if (active) return;
     // Defer to a post-frame callback: we can't call unfocus()/setState while
@@ -177,12 +176,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
       if (!mounted) return;
       _titleFocus.unfocus();
       _contentFocus.unfocus();
-      // Force preview mode directly rather than relying on the focus listener:
-      // in the sidebar layout the field can stay focused when hidden, and a
-      // no-op unfocus wouldn't fire the listener. Dropping out of edit mode
-      // removes the CupertinoTextField from the tree, disposing its stale IME
-      // connection for good.
-      if (_isEditing) setState(() => _isEditing = false);
       _flushSave();
     });
   }
@@ -207,19 +200,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
     if (_deleted) return;
     if (_saving) {
       _resaveRequested = true;
-      noteDbg('save() -> queued resave (in-flight)');
       return;
     }
     _saving = true;
-    noteDbg('save() start disposed=$_disposed '
-        'c=${_disposed ? "?" : _content.text.length}');
     try {
       do {
         _resaveRequested = false;
         await _persistOnce();
-        if (_resaveRequested && (_deleted || _disposed)) {
-          noteDbg('  resave DROPPED deleted=$_deleted disposed=$_disposed');
-        }
       } while (_resaveRequested && !_deleted && !_disposed);
     } finally {
       _saving = false;
@@ -235,16 +222,10 @@ class _NoteDetailViewState extends State<NoteDetailView>
     // mid-flight (the final save fires from dispose()).
     final content = _content.text;
     final folderId = _folderId;
-    noteDbg('persist new=$_persistedNew isNew=${widget.isNew} '
-        'c=${content.length}:"${noteTail(content)}" '
-        'saved=${_savedContent.length}:"${noteTail(_savedContent)}"');
     if (widget.isNew && !_persistedNew) {
-      if (title.isEmpty && content.trim().isEmpty) {
-        noteDbg('  ADD skip empty');
-        return;
-      }
+      if (title.isEmpty && content.trim().isEmpty) return;
       await widget.controller.addNote(
-        widget.note.copyWith(
+        _note.copyWith(
           title: title,
           content: content,
           folderId: folderId,
@@ -256,7 +237,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
       _savedTitle = title;
       _savedContent = content;
       _savedFolderId = folderId;
-      noteDbg('  ADD ok c=${content.length}');
       return;
     }
     // Skip the write when nothing actually changed — otherwise copyWith bumps
@@ -266,11 +246,10 @@ class _NoteDetailViewState extends State<NoteDetailView>
     if (title == _savedTitle &&
         content == _savedContent &&
         folderId == _savedFolderId) {
-      noteDbg('  UPD skip eq c=${content.length}');
       return;
     }
     await widget.controller.updateNote(
-      widget.note.copyWith(
+      _note.copyWith(
         title: title,
         content: content,
         folderId: folderId,
@@ -284,7 +263,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _savedTitle = title;
     _savedContent = content;
     _savedFolderId = folderId;
-    noteDbg('  UPD ok c=${content.length}');
   }
 
   @override
@@ -341,7 +319,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
           // Prefer the persisted copy so the timestamps reflect the latest
           // save (widget.note is the stale placeholder for a new note).
           final latest =
-              widget.controller.noteById(widget.note.id) ?? widget.note;
+              widget.controller.noteById(_note.id) ?? _note;
           showItemInfoSheet(
             context,
             creationDate: latest.creationDate,
@@ -351,13 +329,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
         onDelete: () {
           dismiss();
           _deleted = true;
-          final savedFolderId = widget.note.folderId;
+          final savedFolderId = _note.folderId;
           final undo = UndoScope.maybeOf(context);
-          widget.controller.deleteNote(widget.note.id);
+          widget.controller.deleteNote(_note.id);
           undo?.show(
             label: S.of(context).noteTrashedToast,
             onUndo: () => widget.controller
-                .restoreNote(widget.note.id, savedFolderId),
+                .restoreNote(_note.id, savedFolderId),
           );
           Navigator.of(context).pop();
         },
@@ -367,8 +345,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   @override
   void dispose() {
-    noteDbg('dispose saving=$_saving resave=$_resaveRequested '
-        'c=${_content.text.length}:"${noteTail(_content.text)}"');
     _disposed = true;
     _autosaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -392,7 +368,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
   }
 
   void _startEditing({int? cursorOffset}) {
-    noteDbg('startEditing off=$cursorOffset c=${_content.text.length}');
     setState(() => _isEditing = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -556,53 +531,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
     );
   }
 
-  /// TEMPORARY: on-screen debug trace for the lost-edits investigation.
-  /// Live header (updates as you type) + the persistent module-level log.
-  /// Long-press to clear the log between attempts.
-  Widget _buildDebugPanel() {
-    return GestureDetector(
-      onLongPress: () {
-        kNoteEditLog.clear();
-        setState(() {});
-      },
-      child: Container(
-        height: 150,
-        width: double.infinity,
-        color: const Color(0x22FF2D55),
-        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-        child: ListenableBuilder(
-          listenable: Listenable.merge([_content, _title]),
-          builder: (context, _) {
-            final style = TextStyle(
-              fontSize: 9.5,
-              height: 1.25,
-              color: CupertinoColors.label.resolveFrom(context),
-            );
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Pinned (never scrolls): the decisive last-write results.
-                Text(
-                  'LIVE c=${_content.text.length} saved=${_savedContent.length} '
-                  'new=$_persistedNew (long-press=clear)\n'
-                  'ADD $kNoteLastAdd\nUPD $kNoteLastUpd',
-                  style: style.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 2),
-                Expanded(
-                  child: SingleChildScrollView(
-                    reverse: true,
-                    child: Text(kNoteEditLog.join('\n'), style: style),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // Detect onstage/offstage transitions of the hosting tab (see
@@ -624,8 +552,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
           // typed word isn't lost.
           canPop: true,
           onPopInvokedWithResult: (didPop, _) {
-            noteDbg('POP didPop=$didPop c=${_content.text.length}:'
-                '"${noteTail(_content.text)}"');
             _titleFocus.unfocus();
             _contentFocus.unfocus();
             _flushSave();
@@ -705,7 +631,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
                             color: CupertinoColors.separator,
                           ),
                         ),
-                        if (kNoteEditDebug) _buildDebugPanel(),
                         Expanded(
                           child: _buildContentArea(useMarkdown: useMarkdown),
                         ),
