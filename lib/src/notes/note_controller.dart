@@ -64,6 +64,8 @@ class NoteController with ChangeNotifier {
         'c=${note.content.length} notesLen=${_notes.length}');
     final rowid = await _db.insertNote(note);
     _notes = [note, ..._notes];
+    kNoteLastAdd = 'id=${noteId(note.id)} rowid=$rowid '
+        'c=${note.content.length} len=${_notes.length}';
     noteDbg('CTRL.addNote done rowid=$rowid notesLen=${_notes.length}');
     notifyListeners();
   }
@@ -71,6 +73,8 @@ class NoteController with ChangeNotifier {
   Future<void> updateNote(Note updated) async {
     final rows = await _db.updateNote(updated);
     final i = _notes.indexWhere((n) => n.id == updated.id);
+    kNoteLastUpd = 'id=${noteId(updated.id)} rows=$rows i=$i '
+        'c=${updated.content.length} len=${_notes.length}';
     noteDbg('CTRL.updateNote id=${noteId(updated.id)} '
         'c=${updated.content.length} rows=$rows i=$i notesLen=${_notes.length}');
     if (i == -1) return;

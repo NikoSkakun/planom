@@ -566,25 +566,36 @@ class _NoteDetailViewState extends State<NoteDetailView>
         setState(() {});
       },
       child: Container(
-        height: 130,
+        height: 150,
         width: double.infinity,
         color: const Color(0x22FF2D55),
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
         child: ListenableBuilder(
           listenable: Listenable.merge([_content, _title]),
           builder: (context, _) {
-            return SingleChildScrollView(
-              reverse: true,
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-              child: Text(
-                'LIVE c=${_content.text.length} saved=${_savedContent.length} '
-                'new=$_persistedNew ed=$_isEditing sv=$_saving '
-                '(long-press to clear)\n${kNoteEditLog.join('\n')}',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  height: 1.25,
-                  color: CupertinoColors.label.resolveFrom(context),
+            final style = TextStyle(
+              fontSize: 9.5,
+              height: 1.25,
+              color: CupertinoColors.label.resolveFrom(context),
+            );
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Pinned (never scrolls): the decisive last-write results.
+                Text(
+                  'LIVE c=${_content.text.length} saved=${_savedContent.length} '
+                  'new=$_persistedNew (long-press=clear)\n'
+                  'ADD $kNoteLastAdd\nUPD $kNoteLastUpd',
+                  style: style.copyWith(fontWeight: FontWeight.bold),
                 ),
-              ),
+                const SizedBox(height: 2),
+                Expanded(
+                  child: SingleChildScrollView(
+                    reverse: true,
+                    child: Text(kNoteEditLog.join('\n'), style: style),
+                  ),
+                ),
+              ],
             );
           },
         ),
