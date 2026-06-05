@@ -327,12 +327,15 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
         onDismiss: dismiss,
         onAddNote: () {
           dismiss();
+          // Build the placeholder once, outside the route builder, so a route
+          // rebuild can't mint a new Note (with a new id) and redirect saves.
+          final draft = Note(title: '', content: '');
           Navigator.of(context).push(
             FastRoute<void>(
               settings:
                   const RouteSettings(name: NoteDetailView.routeName),
               builder: (_) => NoteDetailView(
-                note: Note(title: '', content: ''),
+                note: draft,
                 controller: widget.controller,
                 isNew: true,
               ),
@@ -833,17 +836,22 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
               right: 20,
               bottom: 16,
               child: NoteOrangeAddButton(
-                onPressed: () => Navigator.of(context).push(
-                  FastRoute<void>(
-                    settings: const RouteSettings(
-                        name: NoteDetailView.routeName),
-                    builder: (_) => NoteDetailView(
-                      note: Note(title: '', content: ''),
-                      controller: widget.controller,
-                      isNew: true,
+                onPressed: () {
+                  // Stable placeholder (see onAddNote above): created outside
+                  // the route builder so a rebuild can't change its id.
+                  final draft = Note(title: '', content: '');
+                  Navigator.of(context).push(
+                    FastRoute<void>(
+                      settings: const RouteSettings(
+                          name: NoteDetailView.routeName),
+                      builder: (_) => NoteDetailView(
+                        note: draft,
+                        controller: widget.controller,
+                        isNew: true,
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ],

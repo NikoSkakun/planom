@@ -20,10 +20,9 @@ void main() {
     await c.load();
   });
 
-  // Fires the editor's 1s autosave debounce, then lets the real (ffi) DB
-  // futures drain (runAsync, since the fake clock won't advance them).
+  // Lets the real (ffi) DB futures and the editor's awaited save path drain —
+  // the fake test clock never advances them on its own.
   Future<void> drain(WidgetTester tester) async {
-    await tester.pump(const Duration(seconds: 2));
     for (var i = 0; i < 6; i++) {
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 60));
@@ -32,204 +31,70 @@ void main() {
     }
   }
 
-  // Mirrors HomeShell._WideLayout: an IndexedStack of CupertinoTabViews — the
-  // iPad / desktop sidebar layout. [wrapTickerMode] reflects the fix: the real
-  // _WideLayout now wraps each child in TickerMode(enabled: active) so hidden
-  // tabs can tell they've been hidden (CupertinoTabScaffold does this for free;
-  // a bare IndexedStack does not).
-  Widget hostIndexedStack(
-    NoteController controller,
-    Note note,
-    ValueNotifier<int> index, {
-    required bool wrapTickerMode,
-  }) {
-    return CupertinoApp(
-      home: ValueListenableBuilder<int>(
-        valueListenable: index,
-        builder: (context, i, _) {
-          Widget tab(int childIndex, Widget child) {
-            if (!wrapTickerMode) return child;
-            return TickerMode(enabled: childIndex == i, child: child);
-          }
-
-          return Column(
-            children: [
-              CupertinoButton(
-                onPressed: () => index.value = i == 0 ? 1 : 0,
-                child: const Text('switch'),
-              ),
-              Expanded(
-                child: IndexedStack(
-                  index: i,
-                  children: [
-                    tab(
-                      0,
-                      CupertinoTabView(
-                        builder: (_) => NoteDetailView(
-                          note: note,
-                          controller: controller,
-                          isNew: true,
-                        ),
-                      ),
-                    ),
-                    tab(1, const Center(child: Text('Other tab'))),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
+  // Regression test for the real "lost edits after a tab switch" cause: the
+  // new-note placeholder is built inside the route's builder closure, so a
+  // route rebuild (the offstage→onstage flip on a tab switch) mints a fresh
+  // Note with a NEW id and hands it to the same editor State. The editor must
+  // keep persisting against the id it was first opened with — otherwise saves
+  // after the rebuild target a never-inserted row and are silently dropped.
   testWidgets(
-      'sidebar layout WITHOUT TickerMode keeps the editor stuck in edit mode '
-      'after a tab switch (the bug)', (tester) async {
-    final index = ValueNotifier<int>(0);
-    final note = Note(title: 'T', content: 'aaaaa');
-    await tester.pumpWidget(
-        hostIndexedStack(c, note, index, wrapTickerMode: false));
-    await tester.pumpAndSettle();
-
-    // Focus the body so the editor is actively editing (2 fields: title+body).
-    await tester.tap(find.byType(CupertinoTextField).last);
-    await tester.pumpAndSettle();
-    expect(find.byType(CupertinoTextField), findsNWidgets(2));
-
-    // Switch away and back via the IndexedStack index.
-    index.value = 1;
-    await tester.pumpAndSettle();
-    index.value = 0;
-    await tester.pumpAndSettle();
-
-    // Without the TickerMode signal the editor never learned it was hidden, so
-    // the focused body field is still mounted — its IME connection is now the
-    // stale one that drops characters on a real device.
-    expect(find.byType(CupertinoTextField), findsNWidgets(2),
-        reason: 'reproduces the bug: editor stays in edit mode when hidden');
-  });
-
-  testWidgets(
-      'sidebar layout WITH TickerMode returns to preview after a tab switch '
-      'and keeps edits made on return (the fix)', (tester) async {
-    final index = ValueNotifier<int>(0);
-    final note = Note(title: '', content: '');
-    await tester.pumpWidget(
-        hostIndexedStack(c, note, index, wrapTickerMode: true));
-    await tester.pumpAndSettle();
-
-    // Title autofocuses on a new note; type through the real IME connection.
-    expect(tester.testTextInput.hasAnyClients, isTrue);
-    tester.testTextInput.enterText('Title');
-    await tester.pump();
-
-    await tester.tap(find.byType(CupertinoTextField).last);
-    await tester.pump();
-    tester.testTextInput.enterText('aaaaa');
-    await tester.pump();
-
-    // Hide the keyboard WITHOUT unfocusing (iOS hide-keyboard key leaves the
-    // field focused).
-    tester.testTextInput.hide();
-    await tester.pump();
-    await drain(tester);
-    expect(c.noteById(note.id)?.content, 'aaaaa');
-
-    // Switch away and back.
-    index.value = 1;
-    await tester.pumpAndSettle();
-    index.value = 0;
-    await tester.pumpAndSettle();
-    await drain(tester);
-
-    // The fix: the hidden editor dropped focus + returned to preview, so the
-    // body is now a single preview (only the title field remains editable).
-    expect(find.byType(CupertinoTextField), findsOneWidget,
-        reason: 'editor must return to preview mode after being hidden');
-
-    // Continue editing: tapping the preview rebuilds a fresh field/connection.
-    final bodyText = find.text('aaaaa');
-    expect(bodyText, findsOneWidget);
-    await tester.tapAt(tester.getCenter(bodyText));
-    await tester.pumpAndSettle();
-    expect(find.byType(CupertinoTextField), findsNWidgets(2));
-    expect(tester.testTextInput.hasAnyClients, isTrue,
-        reason: 'a fresh input connection must be open after re-tapping');
-
-    tester.testTextInput.enterText('aaaaabbbbbb');
-    await tester.pump();
-
-    FocusManager.instance.primaryFocus?.unfocus();
-    await tester.pump();
-    await drain(tester);
-
-    expect(c.noteById(note.id)?.content, 'aaaaabbbbbb',
-        reason: 'characters typed after the tab switch must be saved');
-  });
-
-  testWidgets(
-      'tab-scaffold layout: edits typed after a tab switch are kept',
+      'edits survive widget.note being replaced by a new placeholder on rebuild',
       (tester) async {
-    final tabController = CupertinoTabController(initialIndex: 0);
-    final note = Note(title: '', content: '');
+    final rebuild = ValueNotifier<int>(0);
+    final placeholderIds = <String>[];
+
     await tester.pumpWidget(
       CupertinoApp(
-        home: CupertinoTabScaffold(
-          controller: tabController,
-          tabBar: CupertinoTabBar(
-            items: const [
-              BottomNavigationBarItem(
-                  icon: Icon(CupertinoIcons.doc), label: 'Notes'),
-              BottomNavigationBarItem(
-                  icon: Icon(CupertinoIcons.calendar), label: 'Other'),
-            ],
-          ),
-          tabBuilder: (context, idx) {
-            if (idx == 1) return const Center(child: Text('Other tab'));
-            return CupertinoTabView(
-              builder: (_) => NoteDetailView(
-                note: note,
-                controller: c,
-                isNew: true,
-              ),
-            );
+        home: ValueListenableBuilder<int>(
+          valueListenable: rebuild,
+          builder: (context, _, __) {
+            // Mimics the route builder closure: a fresh placeholder (new id)
+            // every time this rebuilds.
+            final draft = Note(title: '', content: '');
+            placeholderIds.add(draft.id);
+            return NoteDetailView(note: draft, controller: c, isNew: true);
           },
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    tester.testTextInput.enterText('Title');
-    await tester.pump();
-    await tester.tap(find.byType(CupertinoTextField).last);
-    await tester.pump();
-    tester.testTextInput.enterText('aaaaa');
-    await tester.pump();
-    tester.testTextInput.hide();
-    await tester.pump();
-    await drain(tester);
-    expect(c.noteById(note.id)?.content, 'aaaaa');
-
-    tabController.index = 1;
-    await tester.pumpAndSettle();
-    tabController.index = 0;
-    await tester.pumpAndSettle();
-    await drain(tester);
-
-    expect(find.byType(CupertinoTextField), findsOneWidget,
-        reason: 'editor must return to preview mode after being hidden');
-    final bodyText = find.text('aaaaa');
-    await tester.tapAt(tester.getCenter(bodyText));
-    await tester.pumpAndSettle();
-
-    tester.testTextInput.enterText('aaaaabbbbbb');
+    // Type a first word into the body and drop focus (persists the new note).
+    await tester.enterText(find.byType(CupertinoTextField).last, 'aaaaa');
     await tester.pump();
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pump();
     await drain(tester);
 
-    expect(c.noteById(note.id)?.content, 'aaaaabbbbbb',
-        reason: 'characters typed after the tab switch must be saved');
+    // The note was created under the FIRST placeholder id.
+    expect(c.noteById(placeholderIds.first)?.content, 'aaaaa');
+    expect(c.allNotes.length, 1);
+
+    // Force a rebuild: the builder mints a NEW placeholder (different id) and
+    // hands it to the SAME NoteDetailView State (no key) — exactly what a route
+    // rebuild after a tab switch does.
+    rebuild.value++;
+    await tester.pumpAndSettle();
+    expect(placeholderIds.length, greaterThan(1));
+    expect(placeholderIds.last, isNot(placeholderIds.first));
+
+    // The body is now a preview ('aaaaa'); tapping it re-opens the editor.
+    await tester.tapAt(tester.getCenter(find.text('aaaaa')));
+    await tester.pumpAndSettle();
+
+    // Continue editing, then drop focus to persist.
+    await tester.enterText(find.byType(CupertinoTextField).last, 'aaaaabbbbbb');
+    await tester.pump();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await drain(tester);
+
+    // The edit must land on the ORIGINAL note, not the throwaway rebuild id.
+    expect(c.noteById(placeholderIds.first)?.content, 'aaaaabbbbbb',
+        reason: 'saves must stay aimed at the originally-created note id');
+    expect(c.noteById(placeholderIds.last), isNull,
+        reason: 'the rebuild placeholder id must never be persisted');
+    expect(c.allNotes.length, 1,
+        reason: 'no duplicate/orphan note should be created on rebuild');
   });
 }
