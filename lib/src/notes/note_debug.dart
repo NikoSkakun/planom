@@ -23,3 +23,9 @@ String noteTail(String s) {
 }
 
 String noteId(String id) => id.length <= 4 ? id : id.substring(0, 4);
+
+// Pinned summaries of the LAST real controller writes (skips don't touch
+// these), shown at the top of the panel so the decisive rows/index values
+// can't scroll out of view.
+String kNoteLastAdd = '-';
+String kNoteLastUpd = '-';
