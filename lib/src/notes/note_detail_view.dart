@@ -561,11 +561,15 @@ class _NoteDetailViewState extends State<NoteDetailView>
                   return CupertinoButton(
                     padding: EdgeInsets.zero,
                     onPressed: enabled ? _onMenuPressed : null,
+                    // When active, leave the color unset so the icon inherits
+                    // the nav bar's action tint — matching every other ⋯ menu
+                    // across the app. Only the inert (empty new-note) state
+                    // gets the grayed-out tertiary color.
                     child: Icon(
                       CupertinoIcons.ellipsis,
                       size: 26,
                       color: enabled
-                          ? CupertinoColors.label.resolveFrom(context)
+                          ? null
                           : CupertinoColors.tertiaryLabel.resolveFrom(context),
                     ),
                   );

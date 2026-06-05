@@ -88,6 +88,12 @@ class _HomeShellState extends State<HomeShell> {
   final _activeListId = ValueNotifier<String?>(null);
   final _activeFolderId = ValueNotifier<String?>(null);
   final _activeDueDate = ValueNotifier<DateTime?>(null);
+  // The calendar's currently-selected day. Kept separate from [_activeDueDate]
+  // (which is owned by the Tasks tab's Today/Tomorrow views) so a day selected
+  // in the Calendar tab never leaks into the Tasks tab's + creation sheet —
+  // every tab is kept alive simultaneously, so a shared notifier would bleed
+  // the calendar selection across tabs.
+  final _activeCalendarDate = ValueNotifier<DateTime?>(null);
   final _tasksCollapseSignal = ValueNotifier<int>(0);
   final _notesCollapseSignal = ValueNotifier<int>(0);
   final _calendarResetSignal = ValueNotifier<int>(0);
@@ -372,6 +378,7 @@ class _HomeShellState extends State<HomeShell> {
     _activeListId.dispose();
     _activeFolderId.dispose();
     _activeDueDate.dispose();
+    _activeCalendarDate.dispose();
     _tasksCollapseSignal.dispose();
     _notesCollapseSignal.dispose();
     _calendarResetSignal.dispose();
@@ -487,7 +494,8 @@ class _HomeShellState extends State<HomeShell> {
     // is selected, default to today so the new item has a date.
     if (_lastTabIndex == 2) {
       final now = DateTime.now();
-      final date = _activeDueDate.value ?? DateTime(now.year, now.month, now.day);
+      final date =
+          _activeCalendarDate.value ?? DateTime(now.year, now.month, now.day);
       _showCalendarItemPicker(date);
       return;
     }
@@ -926,7 +934,7 @@ class _HomeShellState extends State<HomeShell> {
           resetSignal: _calendarResetSignal,
           settingsController: widget.settingsController,
           backupService: widget.backupService,
-          onDaySelected: (d) => _activeDueDate.value = d,
+          onDaySelected: (d) => _activeCalendarDate.value = d,
           db: SpaceManagerProvider.of(context).db,
           noteController: widget.noteController,
           routineController: widget.routineController,
