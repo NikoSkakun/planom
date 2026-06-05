@@ -149,11 +149,17 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   /// Called from [build] whenever the hosting tab's active state flips. When
   /// the tab goes offstage (the user switched to another tab), commit any
-  /// pending text and drop focus, so the keyboard's input connection is torn
-  /// down cleanly. Returning to the tab then re-opens the editor with a fresh
-  /// connection (via a tap → [_startEditing]) instead of typing into a stale
-  /// one whose characters never reach the controller — the root cause of
-  /// edits being lost after a tab switch.
+  /// pending text, drop focus, and force the body back to preview mode, so the
+  /// keyboard's input connection is torn down cleanly. Returning to the tab
+  /// then re-opens the editor with a fresh connection (via a tap →
+  /// [_startEditing]) instead of typing into a stale one whose characters never
+  /// reach the controller — the root cause of edits being lost after a tab
+  /// switch.
+  ///
+  /// This fires in both hosting layouts: CupertinoTabScaffold (phone) wraps the
+  /// inactive tab in `TickerMode(enabled: false)`, and HomeShell's sidebar
+  /// IndexedStack does the same for its inactive children — so [TickerMode] is
+  /// a layout-independent "am I hidden?" signal.
   void _handleTabActiveChange(bool active) {
     if (active == _tabActive) return;
     _tabActive = active;
@@ -164,6 +170,12 @@ class _NoteDetailViewState extends State<NoteDetailView>
       if (!mounted) return;
       _titleFocus.unfocus();
       _contentFocus.unfocus();
+      // Force preview mode directly rather than relying on the focus listener:
+      // in the sidebar layout the field can stay focused when hidden, and a
+      // no-op unfocus wouldn't fire the listener. Dropping out of edit mode
+      // removes the CupertinoTextField from the tree, disposing its stale IME
+      // connection for good.
+      if (_isEditing) setState(() => _isEditing = false);
       _flushSave();
     });
   }
