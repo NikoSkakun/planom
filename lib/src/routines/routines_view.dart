@@ -238,10 +238,18 @@ class _DayContentState extends State<_DayContent> {
         .toList();
 
     final today = RoutineController.normalizeDate(DateTime.now());
-    // Left bound of the selector: the first day with any recorded progress,
-    // but always at least the last 7 days (today + 6 past days).
+    // Left bound of the selector: far enough back to reach either the first
+    // recorded progress OR the earliest routine's start date (so an old,
+    // never-completed routine is still reachable), but always at least the
+    // last 7 days (today + 6 past days).
     final weekFloor = DateTime(today.year, today.month, today.day - 6);
-    final earliest = widget.controller.earliestEntryDate;
+    DateTime? earliest;
+    for (final d in [
+      widget.controller.earliestEntryDate,
+      widget.controller.earliestStartDate,
+    ]) {
+      if (d != null && (earliest == null || d.isBefore(earliest))) earliest = d;
+    }
     final firstDate = (earliest != null && earliest.isBefore(weekFloor))
         ? earliest
         : weekFloor;
@@ -448,38 +456,39 @@ class _DaySelectorState extends State<_DaySelector> {
     );
   }
 
-  /// Right-most fully visible day index for a given left-edge cell index.
-  int _rightmostFor(int leftIndex) =>
-      (leftIndex + _visibleCount - 1).clamp(0, _days.length - 1);
-
-  // Live highlight follow as the offset changes (drag + fling). Cheap: only
-  // updates a ValueNotifier, repainting the cells, never the ListView/parent.
-  void _onScroll() {
-    if (_cellWidth <= 0) return;
-    final leftIndex = (_controller.offset / _cellWidth).round();
-    final right = _rightmostFor(leftIndex);
-    if (right != _focused.value) _focused.value = right;
+  /// The day-index window currently shown for the given scroll offset, as
+  /// [leftIndex, rightIndex] (inclusive), clamped to the available days.
+  (int, int) _visibleWindow() {
+    final left = (_controller.offset / _cellWidth)
+        .round()
+        .clamp(0, (_days.length - _visibleCount).clamp(0, _days.length - 1));
+    final right = (left + _visibleCount - 1).clamp(0, _days.length - 1);
+    return (left, right);
   }
 
-  // When the fling settles, snap so only whole day cells are visible, then
-  // commit the right-most visible day to the parent (drives the routine list).
-  void _onScrollEnd() {
+  /// Keeps the currently-selected day put as long as it stays within the
+  /// visible 7-day window; only when it scrolls out of view does the selection
+  /// move to the nearest still-visible day (the edge it left from). Commits the
+  /// change to the parent immediately so the routine list updates live.
+  void _settleFocus() {
     if (_cellWidth <= 0 || !_controller.hasClients) return;
-    final leftIndex = (_controller.offset / _cellWidth).round();
-    final snapped =
-        (leftIndex * _cellWidth).clamp(0.0, _controller.position.maxScrollExtent);
-    if ((snapped - _controller.offset).abs() > 0.5) {
-      _controller.animateTo(
-        snapped,
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-      );
+    final (left, right) = _visibleWindow();
+    final current = _focused.value;
+    int next = current;
+    if (current < left) {
+      next = left;
+    } else if (current > right) {
+      next = right;
     }
-    final right = _rightmostFor(leftIndex);
-    _focused.value = right;
-    final day = _days[right];
+    if (next == current) return;
+    _focused.value = next;
+    final day = _days[next];
     if (day != widget.selected) widget.onSelected(day);
   }
+
+  // Live during drag + fling — cheap (no work unless the selected day actually
+  // scrolls out of the window).
+  void _onScroll() => _settleFocus();
 
   @override
   Widget build(BuildContext context) {
@@ -508,14 +517,17 @@ class _DaySelectorState extends State<_DaySelector> {
             height: 64,
             child: NotificationListener<ScrollNotification>(
               onNotification: (n) {
-                if (n is ScrollEndNotification) _onScrollEnd();
+                if (n is ScrollEndNotification) _settleFocus();
                 return false;
               },
               child: ListView.builder(
                 controller: _controller,
                 scrollDirection: Axis.horizontal,
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
+                physics: _SnapScrollPhysics(
+                  itemExtent: _cellWidth,
+                  parent: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
                 ),
                 itemExtent: _cellWidth,
                 itemCount: _days.length,
@@ -538,6 +550,51 @@ class _DaySelectorState extends State<_DaySelector> {
       ),
     );
   }
+}
+
+/// Scroll physics that snaps the day row to whole [itemExtent] boundaries when
+/// the fling settles — a magnet effect that always ends aligned to exactly 7
+/// cells, no matter where the finger is released.
+class _SnapScrollPhysics extends ScrollPhysics {
+  const _SnapScrollPhysics({required this.itemExtent, super.parent});
+
+  final double itemExtent;
+
+  @override
+  _SnapScrollPhysics applyTo(ScrollPhysics? ancestor) =>
+      _SnapScrollPhysics(itemExtent: itemExtent, parent: buildParent(ancestor));
+
+  double _alignToCell(double pixels, ScrollMetrics position) {
+    if (itemExtent <= 0) return pixels;
+    final aligned = (pixels / itemExtent).round() * itemExtent;
+    return aligned.clamp(position.minScrollExtent, position.maxScrollExtent);
+  }
+
+  @override
+  Simulation? createBallisticSimulation(
+      ScrollMetrics position, double velocity) {
+    final tolerance = toleranceFor(position);
+    // Past either edge: let the parent handle the bounce-back.
+    if ((velocity <= 0.0 && position.pixels <= position.minScrollExtent) ||
+        (velocity >= 0.0 && position.pixels >= position.maxScrollExtent)) {
+      return super.createBallisticSimulation(position, velocity);
+    }
+    // Preserve the natural inertia: let the parent's friction simulation decide
+    // where the fling would come to rest, then only redirect that final resting
+    // point to the nearest whole cell. A hard flick still glides across many
+    // days and decelerates; the magnet is applied at the tail, not up front.
+    // With no real inertia (release at ~0 velocity) the parent returns null and
+    // we snap straight to the nearest cell.
+    final natural = super.createBallisticSimulation(position, velocity);
+    final restingPixels = natural?.x(double.infinity) ?? position.pixels;
+    final target = _alignToCell(restingPixels, position);
+    if ((target - position.pixels).abs() < tolerance.distance) return null;
+    return ScrollSpringSimulation(spring, position.pixels, target, velocity,
+        tolerance: tolerance);
+  }
+
+  @override
+  bool get allowImplicitScrolling => false;
 }
 
 class _DayCell extends StatelessWidget {
