@@ -14,6 +14,11 @@ class Event extends AppItem {
   final DateTime? deletedDate;
   final List<int> reminderOffsets;
 
+  /// JSON-encoded [Recurrence] rule, or null for a one-off event. A recurring
+  /// event is stored once (anchored at [date]) and expanded onto each repeat
+  /// day in the view layer.
+  final String? recurrence;
+
   Event({
     String? id,
     DateTime? creationDate,
@@ -26,6 +31,7 @@ class Event extends AppItem {
     this.isDeleted = false,
     this.deletedDate,
     this.reminderOffsets = const [],
+    this.recurrence,
   }) : super(
           id: id ?? const Uuid().v4(),
           creationDate: creationDate ?? DateTime.now(),
@@ -45,6 +51,8 @@ class Event extends AppItem {
     DateTime? deletedDate,
     bool clearDeletedDate = false,
     List<int>? reminderOffsets,
+    String? recurrence,
+    bool clearRecurrence = false,
   }) {
     return Event(
       id: id,
@@ -59,6 +67,7 @@ class Event extends AppItem {
       deletedDate:
           clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
       reminderOffsets: reminderOffsets ?? this.reminderOffsets,
+      recurrence: clearRecurrence ? null : (recurrence ?? this.recurrence),
     );
   }
 
@@ -74,6 +83,7 @@ class Event extends AppItem {
         'isDeleted': isDeleted ? 1 : 0,
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
         'reminderOffsets': reminderOffsets.join(','),
+        'recurrence': recurrence,
       };
 
   factory Event.fromMap(Map<String, dynamic> map) => Event(
@@ -91,6 +101,7 @@ class Event extends AppItem {
             ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)
             : null,
         reminderOffsets: _parseOffsets(map['reminderOffsets'] as String?),
+        recurrence: map['recurrence'] as String?,
       );
 
   static List<int> _parseOffsets(String? s) {

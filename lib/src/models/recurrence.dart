@@ -46,6 +46,54 @@ class Recurrence {
     }
   }
 
+  /// UTC-midnight day index for [d], so day arithmetic is DST-safe (no 23h/25h
+  /// drift from local-time `difference`).
+  static int _epochDay(DateTime d) =>
+      DateTime.utc(d.year, d.month, d.day).millisecondsSinceEpoch ~/ 86400000;
+
+  /// Whether [date] is an occurrence of a series anchored at [start]. Used to
+  /// expand a recurring event onto every day it repeats on. [date] on or after
+  /// [start] only; the start day itself always counts.
+  bool occursOn(DateTime start, DateTime date) {
+    final sDay = _epochDay(start);
+    final dDay = _epochDay(date);
+    if (dDay < sDay) return false;
+    final s = DateTime(start.year, start.month, start.day);
+    final d = DateTime(date.year, date.month, date.day);
+    switch (type) {
+      case RecurrenceType.daily:
+        return (dDay - sDay) % interval == 0;
+      case RecurrenceType.weekly:
+        if (weekdays.isEmpty) {
+          if (d.weekday != s.weekday) return false;
+          return ((dDay - sDay) ~/ 7) % interval == 0;
+        }
+        final wd = d.weekday - 1; // 0=Mon … 6=Sun
+        if (!weekdays.contains(wd)) return false;
+        // Compare Monday-aligned week indices so interval skips count whole
+        // weeks regardless of which weekday start/date fall on.
+        final sMon = sDay - (s.weekday - 1);
+        final dMon = dDay - (d.weekday - 1);
+        return ((dMon - sMon) ~/ 7) % interval == 0;
+      case RecurrenceType.monthly:
+        final monthsDiff = (d.year - s.year) * 12 + (d.month - s.month);
+        if (monthsDiff < 0 || monthsDiff % interval != 0) return false;
+        final daysInTarget = DateTime(d.year, d.month + 1, 0).day;
+        final targetDay = s.day > daysInTarget ? daysInTarget : s.day;
+        return d.day == targetDay;
+      case RecurrenceType.yearly:
+        final yearsDiff = d.year - s.year;
+        if (yearsDiff < 0 || yearsDiff % interval != 0) return false;
+        // Feb 29 anchors fall back to Feb 28 in non-leap years.
+        if (s.month == 2 && s.day == 29) {
+          final isLeap =
+              (d.year % 4 == 0 && d.year % 100 != 0) || d.year % 400 == 0;
+          return d.month == 2 && d.day == (isLeap ? 29 : 28);
+        }
+        return d.month == s.month && d.day == s.day;
+    }
+  }
+
   /// Returns the next occurrence at or after [from]. The [from] argument is
   /// the date the user just completed — the next instance is at least one
   /// `interval` step away.

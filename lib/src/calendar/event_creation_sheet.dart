@@ -7,7 +7,9 @@ import '../integrations/google/google_calendar_controller.dart';
 import '../integrations/google/remote_event.dart';
 import '../localization/strings.dart';
 import '../models/event.dart';
+import '../models/recurrence.dart';
 import '../tasks/calendar_date_picker.dart';
+import '../tasks/recurrence_picker.dart';
 import '../theme/app_theme.dart';
 import '../utils/duration_picker.dart';
 import '../utils/selection_menu.dart';
@@ -69,6 +71,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
   late DateTime _date;
   int? _doTime;
   int? _duration; // minutes
+  Recurrence? _recurrence;
   bool _titleEmpty = true;
 
   /// The Google calendar new events go to; null means not a Google target.
@@ -172,6 +175,7 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
         date: _date,
         doTime: _doTime,
         duration: _duration,
+        recurrence: _recurrence?.toJson(),
       ));
     }
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -276,6 +280,15 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
     saved?.requestFocus();
   }
 
+  Future<void> _pickRecurrence() async {
+    final saved = _activeFocus;
+    FocusManager.instance.primaryFocus?.unfocus();
+    final result = await showRecurrencePicker(context, _recurrence);
+    if (!mounted) return;
+    if (result != null) setState(() => _recurrence = result.value);
+    saved?.requestFocus();
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -351,6 +364,33 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
             ),
             const SizedBox(height: 8),
           ],
+          // Repeat row — its own line so long date/duration labels never crowd
+          // it. Reuses the task recurrence picker + formatter.
+          GestureDetector(
+            onTap: _pickRecurrence,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.repeat,
+                    size: 16,
+                    color: _recurrence != null ? AppColors.accent : secondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _recurrence != null
+                        ? formatRecurrence(context, _recurrence)
+                        : s.repeat,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: _recurrence != null ? AppColors.accent : secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

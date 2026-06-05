@@ -109,7 +109,7 @@ class _CalendarViewState extends State<CalendarView> {
     _firstDay = widget.settingsController?.firstDayOfWeek ?? DateTime.monday;
     _scrollCtrl = ScrollController();
     _scrollCtrl.addListener(_onScroll);
-    widget.resetSignal.addListener(_scrollToCurrentMonth);
+    widget.resetSignal.addListener(_onResetSignal);
     widget.settingsController?.addListener(_onSettingsChanged);
     // Pre-warm Google Calendar around the current month so the user sees
     // events immediately when they open the tab.
@@ -120,7 +120,7 @@ class _CalendarViewState extends State<CalendarView> {
 
   @override
   void dispose() {
-    widget.resetSignal.removeListener(_scrollToCurrentMonth);
+    widget.resetSignal.removeListener(_onResetSignal);
     widget.settingsController?.removeListener(_onSettingsChanged);
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
@@ -193,6 +193,14 @@ class _CalendarViewState extends State<CalendarView> {
       if (wantGoogle) unawaited(gcal.ensureRangeLoaded(from, to));
       if (wantDevice) unawaited(ekcal.ensureRangeLoaded(from, to));
     });
+  }
+
+  /// Re-tapping the Calendar tab fully resets the view: any open day-preview
+  /// panel is closed and the grid scrolls back to the current month — matching
+  /// the pop-to-root behaviour of the other tabs.
+  void _onResetSignal() {
+    _closeDay();
+    _scrollToCurrentMonth();
   }
 
   void _scrollToCurrentMonth() {

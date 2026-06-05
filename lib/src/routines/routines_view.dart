@@ -189,7 +189,7 @@ class _DayContent extends StatefulWidget {
 
 class _DayContentState extends State<_DayContent> {
   DateTime _selected = RoutineController.normalizeDate(DateTime.now());
-  bool _completedExpanded = false;
+  bool _completedExpanded = true;
 
   @override
   void initState() {

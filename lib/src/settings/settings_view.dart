@@ -54,12 +54,14 @@ class _SettingsViewState extends State<SettingsView> {
       context: context,
       title: s.language,
       current: current,
-      options: kSupportedLocales
+      options: (kSupportedLocales
           .map((loc) => SelectionMenuOption(
                 value: loc.languageCode,
                 label: kLanguageNames[loc.languageCode] ?? loc.languageCode,
               ))
-          .toList(),
+          .toList()
+        ..sort((a, b) =>
+            a.label.toLowerCase().compareTo(b.label.toLowerCase()))),
     );
     if (selected != null) {
       widget.controller.updateLocale(Locale(selected));

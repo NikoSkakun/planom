@@ -1189,12 +1189,22 @@ class _HomeShellState extends State<HomeShell> {
                         : 50 + MediaQuery.paddingOf(context).bottom + 12;
                 return ValueListenableBuilder<double>(
                   valueListenable: _plusButtonInset,
-                  builder: (context, lift, _) => AnimatedPositioned(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOut,
-                    right: 20,
-                    bottom: baseBottom + lift,
-                    child: _PlusButton(onPressed: _onPlusPressed),
+                  builder: (context, lift, _) => ListenableBuilder(
+                    // While the Undo banner is on screen, lift the + button up
+                    // so it rides just above the banner instead of being
+                    // covered by it. The lift animates in/out with the banner.
+                    listenable: _undoController,
+                    builder: (context, _) {
+                      final undoLift =
+                          _undoController.pending != null ? 64.0 : 0.0;
+                      return AnimatedPositioned(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOut,
+                        right: 20,
+                        bottom: baseBottom + lift + undoLift,
+                        child: _PlusButton(onPressed: _onPlusPressed),
+                      );
+                    },
                   ),
                 );
               },
