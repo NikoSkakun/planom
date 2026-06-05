@@ -16,31 +16,8 @@ import '../utils/undo_controller.dart';
 import 'markdown_toolbar.dart';
 import 'markdown_view.dart';
 import 'note_controller.dart';
+import 'note_debug.dart';
 import 'note_share.dart';
-
-// ---------------------------------------------------------------------------
-// TEMPORARY DEBUG INSTRUMENTATION — note "lost edits after tab switch" bug.
-// Renders an on-screen trace (prebuilt iOS builds have no console). The buffer
-// is module-level so it survives leaving and re-entering the note, letting us
-// see the save/dispose events that fire on the way out. Remove once diagnosed.
-// Long-press the red panel to clear the log.
-const bool kNoteEditDebug = true;
-final List<String> kNoteEditLog = <String>[];
-int _kNoteEditSeq = 0;
-void _noteDbg(String msg) {
-  if (!kNoteEditDebug) return;
-  _kNoteEditSeq++;
-  kNoteEditLog.add('$_kNoteEditSeq $msg');
-  if (kNoteEditLog.length > 80) {
-    kNoteEditLog.removeRange(0, kNoteEditLog.length - 80);
-  }
-}
-
-String _noteTail(String s) {
-  final t = s.length <= 8 ? s : s.substring(s.length - 8);
-  return t.replaceAll('\n', '⏎');
-}
-// ---------------------------------------------------------------------------
 
 class NoteDetailView extends StatefulWidget {
   const NoteDetailView({
@@ -121,8 +98,8 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _contentFocus.addListener(_onContentFocusChanged);
     _titleFocus.addListener(_onTitleFocusChanged);
     WidgetsBinding.instance.addObserver(this);
-    _noteDbg('INIT isNew=${widget.isNew} '
-        'c=${widget.note.content.length}:"${_noteTail(widget.note.content)}"');
+    noteDbg('INIT isNew=${widget.isNew} '
+        'c=${widget.note.content.length}:"${noteTail(widget.note.content)}"');
   }
 
   /// Detects the "Select All" gesture (tap empty space → toolbar with the
@@ -154,8 +131,8 @@ class _NoteDetailViewState extends State<NoteDetailView>
   }
 
   void _onContentFocusChanged() {
-    _noteDbg('focus content=${_contentFocus.hasFocus} '
-        'c=${_content.text.length}:"${_noteTail(_content.text)}"');
+    noteDbg('focus content=${_contentFocus.hasFocus} '
+        'c=${_content.text.length}:"${noteTail(_content.text)}"');
     if (!mounted) return;
     if (_contentFocus.hasFocus) {
       // Gaining focus (e.g. via the title's "Next" key, tapping the body, or
@@ -190,7 +167,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
   /// a layout-independent "am I hidden?" signal.
   void _handleTabActiveChange(bool active) {
     if (active == _tabActive) return;
-    _noteDbg('tabActive $active (was $_tabActive) '
+    noteDbg('tabActive $active (was $_tabActive) '
         'ed=$_isEditing focus=${_contentFocus.hasFocus}');
     _tabActive = active;
     if (active) return;
@@ -230,18 +207,18 @@ class _NoteDetailViewState extends State<NoteDetailView>
     if (_deleted) return;
     if (_saving) {
       _resaveRequested = true;
-      _noteDbg('save() -> queued resave (in-flight)');
+      noteDbg('save() -> queued resave (in-flight)');
       return;
     }
     _saving = true;
-    _noteDbg('save() start disposed=$_disposed '
+    noteDbg('save() start disposed=$_disposed '
         'c=${_disposed ? "?" : _content.text.length}');
     try {
       do {
         _resaveRequested = false;
         await _persistOnce();
         if (_resaveRequested && (_deleted || _disposed)) {
-          _noteDbg('  resave DROPPED deleted=$_deleted disposed=$_disposed');
+          noteDbg('  resave DROPPED deleted=$_deleted disposed=$_disposed');
         }
       } while (_resaveRequested && !_deleted && !_disposed);
     } finally {
@@ -258,12 +235,12 @@ class _NoteDetailViewState extends State<NoteDetailView>
     // mid-flight (the final save fires from dispose()).
     final content = _content.text;
     final folderId = _folderId;
-    _noteDbg('persist new=$_persistedNew isNew=${widget.isNew} '
-        'c=${content.length}:"${_noteTail(content)}" '
-        'saved=${_savedContent.length}:"${_noteTail(_savedContent)}"');
+    noteDbg('persist new=$_persistedNew isNew=${widget.isNew} '
+        'c=${content.length}:"${noteTail(content)}" '
+        'saved=${_savedContent.length}:"${noteTail(_savedContent)}"');
     if (widget.isNew && !_persistedNew) {
       if (title.isEmpty && content.trim().isEmpty) {
-        _noteDbg('  ADD skip empty');
+        noteDbg('  ADD skip empty');
         return;
       }
       await widget.controller.addNote(
@@ -279,7 +256,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
       _savedTitle = title;
       _savedContent = content;
       _savedFolderId = folderId;
-      _noteDbg('  ADD ok c=${content.length}');
+      noteDbg('  ADD ok c=${content.length}');
       return;
     }
     // Skip the write when nothing actually changed — otherwise copyWith bumps
@@ -289,7 +266,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
     if (title == _savedTitle &&
         content == _savedContent &&
         folderId == _savedFolderId) {
-      _noteDbg('  UPD skip eq c=${content.length}');
+      noteDbg('  UPD skip eq c=${content.length}');
       return;
     }
     await widget.controller.updateNote(
@@ -307,7 +284,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
     _savedTitle = title;
     _savedContent = content;
     _savedFolderId = folderId;
-    _noteDbg('  UPD ok c=${content.length}');
+    noteDbg('  UPD ok c=${content.length}');
   }
 
   @override
@@ -390,8 +367,8 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   @override
   void dispose() {
-    _noteDbg('dispose saving=$_saving resave=$_resaveRequested '
-        'c=${_content.text.length}:"${_noteTail(_content.text)}"');
+    noteDbg('dispose saving=$_saving resave=$_resaveRequested '
+        'c=${_content.text.length}:"${noteTail(_content.text)}"');
     _disposed = true;
     _autosaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -415,7 +392,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
   }
 
   void _startEditing({int? cursorOffset}) {
-    _noteDbg('startEditing off=$cursorOffset c=${_content.text.length}');
+    noteDbg('startEditing off=$cursorOffset c=${_content.text.length}');
     setState(() => _isEditing = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -636,8 +613,8 @@ class _NoteDetailViewState extends State<NoteDetailView>
           // typed word isn't lost.
           canPop: true,
           onPopInvokedWithResult: (didPop, _) {
-            _noteDbg('POP didPop=$didPop c=${_content.text.length}:'
-                '"${_noteTail(_content.text)}"');
+            noteDbg('POP didPop=$didPop c=${_content.text.length}:'
+                '"${noteTail(_content.text)}"');
             _titleFocus.unfocus();
             _contentFocus.unfocus();
             _flushSave();

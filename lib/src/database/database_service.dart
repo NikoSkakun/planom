@@ -901,15 +901,15 @@ class DatabaseService {
     return rows.map(Note.fromMap).toList();
   }
 
-  Future<void> insertNote(Note note) async {
+  Future<int> insertNote(Note note) async {
     final db = await _database;
-    await db.insert('notes', note.toMap(),
+    return db.insert('notes', note.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<void> updateNote(Note note) async {
+  Future<int> updateNote(Note note) async {
     final db = await _database;
-    await db.update('notes', note.toMap(),
+    return db.update('notes', note.toMap(),
         where: 'id = ?', whereArgs: [note.id]);
   }
 
