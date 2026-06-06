@@ -39,6 +39,10 @@ android {
     ndkVersion flutter.ndkVersion
 
     compileOptions {
+        // flutter_local_notifications (and other plugins) use java.time APIs that
+        // don't exist below API 26. Core library desugaring backports them so the
+        // app doesn't NoClassDefFoundError on launch on Android < 8.0 (minSdk 21).
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -95,4 +99,9 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    // Runtime backport for java.time etc. used by plugins like
+    // flutter_local_notifications. 1.2.2 is the latest line compatible with
+    // AGP 7.3 (desugar_jdk_libs 2.x requires AGP 7.4+).
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.2.2'
+}
