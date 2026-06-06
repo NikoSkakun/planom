@@ -587,6 +587,12 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
     widget.onSelected(null, null);
   }
 
+  /// Reset tapped from the header — clear the icon and dismiss the sheet.
+  void _resetAndClose() {
+    widget.onSelected(null, null);
+    Navigator.of(context, rootNavigator: true).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
@@ -633,7 +639,7 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
                   child: Padding(
                     padding: const EdgeInsets.only(right: 16),
                     child: GestureDetector(
-                      onTap: _resetToDefault,
+                      onTap: _resetAndClose,
                       behavior: HitTestBehavior.opaque,
                       child: Text(
                         s.resetLabel,
@@ -908,7 +914,11 @@ class _EmojiPickerState extends State<_EmojiPicker> {
                   ),
                 )
               : GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                  // Scroll left-to-right: emojis fill top-to-bottom in each
+                  // column, new columns extend off the right edge.
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 12),
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
