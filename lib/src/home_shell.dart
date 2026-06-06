@@ -676,8 +676,12 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   /// All items on the current page (built-ins + shortcuts), in display order.
+  /// The live, rendered pages — disabled tabs filtered out.
+  List<List<TabItem>> _activePages() =>
+      widget.settingsController.tabBarConfig.active.pages;
+
   List<TabItem> _pageItems() {
-    final pages = widget.settingsController.tabBarConfig.pages;
+    final pages = _activePages();
     if (pages.isEmpty) return const [];
     final pageIdx = _currentPage.clamp(0, pages.length - 1);
     return pages[pageIdx];
@@ -687,7 +691,7 @@ class _HomeShellState extends State<HomeShell> {
   /// swipe to / that earn a page-indicator dot. Empty pages are skipped so the
   /// dots never count a page the user can't actually reach.
   List<int> _navigablePageIndices() {
-    final pages = widget.settingsController.tabBarConfig.pages;
+    final pages = _activePages();
     final result = <int>[];
     for (var i = 0; i < pages.length; i++) {
       if (pages[i].isNotEmpty) result.add(i);
@@ -750,7 +754,7 @@ class _HomeShellState extends State<HomeShell> {
       _tabController.index = _visualForBuiltin(ownerLogicalIdx);
     } else {
       // Owner tab isn't on this page — switch to whichever page has it.
-      final pages = widget.settingsController.tabBarConfig.pages;
+      final pages = _activePages();
       for (var p = 0; p < pages.length; p++) {
         if (pages[p].any((it) =>
             it.kind == TabKind.builtin && it.builtinIndex == ownerLogicalIdx)) {

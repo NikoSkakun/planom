@@ -186,6 +186,11 @@ class TabBarPagesEditor extends StatelessWidget {
     await controller.updateTabBarConfig(cfg.removeItem(pageIdx, itemIdx));
   }
 
+  void _setItemEnabled(int pageIdx, int itemIdx, bool enabled) {
+    final cfg = controller.tabBarConfig;
+    controller.updateTabBarConfig(cfg.setItemEnabled(pageIdx, itemIdx, enabled));
+  }
+
   void _reorderItem(int pageIdx, int oldIndex, int newIndex) {
     if (newIndex > oldIndex) newIndex -= 1;
     final cfg = controller.tabBarConfig;
@@ -322,6 +327,8 @@ class TabBarPagesEditor extends StatelessWidget {
                     index: i,
                     label: _itemLabel(context, cfg.pages[p][i]),
                     icon: _itemIcon(context, cfg.pages[p][i]),
+                    enabled: cfg.pages[p][i].enabled,
+                    onToggle: (v) => _setItemEnabled(p, i, v),
                     onRemove: () => _removeItem(p, i),
                   ),
               ],
@@ -341,7 +348,7 @@ class TabBarPagesEditor extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             s.tabBarPagesHint,
             style: TextStyle(
@@ -368,7 +375,9 @@ class _PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
       children: [
         Expanded(
           child: Text(
@@ -392,6 +401,7 @@ class _PageHeader extends StatelessWidget {
             ),
           ),
       ],
+      ),
     );
   }
 }
@@ -402,12 +412,16 @@ class _ItemRow extends StatelessWidget {
     required this.index,
     required this.label,
     required this.icon,
+    required this.enabled,
+    required this.onToggle,
     required this.onRemove,
   });
 
   final int index;
   final String label;
   final Widget icon;
+  final bool enabled;
+  final ValueChanged<bool> onToggle;
   final VoidCallback onRemove;
 
   @override
@@ -418,16 +432,32 @@ class _ItemRow extends StatelessWidget {
     );
     return Container(
       margin: const EdgeInsets.only(bottom: 1),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
-          SizedBox(width: 22, height: 22, child: Center(child: icon)),
+          // Icon + label dim when the tab is disabled, signalling it won't
+          // appear in the live tab bar while still listed here.
+          Opacity(
+            opacity: enabled ? 1.0 : 0.4,
+            child: SizedBox(width: 22, height: 22, child: Center(child: icon)),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 17))),
+          Expanded(
+            child: Opacity(
+              opacity: enabled ? 1.0 : 0.4,
+              child: Text(label, style: const TextStyle(fontSize: 17)),
+            ),
+          ),
+          CupertinoSwitch(
+            value: enabled,
+            onChanged: onToggle,
+            activeColor: AppColors.accent,
+          ),
+          const SizedBox(width: 8),
           CupertinoButton(
             padding: EdgeInsets.zero,
             minSize: 0,
