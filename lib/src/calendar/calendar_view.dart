@@ -88,6 +88,11 @@ class _CalendarViewState extends State<CalendarView> {
   /// the panel, tapping the same day again (or the nav-bar title) closes it.
   DateTime? _selectedDate;
 
+  /// Scroll offset captured the moment a day preview is first opened, so that
+  /// closing the panel can restore the calendar to exactly where it was before
+  /// the tapped day was scrolled to the top. Null while no panel is open.
+  double? _scrollOffsetBeforeDay;
+
   // Mirrored from the settings controller so the sliver structure rebuilds
   // when the user switches view mode or first-day-of-week.
   late CalendarViewMode _viewMode;
@@ -199,7 +204,9 @@ class _CalendarViewState extends State<CalendarView> {
   /// panel is closed and the grid scrolls back to the current month — matching
   /// the pop-to-root behaviour of the other tabs.
   void _onResetSignal() {
-    _closeDay();
+    // The reset jumps to the current month, so don't also restore the
+    // pre-open scroll position — that would fight the scroll-to-today animation.
+    _closeDay(restoreScroll: false);
     _scrollToCurrentMonth();
   }
 
@@ -235,15 +242,39 @@ class _CalendarViewState extends State<CalendarView> {
       _closeDay();
       return;
     }
+    // Capture the scroll position only when opening from a closed state, so
+    // re-targeting from one open day to another keeps the original "before"
+    // position to restore on close.
+    if (_selectedDate == null && _scrollCtrl.hasClients) {
+      _scrollOffsetBeforeDay = _scrollCtrl.offset;
+    }
     setState(() => _selectedDate = date);
     widget.onDaySelected?.call(date);
     _scrollToDate(date);
   }
 
-  void _closeDay() {
+  void _closeDay({bool restoreScroll = true}) {
     if (_selectedDate == null) return;
     setState(() => _selectedDate = null);
     widget.onDaySelected?.call(null);
+
+    final saved = _scrollOffsetBeforeDay;
+    _scrollOffsetBeforeDay = null;
+    if (!restoreScroll || saved == null) return;
+    // Restore after the panel is removed so the scroll viewport has grown back
+    // to its full height before we clamp/animate to the saved offset.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollCtrl.hasClients) return;
+      final clamped = saved.clamp(
+        _scrollCtrl.position.minScrollExtent,
+        _scrollCtrl.position.maxScrollExtent,
+      );
+      _scrollCtrl.animateTo(
+        clamped,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   /// Scrolls so that the row containing [date] sits near the top of the
