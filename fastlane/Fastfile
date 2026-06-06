@@ -125,3 +125,27 @@ platform :ios do
   end
 
 end
+
+platform :android do
+
+  desc "Distribute a new beta APK to Firebase App Distribution"
+  lane :android_beta do
+    # The APK is produced by `flutter build apk --release` in the workflow
+    # (Flutter's gradle integration), so the lane just distributes the artifact.
+    apk_path = "build/app/outputs/flutter-apk/app-release.apk"
+    UI.user_error!("APK not found at #{apk_path} — run `flutter build apk --release` first") unless File.exist?(apk_path)
+
+    firebase_app_distribution(
+      app:                      ENV["FIREBASE_APP_ID"],
+      android_artifact_type:    "APK",
+      android_artifact_path:    apk_path,
+      service_credentials_file: ENV["FIREBASE_SERVICE_ACCOUNT_FILE"],
+      # Comma-separated tester group aliases configured in the Firebase console.
+      groups:                   ENV["FIREBASE_TESTER_GROUPS"],
+      release_notes:            "Automated build from GitHub Actions — branch: #{ENV.fetch('GITHUB_REF_NAME', 'unknown')}",
+    )
+
+    UI.success("✅  Uploaded APK to Firebase App Distribution")
+  end
+
+end

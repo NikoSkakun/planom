@@ -1,0 +1,109 @@
+name: Android Distribution
+
+on:
+  workflow_dispatch:          # manual trigger only — App Distribution notifies
+                              # testers on every release, so we don't auto-run on push.
+
+concurrency:
+  group: android-distribution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  distribute:
+    name: Build & Distribute to Firebase App Distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      FLUTTER_VERSION: "3.32.0"   # keep in sync with testflight.yml
+
+    steps:
+      # ── Source ───────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Java ─────────────────────────────────────────────────────────────────
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # ── Flutter ──────────────────────────────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Install pub dependencies
+        run: flutter pub get
+
+      # ── Signing material ──────────────────────────────────────────────────────
+      - name: Decode keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/upload-keystore.jks
+
+      - name: Write key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storeFile=upload-keystore.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
+      - name: Decode Firebase service account
+        run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" | base64 --decode > firebase-service-account.json
+
+      # ── Build ─────────────────────────────────────────────────────────────────
+      # --build-number stamps versionCode. Use %y (2-digit year) so the value
+      # stays 10 digits and fits in a signed 32-bit int (versionCode max is
+      # 2,147,483,647) — a 12-digit %Y... timestamp would overflow.
+      # --split-debug-info strips Dart symbols out of the APK; retained as an
+      # artifact for later `flutter symbolize`.
+      - name: Build release APK
+        run: >
+          flutter build apk --release
+          --build-number=$(date +%y%m%d%H%M)
+          --split-debug-info=build/debug-symbols
+
+      # ── Ruby / Fastlane ───────────────────────────────────────────────────────
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Run Fastlane android_beta lane
+        env:
+          FIREBASE_APP_ID:               ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_SERVICE_ACCOUNT_FILE: firebase-service-account.json
+          FIREBASE_TESTER_GROUPS:        ${{ secrets.FIREBASE_TESTER_GROUPS }}
+        run: bundle exec fastlane android android_beta
+
+      # ── Artifacts ─────────────────────────────────────────────────────────────
+      - name: Upload Dart debug symbols
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-dart-debug-symbols
+          path: build/debug-symbols
+          if-no-files-found: warn
+
+      - name: Upload release APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: warn

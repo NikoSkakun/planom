@@ -1,0 +1,72 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      FLUTTER_VERSION: "3.32.0"   # keep in sync with the other workflows
+
+    steps:
+      # ── Source ───────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Java ─────────────────────────────────────────────────────────────────
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # ── Flutter ──────────────────────────────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Install pub dependencies
+        run: flutter pub get
+
+      # ── Build ─────────────────────────────────────────────────────────────────
+      # No keystore secrets are used here: with android/key.properties absent the
+      # release build falls back to debug signing (see android/app/build.gradle),
+      # so this produces an installable APK with no secret setup. For a
+      # release-signed APK delivered to testers, use the Android Distribution
+      # workflow instead.
+      - name: Build release APK
+        run: >
+          flutter build apk --release
+          --build-number=$(date +%y%m%d%H%M)
+          --split-debug-info=build/debug-symbols
+
+      # ── Artifact ──────────────────────────────────────────────────────────────
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
