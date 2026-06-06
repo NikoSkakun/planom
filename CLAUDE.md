@@ -194,7 +194,7 @@ Custom photo icons for folders, lists, and routines are stored as **relative pat
 
 - `initFolderIconService()` — called once in `main.dart` before `runApp`; caches `getApplicationDocumentsDirectory()` so path resolution is synchronous during widget builds.
 - `isCustomIconId(iconId)` — `true` for relative paths (`icons/…`) and legacy absolute paths (`/…`).
-- Folder/list icons may also be an **emoji / unicode character**, stored as `emoji:<char>` (`isEmojiIconId` / `emojiFromIconId`). `buildFolderItemIcon` renders these as centered text; they carry no color tint. The icon picker exposes a text field to set one.
+- Folder/list icons may also be an **emoji / unicode character**, stored as `emoji:<char>` (`isEmojiIconId` / `emojiFromIconId`). `buildFolderItemIcon` renders these as centered text; they carry no color tint. The icon picker's **Emoji** tab presents a categorised emoji grid (catalogue in `lib/src/folders/emoji_catalog.dart`) to set one — free-text/char entry was removed.
 - `resolveCustomIconPath(iconId)` — runtime absolute path; handles new relative + legacy absolute (graceful fallback).
 - `buildFolderItemIcon(iconId, isFolder)` — synchronous widget builder; falls back to the default PNG on error.
 - Backups inline icon bytes as base64 in a top-level `customIcons` map keyed by relative path; on import they're written back to `<docsDir>/icons/`.

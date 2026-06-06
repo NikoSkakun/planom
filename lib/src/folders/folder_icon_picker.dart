@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart' show showModalBottomSheet;
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
@@ -13,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import '../localization/strings.dart';
 import '../theme/app_theme.dart';
 import '../utils/platform_capabilities.dart';
+import 'emoji_catalog.dart';
 
 // Preset (iconId, displayColor) pairs.
 const kFolderIconPresets = <(String, int)>[
@@ -309,6 +309,11 @@ const _kIconColorPresets = <int>[
   0xFF8E8E93,
 ];
 
+// Tab indices for the icon-picker segmented control.
+const int _kTabEmoji = 0;
+const int _kTabIcons = 1;
+const int _kTabUpload = 2;
+
 class _IconPickerSheet extends StatefulWidget {
   const _IconPickerSheet({
     required this.currentIconId,
@@ -330,22 +335,16 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
   late String? _selected;
   int? _color;
   bool _picking = false;
-  late final TextEditingController _emojiCtrl;
+  late int _tab;
 
   @override
   void initState() {
     super.initState();
     _selected = widget.currentIconId;
     _color = widget.currentIconColor;
-    _emojiCtrl = TextEditingController(
-      text: isEmojiIconId(_selected) ? emojiFromIconId(_selected!) : '',
-    );
-  }
-
-  @override
-  void dispose() {
-    _emojiCtrl.dispose();
-    super.dispose();
+    // Open on the tab matching the current icon (emoji → Emoji, otherwise the
+    // Icons gallery; a custom photo has no gallery representation).
+    _tab = isEmojiIconId(_selected) ? _kTabEmoji : _kTabIcons;
   }
 
   Future<void> _pickFromLibrary() async {
@@ -370,9 +369,8 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
 
   void _selectColor(int? color) {
     setState(() => _color = color);
-    // If no icon is set yet (default/photo tile), don't propagate — the color
-    // only matters once the user has picked an SF-symbol icon. Custom images
-    // and emoji icons can't be tinted.
+    // If no SF-symbol icon is set yet, don't propagate — the color only matters
+    // once the user has picked one. Custom images and emoji can't be tinted.
     if (_selected != null &&
         !isCustomIconId(_selected) &&
         !isEmojiIconId(_selected)) {
@@ -380,15 +378,9 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
     }
   }
 
-  void _selectEmoji(String raw) {
-    final char = raw.trim();
-    if (char.isEmpty) {
-      _resetToDefault();
-      return;
-    }
-    setState(() => _selected = '$kEmojiIconPrefix$char');
-    // Emoji icons carry no color tint.
-    widget.onSelected(_selected, null);
+  void _selectEmoji(String char) {
+    widget.onSelected('$kEmojiIconPrefix$char', null);
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   void _resetToDefault() {
@@ -404,20 +396,19 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
     final bg = CupertinoColors.systemBackground.resolveFrom(context);
     final bottomPad = MediaQuery.paddingOf(context).bottom;
     final s = S.of(context);
-    final effectiveColor = _color != null
-        ? Color(_color!)
-        : AppColors.accent;
+    final height = MediaQuery.sizeOf(context).height * 0.72;
 
     return Container(
+      height: height,
       decoration: BoxDecoration(
         color: bg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
       ),
-      padding: EdgeInsets.fromLTRB(20, 12, 20, bottomPad + 16),
+      padding: EdgeInsets.only(bottom: bottomPad),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const SizedBox(height: 12),
           Center(
             child: Container(
               width: 36,
@@ -428,76 +419,156 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            s.chooseIcon,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              // "Default" tile
-              _IconTile(
-                isSelected: _selected == null,
-                onTap: _resetToDefault,
-                child: Image.asset(
-                  widget.isFolder
-                      ? 'assets/icons/folder.png'
-                      : 'assets/icons/list.png',
-                  width: 26,
-                  height: 26,
-                ),
-              ),
-              ...kFolderIconPresets.map(
-                (preset) => _IconTile(
-                  isSelected: _selected == preset.$1,
-                  color: effectiveColor,
-                  onTap: () => _selectPreset(preset.$1),
-                  child: Icon(
-                    folderItemIconData(preset.$1),
-                    size: 22,
-                    color: CupertinoColors.white,
+          const SizedBox(height: 12),
+          // Header: centered title + Reset on the right.
+          SizedBox(
+            height: 28,
+            child: Stack(
+              children: [
+                Center(
+                  child: Text(
+                    widget.isFolder ? s.folderIcon : s.listIcon,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text(
-            s.iconColor,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _ColorDot(
-                isSelected: _color == null,
-                color: AppColors.accent,
-                isDefault: true,
-                onTap: () => _selectColor(null),
-              ),
-              for (final c in _kIconColorPresets)
-                _ColorDot(
-                  isSelected: _color == c,
-                  color: Color(c),
-                  isDefault: false,
-                  onTap: () => _selectColor(c),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: GestureDetector(
+                      onTap: _resetToDefault,
+                      behavior: HitTestBehavior.opaque,
+                      child: Text(
+                        s.resetLabel,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: CupertinoSlidingSegmentedControl<int>(
+              groupValue: _tab,
+              onValueChanged: (v) {
+                if (v != null) setState(() => _tab = v);
+              },
+              children: {
+                _kTabEmoji: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(s.iconTabEmoji),
+                ),
+                _kTabIcons: Text(s.iconTabIcons),
+                _kTabUpload: Text(s.iconTabUpload),
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(child: _buildTab(context, s)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTab(BuildContext context, S s) {
+    switch (_tab) {
+      case _kTabEmoji:
+        return _EmojiPicker(
+          selected: isEmojiIconId(_selected) ? emojiFromIconId(_selected!) : null,
+          onSelected: _selectEmoji,
+        );
+      case _kTabUpload:
+        return _buildUploadTab(context, s);
+      case _kTabIcons:
+      default:
+        return _buildIconsTab(context, s);
+    }
+  }
+
+  Widget _buildIconsTab(BuildContext context, S s) {
+    final effectiveColor = _color != null ? Color(_color!) : AppColors.accent;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            // "Default" tile.
+            _IconTile(
+              isSelected: _selected == null,
+              onTap: _resetToDefault,
+              child: Image.asset(
+                widget.isFolder
+                    ? 'assets/icons/folder.png'
+                    : 'assets/icons/list.png',
+                width: 26,
+                height: 26,
+              ),
+            ),
+            ...kFolderIconPresets.map(
+              (preset) => _IconTile(
+                isSelected: _selected == preset.$1,
+                color: effectiveColor,
+                onTap: () => _selectPreset(preset.$1),
+                child: Icon(
+                  folderItemIconData(preset.$1),
+                  size: 22,
+                  color: CupertinoColors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Text(
+          s.iconColor,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _ColorDot(
+              isSelected: _color == null,
+              color: AppColors.accent,
+              isDefault: true,
+              onTap: () => _selectColor(null),
+            ),
+            for (final c in _kIconColorPresets)
+              _ColorDot(
+                isSelected: _color == c,
+                color: Color(c),
+                isDefault: false,
+                onTap: () => _selectColor(c),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUploadTab(BuildContext context, S s) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
           GestureDetector(
             onTap: _picking ? null : _pickFromLibrary,
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                color:
-                    CupertinoColors.tertiarySystemFill.resolveFrom(context),
+                color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -510,9 +581,7 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _picking
-                        ? s.opening
-                        : s.chooseFromLibrary,
+                    _picking ? s.opening : s.chooseFromLibrary,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
@@ -523,64 +592,114 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            s.emojiOrSymbol,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 10),
-          Row(
+        ],
+      ),
+    );
+  }
+}
+
+/// Categorised emoji grid with a top category bar. No keyword search (the
+/// catalogue carries glyphs only) — the user browses by category.
+class _EmojiPicker extends StatefulWidget {
+  const _EmojiPicker({required this.selected, required this.onSelected});
+
+  final String? selected;
+  final void Function(String emoji) onSelected;
+
+  @override
+  State<_EmojiPicker> createState() => _EmojiPickerState();
+}
+
+class _EmojiPickerState extends State<_EmojiPicker> {
+  int _category = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Open on the category that already contains the selected emoji.
+    if (widget.selected != null) {
+      for (var i = 0; i < kEmojiCatalog.length; i++) {
+        if (kEmojiCatalog[i].emojis.contains(widget.selected)) {
+          _category = i;
+          break;
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final emojis = kEmojiCatalog[_category].emojis;
+    return Column(
+      children: [
+        // Category bar.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: CupertinoColors.tertiarySystemFill
-                      .resolveFrom(context),
-                  borderRadius: BorderRadius.circular(12),
-                  border: isEmojiIconId(_selected)
-                      ? Border.all(
-                          color: CupertinoColors.label.resolveFrom(context),
-                          width: 2.5,
-                        )
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    isEmojiIconId(_selected)
-                        ? emojiFromIconId(_selected!)
-                        : '🙂',
-                    style: TextStyle(
-                      fontSize: 24,
-                      color: isEmojiIconId(_selected)
-                          ? null
-                          : CupertinoColors.tertiaryLabel.resolveFrom(context),
+              for (var i = 0; i < kEmojiCatalog.length; i++)
+                GestureDetector(
+                  onTap: () => setState(() => _category = i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4, vertical: 6),
+                    child: Icon(
+                      kEmojiCatalog[i].icon,
+                      size: 22,
+                      color: i == _category
+                          ? AppColors.accent
+                          : CupertinoColors.secondaryLabel.resolveFrom(context),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: CupertinoTextField(
-                  controller: _emojiCtrl,
-                  placeholder: s.emojiOrSymbolPlaceholder,
-                  textAlign: TextAlign.center,
-                  maxLength: 4,
-                  style: const TextStyle(fontSize: 22),
-                  decoration: BoxDecoration(
-                    color: CupertinoColors.tertiarySystemFill
-                        .resolveFrom(context),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  onChanged: _selectEmoji,
-                ),
-              ),
             ],
           ),
-        ],
-      ),
+        ),
+        Container(
+          height: 1,
+          color: CupertinoColors.separator.resolveFrom(context),
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 48,
+              mainAxisSpacing: 4,
+              crossAxisSpacing: 4,
+            ),
+            itemCount: emojis.length,
+            itemBuilder: (context, i) {
+              final emoji = emojis[i];
+              final isSelected = emoji == widget.selected;
+              return GestureDetector(
+                onTap: () => widget.onSelected(emoji),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  decoration: isSelected
+                      ? BoxDecoration(
+                          color: CupertinoColors.tertiarySystemFill
+                              .resolveFrom(context),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.accent,
+                            width: 2,
+                          ),
+                        )
+                      : null,
+                  child: Center(
+                    child: Text(
+                      emoji,
+                      style: const TextStyle(fontSize: 26),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -621,7 +740,7 @@ class _ColorDot extends StatelessWidget {
                   : null,
         ),
         child: isDefault
-            ? Icon(
+            ? const Icon(
                 CupertinoIcons.circle_grid_3x3_fill,
                 size: 14,
                 color: CupertinoColors.white,
