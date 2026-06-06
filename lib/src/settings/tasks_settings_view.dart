@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_icon_picker.dart';
 import '../localization/strings.dart';
+import '../spaces/space_manager.dart';
 import '../tasks/task_field_prefs.dart';
 import '../theme/app_theme.dart';
 import '../utils/selection_menu.dart';
@@ -138,7 +139,21 @@ class TasksSettingsView extends StatelessWidget {
                   icon: Image.asset('assets/icons/inbox.png',
                       width: 22, height: 22),
                   label: s.inbox,
+                  visibility: prefs.inbox,
+                  onTap: () =>
+                      _showVisibilityPicker(ctx, 'inbox', prefs.inbox),
                 ),
+                if (prefs.inbox == SmartListVisibility.hidden &&
+                    SpaceManagerProvider.of(ctx)
+                        .folderController
+                        .lists
+                        .isNotEmpty) ...[
+                  const SizedBox(height: 1),
+                  // When Inbox is hidden, new tasks need somewhere to go —
+                  // mirror the per-folder "Default List" affordance. Only
+                  // surfaced when at least one list exists.
+                  _DefaultListRow(controller: controller),
+                ],
                 const SizedBox(height: 1),
                 _SmartListRow(
                   icon: Image.asset('assets/icons/today.png',
@@ -450,6 +465,98 @@ class _DefaultIconRow extends StatelessWidget {
                 style: const TextStyle(fontSize: 17),
               ),
             ),
+            Icon(
+              CupertinoIcons.chevron_right,
+              size: 14,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Row shown under the Inbox setting (only when Inbox is hidden) letting the
+/// user pin which list new tasks land in by default.
+class _DefaultListRow extends StatelessWidget {
+  const _DefaultListRow({required this.controller});
+
+  final SettingsController controller;
+
+  Future<void> _pickList(BuildContext context) async {
+    final s = S.of(context);
+    final folders = SpaceManagerProvider.of(context).folderController;
+    final lists = folders.lists;
+    if (lists.isEmpty) return;
+    const noneSentinel = '__none__';
+    final picked = await showSelectionMenu<String>(
+      context: context,
+      title: s.defaultList,
+      current: controller.defaultTaskListId ?? noneSentinel,
+      options: [
+        SelectionMenuOption(value: noneSentinel, label: s.defaultListNone),
+        for (final l in lists)
+          SelectionMenuOption(value: l.id, label: l.name),
+      ],
+    );
+    if (picked == null) return;
+    await controller.updateDefaultTaskListId(
+      picked == noneSentinel ? null : picked,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final folders = SpaceManagerProvider.of(context).folderController;
+    final bg = CupertinoDynamicColor.resolve(
+      CupertinoColors.tertiarySystemBackground,
+      context,
+    );
+    final pinnedId = controller.defaultTaskListId;
+    final pinned = pinnedId == null ? null : folders.listById(pinnedId);
+    final trailingLabel = pinned?.name ?? s.defaultListNone;
+    return GestureDetector(
+      onTap: () => _pickList(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: Icon(CupertinoIcons.list_bullet_below_rectangle,
+                  size: 22, color: AppColors.accent),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                s.defaultList,
+                style: TextStyle(
+                  fontSize: 17,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                trailingLabel,
+                textAlign: TextAlign.end,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
             Icon(
               CupertinoIcons.chevron_right,
               size: 14,

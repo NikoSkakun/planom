@@ -27,14 +27,10 @@ void main() async {
   }
 
   if (PlatformCapabilities.supportsOrientationLock) {
+    // Landscape is temporarily disabled — portrait only on phone/tablet for now.
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
-      // iPad opens to a sidebar+detail layout in HomeShell; allowing landscape
-      // here lets users actually use that extra room. Phone bottom-tab layout
-      // still works in landscape too.
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
     ]);
   }
 

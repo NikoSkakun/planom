@@ -28,6 +28,9 @@ Future<void> showNoteShareMenu(
   final choice = await showSelectionMenu<NoteShareFormat>(
     context: context,
     title: s.share,
+    // Opened from the note's nav-bar ⋯ menu → anchor in the same top-right
+    // spot so the format picker visually replaces the parent dropdown.
+    anchor: SelectionMenuAnchor.topRight,
     options: [
       SelectionMenuOption(
         value: NoteShareFormat.text,

@@ -6,6 +6,11 @@ import 'package:path_provider/path_provider.dart';
 enum SmartListVisibility { show, showIfNotEmpty, hidden }
 
 class SmartListPrefs {
+  // Inbox is treated as a smart list for visibility purposes, even though it's
+  // really "tasks without a list assignment". When hidden, new tasks created
+  // from the global + button get routed to the user-configured default list
+  // (see [SettingsController.defaultTaskListId]) or the first available list.
+  SmartListVisibility inbox;
   SmartListVisibility today;
   SmartListVisibility tomorrow;
   SmartListVisibility upcoming;
@@ -21,6 +26,7 @@ class SmartListPrefs {
   bool notesUseMarkdown;
 
   SmartListPrefs({
+    this.inbox = SmartListVisibility.show,
     this.today = SmartListVisibility.show,
     this.tomorrow = SmartListVisibility.showIfNotEmpty,
     this.upcoming = SmartListVisibility.show,
@@ -46,6 +52,7 @@ class SmartListPrefs {
       final data =
           jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       return SmartListPrefs(
+        inbox: _parse(data['inbox']),
         today: _parse(data['today']),
         tomorrow: _parse(data['tomorrow'],
             fallback: SmartListVisibility.showIfNotEmpty),
@@ -73,6 +80,7 @@ class SmartListPrefs {
   }
 
   Map<String, dynamic> toJson() => {
+        'inbox': _encode(inbox),
         'today': _encode(today),
         'tomorrow': _encode(tomorrow),
         'upcoming': _encode(upcoming),
@@ -87,6 +95,7 @@ class SmartListPrefs {
       };
 
   void applyJson(Map<String, dynamic> data) {
+    inbox = _parse(data['inbox']);
     today = _parse(data['today']);
     tomorrow =
         _parse(data['tomorrow'], fallback: SmartListVisibility.showIfNotEmpty);

@@ -547,8 +547,14 @@ class _EditItemSheetState extends State<_EditItemSheet> {
           Center(
             child: Text(
               widget.args.isFolder ? s.editFolder : s.editList,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                // Modal bottom sheets are Material widgets — a const TextStyle
+                // without a color falls through to Material's dark text, which
+                // becomes invisible in dark mode. Pin label color.
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -672,7 +678,10 @@ class _ListTypeButton extends StatelessWidget {
             Expanded(
               child: Text(
                 S.of(context).listType,
-                style: const TextStyle(fontSize: 17),
+                style: TextStyle(
+                  fontSize: 17,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
               ),
             ),
             Text(
@@ -719,7 +728,10 @@ class _ColorPickerButton extends StatelessWidget {
             Expanded(
               child: Text(
                 S.of(context).listColor,
-                style: const TextStyle(fontSize: 17),
+                style: TextStyle(
+                  fontSize: 17,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
               ),
             ),
             if (selectedColor == null)

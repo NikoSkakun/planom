@@ -5,9 +5,11 @@ import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show showModalBottomSheet;
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../localization/strings.dart';
 import '../theme/app_theme.dart';
@@ -285,26 +287,76 @@ Future<String?> pickIconFromGallery() async {
   return pickIconFromFile();
 }
 
+/// Sentinel for "the user denied camera permission" so the caller can show
+/// a tailored dialog (with a deep-link to the app's Settings page) instead of
+/// surfacing the raw PlatformException to the UI.
+class CameraPermissionDeniedException implements Exception {
+  const CameraPermissionDeniedException();
+}
+
 /// Captures a photo with the device camera and returns the relative icon path,
-/// or null. Mobile only (no-op elsewhere).
+/// or null. Mobile only (no-op elsewhere). Throws
+/// [CameraPermissionDeniedException] when the OS returns the
+/// `camera_access_denied` error code, so the caller can show a friendly hint
+/// that points the user to system settings.
 Future<String?> pickIconFromCamera() async {
   if (!PlatformCapabilities.supportsImagePicker) return null;
   final picker = ImagePicker();
-  final xfile = await picker.pickImage(
-    source: ImageSource.camera,
-    maxWidth: _kMaxIconDimension.toDouble(),
-    maxHeight: _kMaxIconDimension.toDouble(),
-    imageQuality: 90,
-  );
-  if (xfile == null) return null;
-  return _copyIconToDocuments(xfile.path);
+  try {
+    final xfile = await picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: _kMaxIconDimension.toDouble(),
+      maxHeight: _kMaxIconDimension.toDouble(),
+      imageQuality: 90,
+    );
+    if (xfile == null) return null;
+    return _copyIconToDocuments(xfile.path);
+  } on PlatformException catch (e) {
+    if (e.code == 'camera_access_denied' ||
+        e.code == 'photo_access_denied') {
+      throw const CameraPermissionDeniedException();
+    }
+    rethrow;
+  }
 }
 
-/// Opens the document picker (file system) filtered to images and returns the
-/// relative icon path, or null.
+/// Opens the system Settings page for this app (so the user can flip the
+/// camera permission switch). iOS uses the documented `app-settings:` URL;
+/// Android uses the `package:` deep link via [url_launcher].
+///
+/// Returns true when the OS accepted the deep link.
+Future<bool> openAppSystemSettings() async {
+  if (PlatformCapabilities.isIOS) {
+    return launchUrl(Uri.parse('app-settings:'),
+        mode: LaunchMode.externalApplication);
+  }
+  if (PlatformCapabilities.isAndroid) {
+    // `package:` requires the bundle id, which we don't have available here
+    // without an extra dependency. Best effort: open the system Settings root.
+    final ok = await launchUrl(Uri.parse('package:'),
+        mode: LaunchMode.externalApplication);
+    if (ok) return true;
+    return launchUrl(Uri.parse('intent:#Intent;action=android.settings.SETTINGS;end'),
+        mode: LaunchMode.externalApplication);
+  }
+  return false;
+}
+
+/// Opens the system Files browser filtered to common image extensions and
+/// returns the relative icon path, or null.
+///
+/// We pass `FileType.custom` + an explicit extension list so iOS opens the
+/// document picker (UIDocumentPickerViewController) and Android opens the
+/// Storage Access Framework — i.e. the actual file-system browser the user
+/// can navigate to iCloud Drive / Downloads / SD card from. With
+/// `FileType.image` the plugin would route to the photo library instead,
+/// which is what the dedicated "Photo Library" option already does.
 Future<String?> pickIconFromFile() async {
   final result = await FilePicker.platform.pickFiles(
-    type: FileType.image,
+    type: FileType.custom,
+    allowedExtensions: const [
+      'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'heic', 'heif',
+    ],
     allowMultiple: false,
     withData: false,
   );
@@ -440,7 +492,9 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
   }
 
   /// Runs an image-source [picker], and on success applies the result and
-  /// closes the sheet. Surfaces any error in an alert.
+  /// closes the sheet. Camera-permission denials get a tailored dialog with a
+  /// deep-link to system settings; other errors fall through to a generic
+  /// alert.
   Future<void> _handleSource(Future<String?> Function() picker) async {
     setState(() => _picking = true);
     try {
@@ -451,11 +505,48 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
         widget.onSelected(path, null);
         Navigator.of(context, rootNavigator: true).pop();
       }
+    } on CameraPermissionDeniedException {
+      if (mounted) _showCameraDeniedDialog();
     } catch (e) {
       if (mounted) _showError(e);
     } finally {
       if (mounted) setState(() => _picking = false);
     }
+  }
+
+  void _showCameraDeniedDialog() {
+    final s = S.of(context);
+    final canDeepLink = PlatformCapabilities.isIOS ||
+        PlatformCapabilities.isAndroid;
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(s.cameraAccessDeniedTitle),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            canDeepLink
+                ? s.cameraAccessDeniedBodyWithLink
+                : s.cameraAccessDeniedBody,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.done),
+          ),
+          if (canDeepLink)
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                openAppSystemSettings();
+              },
+              child: Text(s.openSettings),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showUploadMenu() async {
@@ -630,8 +721,15 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
                 Center(
                   child: Text(
                     widget.isFolder ? s.folderIcon : s.listIcon,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      // `showModalBottomSheet` is a Material widget — `const
+                      // TextStyle` here inherits Material's default-black text
+                      // color, which renders almost invisible in dark mode.
+                      // Use `CupertinoColors.label` so the title adapts.
+                      color: CupertinoColors.label.resolveFrom(context),
+                    ),
                   ),
                 ),
                 Align(
@@ -732,7 +830,13 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
         const SizedBox(height: 24),
         Text(
           s.iconColor,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            // Inherits Material defaults in showModalBottomSheet — pin the
+            // color so it stays readable in dark mode.
+            color: CupertinoColors.label.resolveFrom(context),
+          ),
         ),
         const SizedBox(height: 10),
         Wrap(
@@ -760,9 +864,12 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
 
   Widget _buildUploadTab(BuildContext context, S s) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+      // Top-aligned so the action sits near the segmented control instead of
+      // floating in the vertical middle of the panel.
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
           GestureDetector(
             onTap: _picking ? null : _showUploadMenu,
@@ -776,8 +883,12 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // Switched from a "cloud upload" glyph (which read as
+                  // "upload to a server") to a plain photo glyph so the
+                  // button visually matches what it actually does —
+                  // pick a single local image for the icon.
                   Icon(
-                    CupertinoIcons.cloud_upload,
+                    CupertinoIcons.photo,
                     size: 18,
                     color: CupertinoColors.label.resolveFrom(context),
                   ),
@@ -914,6 +1025,13 @@ class _EmojiPickerState extends State<_EmojiPicker> {
                   ),
                 )
               : GridView.builder(
+                  // Per-category Key forces a fresh ScrollController when the
+                  // user switches sub-collection — otherwise a leftover fling
+                  // animation from the previous category keeps scrolling the
+                  // new content (visible as "inertia" that carries over).
+                  // Using the search-string flag too so the search → category
+                  // transition also resets cleanly.
+                  key: ValueKey('emoji-grid-$_category-$searching'),
                   // Scroll left-to-right: emojis fill top-to-bottom in each
                   // column, new columns extend off the right edge.
                   scrollDirection: Axis.horizontal,

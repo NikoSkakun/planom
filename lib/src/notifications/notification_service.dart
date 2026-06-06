@@ -14,6 +14,14 @@ class NotificationService {
   bool _initialized = false;
   bool _permissionGranted = false;
 
+  /// Filename of a custom notification sound to play. iOS resolves names
+  /// against the main bundle and `Library/Sounds/`; null = system default.
+  /// Mirrored from [SettingsController.customNotificationSoundPath]; the
+  /// stored path is in `<docs>/notifications/<file>` and we pass just the
+  /// basename to the plugin (it auto-resolves to Library/Sounds at runtime
+  /// after the platform copies it there).
+  String? customSoundName;
+
   /// Maximum reminders per item. Scheduling and cancellation both iterate
   /// slots `0.._maxSlots-1`, so the two must use the same bound to stay in sync.
   static const _maxSlots = 20;
@@ -260,17 +268,22 @@ class NotificationService {
     required DateTime fireAt,
   }) async {
     if (!PlatformCapabilities.supportsLocalNotifications) return;
-    const darwinDetails = DarwinNotificationDetails(
+    // When a custom sound is configured, hand its filename to the plugin.
+    // `presentSound: true` + a non-null sound makes iOS play it instead of
+    // the default tritone.
+    final soundName = customSoundName;
+    final darwinDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: false,
       presentSound: true,
+      sound: soundName,
     );
     await _plugin.zonedSchedule(
       id,
       title,
       body,
       tz.TZDateTime.from(fireAt, tz.local),
-      const NotificationDetails(iOS: darwinDetails, macOS: darwinDetails),
+      NotificationDetails(iOS: darwinDetails, macOS: darwinDetails),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,

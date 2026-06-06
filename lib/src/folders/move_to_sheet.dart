@@ -167,7 +167,11 @@ class _MoveToSheetState extends State<_MoveToSheet> {
             child: Text(
               S.of(context).moveTo,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
             ),
           ),
           CupertinoButton(
@@ -347,7 +351,11 @@ class _NoteMoveToSheetState extends State<_NoteMoveToSheet> {
             child: Text(
               S.of(context).moveTo,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
             ),
           ),
           CupertinoButton(

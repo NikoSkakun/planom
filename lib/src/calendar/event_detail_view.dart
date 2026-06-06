@@ -103,6 +103,14 @@ class _EventDetailViewState extends State<EventDetailView> {
     setState(() => _recurrence = result.value);
   }
 
+  Future<void> _pickRecurrenceEndDate() async {
+    final current = _recurrence;
+    if (current == null) return;
+    final result = await showRecurrenceEndDateSheet(context, current);
+    if (!mounted || result == null) return;
+    setState(() => _recurrence = result.value);
+  }
+
   Future<void> _delete() async {
     final s = S.of(context);
     final confirmed = await showCupertinoDialog<bool>(
@@ -260,11 +268,49 @@ class _EventDetailViewState extends State<EventDetailView> {
                 ],
               ),
             ),
+            if (_recurrence != null) ...[
+              const SizedBox(height: 12),
+              _SectionCard(
+                onTap: _pickRecurrenceEndDate,
+                child: Row(
+                  children: [
+                    Icon(
+                      CupertinoIcons.calendar_badge_minus,
+                      size: 18,
+                      color: _recurrence!.endDate != null
+                          ? AppColors.accent
+                          : secondary,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      _recurrence!.endDate != null
+                          ? s.repeatUntil(
+                              '', _formatEndDateShort(_recurrence!.endDate!))
+                          : s.repeatForever,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: _recurrence!.endDate != null
+                            ? AppColors.accent
+                            : secondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+String _formatEndDateShort(DateTime d) {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${months[d.month - 1]} ${d.day}, ${d.year}';
 }
 
 class _SectionCard extends StatelessWidget {

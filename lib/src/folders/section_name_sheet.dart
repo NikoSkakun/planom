@@ -79,8 +79,11 @@ class _SectionNameSheetState extends State<_SectionNameSheet> {
           Center(
             child: Text(
               widget.title ?? s.addSection,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
             ),
           ),
           const SizedBox(height: 16),

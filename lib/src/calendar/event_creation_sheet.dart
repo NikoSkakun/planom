@@ -289,6 +289,17 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
     saved?.requestFocus();
   }
 
+  Future<void> _pickRecurrenceEndDate() async {
+    final current = _recurrence;
+    if (current == null) return;
+    final saved = _activeFocus;
+    FocusManager.instance.primaryFocus?.unfocus();
+    final result = await showRecurrenceEndDateSheet(context, current);
+    if (!mounted) return;
+    if (result != null) setState(() => _recurrence = result.value);
+    saved?.requestFocus();
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -365,30 +376,68 @@ class _EventCreationSheetState extends State<EventCreationSheet> {
             const SizedBox(height: 8),
           ],
           // Repeat row — its own line so long date/duration labels never crowd
-          // it. Reuses the task recurrence picker + formatter.
-          GestureDetector(
-            onTap: _pickRecurrence,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  Icon(
-                    CupertinoIcons.repeat,
-                    size: 16,
-                    color: _recurrence != null ? AppColors.accent : secondary,
+          // it. Reuses the task recurrence picker + formatter. When a
+          // recurrence is set, an "Ends" chip lets the user bound the series.
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: _pickRecurrence,
+                  child: Row(
+                    children: [
+                      Icon(
+                        CupertinoIcons.repeat,
+                        size: 16,
+                        color: _recurrence != null
+                            ? AppColors.accent
+                            : secondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _recurrence != null
+                            ? formatRecurrence(context, _recurrence)
+                            : s.repeat,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _recurrence != null
+                              ? AppColors.accent
+                              : secondary,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _recurrence != null
-                        ? formatRecurrence(context, _recurrence)
-                        : s.repeat,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: _recurrence != null ? AppColors.accent : secondary,
+                ),
+                if (_recurrence != null) ...[
+                  const SizedBox(width: 14),
+                  GestureDetector(
+                    onTap: _pickRecurrenceEndDate,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.calendar_badge_minus,
+                          size: 16,
+                          color: _recurrence!.endDate != null
+                              ? AppColors.accent
+                              : secondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _recurrence!.endDate != null
+                              ? s.repeatUntilLabel
+                              : s.repeatForever,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: _recurrence!.endDate != null
+                                ? AppColors.accent
+                                : secondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
           ),
           Row(

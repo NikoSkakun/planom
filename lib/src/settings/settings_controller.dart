@@ -4,10 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../database/database_service.dart';
 import '../localization/strings.dart';
+import '../notifications/notification_service.dart';
 import '../tasks/task_field_prefs.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 import '../theme/appearance_prefs.dart';
+import '../utils/day_boundary.dart';
 import 'settings_service.dart';
 import 'smart_list_prefs.dart';
 import 'tab_bar_config.dart';
@@ -251,6 +253,24 @@ class SettingsController with ChangeNotifier {
   String? _defaultNoteFolderIcon;
   String? get defaultNoteFolderIcon => _defaultNoteFolderIcon;
 
+  // Where new tasks created from the global + button land when Inbox is
+  // hidden (SmartListVisibility.hidden) and no list/folder context is set.
+  // null = "first available list" — resolved at task-creation time, so the UI
+  // doesn't have to keep this in sync with list deletions.
+  String? _defaultTaskListId;
+  String? get defaultTaskListId => _defaultTaskListId;
+
+  // Hour-of-day (0–23) at which "today" rolls over. Default 0 = midnight.
+  // Users who routinely work past midnight can shift this so the badge /
+  // Today / Tomorrow smart lists keep showing yesterday's day until N AM.
+  int _dayBoundaryHour = 0;
+  int get dayBoundaryHour => _dayBoundaryHour;
+
+  // Path (under `<docs>/notifications/`) of a custom audio file to play with
+  // reminder notifications, or null = use system default.
+  String? _customNotificationSoundPath;
+  String? get customNotificationSoundPath => _customNotificationSoundPath;
+
   /// Bumped whenever the accent/completion color changes. Those colors live in
   /// AppColors statics read all over the tree, so instead of firing the main
   /// notifier (which rebuilds the whole CupertinoApp, including routing, locale
@@ -394,6 +414,13 @@ class SettingsController with ChangeNotifier {
         _defaultFolderIcon = value.isEmpty ? null : value;
       } else if (key == 'default_note_folder_icon') {
         _defaultNoteFolderIcon = value.isEmpty ? null : value;
+      } else if (key == 'default_task_list_id') {
+        _defaultTaskListId = value.isEmpty ? null : value;
+      } else if (key == 'day_boundary_hour') {
+        final v = int.tryParse(value);
+        if (v != null && v >= 0 && v <= 23) _dayBoundaryHour = v;
+      } else if (key == 'custom_notification_sound') {
+        _customNotificationSoundPath = value.isEmpty ? null : value;
       } else if (key == 'text_scale') {
         final v = double.tryParse(value);
         if (v != null && v >= 0.5 && v <= 2.5) _textScale = v;
@@ -419,6 +446,9 @@ class SettingsController with ChangeNotifier {
     AppDefaults.folderIcon = _defaultFolderIcon;
     AppDefaults.noteFolderIcon = _defaultNoteFolderIcon;
     AppScale.factor = _textScale;
+    DayBoundary.hour = _dayBoundaryHour;
+    NotificationService.instance.customSoundName =
+        _soundFileNameFromPath(_customNotificationSoundPath);
     S.useHabitNaming = _useHabitNaming;
     _applyAnimationSpeed(_animationSpeed);
 
@@ -640,6 +670,40 @@ class SettingsController with ChangeNotifier {
     await _db.setAppSetting('default_note_folder_icon', iconId ?? '');
   }
 
+  Future<void> updateDefaultTaskListId(String? listId) async {
+    if (listId == _defaultTaskListId) return;
+    _defaultTaskListId = listId;
+    notifyListeners();
+    await _db.setAppSetting('default_task_list_id', listId ?? '');
+  }
+
+  Future<void> updateDayBoundaryHour(int hour) async {
+    final clamped = hour.clamp(0, 23);
+    if (clamped == _dayBoundaryHour) return;
+    _dayBoundaryHour = clamped;
+    DayBoundary.hour = clamped;
+    notifyListeners();
+    await _db.setAppSetting('day_boundary_hour', clamped.toString());
+  }
+
+  Future<void> updateCustomNotificationSoundPath(String? path) async {
+    if (path == _customNotificationSoundPath) return;
+    _customNotificationSoundPath = path;
+    NotificationService.instance.customSoundName =
+        _soundFileNameFromPath(path);
+    notifyListeners();
+    await _db.setAppSetting('custom_notification_sound', path ?? '');
+  }
+
+  /// iOS needs just the filename (not the full path) — it resolves it against
+  /// the main bundle / `Library/Sounds`. We stash the file under
+  /// `<docs>/notifications/` but tell the plugin only the basename.
+  static String? _soundFileNameFromPath(String? path) {
+    if (path == null || path.isEmpty) return null;
+    final slash = path.lastIndexOf('/');
+    return slash == -1 ? path : path.substring(slash + 1);
+  }
+
   Future<void> updateTextScale(double scale) async {
     final clamped = scale.clamp(0.5, 2.5).toDouble();
     if (clamped == _textScale) return;
@@ -822,6 +886,9 @@ class SettingsController with ChangeNotifier {
   Future<void> updateSmartListVisibility(
       String key, SmartListVisibility value) async {
     switch (key) {
+      case 'inbox':
+        _smartListPrefs.inbox = value;
+        break;
       case 'today':
         _smartListPrefs.today = value;
         break;

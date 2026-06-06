@@ -296,6 +296,9 @@ class _FolderViewState extends State<FolderView>
       context: context,
       title: s.viewLabel,
       current: _viewMode,
+      // Opened from the nav-bar ⋯ menu → anchor in the same top-right spot
+      // so the picker visually replaces the parent dropdown.
+      anchor: SelectionMenuAnchor.topRight,
       options: [
         SelectionMenuOption(
           value: _FolderViewMode.list,
@@ -366,6 +369,8 @@ class _FolderViewState extends State<FolderView>
       context: context,
       title: s.defaultList,
       current: _currentFolder.defaultListId ?? noneSentinel,
+      // Opened from the nav-bar ⋯ menu → anchor top-right.
+      anchor: SelectionMenuAnchor.topRight,
       options: [
         SelectionMenuOption(value: noneSentinel, label: s.defaultListNone),
         for (final l in lists)

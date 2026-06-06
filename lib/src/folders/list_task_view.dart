@@ -270,6 +270,9 @@ class _ListTaskViewState extends State<ListTaskView>
       context: context,
       title: s.viewLabel,
       current: _viewMode,
+      // Opened from the nav-bar ⋯ menu → anchor top-right so the picker
+      // appears in the same place as the parent dropdown.
+      anchor: SelectionMenuAnchor.topRight,
       options: [
         SelectionMenuOption(
           value: _ListViewMode.list,

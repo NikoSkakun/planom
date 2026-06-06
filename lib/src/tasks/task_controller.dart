@@ -7,6 +7,7 @@ import '../models/tag.dart';
 import '../models/task.dart';
 import '../notifications/notification_service.dart';
 import '../settings/settings_controller.dart';
+import '../utils/day_boundary.dart';
 import '../utils/platform_capabilities.dart';
 
 enum TaskSortOrder { defaultOrder, creationDate, name, priority, dateTime }
@@ -97,8 +98,9 @@ class TaskController with ChangeNotifier {
       _topLevel.where((t) => t.listId == null && !t.isCompleted).length;
 
   List<Task> get todayTasks {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    // Respects the user-configurable day boundary so working past midnight
+    // doesn't roll "today" over until the configured hour.
+    final today = DayBoundary.today();
     return _completedLast(_applySort(_topLevel.where((t) {
       if (t.dueDate == null) return false;
       final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);
@@ -112,9 +114,7 @@ class TaskController with ChangeNotifier {
       todayTasks.where((t) => !t.isCompleted).length;
 
   List<Task> get tomorrowTasks {
-    final now = DateTime.now();
-    final tomorrow =
-        DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    final tomorrow = DayBoundary.tomorrow();
     return _completedLast(_applySort(_topLevel.where((t) {
       if (t.dueDate == null) return false;
       final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);
@@ -126,8 +126,7 @@ class TaskController with ChangeNotifier {
       tomorrowTasks.where((t) => !t.isCompleted).length;
 
   List<Task> get upcomingTasks {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = DayBoundary.today();
     final filtered = _topLevel.where((t) {
       if (t.dueDate == null) return false;
       final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);

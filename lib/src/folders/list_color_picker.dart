@@ -215,7 +215,13 @@ class _PickerSheetState extends State<_PickerSheet> {
           const SizedBox(height: 16),
           Text(
             S.of(context).listColor,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              // showModalBottomSheet defaults text to Material's black —
+              // pin to CupertinoColors.label so the title reads in dark mode.
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
           ),
           const SizedBox(height: 16),
           ListColorSwatches(

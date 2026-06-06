@@ -22,6 +22,7 @@ import 'security/security_service.dart';
 import 'settings/backup_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
+import 'settings/smart_list_prefs.dart';
 import 'settings/tab_bar_config.dart';
 import 'utils/shortcut_router.dart';
 import 'tasks/task_controller.dart';
@@ -504,11 +505,23 @@ class _HomeShellState extends State<HomeShell> {
       return;
     }
 
+    // No valid destination for a new task → the + button is grayed and
+    // shouldn't fire. Guard here as well as at render time so a stray tap
+    // (or programmatic invocation) doesn't open an empty creation sheet.
+    if (_lastTabIndex == 0 && !_tasksPlusEnabled()) return;
+
     // Resolve the target list: the active list if any, otherwise the active
-    // folder's default (or first) list when we're browsing inside a folder.
+    // folder's default (or first) list when we're browsing inside a folder,
+    // otherwise — when Inbox is hidden — the user's configured "default
+    // list" or the first available list.
     var initialListId = _activeListId.value;
     if (initialListId == null && _activeFolderId.value != null) {
       initialListId = _resolveFolderDefaultList(_activeFolderId.value!);
+    }
+    if (initialListId == null &&
+        widget.settingsController.smartListPrefs.inbox ==
+            SmartListVisibility.hidden) {
+      initialListId = _resolveInboxFallbackList();
     }
 
     // When the target is a Birthdays list, open the contact creator instead
@@ -533,6 +546,38 @@ class _HomeShellState extends State<HomeShell> {
       initialDueDate: _activeDueDate.value,
       settingsController: widget.settingsController,
     );
+  }
+
+  /// Resolves where a new task lands when Inbox is hidden: the user's chosen
+  /// default list (if it still exists), otherwise the first list in the
+  /// space, otherwise null (which falls through to Inbox — but the +
+  /// button is grayed in that case so we shouldn't get here).
+  String? _resolveInboxFallbackList() {
+    final preferred = widget.settingsController.defaultTaskListId;
+    if (preferred != null &&
+        widget.folderController.listById(preferred) != null) {
+      return preferred;
+    }
+    final lists = widget.folderController.lists;
+    return lists.isEmpty ? null : lists.first.id;
+  }
+
+  /// Whether the Tasks-tab + button has any task creation target. False when
+  /// Inbox is hidden AND there's no default list, no smart-list with a
+  /// natural date, and no user lists in the active space — i.e. nowhere a
+  /// new task could go.
+  bool _tasksPlusEnabled() {
+    final prefs = widget.settingsController.smartListPrefs;
+    // Inbox visible → tapping + always falls back to Inbox.
+    if (prefs.inbox != SmartListVisibility.hidden) return true;
+    // A folder context can resolve to a list.
+    if (_activeFolderId.value != null &&
+        widget.folderController.listsIn(_activeFolderId.value!).isNotEmpty) {
+      return true;
+    }
+    // Default list set and still exists.
+    if (_resolveInboxFallbackList() != null) return true;
+    return false;
   }
 
   Future<void> _showCalendarItemPicker(DateTime date) async {
@@ -1194,19 +1239,32 @@ class _HomeShellState extends State<HomeShell> {
                 return ValueListenableBuilder<double>(
                   valueListenable: _plusButtonInset,
                   builder: (context, lift, _) => ListenableBuilder(
-                    // While the Undo banner is on screen, lift the + button up
-                    // so it rides just above the banner instead of being
-                    // covered by it. The lift animates in/out with the banner.
-                    listenable: _undoController,
+                    // Listen to FolderController too so deleting the last list
+                    // (which can swing the + button enabled → disabled) repaints
+                    // immediately instead of waiting for the next rebuild.
+                    listenable: Listenable.merge([
+                      _undoController,
+                      widget.settingsController,
+                      widget.folderController,
+                      _activeListId,
+                      _activeFolderId,
+                    ]),
                     builder: (context, _) {
                       final undoLift =
                           _undoController.pending != null ? 64.0 : 0.0;
+                      // Only the Tasks tab can render the disabled state — the
+                      // other tabs always have somewhere to create into.
+                      final plusEnabled =
+                          _lastTabIndex != 0 || _tasksPlusEnabled();
                       return AnimatedPositioned(
                         duration: const Duration(milliseconds: 180),
                         curve: Curves.easeOut,
                         right: 20,
                         bottom: baseBottom + lift + undoLift,
-                        child: _PlusButton(onPressed: _onPlusPressed),
+                        child: _PlusButton(
+                          onPressed: _onPlusPressed,
+                          enabled: plusEnabled,
+                        ),
                       );
                     },
                   ),
@@ -1530,9 +1588,13 @@ class _DepthObserver extends NavigatorObserver {
 }
 
 class _PlusButton extends StatelessWidget {
-  const _PlusButton({required this.onPressed});
+  const _PlusButton({required this.onPressed, this.enabled = true});
 
   final VoidCallback onPressed;
+  // When false, render the button greyed and don't fire onPressed. Dragging
+  // is also disabled — there's nothing to drop onto if there's no list to
+  // create a task in.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -1540,15 +1602,19 @@ class _PlusButton extends StatelessWidget {
       width: 52,
       height: 52,
       decoration: BoxDecoration(
-        color: AppColors.accent,
+        color: enabled
+            ? AppColors.accent
+            : CupertinoColors.systemGrey3.resolveFrom(context),
         shape: BoxShape.circle,
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
+        boxShadow: enabled
+            ? const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: const Icon(
         CupertinoIcons.plus,
@@ -1556,6 +1622,18 @@ class _PlusButton extends StatelessWidget {
         size: 24,
       ),
     );
+    if (!enabled) {
+      return Semantics(
+        label: S.of(context).add,
+        button: true,
+        enabled: false,
+        child: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: null,
+          child: visual,
+        ),
+      );
+    }
     return Semantics(
       label: S.of(context).add,
       button: true,

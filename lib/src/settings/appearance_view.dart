@@ -264,12 +264,47 @@ class AppearanceView extends StatelessWidget {
                   trailingLabel: _firstDayLabel(s, controller.firstDayOfWeek),
                   onTap: () => _pickFirstDay(context, controller),
                 ),
+                const SizedBox(height: 1),
+                SettingsNavRow(
+                  label: s.dayBoundary,
+                  trailingLabel: _hourLabel(controller.dayBoundaryHour),
+                  onTap: () => _pickDayBoundary(context, controller),
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    s.dayBoundaryHint,
+                    style: TextStyle(fontSize: 13, color: labelColor),
+                  ),
+                ),
               ],
             );
           },
         ),
       ),
     );
+  }
+
+  static String _hourLabel(int h) {
+    final hour = h % 24;
+    final twoDigit = hour.toString().padLeft(2, '0');
+    return '$twoDigit:00';
+  }
+
+  Future<void> _pickDayBoundary(
+      BuildContext context, SettingsController controller) async {
+    final s = S.of(context);
+    final selected = await showSelectionMenu<int>(
+      context: context,
+      title: s.dayBoundary,
+      current: controller.dayBoundaryHour,
+      options: [
+        for (var h = 0; h < 24; h++)
+          SelectionMenuOption(value: h, label: _hourLabel(h)),
+      ],
+    );
+    if (selected != null) await controller.updateDayBoundaryHour(selected);
   }
 
   static String _bgModeLabel(S s, BackgroundMode m) => switch (m) {

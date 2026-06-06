@@ -10,6 +10,7 @@ class Recurrence {
     required this.type,
     this.interval = 1,
     this.weekdays = const [],
+    this.endDate,
   });
 
   final RecurrenceType type;
@@ -20,11 +21,16 @@ class Recurrence {
   /// Only meaningful for [RecurrenceType.weekly]. 0=Mon … 6=Sun.
   final List<int> weekdays;
 
-  /// Serialised as JSON in the `tasks.recurrence` column. `null` = no repeat.
+  /// Optional last day the series fires on (inclusive). `null` = forever.
+  final DateTime? endDate;
+
+  /// Serialised as JSON in the `tasks.recurrence` / `events.recurrence` column.
+  /// `null` (the field, not the string) = no repeat.
   String toJson() => jsonEncode({
         'type': type.name,
         'interval': interval,
         if (weekdays.isNotEmpty) 'weekdays': weekdays,
+        if (endDate != null) 'endDate': _encodeDate(endDate!),
       });
 
   static Recurrence? parse(String? s) {
@@ -40,11 +46,43 @@ class Recurrence {
         interval: (m['interval'] as int?) ?? 1,
         weekdays:
             (m['weekdays'] as List?)?.map((e) => e as int).toList() ?? const [],
+        endDate: _decodeDate(m['endDate']),
       );
     } catch (_) {
       return null;
     }
   }
+
+  static String _encodeDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  static DateTime? _decodeDate(dynamic value) {
+    if (value is! String || value.isEmpty) return null;
+    try {
+      final parts = value.split('-');
+      if (parts.length != 3) return null;
+      final y = int.parse(parts[0]);
+      final m = int.parse(parts[1]);
+      final d = int.parse(parts[2]);
+      return DateTime(y, m, d);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Recurrence copyWith({
+    RecurrenceType? type,
+    int? interval,
+    List<int>? weekdays,
+    DateTime? endDate,
+    bool clearEndDate = false,
+  }) =>
+      Recurrence(
+        type: type ?? this.type,
+        interval: interval ?? this.interval,
+        weekdays: weekdays ?? this.weekdays,
+        endDate: clearEndDate ? null : (endDate ?? this.endDate),
+      );
 
   /// UTC-midnight day index for [d], so day arithmetic is DST-safe (no 23h/25h
   /// drift from local-time `difference`).
@@ -58,6 +96,8 @@ class Recurrence {
     final sDay = _epochDay(start);
     final dDay = _epochDay(date);
     if (dDay < sDay) return false;
+    // Series terminates at endDate (inclusive) when set.
+    if (endDate != null && dDay > _epochDay(endDate!)) return false;
     final s = DateTime(start.year, start.month, start.day);
     final d = DateTime(date.year, date.month, date.day);
     switch (type) {

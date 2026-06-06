@@ -1,4 +1,9 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../localization/strings.dart';
 import '../notifications/notification_service.dart';
@@ -122,6 +127,55 @@ class _NotificationsSettingsViewState
               ),
             ),
 
+            // ── Reminder sound ─────────────────────────────────────────
+            if (PlatformCapabilities.supportsLocalNotifications &&
+                widget.settingsController != null) ...[
+              const SizedBox(height: 24),
+              Text(
+                s.sectionReminderSound,
+                style: TextStyle(
+                    fontSize: 13, color: labelColor, letterSpacing: -0.08),
+              ),
+              const SizedBox(height: 8),
+              ListenableBuilder(
+                listenable: widget.settingsController!,
+                builder: (ctx, _) {
+                  final sc = widget.settingsController!;
+                  final hasCustom =
+                      (sc.customNotificationSoundPath ?? '').isNotEmpty;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SettingsNavRow(
+                        label: s.reminderSound,
+                        trailingLabel: hasCustom
+                            ? _basename(sc.customNotificationSoundPath!)
+                            : s.reminderSoundDefault,
+                        onTap: () => _pickReminderSound(ctx, sc),
+                      ),
+                      if (hasCustom) ...[
+                        const SizedBox(height: 1),
+                        SettingsNavRow(
+                          label: s.reminderSoundClear,
+                          trailingLabel: '',
+                          onTap: () =>
+                              sc.updateCustomNotificationSoundPath(null),
+                        ),
+                      ],
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  s.reminderSoundHint,
+                  style: TextStyle(fontSize: 13, color: labelColor),
+                ),
+              ),
+            ],
+
             // ── App icon badge ─────────────────────────────────────────
             if (PlatformCapabilities.supportsAppBadge &&
                 widget.settingsController != null) ...[
@@ -225,4 +279,79 @@ class _NotificationsSettingsViewState
     );
     if (selected != null) await sc.updateBadgeMode(selected);
   }
+
+  Future<void> _pickReminderSound(
+      BuildContext context, SettingsController sc) async {
+    final s = S.of(context);
+    final choice = await showSelectionMenu<String>(
+      context: context,
+      title: s.reminderSound,
+      options: [
+        SelectionMenuOption(
+          value: 'default',
+          label: s.reminderSoundDefault,
+        ),
+        SelectionMenuOption(
+          value: 'pick',
+          label: s.reminderSoundPick,
+          icon: CupertinoIcons.music_note,
+        ),
+      ],
+    );
+    if (choice == 'default') {
+      await sc.updateCustomNotificationSoundPath(null);
+    } else if (choice == 'pick') {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        // iOS notifications only play caf/aiff/wav and require ≤ 30 s.
+        // Accept a broader set on the picker so the user sees their files,
+        // then copy as-is and let iOS reject anything unplayable.
+        allowedExtensions: const ['caf', 'wav', 'aiff', 'mp3', 'm4a'],
+        allowMultiple: false,
+        withData: false,
+      );
+      final source = picked?.files.single.path;
+      if (source == null) return;
+      try {
+        final relative = await _copyToNotifications(source);
+        await sc.updateCustomNotificationSoundPath(relative);
+      } catch (_) {
+        if (mounted) {
+          showCupertinoDialog<void>(
+            context: context,
+            builder: (ctx) => CupertinoAlertDialog(
+              title: Text(s.reminderSoundFailedTitle),
+              content: Text(s.reminderSoundFailedBody),
+              actions: [
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(s.done),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  /// Copies [sourcePath] under `<docs>/notifications/<basename>` and returns
+  /// the relative path. Stable name so a re-pick of the same file overwrites
+  /// rather than piles up copies; basename is reused by [NotificationService]
+  /// (it only needs the filename, not the full path).
+  Future<String> _copyToNotifications(String sourcePath) async {
+    final docs = await getApplicationDocumentsDirectory();
+    final dir = Directory('${docs.path}/notifications');
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    final name = p.basename(sourcePath);
+    final dest = '${dir.path}/$name';
+    await File(sourcePath).copy(dest);
+    return 'notifications/$name';
+  }
+}
+
+String _basename(String path) {
+  final slash = path.lastIndexOf('/');
+  return slash == -1 ? path : path.substring(slash + 1);
 }

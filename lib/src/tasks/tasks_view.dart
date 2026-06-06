@@ -27,6 +27,7 @@ import '../utils/plus_drag_payload.dart';
 import '../utils/reorder_drag.dart';
 import '../utils/selection_checkbox.dart';
 import '../utils/selection_controller.dart';
+import '../utils/selection_menu.dart';
 import '../utils/selection_toolbar.dart';
 import '../utils/undo_controller.dart';
 import 'all_tasks_view.dart';
@@ -184,6 +185,13 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
 
   void _showDropdown(BuildContext context) {
     final settingsHidden = !widget.settingsController.isTabVisible(4);
+    // Mirror the folder ⋯ menu's "Default List" affordance — but only when
+    // Inbox is hidden (otherwise new tasks have Inbox as their natural home)
+    // and there's at least one list to pick.
+    final inboxHidden = widget.settingsController.smartListPrefs.inbox ==
+        SmartListVisibility.hidden;
+    final hasLists = widget.folderController.lists.isNotEmpty;
+    final showDefaultList = inboxHidden && hasLists;
     showDropdown(context, (dismiss) {
       return _TasksOptionsDropdown(
         onDismiss: dismiss,
@@ -213,8 +221,37 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
             initialType: CreateSheetInitial.folder,
           );
         },
+        onDefaultList: showDefaultList
+            ? () {
+                dismiss();
+                _pickDefaultList(context);
+              }
+            : null,
       );
     });
+  }
+
+  Future<void> _pickDefaultList(BuildContext context) async {
+    final s = S.of(context);
+    final lists = widget.folderController.lists;
+    if (lists.isEmpty) return;
+    const noneSentinel = '__none__';
+    final picked = await showSelectionMenu<String>(
+      context: context,
+      title: s.defaultList,
+      current: widget.settingsController.defaultTaskListId ?? noneSentinel,
+      // Anchor in the same top-right spot the parent ⋯ menu sat in.
+      anchor: SelectionMenuAnchor.topRight,
+      options: [
+        SelectionMenuOption(value: noneSentinel, label: s.defaultListNone),
+        for (final l in lists)
+          SelectionMenuOption(value: l.id, label: l.name),
+      ],
+    );
+    if (picked == null) return;
+    await widget.settingsController.updateDefaultTaskListId(
+      picked == noneSentinel ? null : picked,
+    );
   }
 
   Future<bool> _confirmDelete(BuildContext context, String name,
@@ -505,6 +542,9 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
 
                 final prefs =
                     widget.settingsController.smartListPrefs;
+                final inboxCount =
+                    widget.controller.inboxUncompletedCount;
+                final showInbox = _isVisible(prefs.inbox, inboxCount > 0);
                 final showToday =
                     _isVisible(prefs.today, todayCount > 0);
                 final showTomorrow =
@@ -518,6 +558,14 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                 final showTrash =
                     _isVisible(prefs.trash, hasTrashContent);
                 final showBottomSection = showCompleted || showTrash;
+                // Drop the divider between smart lists and folders/lists when
+                // no smart-list row is rendered — otherwise the divider sits
+                // alone at the top of the screen for no reason.
+                final showTopDivider = showInbox ||
+                    showToday ||
+                    showTomorrow ||
+                    showUpcoming ||
+                    showAllTasks;
 
                 return CustomScrollView(
                   slivers: [
@@ -525,24 +573,25 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                       child: Column(
                         children: [
                           const SizedBox(height: 8),
-                          _ListItem(
-                            iconAsset: 'assets/icons/inbox.png',
-                            label: s.inbox,
-                            count: widget
-                                .controller.inboxUncompletedCount,
-                            onAcceptPlus: () => PlusDragScope.of(context)
-                                ?.onDropOnSmartList
-                                ?.call(PlusDropSmartList.inbox),
-                            onTap: () => Navigator.of(context).push(
-                              FastRoute<void>(
-                                builder: (_) => InboxView(
-                                  controller: widget.controller,
-                                  folderController:
-                                      widget.folderController,
+                          if (showInbox)
+                            _ListItem(
+                              iconAsset: 'assets/icons/inbox.png',
+                              label: s.inbox,
+                              count: widget
+                                  .controller.inboxUncompletedCount,
+                              onAcceptPlus: () => PlusDragScope.of(context)
+                                  ?.onDropOnSmartList
+                                  ?.call(PlusDropSmartList.inbox),
+                              onTap: () => Navigator.of(context).push(
+                                FastRoute<void>(
+                                  builder: (_) => InboxView(
+                                    controller: widget.controller,
+                                    folderController:
+                                        widget.folderController,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
                           if (showToday)
                             _ListItem(
                               iconAsset: 'assets/icons/today.png',
@@ -640,16 +689,20 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                                 ),
                               ),
                             ),
-                          // Separator between smart lists and user folders/lists
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            child: Container(
-                              height: 0.5,
-                              color: CupertinoColors.separator
-                                  .resolveFrom(context),
+                          // Separator between smart lists and user folders/lists.
+                          // Hide when no smart list row is rendered above — an
+                          // empty top divider was the previous (confusing)
+                          // behaviour.
+                          if (showTopDivider)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              child: Container(
+                                height: 0.5,
+                                color: CupertinoColors.separator
+                                    .resolveFrom(context),
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -1249,6 +1302,7 @@ class _TasksOptionsDropdown extends StatelessWidget {
     required this.onSelect,
     this.showSettings = false,
     this.onSettings,
+    this.onDefaultList,
   });
 
   final VoidCallback onDismiss;
@@ -1257,6 +1311,9 @@ class _TasksOptionsDropdown extends StatelessWidget {
   final VoidCallback onSelect;
   final bool showSettings;
   final VoidCallback? onSettings;
+  // When non-null, render a "Default list" row that opens a list picker —
+  // shown only when Inbox is hidden so new tasks need a destination.
+  final VoidCallback? onDefaultList;
 
   @override
   Widget build(BuildContext context) {
@@ -1284,6 +1341,14 @@ class _TasksOptionsDropdown extends StatelessWidget {
         icon: CupertinoIcons.folder_badge_plus,
         onTap: onAddFolder,
       ),
+      if (onDefaultList != null) ...[
+        separator,
+        DropdownRow(
+          label: s.defaultList,
+          icon: CupertinoIcons.list_bullet_below_rectangle,
+          onTap: onDefaultList!,
+        ),
+      ],
     ];
     if (showSettings) {
       items.add(separator);

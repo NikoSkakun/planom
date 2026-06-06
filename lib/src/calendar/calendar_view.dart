@@ -928,22 +928,36 @@ class _DayCell extends StatelessWidget {
     final deviceEvents =
         deviceCalendarController?.eventsForDate(date!) ?? const <DeviceEvent>[];
 
-    // Order: events first (local Planom, then Google, then Apple Calendar),
-    // then birthdays, then incomplete tasks, then completed tasks. Remote and
-    // device events render with their calendar color so different calendars
-    // stay visually distinct.
+    // Order mirrors the day-schedule sheet: active items first (upcoming
+    // events, birthdays, incomplete tasks), then past/finished items sunk to
+    // the bottom (past events, completed tasks). Within each group: events
+    // (local Planom → Google → Apple), birthdays, then tasks. Remote/device
+    // events render with their calendar color so different calendars stay
+    // visually distinct.
     final chips = <_ChipData>[
-      for (final e in events) _ChipData.event(e),
-      for (final e in remoteEvents) _ChipData.remoteEvent(e),
-      for (final e in deviceEvents) _ChipData.deviceEvent(e),
+      for (final e in events.where((e) => !_eventIsPast(e)))
+        _ChipData.event(e),
+      for (final e in remoteEvents.where((e) => !_remoteEventIsPast(e)))
+        _ChipData.remoteEvent(e),
+      for (final e in deviceEvents.where((e) => !_deviceEventIsPast(e)))
+        _ChipData.deviceEvent(e),
       for (final b in birthdays) _ChipData.birthday(b),
       for (final t in uncompleted) _ChipData.task(t, false),
+      // Past/finished items sink to the bottom.
+      for (final e in events.where(_eventIsPast)) _ChipData.event(e),
+      for (final e in remoteEvents.where(_remoteEventIsPast))
+        _ChipData.remoteEvent(e),
+      for (final e in deviceEvents.where(_deviceEventIsPast))
+        _ChipData.deviceEvent(e),
       for (final t in completed) _ChipData.task(t, true),
     ];
 
-    // All cells are a fixed height, so a day holds at most 4 content rows:
-    // 3 chips plus a "+N" overflow indicator once there are more than 3 items.
-    final visibleCount = chips.length <= 3 ? chips.length : 3;
+    // All cells are a fixed height of 4 content rows: when there are 4 or fewer
+    // chips they all render; only when there are 5+ do we drop to 3 chips +
+    // "+N" overflow, so the indicator only appears for genuinely truncated
+    // days. (Previously even a single hidden item showed "+1" instead of just
+    // rendering it.)
+    final visibleCount = chips.length <= 4 ? chips.length : 3;
     final overflowCount = chips.length - visibleCount;
 
     return DragTarget<PlusDragPayload>(
