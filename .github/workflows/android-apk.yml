@@ -17,7 +17,11 @@ jobs:
     timeout-minutes: 45
 
     env:
-      FLUTTER_VERSION: "3.32.0"   # keep in sync with the other workflows
+      # Pinned to the SDK the app is developed against (android/local.properties).
+      # iOS uses 3.32.0 for Xcode 26; on Android 3.32's Gradle plugin regressed
+      # NDK-version reconciliation and crashes on plugins (file_picker) that
+      # declare no ndkVersion. 3.24.5 has the null guard and builds cleanly.
+      FLUTTER_VERSION: "3.24.5"
 
     steps:
       # ── Source ───────────────────────────────────────────────────────────────
@@ -59,10 +63,8 @@ jobs:
       # workflow instead.
       # --build-number stamps versionCode with minutes-since-epoch: monotonic and
       # ~29.6M today, well under Flutter's 2,100,000,000 versionCode cap.
-      # --android-skip-build-dependency-validation: the project pins AGP 7.3.0 /
-      # Kotlin 1.7.10, and Flutter 3.32's dependency-version check crashes on a
-      # plugin (file_picker) that declares no AGP version. Skipping the check
-      # avoids that until AGP/Gradle/Kotlin are upgraded.
+      # --android-skip-build-dependency-validation: belt-and-suspenders against the
+      # AGP/Kotlin version checks (project pins AGP 7.3.0 / Kotlin 1.7.10).
       - name: Build release APK
         run: >
           flutter build apk --release
