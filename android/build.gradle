@@ -21,15 +21,13 @@ rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
-subprojects {
-    project.evaluationDependsOn(':app')
-}
 
 // Some plugins (e.g. the discontinued flutter_app_badger 1.5.0) pin an old
 // compileSdkVersion (29) that can't resolve AndroidX resources like
 // android:attr/lStar (API 31+), failing resource linking. Force every Android
 // subproject to compile against a modern SDK; higher compileSdk is backward
-// compatible.
+// compatible. Registered before evaluationDependsOn below so the afterEvaluate
+// hook is attached before ':app' is force-evaluated.
 subprojects {
     afterEvaluate { project ->
         if (project.extensions.findByName("android") != null) {
@@ -38,6 +36,9 @@ subprojects {
             }
         }
     }
+}
+subprojects {
+    project.evaluationDependsOn(':app')
 }
 
 tasks.register("clean", Delete) {
