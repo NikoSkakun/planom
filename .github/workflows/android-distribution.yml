@@ -66,15 +66,15 @@ jobs:
         run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" | base64 --decode > firebase-service-account.json
 
       # ── Build ─────────────────────────────────────────────────────────────────
-      # --build-number stamps versionCode. Use %y (2-digit year) so the value
-      # stays 10 digits and fits in a signed 32-bit int (versionCode max is
-      # 2,147,483,647) — a 12-digit %Y... timestamp would overflow.
+      # --build-number stamps versionCode with minutes-since-epoch: monotonically
+      # increasing and ~29.6M today, well under Flutter's 2,100,000,000 cap (a
+      # yymmddHHMM timestamp would overflow it).
       # --split-debug-info strips Dart symbols out of the APK; retained as an
       # artifact for later `flutter symbolize`.
       - name: Build release APK
         run: >
           flutter build apk --release
-          --build-number=$(date +%y%m%d%H%M)
+          --build-number=$(($(date +%s) / 60))
           --split-debug-info=build/debug-symbols
 
       # ── Ruby / Fastlane ───────────────────────────────────────────────────────

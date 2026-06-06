@@ -229,6 +229,8 @@ FIREBASE_TESTER_GROUPS
 → Confirm the group alias in `FIREBASE_TESTER_GROUPS` matches a group in
    App Distribution and that testers were added to it.
 
-**`versionCode` rejected / negative**
-→ The build number must stay ≤ 2,147,483,647 (signed 32-bit int). The workflow uses
-   `date +%y%m%d%H%M` (10 digits) to stay within range; don't switch to `%Y`.
+**`buildNumber: … is greater than the maximum allowed value of 2100000000`**
+→ Flutter caps `versionCode` at 2,100,000,000. The workflows stamp it with
+   minutes-since-epoch (`$(($(date +%s) / 60))` ≈ 29.6M today), which is monotonic
+   and stays well under the cap. Don't switch to a `yymmddHHMM`-style timestamp — it
+   overflows.

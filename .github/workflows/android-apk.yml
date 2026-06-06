@@ -57,10 +57,12 @@ jobs:
       # so this produces an installable APK with no secret setup. For a
       # release-signed APK delivered to testers, use the Android Distribution
       # workflow instead.
+      # --build-number stamps versionCode with minutes-since-epoch: monotonic and
+      # ~29.6M today, well under Flutter's 2,100,000,000 versionCode cap.
       - name: Build release APK
         run: >
           flutter build apk --release
-          --build-number=$(date +%y%m%d%H%M)
+          --build-number=$(($(date +%s) / 60))
           --split-debug-info=build/debug-symbols
 
       # ── Artifact ──────────────────────────────────────────────────────────────
