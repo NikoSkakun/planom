@@ -599,6 +599,12 @@ class S {
   String get chooseIcon => t('chooseIcon');
   String get opening => t('opening');
   String get chooseFromLibrary => t('chooseFromLibrary');
+  String get listIcon => t('listIcon');
+  String get folderIcon => t('folderIcon');
+  String get resetLabel => t('resetLabel');
+  String get iconTabEmoji => t('iconTabEmoji');
+  String get iconTabIcons => t('iconTabIcons');
+  String get iconTabUpload => t('iconTabUpload');
   String get createFolder => t('createFolder');
   String get createList => t('createList');
   String get folder => t('folder');
@@ -1183,6 +1189,8 @@ const Map<String, String> _en = {
   'selectColor': 'Select Color', 'otherDots': 'Other…',
   'chooseIcon': 'Choose Icon', 'opening': 'Opening…',
   'chooseFromLibrary': 'Choose from Library',
+  'listIcon': 'List icon', 'folderIcon': 'Folder icon', 'resetLabel': 'Reset',
+  'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Icons', 'iconTabUpload': 'Upload',
   'createFolder': 'Create Folder', 'createList': 'Create List',
   'folder': 'Folder', 'list': 'List',
   'newRoutine': 'New Routine', 'editRoutine': 'Edit Routine',
@@ -1400,6 +1408,8 @@ const Map<String, String> _uk = {
   'selectColor': 'Вибрати колір', 'otherDots': 'Інше…',
   'chooseIcon': 'Вибрати іконку', 'opening': 'Відкриття…',
   'chooseFromLibrary': 'Вибрати з бібліотеки',
+  'listIcon': 'Іконка списку', 'folderIcon': 'Іконка папки', 'resetLabel': 'Скинути',
+  'iconTabEmoji': 'Емодзі', 'iconTabIcons': 'Іконки', 'iconTabUpload': 'Завантажити',
   'createFolder': 'Створити папку', 'createList': 'Створити список',
   'folder': 'Папка', 'list': 'Список',
   'newRoutine': 'Нова звичка', 'editRoutine': 'Редагувати звичку',
@@ -1812,6 +1822,8 @@ const Map<String, String> _es = {
   'selectColor': 'Seleccionar color', 'otherDots': 'Otro…',
   'chooseIcon': 'Elegir icono', 'opening': 'Abriendo…',
   'chooseFromLibrary': 'Elegir de la biblioteca',
+  'listIcon': 'Icono de lista', 'folderIcon': 'Icono de carpeta', 'resetLabel': 'Restablecer',
+  'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Iconos', 'iconTabUpload': 'Subir',
   'createFolder': 'Crear carpeta', 'createList': 'Crear lista',
   'folder': 'Carpeta', 'list': 'Lista',
   'newRoutine': 'Nueva rutina', 'editRoutine': 'Editar rutina',
@@ -2224,6 +2236,8 @@ const Map<String, String> _fr = {
   'selectColor': 'Sélectionner', 'otherDots': 'Autre…',
   'chooseIcon': 'Choisir une icône', 'opening': 'Ouverture…',
   'chooseFromLibrary': 'Choisir depuis la bibliothèque',
+  'listIcon': 'Icône de liste', 'folderIcon': 'Icône de dossier', 'resetLabel': 'Réinitialiser',
+  'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Icônes', 'iconTabUpload': 'Importer',
   'createFolder': 'Créer un dossier', 'createList': 'Créer une liste',
   'folder': 'Dossier', 'list': 'Liste',
   'newRoutine': 'Nouvelle routine', 'editRoutine': 'Modifier la routine',
@@ -2636,6 +2650,8 @@ const Map<String, String> _de = {
   'selectColor': 'Farbe wählen', 'otherDots': 'Andere…',
   'chooseIcon': 'Symbol wählen', 'opening': 'Öffne…',
   'chooseFromLibrary': 'Aus Bibliothek wählen',
+  'listIcon': 'Listensymbol', 'folderIcon': 'Ordnersymbol', 'resetLabel': 'Zurücksetzen',
+  'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Symbole', 'iconTabUpload': 'Hochladen',
   'createFolder': 'Ordner erstellen', 'createList': 'Liste erstellen',
   'folder': 'Ordner', 'list': 'Liste',
   'newRoutine': 'Neue Routine', 'editRoutine': 'Routine bearbeiten',
@@ -3048,6 +3064,8 @@ const Map<String, String> _it = {
   'selectColor': 'Seleziona colore', 'otherDots': 'Altro…',
   'chooseIcon': 'Scegli icona', 'opening': 'Apertura…',
   'chooseFromLibrary': 'Scegli dalla libreria',
+  'listIcon': 'Icona elenco', 'folderIcon': 'Icona cartella', 'resetLabel': 'Reimposta',
+  'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Icone', 'iconTabUpload': 'Carica',
   'createFolder': 'Crea cartella', 'createList': 'Crea lista',
   'folder': 'Cartella', 'list': 'Lista',
   'newRoutine': 'Nuova abitudine', 'editRoutine': 'Modifica abitudine',
@@ -3460,6 +3478,8 @@ const Map<String, String> _pt = {
   'selectColor': 'Selecionar cor', 'otherDots': 'Outro…',
   'chooseIcon': 'Escolher ícone', 'opening': 'Abrindo…',
   'chooseFromLibrary': 'Escolher da biblioteca',
+  'listIcon': 'Ícone de lista', 'folderIcon': 'Ícone de pasta', 'resetLabel': 'Redefinir',
+  'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Ícones', 'iconTabUpload': 'Enviar',
   'createFolder': 'Criar pasta', 'createList': 'Criar lista',
   'folder': 'Pasta', 'list': 'Lista',
   'newRoutine': 'Nova rotina', 'editRoutine': 'Editar rotina',
@@ -3872,6 +3892,8 @@ const Map<String, String> _ru = {
   'selectColor': 'Выбрать цвет', 'otherDots': 'Другое…',
   'chooseIcon': 'Выбрать значок', 'opening': 'Открытие…',
   'chooseFromLibrary': 'Выбрать из библиотеки',
+  'listIcon': 'Значок списка', 'folderIcon': 'Значок папки', 'resetLabel': 'Сбросить',
+  'iconTabEmoji': 'Эмодзи', 'iconTabIcons': 'Значки', 'iconTabUpload': 'Загрузить',
   'createFolder': 'Создать папку', 'createList': 'Создать список',
   'folder': 'Папка', 'list': 'Список',
   'newRoutine': 'Новая привычка', 'editRoutine': 'Редактировать',
@@ -4283,6 +4305,8 @@ const Map<String, String> _zh = {
   'selectColor': '选择颜色', 'otherDots': '其他…',
   'chooseIcon': '选择图标', 'opening': '打开中…',
   'chooseFromLibrary': '从图库选择',
+  'listIcon': '列表图标', 'folderIcon': '文件夹图标', 'resetLabel': '重置',
+  'iconTabEmoji': '表情', 'iconTabIcons': '图标', 'iconTabUpload': '上传',
   'createFolder': '创建文件夹', 'createList': '创建列表',
   'folder': '文件夹', 'list': '列表',
   'newRoutine': '新习惯', 'editRoutine': '编辑习惯',
@@ -4694,6 +4718,8 @@ const Map<String, String> _ja = {
   'selectColor': '色を選択', 'otherDots': 'その他…',
   'chooseIcon': 'アイコンを選択', 'opening': '開いています…',
   'chooseFromLibrary': 'ライブラリから選択',
+  'listIcon': 'リストアイコン', 'folderIcon': 'フォルダアイコン', 'resetLabel': 'リセット',
+  'iconTabEmoji': '絵文字', 'iconTabIcons': 'アイコン', 'iconTabUpload': 'アップロード',
   'createFolder': 'フォルダを作成', 'createList': 'リストを作成',
   'folder': 'フォルダ', 'list': 'リスト',
   'newRoutine': '新しい習慣', 'editRoutine': '習慣を編集',
