@@ -25,6 +25,21 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
+// Some plugins (e.g. the discontinued flutter_app_badger 1.5.0) pin an old
+// compileSdkVersion (29) that can't resolve AndroidX resources like
+// android:attr/lStar (API 31+), failing resource linking. Force every Android
+// subproject to compile against a modern SDK; higher compileSdk is backward
+// compatible.
+subprojects {
+    afterEvaluate { project ->
+        if (project.extensions.findByName("android") != null) {
+            project.android {
+                compileSdkVersion 34
+            }
+        }
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
