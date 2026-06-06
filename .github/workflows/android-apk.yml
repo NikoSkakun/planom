@@ -59,11 +59,16 @@ jobs:
       # workflow instead.
       # --build-number stamps versionCode with minutes-since-epoch: monotonic and
       # ~29.6M today, well under Flutter's 2,100,000,000 versionCode cap.
+      # --android-skip-build-dependency-validation: the project pins AGP 7.3.0 /
+      # Kotlin 1.7.10, and Flutter 3.32's dependency-version check crashes on a
+      # plugin (file_picker) that declares no AGP version. Skipping the check
+      # avoids that until AGP/Gradle/Kotlin are upgraded.
       - name: Build release APK
         run: >
           flutter build apk --release
           --build-number=$(($(date +%s) / 60))
           --split-debug-info=build/debug-symbols
+          --android-skip-build-dependency-validation
 
       # ── Artifact ──────────────────────────────────────────────────────────────
       - name: Upload APK

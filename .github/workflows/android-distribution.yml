@@ -71,11 +71,15 @@ jobs:
       # yymmddHHMM timestamp would overflow it).
       # --split-debug-info strips Dart symbols out of the APK; retained as an
       # artifact for later `flutter symbolize`.
+      # --android-skip-build-dependency-validation: AGP 7.3.0 / Kotlin 1.7.10 are
+      # below what Flutter 3.32's dependency check wants, and that check crashes on
+      # a plugin (file_picker) declaring no AGP version. Skip until upgraded.
       - name: Build release APK
         run: >
           flutter build apk --release
           --build-number=$(($(date +%s) / 60))
           --split-debug-info=build/debug-symbols
+          --android-skip-build-dependency-validation
 
       # ── Ruby / Fastlane ───────────────────────────────────────────────────────
       - name: Set up Ruby
