@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash background shown while the process starts (dark mode): matches
+         the app's dark-theme scaffold background (0xFF1C1C1E) rather than black. -->
+    <color name="launch_background">#FF1C1C1E</color>
+</resources>
