@@ -605,6 +605,16 @@ class S {
   String get iconTabEmoji => t('iconTabEmoji');
   String get iconTabIcons => t('iconTabIcons');
   String get iconTabUpload => t('iconTabUpload');
+  String get uploadAnImage => t('uploadAnImage');
+  String get uploadImageHint => t('uploadImageHint');
+  String get photoLibrary => t('photoLibrary');
+  String get takePhoto => t('takePhoto');
+  String get chooseFile => t('chooseFile');
+  String get fromUrl => t('fromUrl');
+  String get imageUrl => t('imageUrl');
+  String get download => t('download');
+  String get downloadFailed => t('downloadFailed');
+  String get noResults => t('noResults');
   String get createFolder => t('createFolder');
   String get createList => t('createList');
   String get folder => t('folder');
@@ -1191,6 +1201,10 @@ const Map<String, String> _en = {
   'chooseFromLibrary': 'Choose from Library',
   'listIcon': 'List icon', 'folderIcon': 'Folder icon', 'resetLabel': 'Reset',
   'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Icons', 'iconTabUpload': 'Upload',
+  'uploadAnImage': 'Upload an image', 'uploadImageHint': 'Choose a photo, take one, pick a file, or paste an image URL.',
+  'photoLibrary': 'Photo Library', 'takePhoto': 'Take Photo', 'chooseFile': 'Choose File',
+  'fromUrl': 'From URL', 'imageUrl': 'Image URL', 'download': 'Download',
+  'downloadFailed': 'Download Failed', 'noResults': 'No results',
   'createFolder': 'Create Folder', 'createList': 'Create List',
   'folder': 'Folder', 'list': 'List',
   'newRoutine': 'New Routine', 'editRoutine': 'Edit Routine',
@@ -1410,6 +1424,10 @@ const Map<String, String> _uk = {
   'chooseFromLibrary': 'Вибрати з бібліотеки',
   'listIcon': 'Іконка списку', 'folderIcon': 'Іконка папки', 'resetLabel': 'Скинути',
   'iconTabEmoji': 'Емодзі', 'iconTabIcons': 'Іконки', 'iconTabUpload': 'Завантажити',
+  'uploadAnImage': 'Завантажити зображення', 'uploadImageHint': 'Виберіть фото, зробіть знімок, виберіть файл або вставте URL зображення.',
+  'photoLibrary': 'Фотогалерея', 'takePhoto': 'Зробити фото', 'chooseFile': 'Вибрати файл',
+  'fromUrl': 'З URL', 'imageUrl': 'URL зображення', 'download': 'Завантажити',
+  'downloadFailed': 'Не вдалося завантажити', 'noResults': 'Нічого не знайдено',
   'createFolder': 'Створити папку', 'createList': 'Створити список',
   'folder': 'Папка', 'list': 'Список',
   'newRoutine': 'Нова звичка', 'editRoutine': 'Редагувати звичку',
@@ -1824,6 +1842,10 @@ const Map<String, String> _es = {
   'chooseFromLibrary': 'Elegir de la biblioteca',
   'listIcon': 'Icono de lista', 'folderIcon': 'Icono de carpeta', 'resetLabel': 'Restablecer',
   'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Iconos', 'iconTabUpload': 'Subir',
+  'uploadAnImage': 'Subir una imagen', 'uploadImageHint': 'Elige una foto, haz una, selecciona un archivo o pega una URL de imagen.',
+  'photoLibrary': 'Fototeca', 'takePhoto': 'Hacer foto', 'chooseFile': 'Elegir archivo',
+  'fromUrl': 'Desde URL', 'imageUrl': 'URL de imagen', 'download': 'Descargar',
+  'downloadFailed': 'Error de descarga', 'noResults': 'Sin resultados',
   'createFolder': 'Crear carpeta', 'createList': 'Crear lista',
   'folder': 'Carpeta', 'list': 'Lista',
   'newRoutine': 'Nueva rutina', 'editRoutine': 'Editar rutina',
@@ -2238,6 +2260,10 @@ const Map<String, String> _fr = {
   'chooseFromLibrary': 'Choisir depuis la bibliothèque',
   'listIcon': 'Icône de liste', 'folderIcon': 'Icône de dossier', 'resetLabel': 'Réinitialiser',
   'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Icônes', 'iconTabUpload': 'Importer',
+  'uploadAnImage': 'Importer une image', 'uploadImageHint': 'Choisissez une photo, prenez-en une, sélectionnez un fichier ou collez une URL d\'image.',
+  'photoLibrary': 'Photothèque', 'takePhoto': 'Prendre une photo', 'chooseFile': 'Choisir un fichier',
+  'fromUrl': 'Depuis une URL', 'imageUrl': 'URL de l\'image', 'download': 'Télécharger',
+  'downloadFailed': 'Échec du téléchargement', 'noResults': 'Aucun résultat',
   'createFolder': 'Créer un dossier', 'createList': 'Créer une liste',
   'folder': 'Dossier', 'list': 'Liste',
   'newRoutine': 'Nouvelle routine', 'editRoutine': 'Modifier la routine',
@@ -2652,6 +2678,10 @@ const Map<String, String> _de = {
   'chooseFromLibrary': 'Aus Bibliothek wählen',
   'listIcon': 'Listensymbol', 'folderIcon': 'Ordnersymbol', 'resetLabel': 'Zurücksetzen',
   'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Symbole', 'iconTabUpload': 'Hochladen',
+  'uploadAnImage': 'Bild hochladen', 'uploadImageHint': 'Wähle ein Foto, mache eines, wähle eine Datei oder füge eine Bild-URL ein.',
+  'photoLibrary': 'Fotomediathek', 'takePhoto': 'Foto aufnehmen', 'chooseFile': 'Datei wählen',
+  'fromUrl': 'Von URL', 'imageUrl': 'Bild-URL', 'download': 'Herunterladen',
+  'downloadFailed': 'Download fehlgeschlagen', 'noResults': 'Keine Ergebnisse',
   'createFolder': 'Ordner erstellen', 'createList': 'Liste erstellen',
   'folder': 'Ordner', 'list': 'Liste',
   'newRoutine': 'Neue Routine', 'editRoutine': 'Routine bearbeiten',
@@ -3066,6 +3096,10 @@ const Map<String, String> _it = {
   'chooseFromLibrary': 'Scegli dalla libreria',
   'listIcon': 'Icona elenco', 'folderIcon': 'Icona cartella', 'resetLabel': 'Reimposta',
   'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Icone', 'iconTabUpload': 'Carica',
+  'uploadAnImage': 'Carica un\'immagine', 'uploadImageHint': 'Scegli una foto, scattane una, seleziona un file o incolla l\'URL di un\'immagine.',
+  'photoLibrary': 'Libreria foto', 'takePhoto': 'Scatta foto', 'chooseFile': 'Scegli file',
+  'fromUrl': 'Da URL', 'imageUrl': 'URL immagine', 'download': 'Scarica',
+  'downloadFailed': 'Download non riuscito', 'noResults': 'Nessun risultato',
   'createFolder': 'Crea cartella', 'createList': 'Crea lista',
   'folder': 'Cartella', 'list': 'Lista',
   'newRoutine': 'Nuova abitudine', 'editRoutine': 'Modifica abitudine',
@@ -3480,6 +3514,10 @@ const Map<String, String> _pt = {
   'chooseFromLibrary': 'Escolher da biblioteca',
   'listIcon': 'Ícone de lista', 'folderIcon': 'Ícone de pasta', 'resetLabel': 'Redefinir',
   'iconTabEmoji': 'Emoji', 'iconTabIcons': 'Ícones', 'iconTabUpload': 'Enviar',
+  'uploadAnImage': 'Enviar uma imagem', 'uploadImageHint': 'Escolha uma foto, tire uma, selecione um arquivo ou cole uma URL de imagem.',
+  'photoLibrary': 'Biblioteca de fotos', 'takePhoto': 'Tirar foto', 'chooseFile': 'Escolher arquivo',
+  'fromUrl': 'De URL', 'imageUrl': 'URL da imagem', 'download': 'Baixar',
+  'downloadFailed': 'Falha no download', 'noResults': 'Sem resultados',
   'createFolder': 'Criar pasta', 'createList': 'Criar lista',
   'folder': 'Pasta', 'list': 'Lista',
   'newRoutine': 'Nova rotina', 'editRoutine': 'Editar rotina',
@@ -3894,6 +3932,10 @@ const Map<String, String> _ru = {
   'chooseFromLibrary': 'Выбрать из библиотеки',
   'listIcon': 'Значок списка', 'folderIcon': 'Значок папки', 'resetLabel': 'Сбросить',
   'iconTabEmoji': 'Эмодзи', 'iconTabIcons': 'Значки', 'iconTabUpload': 'Загрузить',
+  'uploadAnImage': 'Загрузить изображение', 'uploadImageHint': 'Выберите фото, сделайте снимок, выберите файл или вставьте URL изображения.',
+  'photoLibrary': 'Галерея', 'takePhoto': 'Сделать фото', 'chooseFile': 'Выбрать файл',
+  'fromUrl': 'Из URL', 'imageUrl': 'URL изображения', 'download': 'Загрузить',
+  'downloadFailed': 'Не удалось загрузить', 'noResults': 'Ничего не найдено',
   'createFolder': 'Создать папку', 'createList': 'Создать список',
   'folder': 'Папка', 'list': 'Список',
   'newRoutine': 'Новая привычка', 'editRoutine': 'Редактировать',
@@ -4307,6 +4349,10 @@ const Map<String, String> _zh = {
   'chooseFromLibrary': '从图库选择',
   'listIcon': '列表图标', 'folderIcon': '文件夹图标', 'resetLabel': '重置',
   'iconTabEmoji': '表情', 'iconTabIcons': '图标', 'iconTabUpload': '上传',
+  'uploadAnImage': '上传图片', 'uploadImageHint': '选择照片、拍照、选取文件或粘贴图片网址。',
+  'photoLibrary': '照片图库', 'takePhoto': '拍照', 'chooseFile': '选取文件',
+  'fromUrl': '从网址', 'imageUrl': '图片网址', 'download': '下载',
+  'downloadFailed': '下载失败', 'noResults': '无结果',
   'createFolder': '创建文件夹', 'createList': '创建列表',
   'folder': '文件夹', 'list': '列表',
   'newRoutine': '新习惯', 'editRoutine': '编辑习惯',
@@ -4720,6 +4766,10 @@ const Map<String, String> _ja = {
   'chooseFromLibrary': 'ライブラリから選択',
   'listIcon': 'リストアイコン', 'folderIcon': 'フォルダアイコン', 'resetLabel': 'リセット',
   'iconTabEmoji': '絵文字', 'iconTabIcons': 'アイコン', 'iconTabUpload': 'アップロード',
+  'uploadAnImage': '画像をアップロード', 'uploadImageHint': '写真を選ぶ・撮影する・ファイルを選択する・画像URLを貼り付けます。',
+  'photoLibrary': 'フォトライブラリ', 'takePhoto': '写真を撮る', 'chooseFile': 'ファイルを選択',
+  'fromUrl': 'URLから', 'imageUrl': '画像URL', 'download': 'ダウンロード',
+  'downloadFailed': 'ダウンロード失敗', 'noResults': '結果なし',
   'createFolder': 'フォルダを作成', 'createList': 'リストを作成',
   'folder': 'フォルダ', 'list': 'リスト',
   'newRoutine': '新しい習慣', 'editRoutine': '習慣を編集',

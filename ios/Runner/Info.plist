@@ -49,6 +49,8 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose a photo to use as the icon for your list or folder.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo to use as the icon for your list or folder.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock Planom.</string>
 	<key>NSCalendarsUsageDescription</key>

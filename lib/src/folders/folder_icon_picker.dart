@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import '../localization/strings.dart';
 import '../theme/app_theme.dart';
 import '../utils/platform_capabilities.dart';
+import '../utils/selection_menu.dart';
 import 'emoji_catalog.dart';
 
 // Preset (iconId, displayColor) pairs.
@@ -116,8 +117,15 @@ Widget buildFolderItemIcon(
       child: Center(
         child: Text(
           emojiFromIconId(iconId),
-          style: const TextStyle(fontSize: 18),
           textAlign: TextAlign.center,
+          // height: 1.0 + even leading distribution removes the emoji's extra
+          // line-box padding so the glyph sits centred in the 22×22 box rather
+          // than riding slightly low/right.
+          style: const TextStyle(
+            fontSize: 18,
+            height: 1.0,
+            leadingDistribution: TextLeadingDistribution.even,
+          ),
         ),
       ),
     );
@@ -234,13 +242,35 @@ Future<Uint8List?> _resizeToFit(Uint8List src, int maxDimension) async {
   return png.buffer.asUint8List();
 }
 
-/// Opens the system photo picker and returns the relative icon path, or null.
+/// Resizes [bytes] and writes them as a PNG into the app's `icons/` directory.
+/// Returns the **relative** path (`icons/<timestamp>.png`). Used by the URL
+/// download path where we have raw bytes rather than a source file.
+Future<String> _saveIconBytes(Uint8List bytes) async {
+  _docsPath ??= (await getApplicationDocumentsDirectory()).path;
+  final iconsDir = Directory('$_docsPath/icons');
+  if (!iconsDir.existsSync()) iconsDir.createSync(recursive: true);
+
+  Uint8List out = bytes;
+  try {
+    final resized = await _resizeToFit(bytes, _kMaxIconDimension);
+    if (resized != null) out = resized;
+  } catch (e, st) {
+    debugPrint('icon resize failed, saving original: $e\n$st');
+  }
+
+  final ts = DateTime.now().millisecondsSinceEpoch;
+  final outPath = '$_docsPath/icons/$ts.png';
+  await File(outPath).writeAsBytes(out);
+  return 'icons/$ts.png';
+}
+
+/// Opens the system photo gallery and returns the relative icon path, or null.
 ///
 /// Mobile uses `image_picker` (the OS gallery UI) with a max-dimension and
 /// quality hint so big photos are pre-scaled by the platform before they
 /// even reach Dart. Desktop has no gallery concept, so we fall back to
 /// `file_picker` and rely on our own resize pass.
-Future<String?> pickCustomIcon() async {
+Future<String?> pickIconFromGallery() async {
   if (PlatformCapabilities.supportsImagePicker) {
     final picker = ImagePicker();
     final xfile = await picker.pickImage(
@@ -252,7 +282,27 @@ Future<String?> pickCustomIcon() async {
     if (xfile == null) return null;
     return _copyIconToDocuments(xfile.path);
   }
+  return pickIconFromFile();
+}
 
+/// Captures a photo with the device camera and returns the relative icon path,
+/// or null. Mobile only (no-op elsewhere).
+Future<String?> pickIconFromCamera() async {
+  if (!PlatformCapabilities.supportsImagePicker) return null;
+  final picker = ImagePicker();
+  final xfile = await picker.pickImage(
+    source: ImageSource.camera,
+    maxWidth: _kMaxIconDimension.toDouble(),
+    maxHeight: _kMaxIconDimension.toDouble(),
+    imageQuality: 90,
+  );
+  if (xfile == null) return null;
+  return _copyIconToDocuments(xfile.path);
+}
+
+/// Opens the document picker (file system) filtered to images and returns the
+/// relative icon path, or null.
+Future<String?> pickIconFromFile() async {
   final result = await FilePicker.platform.pickFiles(
     type: FileType.image,
     allowMultiple: false,
@@ -262,6 +312,48 @@ Future<String?> pickCustomIcon() async {
   if (path == null) return null;
   return _copyIconToDocuments(path);
 }
+
+/// Downloads an image from [url] (http/https), stores it as an icon and returns
+/// the relative path. Throws a [FormatException] for malformed URLs and an
+/// [HttpException] for non-image / failed responses.
+Future<String?> downloadIconFromUrl(String url) async {
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null ||
+      !uri.hasScheme ||
+      !(uri.isScheme('http') || uri.isScheme('https')) ||
+      uri.host.isEmpty) {
+    throw const FormatException('Invalid URL');
+  }
+
+  final client = HttpClient();
+  try {
+    final request = await client.getUrl(uri);
+    final response = await request.close();
+    if (response.statusCode != HttpStatus.ok) {
+      throw HttpException('HTTP ${response.statusCode}', uri: uri);
+    }
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in response) {
+      builder.add(chunk);
+    }
+    final bytes = builder.takeBytes();
+    if (bytes.isEmpty) {
+      throw HttpException('Empty response', uri: uri);
+    }
+    // Validate that the bytes actually decode as an image before saving.
+    final descriptor = await ui.ImageDescriptor.encoded(
+        await ui.ImmutableBuffer.fromUint8List(bytes));
+    descriptor.dispose();
+    return _saveIconBytes(bytes);
+  } finally {
+    client.close();
+  }
+}
+
+/// Opens the system photo picker and returns the relative icon path, or null.
+/// Backwards-compatible entry point (delegates to [pickIconFromGallery]); used
+/// by the routine icon picker.
+Future<String?> pickCustomIcon() => pickIconFromGallery();
 
 /// Shows the icon picker bottom sheet.
 ///
@@ -347,19 +439,123 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
     _tab = isEmojiIconId(_selected) ? _kTabEmoji : _kTabIcons;
   }
 
-  Future<void> _pickFromLibrary() async {
+  /// Runs an image-source [picker], and on success applies the result and
+  /// closes the sheet. Surfaces any error in an alert.
+  Future<void> _handleSource(Future<String?> Function() picker) async {
     setState(() => _picking = true);
     try {
-      final path = await pickCustomIcon();
+      final path = await picker();
       if (!mounted) return;
       if (path != null) {
         // Custom images don't accept a color tint — clear any override.
         widget.onSelected(path, null);
         Navigator.of(context, rootNavigator: true).pop();
       }
+    } catch (e) {
+      if (mounted) _showError(e);
     } finally {
       if (mounted) setState(() => _picking = false);
     }
+  }
+
+  Future<void> _showUploadMenu() async {
+    final s = S.of(context);
+    final options = <SelectionMenuOption<int>>[
+      if (PlatformCapabilities.supportsImagePicker)
+        SelectionMenuOption(
+          value: 0,
+          label: s.photoLibrary,
+          icon: CupertinoIcons.photo_on_rectangle,
+        ),
+      if (PlatformCapabilities.supportsImagePicker)
+        SelectionMenuOption(
+          value: 1,
+          label: s.takePhoto,
+          icon: CupertinoIcons.camera,
+        ),
+      SelectionMenuOption(
+        value: 2,
+        label: s.chooseFile,
+        icon: CupertinoIcons.folder,
+      ),
+      SelectionMenuOption(
+        value: 3,
+        label: s.fromUrl,
+        icon: CupertinoIcons.link,
+      ),
+    ];
+    final choice = await showSelectionMenu<int>(
+      context: context,
+      options: options,
+      title: s.uploadAnImage,
+    );
+    if (choice == null || !mounted) return;
+    switch (choice) {
+      case 0:
+        await _handleSource(pickIconFromGallery);
+      case 1:
+        await _handleSource(pickIconFromCamera);
+      case 2:
+        await _handleSource(pickIconFromFile);
+      case 3:
+        await _handleUrl();
+    }
+  }
+
+  Future<void> _handleUrl() async {
+    final url = await _promptForUrl();
+    if (url == null || url.trim().isEmpty || !mounted) return;
+    await _handleSource(() => downloadIconFromUrl(url));
+  }
+
+  Future<String?> _promptForUrl() {
+    final s = S.of(context);
+    final ctrl = TextEditingController();
+    return showCupertinoDialog<String>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(s.imageUrl),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: ctrl,
+            placeholder: 'https://…',
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            autofocus: true,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.cancel),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text),
+            child: Text(s.download),
+          ),
+        ],
+      ),
+    ).whenComplete(ctrl.dispose);
+  }
+
+  void _showError(Object error) {
+    final s = S.of(context);
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(s.downloadFailed),
+        content: Text('$error'),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.done),
+          ),
+        ],
+      ),
+    );
   }
 
   void _selectPreset(String iconId) {
@@ -563,7 +759,7 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           GestureDetector(
-            onTap: _picking ? null : _pickFromLibrary,
+            onTap: _picking ? null : _showUploadMenu,
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -575,21 +771,36 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    CupertinoIcons.photo,
+                    CupertinoIcons.cloud_upload,
                     size: 18,
                     color: CupertinoColors.label.resolveFrom(context),
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _picking ? s.opening : s.chooseFromLibrary,
+                    _picking ? s.opening : s.uploadAnImage,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                       color: CupertinoColors.label.resolveFrom(context),
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    CupertinoIcons.chevron_down,
+                    size: 13,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            s.uploadImageHint,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
         ],
@@ -598,8 +809,8 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
   }
 }
 
-/// Categorised emoji grid with a top category bar. No keyword search (the
-/// catalogue carries glyphs only) — the user browses by category.
+/// Categorised emoji grid with a search bar + top category bar. Search matches
+/// per-emoji keywords (and the category name as a fallback) via [searchEmojis].
 class _EmojiPicker extends StatefulWidget {
   const _EmojiPicker({required this.selected, required this.onSelected});
 
@@ -612,6 +823,8 @@ class _EmojiPicker extends StatefulWidget {
 
 class _EmojiPickerState extends State<_EmojiPicker> {
   int _category = 0;
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
 
   @override
   void initState() {
@@ -628,76 +841,110 @@ class _EmojiPickerState extends State<_EmojiPicker> {
   }
 
   @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final emojis = kEmojiCatalog[_category].emojis;
+    final s = S.of(context);
+    final searching = _query.trim().isNotEmpty;
+    final emojis =
+        searching ? searchEmojis(_query) : kEmojiCatalog[_category].emojis;
+
     return Column(
       children: [
-        // Category bar.
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              for (var i = 0; i < kEmojiCatalog.length; i++)
-                GestureDetector(
-                  onTap: () => setState(() => _category = i),
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 4, vertical: 6),
-                    child: Icon(
-                      kEmojiCatalog[i].icon,
-                      size: 22,
-                      color: i == _category
-                          ? AppColors.accent
-                          : CupertinoColors.secondaryLabel.resolveFrom(context),
-                    ),
-                  ),
-                ),
-            ],
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: CupertinoSearchTextField(
+            controller: _searchCtrl,
+            placeholder: s.search,
+            onChanged: (v) => setState(() => _query = v),
           ),
         ),
-        Container(
-          height: 1,
-          color: CupertinoColors.separator.resolveFrom(context),
-        ),
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 48,
-              mainAxisSpacing: 4,
-              crossAxisSpacing: 4,
+        // Category bar (hidden while searching).
+        if (!searching) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                for (var i = 0; i < kEmojiCatalog.length; i++)
+                  GestureDetector(
+                    onTap: () => setState(() => _category = i),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 6),
+                      child: Icon(
+                        kEmojiCatalog[i].icon,
+                        size: 22,
+                        color: i == _category
+                            ? AppColors.accent
+                            : CupertinoColors.secondaryLabel
+                                .resolveFrom(context),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            itemCount: emojis.length,
-            itemBuilder: (context, i) {
-              final emoji = emojis[i];
-              final isSelected = emoji == widget.selected;
-              return GestureDetector(
-                onTap: () => widget.onSelected(emoji),
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  decoration: isSelected
-                      ? BoxDecoration(
-                          color: CupertinoColors.tertiarySystemFill
-                              .resolveFrom(context),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: AppColors.accent,
-                            width: 2,
-                          ),
-                        )
-                      : null,
-                  child: Center(
-                    child: Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 26),
+          ),
+          Container(
+            height: 1,
+            color: CupertinoColors.separator.resolveFrom(context),
+          ),
+        ],
+        Expanded(
+          child: emojis.isEmpty
+              ? Center(
+                  child: Text(
+                    s.noResults,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color:
+                          CupertinoColors.secondaryLabel.resolveFrom(context),
                     ),
                   ),
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 48,
+                    mainAxisSpacing: 4,
+                    crossAxisSpacing: 4,
+                  ),
+                  itemCount: emojis.length,
+                  itemBuilder: (context, i) {
+                    final emoji = emojis[i];
+                    final isSelected = emoji == widget.selected;
+                    return GestureDetector(
+                      onTap: () => widget.onSelected(emoji),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        decoration: isSelected
+                            ? BoxDecoration(
+                                color: CupertinoColors.tertiarySystemFill
+                                    .resolveFrom(context),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: AppColors.accent,
+                                  width: 2,
+                                ),
+                              )
+                            : null,
+                        child: Center(
+                          child: Text(
+                            emoji,
+                            style: const TextStyle(fontSize: 26),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );
