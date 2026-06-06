@@ -71,7 +71,6 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    final labelColor = CupertinoColors.secondaryLabel.resolveFrom(context);
     final hasBackup = widget.backupService != null;
 
     return CupertinoPageScaffold(
@@ -81,18 +80,10 @@ class _SettingsViewState extends State<SettingsView> {
       ),
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           children: [
             // ── Appearance ──────────────────────────────────────────────
-            Text(
-              s.sectionAppearance,
-              style: TextStyle(
-                fontSize: 13,
-                color: labelColor,
-                letterSpacing: -0.08,
-              ),
-            ),
-            const SizedBox(height: 6),
+            _SectionHeader(s.sectionAppearance),
             ListenableBuilder(
               listenable: widget.controller,
               builder: (ctx, _) {
@@ -119,15 +110,7 @@ class _SettingsViewState extends State<SettingsView> {
 
             // ── Language ────────────────────────────────────────────────
             const SizedBox(height: 18),
-            Text(
-              s.sectionLanguage,
-              style: TextStyle(
-                fontSize: 13,
-                color: labelColor,
-                letterSpacing: -0.08,
-              ),
-            ),
-            const SizedBox(height: 6),
+            _SectionHeader(s.sectionLanguage),
             ListenableBuilder(
               listenable: widget.controller,
               builder: (ctx, _) {
@@ -143,15 +126,7 @@ class _SettingsViewState extends State<SettingsView> {
 
             // ── Modules ─────────────────────────────────────────────────
             const SizedBox(height: 18),
-            Text(
-              s.sectionModules,
-              style: TextStyle(
-                fontSize: 13,
-                color: labelColor,
-                letterSpacing: -0.08,
-              ),
-            ),
-            const SizedBox(height: 6),
+            _SectionHeader(s.sectionModules),
             _NavRow(
               label: s.tabTasks,
               icon: CupertinoIcons.checkmark_square,
@@ -203,15 +178,7 @@ class _SettingsViewState extends State<SettingsView> {
 
             // ── Spaces ──────────────────────────────────────────────────
             const SizedBox(height: 18),
-            Text(
-              s.spaces,
-              style: TextStyle(
-                fontSize: 13,
-                color: labelColor,
-                letterSpacing: -0.08,
-              ),
-            ),
-            const SizedBox(height: 6),
+            _SectionHeader(s.spaces),
             _NavRow(
               label: s.spaces,
               icon: CupertinoIcons.square_stack_3d_up,
@@ -224,15 +191,7 @@ class _SettingsViewState extends State<SettingsView> {
 
             // ── Tab Bar ─────────────────────────────────────────────────
             const SizedBox(height: 18),
-            Text(
-              s.sectionCustomization,
-              style: TextStyle(
-                fontSize: 13,
-                color: labelColor,
-                letterSpacing: -0.08,
-              ),
-            ),
-            const SizedBox(height: 6),
+            _SectionHeader(s.sectionCustomization),
             _NavRow(
               label: s.tabBar,
               icon: CupertinoIcons.rectangle_grid_1x2,
@@ -245,45 +204,9 @@ class _SettingsViewState extends State<SettingsView> {
               ),
             ),
 
-            // ── Startup ─────────────────────────────────────────────────
-            // Surfaced at the top level (not buried inside Tab Bar) so the
-            // setting that controls "which tab opens on app launch" is easy
-            // to find — discoverability complaint from real users.
-            const SizedBox(height: 18),
-            Text(
-              s.startup,
-              style: TextStyle(
-                fontSize: 13,
-                color: labelColor,
-                letterSpacing: -0.08,
-              ),
-            ),
-            const SizedBox(height: 6),
-            ListenableBuilder(
-              listenable: widget.controller,
-              builder: (ctx, _) {
-                return _NavRow(
-                  label: s.defaultTab,
-                  icon: CupertinoIcons.app_badge,
-                  trailingLabel: defaultTabLabel(
-                      s, widget.controller),
-                  onTap: () =>
-                      showDefaultTabPicker(context, widget.controller),
-                );
-              },
-            ),
-
             // ── Notifications ────────────────────────────────────────
             const SizedBox(height: 18),
-            Text(
-              s.sectionNotifications,
-              style: TextStyle(
-                fontSize: 13,
-                color: labelColor,
-                letterSpacing: -0.08,
-              ),
-            ),
-            const SizedBox(height: 6),
+            _SectionHeader(s.sectionNotifications),
             _NavRow(
               label: s.sectionNotifications,
               icon: CupertinoIcons.bell,
@@ -299,15 +222,7 @@ class _SettingsViewState extends State<SettingsView> {
             // ── Security ─────────────────────────────────────────────
             if (widget.securityService != null) ...[
               const SizedBox(height: 18),
-              Text(
-                s.sectionSecurity,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: labelColor,
-                  letterSpacing: -0.08,
-                ),
-              ),
-              const SizedBox(height: 6),
+              _SectionHeader(s.sectionSecurity),
               _NavRow(
                 label: s.sectionSecurity,
                 icon: CupertinoIcons.lock,
@@ -326,15 +241,7 @@ class _SettingsViewState extends State<SettingsView> {
                 (widget.deviceCalendarController != null &&
                     PlatformCapabilities.supportsEventKit)) ...[
               const SizedBox(height: 18),
-              Text(
-                s.sectionIntegrations,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: labelColor,
-                  letterSpacing: -0.08,
-                ),
-              ),
-              const SizedBox(height: 6),
+              _SectionHeader(s.sectionIntegrations),
               if (widget.googleCalendarController != null)
                 ListenableBuilder(
                   listenable: widget.googleCalendarController!,
@@ -385,15 +292,7 @@ class _SettingsViewState extends State<SettingsView> {
             if (hasBackup) ...[
               // ── Sync ──────────────────────────────────────────────
               const SizedBox(height: 18),
-              Text(
-                s.sync,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: labelColor,
-                  letterSpacing: -0.08,
-                ),
-              ),
-              const SizedBox(height: 6),
+              _SectionHeader(s.sync),
               _NavRow(
                 label: s.sync,
                 icon: CupertinoIcons.arrow_2_circlepath,
@@ -411,15 +310,7 @@ class _SettingsViewState extends State<SettingsView> {
 
               // ── Data ──────────────────────────────────────────────
               const SizedBox(height: 18),
-              Text(
-                s.sectionData,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: labelColor,
-                  letterSpacing: -0.08,
-                ),
-              ),
-              const SizedBox(height: 6),
+              _SectionHeader(s.sectionData),
               _NavRow(
                 label: s.sectionData,
                 icon: CupertinoIcons.archivebox,
@@ -437,15 +328,7 @@ class _SettingsViewState extends State<SettingsView> {
 
             // ── About ─────────────────────────────────────────────────
             const SizedBox(height: 18),
-            Text(
-              s.sectionAbout,
-              style: TextStyle(
-                fontSize: 13,
-                color: labelColor,
-                letterSpacing: -0.08,
-              ),
-            ),
-            const SizedBox(height: 6),
+            _SectionHeader(s.sectionAbout),
             _NavRow(
               label: s.sectionAbout,
               icon: CupertinoIcons.info_circle,
@@ -523,37 +406,20 @@ class TabBarSettingsView extends StatelessWidget {
           listenable: controller,
           builder: (ctx, _) {
             return SingleChildScrollView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ── Display ────────────────────────────────────────────
-                  Text(
-                    s.display,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: labelColor,
-                      letterSpacing: -0.08,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
+                  _SectionHeader(s.display),
                   _ToggleRow(
-                    label: s.hideLabels,
-                    value: controller.hideTabLabels,
-                    onChanged: controller.updateHideTabLabels,
+                    label: s.showLabels,
+                    value: controller.showTabLabels,
+                    onChanged: controller.updateShowTabLabels,
                   ),
                   const SizedBox(height: 18),
                   // ── Startup ────────────────────────────────────────────
-                  Text(
-                    s.startup,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: labelColor,
-                      letterSpacing: -0.08,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
+                  _SectionHeader(s.startup),
                   _NavRow(
                     label: s.defaultTab,
                     trailingLabel: defaultTabLabel(s, controller),
@@ -561,20 +427,12 @@ class TabBarSettingsView extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   // ── Visible Tabs (page 1 + additional pages) ───────────
-                  Text(
-                    s.visibleTabs,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: labelColor,
-                      letterSpacing: -0.08,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
+                  _SectionHeader(s.visibleTabs),
                   TabBarPagesEditor(controller: controller),
                   if (!controller.isTabVisible(4)) ...[
                     const SizedBox(height: 6),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         s.settingsAccessibleHint,
                         style: TextStyle(fontSize: 13, color: labelColor),
@@ -592,6 +450,30 @@ class TabBarSettingsView extends StatelessWidget {
 }
 
 // ── Shared row widgets ────────────────────────────────────────────────────────
+
+/// Section header kept at the screen margin (horizontal 16) while the list
+/// itself has no horizontal padding, so the full-width card rows below line
+/// their text up with this header.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 6),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          letterSpacing: -0.08,
+        ),
+      ),
+    );
+  }
+}
 
 class _NavRow extends StatelessWidget {
   const _NavRow({
@@ -667,13 +549,11 @@ class _ToggleRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onChanged,
-    this.enabled = true,
   });
 
   final String label;
   final bool value;
   final ValueChanged<bool> onChanged;
-  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -681,32 +561,29 @@ class _ToggleRow extends StatelessWidget {
       CupertinoColors.tertiarySystemBackground,
       context,
     );
-    return Opacity(
-      opacity: enabled ? 1.0 : 0.4,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 17,
-                  color: CupertinoColors.label.resolveFrom(context),
-                ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 17,
+                color: CupertinoColors.label.resolveFrom(context),
               ),
             ),
-            CupertinoSwitch(
-              value: value,
-              onChanged: enabled ? onChanged : null,
-              activeColor: AppColors.accent,
-            ),
-          ],
-        ),
+          ),
+          CupertinoSwitch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: AppColors.accent,
+          ),
+        ],
       ),
     );
   }

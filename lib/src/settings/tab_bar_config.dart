@@ -25,7 +25,7 @@ enum ShortcutTarget {
 
 /// One item in the tab bar.
 class TabItem {
-  TabItem.builtin(this.builtinIndex)
+  TabItem.builtin(this.builtinIndex, {this.enabled = true})
       : kind = TabKind.builtin,
         shortcutTarget = null,
         shortcutId = null,
@@ -35,6 +35,7 @@ class TabItem {
     required this.shortcutTarget,
     this.shortcutId,
     this.customLabel,
+    this.enabled = true,
   })  : kind = TabKind.shortcut,
         builtinIndex = null;
 
@@ -44,20 +45,41 @@ class TabItem {
   final String? shortcutId; // list/folder/note-folder id; null for smart lists
   final String? customLabel;
 
+  /// Whether this tab is shown in the live tab bar. Disabled tabs stay in the
+  /// config (so the user can re-enable them) but are filtered out of the
+  /// rendered bar / sidebar via [TabBarConfig.active].
+  final bool enabled;
+
+  /// Returns a copy with [enabled] overridden.
+  TabItem copyWithEnabled(bool value) {
+    if (kind == TabKind.builtin) {
+      return TabItem.builtin(builtinIndex!, enabled: value);
+    }
+    return TabItem.shortcut(
+      shortcutTarget: shortcutTarget!,
+      shortcutId: shortcutId,
+      customLabel: customLabel,
+      enabled: value,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'kind': kind.name,
         if (builtinIndex != null) 'builtinIndex': builtinIndex,
         if (shortcutTarget != null) 'shortcutTarget': shortcutTarget!.name,
         if (shortcutId != null) 'shortcutId': shortcutId,
         if (customLabel != null) 'customLabel': customLabel,
+        // Only persist when disabled — keeps existing layouts byte-compatible.
+        if (!enabled) 'enabled': false,
       };
 
   static TabItem? fromJson(Map<String, dynamic> map) {
     final kindStr = map['kind'] as String?;
+    final enabled = map['enabled'] != false; // default true
     if (kindStr == 'builtin') {
       final idx = map['builtinIndex'] as int?;
       if (idx == null || idx < 0 || idx > 4) return null;
-      return TabItem.builtin(idx);
+      return TabItem.builtin(idx, enabled: enabled);
     }
     if (kindStr == 'shortcut') {
       final targetStr = map['shortcutTarget'] as String?;
@@ -67,6 +89,7 @@ class TabItem {
         shortcutTarget: target,
         shortcutId: map['shortcutId'] as String?,
         customLabel: map['customLabel'] as String?,
+        enabled: enabled,
       );
     }
     return null;
@@ -109,6 +132,14 @@ class TabBarConfig {
   /// All tabs flattened in display order (used for sidebar layout where
   /// pages are not meaningful).
   List<TabItem> get flattened => [for (final p in pages) ...p];
+
+  /// The layout actually rendered in the tab bar: disabled items removed from
+  /// every page (pages may become empty — the shell skips empty pages).
+  TabBarConfig get active => TabBarConfig(
+        pages: [
+          for (final p in pages) [for (final it in p) if (it.enabled) it],
+        ],
+      );
 
   String toJsonString() => jsonEncode(
         pages
@@ -163,6 +194,15 @@ class TabBarConfig {
     final page = pages[pageIndex];
     if (page.length >= maxItemsPerPage) return this;
     return setPage(pageIndex, [...page, item]);
+  }
+
+  /// Toggles the [enabled] flag of the item at [itemIndex] on [pageIndex].
+  TabBarConfig setItemEnabled(int pageIndex, int itemIndex, bool enabled) {
+    if (pageIndex < 0 || pageIndex >= pages.length) return this;
+    final page = [...pages[pageIndex]];
+    if (itemIndex < 0 || itemIndex >= page.length) return this;
+    page[itemIndex] = page[itemIndex].copyWithEnabled(enabled);
+    return setPage(pageIndex, page);
   }
 
   TabBarConfig removeItem(int pageIndex, int itemIndex) {

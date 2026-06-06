@@ -122,6 +122,11 @@ class SettingsController with ChangeNotifier {
   SmartListPrefs get smartListPrefs => _smartListPrefs;
   bool get hideTabLabels => _smartListPrefs.hideTabLabels;
 
+  /// Inverse of [hideTabLabels] — exposed so the UI can present a positive
+  /// "Show Labels" toggle (on by default, since labels are shown unless the
+  /// user opts out).
+  bool get showTabLabels => !_smartListPrefs.hideTabLabels;
+
   TaskFieldPrefs _taskFieldPrefs = TaskFieldPrefs();
   TaskFieldPrefs get taskFieldPrefs => _taskFieldPrefs;
 
@@ -271,8 +276,8 @@ class SettingsController with ChangeNotifier {
   /// rendered tab bar — so callers (e.g. the Settings ⋯ fallback) stay in
   /// sync with what the user actually sees. The legacy `_tabVisibility` map
   /// is retained only to migrate old persisted layouts on first load.
-  bool isTabVisible(int index) => _tabBarConfig.flattened.any(
-      (it) => it.kind == TabKind.builtin && it.builtinIndex == index);
+  bool isTabVisible(int index) => _tabBarConfig.flattened.any((it) =>
+      it.enabled && it.kind == TabKind.builtin && it.builtinIndex == index);
 
   /// Returns the count of built-in tabs (0–4) present in the live config.
   int get visibleOptionalTabCount =>
@@ -777,6 +782,9 @@ class SettingsController with ChangeNotifier {
     notifyListeners();
     await _smartListPrefs.save();
   }
+
+  /// Positive-sense setter paired with [showTabLabels].
+  Future<void> updateShowTabLabels(bool value) => updateHideTabLabels(!value);
 
   Future<void> updateShowAddFolderButton(bool value) async {
     _smartListPrefs.showAddFolderButton = value;
