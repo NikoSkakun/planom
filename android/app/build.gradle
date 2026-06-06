@@ -68,6 +68,7 @@ android {
         manifestPlaceholders = [
             appAuthRedirectScheme: 'com.googleusercontent.apps.264060209270-4l2qk3d1k4ehkmtg8iikjme28590ihp3'
         ]
+    }
 
     signingConfigs {
         release {
