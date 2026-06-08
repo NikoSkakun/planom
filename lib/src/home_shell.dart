@@ -678,8 +678,18 @@ class _HomeShellState extends State<HomeShell> {
       if (tappedIndex == 3) _routinesResetSignal.value++;
     }
     _refreshPlusForTab(tappedIndex);
+    final changed = tappedIndex != _lastTabIndex;
     _lastTabIndex = tappedIndex;
     widget.settingsController.setLastOpenedTab(tappedIndex);
+    // The wide (sidebar) layout's IndexedStack is driven by `_lastTabIndex`
+    // through `_buildShell`, which otherwise only rebuilds on a
+    // settingsController notify. `setLastOpenedTab` deliberately doesn't
+    // notify, so without an explicit rebuild here a sidebar tab tap would
+    // update `_lastTabIndex` but leave the visible tab unchanged until some
+    // unrelated rebuild flushed it. Rebuild so the switch is immediate.
+    // (Narrow layout drives switching through CupertinoTabController and is
+    // unaffected by this extra rebuild.)
+    if (changed && mounted) setState(() {});
   }
 
   /// Sets the floating + button visibility for the given built-in tab.

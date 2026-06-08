@@ -469,6 +469,16 @@ class _FolderViewState extends State<FolderView>
           _plusScope?.onDropOnSection?.call(listId, sectionId);
         }
       },
+      onReorderTask: (listId, group, movedTaskId, beforeTaskId) {
+        // In folder kanban each column is a whole list; reordering keeps the
+        // card in that list + group's section, just repositioned.
+        widget.taskController.reorderTaskBefore(
+          movedTaskId: movedTaskId,
+          beforeTaskId: beforeTaskId,
+          listId: listId,
+          sectionId: group.sectionId,
+        );
+      },
       onToggleTask: (task) =>
           toggleTaskCompletedWithUndo(context, widget.taskController, task),
       onTapTask: (task) => Navigator.of(context).push(

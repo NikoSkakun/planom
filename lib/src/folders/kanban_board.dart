@@ -92,6 +92,7 @@ class KanbanBoard extends StatefulWidget {
     this.boardController,
     this.onCreateInColumn,
     this.onCreateInGroup,
+    this.onReorderTask,
     this.emptyLabel,
   });
 
@@ -109,14 +110,29 @@ class KanbanBoard extends StatefulWidget {
   /// Plus button dropped on a specific section group inside a column.
   final void Function(String columnId, KanbanGroupData group)? onCreateInGroup;
 
+  /// A card was dropped between cards (within or across groups/columns) to
+  /// reorder it. [beforeTaskId] is the task it should land before (null = end
+  /// of the group). The host resolves [columnId] + [group] to a list/section.
+  final void Function(
+    String columnId,
+    KanbanGroupData group,
+    String movedTaskId,
+    String? beforeTaskId,
+  )? onReorderTask;
+
   final String? emptyLabel;
 
   /// Column width in free-scroll mode.
-  static const double _freeColumnWidth = 300;
+  static const double _freeColumnWidth = 320;
 
-  /// Fraction of the viewport one page occupies in snap mode — slightly under
-  /// 1 so the next column peeks at the edge as a swipe affordance.
-  static const double _snapViewportFraction = 0.9;
+  /// Fraction of the viewport one page occupies in snap mode — under 1 so the
+  /// neighbouring columns peek at both edges (the page is centred via
+  /// `padEnds: true`) as a swipe affordance.
+  static const double _snapViewportFraction = 0.92;
+
+  /// Bottom padding inside a column's scroll list so the last cards can scroll
+  /// clear of the floating + button (which now draws over the column).
+  static const double _columnBottomInset = 88;
 
   @override
   State<KanbanBoard> createState() => _KanbanBoardState();
@@ -265,17 +281,20 @@ class _KanbanBoardState extends State<KanbanBoard> {
           onToggleTask: widget.onToggleTask,
           onCreateInColumn: widget.onCreateInColumn,
           onCreateInGroup: widget.onCreateInGroup,
+          onReorderTask: widget.onReorderTask,
           isExpanded: _isExpanded,
           onToggleGroup: _toggleGroup,
         );
 
     if (widget.scrollMode == KanbanScrollMode.snap) {
+      // `padEnds: true` centres each page so the previous/next columns peek at
+      // both edges. Columns run to the bottom of the viewport (no bottom
+      // padding) so the floating + button draws over the focused column.
       return PageView.builder(
         controller: _pageController,
-        padEnds: false,
         itemCount: widget.columns.length,
         itemBuilder: (context, index) => Padding(
-          padding: const EdgeInsets.fromLTRB(6, 12, 6, 80),
+          padding: const EdgeInsets.fromLTRB(6, 12, 6, 0),
           child: columnAt(index),
         ),
       );
@@ -284,7 +303,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     return ListView.separated(
       controller: _scrollController,
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
       itemCount: widget.columns.length,
       separatorBuilder: (_, __) => const SizedBox(width: 12),
       itemBuilder: (context, index) => SizedBox(
@@ -317,6 +336,7 @@ class _KanbanColumn extends StatelessWidget {
     required this.onToggleTask,
     required this.onCreateInColumn,
     required this.onCreateInGroup,
+    required this.onReorderTask,
     required this.isExpanded,
     required this.onToggleGroup,
   });
@@ -327,6 +347,12 @@ class _KanbanColumn extends StatelessWidget {
   final void Function(Task task) onToggleTask;
   final void Function(String columnId)? onCreateInColumn;
   final void Function(String columnId, KanbanGroupData group)? onCreateInGroup;
+  final void Function(
+    String columnId,
+    KanbanGroupData group,
+    String movedTaskId,
+    String? beforeTaskId,
+  )? onReorderTask;
   final bool Function(KanbanGroupData group) isExpanded;
   final void Function(KanbanGroupData group) onToggleGroup;
 
@@ -438,19 +464,7 @@ class _KanbanColumn extends StatelessWidget {
         ));
       }
       if (group.title == null || expanded) {
-        final body = group.tasks.isEmpty
-            ? const SizedBox(height: 10, width: double.infinity)
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final task in group.tasks)
-                    _KanbanCard(
-                      task: task,
-                      onTap: () => onTapTask(task),
-                      onToggle: () => onToggleTask(task),
-                    ),
-                ],
-              );
+        final body = _groupBody(group);
         // Section / top groups accept Plus drops; completed groups don't.
         if (!group.isCompleted && onCreateInGroup != null) {
           children.add(_GroupDropZone(
@@ -465,8 +479,130 @@ class _KanbanColumn extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+      padding:
+          const EdgeInsets.fromLTRB(8, 0, 8, KanbanBoard._columnBottomInset),
       children: children,
+    );
+  }
+
+  /// Builds the cards for [group]. Active (non-completed) groups get
+  /// insert-before drop targets between cards plus a trailing slot so cards can
+  /// be long-press-dragged to a new position (mirrors the list view's
+  /// drag-to-reorder). Completed groups render plain, non-reorderable cards.
+  Widget _groupBody(KanbanGroupData group) {
+    final reorderable = !group.isCompleted && onReorderTask != null;
+    if (group.tasks.isEmpty) {
+      // Keep a small trailing drop slot for empty active groups so a card can
+      // be dropped into an otherwise-empty section.
+      return reorderable
+          ? _KanbanReorderSlot(
+              onAccept: (movedId) =>
+                  onReorderTask!(data.id, group, movedId, null),
+              minHeight: 10,
+            )
+          : const SizedBox(height: 10, width: double.infinity);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final task in group.tasks)
+          if (reorderable)
+            _KanbanReorderTarget(
+              beforeTaskId: task.id,
+              onAccept: (movedId) =>
+                  onReorderTask!(data.id, group, movedId, task.id),
+              child: _KanbanCard(
+                task: task,
+                onTap: () => onTapTask(task),
+                onToggle: () => onToggleTask(task),
+              ),
+            )
+          else
+            _KanbanCard(
+              task: task,
+              onTap: () => onTapTask(task),
+              onToggle: () => onToggleTask(task),
+            ),
+        if (reorderable)
+          _KanbanReorderSlot(
+            onAccept: (movedId) => onReorderTask!(data.id, group, movedId, null),
+          ),
+      ],
+    );
+  }
+}
+
+/// Insert-before drop target wrapping a card. Accepts a dragged task id and
+/// shows a 2 px accent line at the top edge while hovering.
+class _KanbanReorderTarget extends StatelessWidget {
+  const _KanbanReorderTarget({
+    required this.beforeTaskId,
+    required this.onAccept,
+    required this.child,
+  });
+
+  final String beforeTaskId;
+  final void Function(String movedTaskId) onAccept;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (d) => d.data != beforeTaskId,
+      onAcceptWithDetails: (d) => onAccept(d.data),
+      builder: (context, candidates, _) {
+        final highlighted = candidates.isNotEmpty;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              height: highlighted ? 3 : 0,
+              margin: const EdgeInsets.only(bottom: 2),
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            child,
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// End-of-group drop target so a card can be dropped after the last card.
+class _KanbanReorderSlot extends StatelessWidget {
+  const _KanbanReorderSlot({required this.onAccept, this.minHeight = 24});
+
+  final void Function(String movedTaskId) onAccept;
+  final double minHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (d) => onAccept(d.data),
+      builder: (context, candidates, _) {
+        final highlighted = candidates.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          height: highlighted ? minHeight + 16 : minHeight,
+          width: double.infinity,
+          alignment: Alignment.topCenter,
+          child: highlighted
+              ? Container(
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                )
+              : null,
+        );
+      },
     );
   }
 }
