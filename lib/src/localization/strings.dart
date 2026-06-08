@@ -604,6 +604,9 @@ class S {
   String get viewAsList => t('viewAsList');
   String get viewAsKanban => t('viewAsKanban');
   String get noSectionTitle => t('noSectionTitle');
+  String get kanbanScrollLabel => t('kanbanScrollLabel');
+  String get kanbanScrollSnap => t('kanbanScrollSnap');
+  String get kanbanScrollFree => t('kanbanScrollFree');
   String get sectionName => t('sectionName');
   String get sectionCompleted => t('sectionCompleted');
   String get turns => t('turns');
@@ -1232,6 +1235,7 @@ const Map<String, String> _en = {
   'completable': 'Show checkbox', 'thisYear': 'This year',
   'nextYear': 'Next year', 'addSection': 'Add Section',
   'viewLabel': 'View', 'viewAsList': 'List View', 'viewAsKanban': 'Kanban View', 'noSectionTitle': 'No Section',
+  'kanbanScrollLabel': 'Kanban Scrolling', 'kanbanScrollSnap': 'Snap to List', 'kanbanScrollFree': 'Free Scroll',
   'sectionName': 'Section name', 'sectionCompleted': 'Completed',
   'turns': 'turns',
   'selectColor': 'Select Color', 'otherDots': 'Other…',
@@ -1473,6 +1477,7 @@ const Map<String, String> _uk = {
   'completable': 'Показати чекбокс', 'thisYear': 'Цей рік',
   'nextYear': 'Наступний рік', 'addSection': 'Додати розділ',
   'viewLabel': 'Вигляд', 'viewAsList': 'Список', 'viewAsKanban': 'Канбан', 'noSectionTitle': 'Без розділу',
+  'kanbanScrollLabel': 'Прокрутка канбану', 'kanbanScrollSnap': 'Прив’язка до списку', 'kanbanScrollFree': 'Вільна прокрутка',
   'sectionName': 'Назва розділу', 'sectionCompleted': 'Виконано',
   'turns': 'виповнюється',
   'selectColor': 'Вибрати колір', 'otherDots': 'Інше…',
@@ -1909,6 +1914,7 @@ const Map<String, String> _es = {
   'completable': 'Mostrar casilla', 'thisYear': 'Este año',
   'nextYear': 'Próximo año', 'addSection': 'Añadir sección',
   'viewLabel': 'Vista', 'viewAsList': 'Vista de lista', 'viewAsKanban': 'Vista Kanban', 'noSectionTitle': 'Sin sección',
+  'kanbanScrollLabel': 'Desplazamiento Kanban', 'kanbanScrollSnap': 'Ajustar a la lista', 'kanbanScrollFree': 'Desplazamiento libre',
   'sectionName': 'Nombre de la sección', 'sectionCompleted': 'Completadas',
   'turns': 'cumple',
   'selectColor': 'Seleccionar color', 'otherDots': 'Otro…',
@@ -2345,6 +2351,7 @@ const Map<String, String> _fr = {
   'completable': 'Afficher la case', 'thisYear': 'Cette année',
   'nextYear': 'Année prochaine', 'addSection': 'Ajouter une section',
   'viewLabel': 'Affichage', 'viewAsList': 'Vue liste', 'viewAsKanban': 'Vue Kanban', 'noSectionTitle': 'Sans section',
+  'kanbanScrollLabel': 'Défilement Kanban', 'kanbanScrollSnap': 'Aligner sur la liste', 'kanbanScrollFree': 'Défilement libre',
   'sectionName': 'Nom de la section', 'sectionCompleted': 'Terminé',
   'turns': 'fête',
   'selectColor': 'Sélectionner', 'otherDots': 'Autre…',
@@ -2781,6 +2788,7 @@ const Map<String, String> _de = {
   'completable': 'Kästchen anzeigen', 'thisYear': 'Dieses Jahr',
   'nextYear': 'Nächstes Jahr', 'addSection': 'Abschnitt hinzufügen',
   'viewLabel': 'Ansicht', 'viewAsList': 'Listenansicht', 'viewAsKanban': 'Kanban-Ansicht', 'noSectionTitle': 'Kein Abschnitt',
+  'kanbanScrollLabel': 'Kanban-Scrollen', 'kanbanScrollSnap': 'An Liste ausrichten', 'kanbanScrollFree': 'Freies Scrollen',
   'sectionName': 'Abschnittsname', 'sectionCompleted': 'Erledigt',
   'turns': 'wird',
   'selectColor': 'Farbe wählen', 'otherDots': 'Andere…',
@@ -3217,6 +3225,7 @@ const Map<String, String> _it = {
   'completable': 'Mostra casella', 'thisYear': "Quest'anno",
   'nextYear': 'Anno prossimo', 'addSection': 'Aggiungi sezione',
   'viewLabel': 'Vista', 'viewAsList': 'Vista elenco', 'viewAsKanban': 'Vista Kanban', 'noSectionTitle': 'Nessuna sezione',
+  'kanbanScrollLabel': 'Scorrimento Kanban', 'kanbanScrollSnap': 'Aggancia alla lista', 'kanbanScrollFree': 'Scorrimento libero',
   'sectionName': 'Nome sezione', 'sectionCompleted': 'Completate',
   'turns': 'compie',
   'selectColor': 'Seleziona colore', 'otherDots': 'Altro…',
@@ -3653,6 +3662,7 @@ const Map<String, String> _pt = {
   'completable': 'Mostrar caixa', 'thisYear': 'Este ano',
   'nextYear': 'Próximo ano', 'addSection': 'Adicionar seção',
   'viewLabel': 'Visualização', 'viewAsList': 'Lista', 'viewAsKanban': 'Kanban', 'noSectionTitle': 'Sem seção',
+  'kanbanScrollLabel': 'Rolagem Kanban', 'kanbanScrollSnap': 'Ajustar à lista', 'kanbanScrollFree': 'Rolagem livre',
   'sectionName': 'Nome da seção', 'sectionCompleted': 'Concluídas',
   'turns': 'faz',
   'selectColor': 'Selecionar cor', 'otherDots': 'Outro…',
@@ -4089,6 +4099,7 @@ const Map<String, String> _ru = {
   'completable': 'Показывать чекбокс', 'thisYear': 'В этом году',
   'nextYear': 'В следующем году', 'addSection': 'Добавить раздел',
   'viewLabel': 'Вид', 'viewAsList': 'Список', 'viewAsKanban': 'Канбан', 'noSectionTitle': 'Без раздела',
+  'kanbanScrollLabel': 'Прокрутка канбана', 'kanbanScrollSnap': 'Привязка к списку', 'kanbanScrollFree': 'Свободная прокрутка',
   'sectionName': 'Название раздела', 'sectionCompleted': 'Выполнено',
   'turns': 'исполняется',
   'selectColor': 'Выбрать цвет', 'otherDots': 'Другое…',
@@ -4524,6 +4535,7 @@ const Map<String, String> _zh = {
   'completable': '显示复选框', 'thisYear': '今年',
   'nextYear': '明年', 'addSection': '添加分组',
   'viewLabel': '视图', 'viewAsList': '列表视图', 'viewAsKanban': '看板视图', 'noSectionTitle': '无分组',
+  'kanbanScrollLabel': '看板滚动', 'kanbanScrollSnap': '对齐到列表', 'kanbanScrollFree': '自由滚动',
   'sectionName': '分组名称', 'sectionCompleted': '已完成',
   'turns': '将满',
   'selectColor': '选择颜色', 'otherDots': '其他…',
@@ -4959,6 +4971,7 @@ const Map<String, String> _ja = {
   'completable': 'チェックボックスを表示', 'thisYear': '今年',
   'nextYear': '来年', 'addSection': 'セクションを追加',
   'viewLabel': '表示', 'viewAsList': 'リスト表示', 'viewAsKanban': 'カンバン表示', 'noSectionTitle': 'セクションなし',
+  'kanbanScrollLabel': 'カンバンのスクロール', 'kanbanScrollSnap': 'リストにスナップ', 'kanbanScrollFree': '自由スクロール',
   'sectionName': 'セクション名', 'sectionCompleted': '完了',
   'turns': '歳',
   'selectColor': '色を選択', 'otherDots': 'その他…',

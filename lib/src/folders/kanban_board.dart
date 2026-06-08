@@ -2,37 +2,96 @@ import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
 import '../models/task.dart';
+import '../models/view_mode.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../tasks/task_row.dart';
 import '../theme/app_theme.dart';
+import '../utils/plus_drag_payload.dart';
+
+/// A group of tasks shown inside a Kanban column. A column may contain several
+/// groups: an implicit headerless "top" group, one collapsible group per list
+/// section, and an implicit collapsible "Completed" group at the bottom.
+class KanbanGroupData {
+  const KanbanGroupData({
+    required this.id,
+    required this.tasks,
+    this.title,
+    this.isCompleted = false,
+    this.sectionId,
+  });
+
+  /// Stable unique id (used as the collapse-state key + Plus-drop token).
+  final String id;
+
+  /// `null` for the headerless top group; otherwise the section / "Completed"
+  /// label rendered as a collapsible header.
+  final String? title;
+  final List<Task> tasks;
+
+  /// Completed groups default to collapsed and aren't Plus-drop targets.
+  final bool isCompleted;
+
+  /// The section a Plus-button drop here should assign the new task to
+  /// (`null` = no section / top group).
+  final String? sectionId;
+}
 
 /// One column of a [KanbanBoard]. [id] is an opaque token handed back to
-/// [KanbanBoard.onMoveTask] when a card is dropped here; the host maps it to a
-/// list id / section id as appropriate.
+/// [KanbanBoard.onMoveTask] when a card is dropped here, and to the create
+/// callbacks when the Plus button targets this column.
 class KanbanColumnData {
   const KanbanColumnData({
     required this.id,
     required this.title,
-    required this.tasks,
+    required this.groups,
     this.accentColor,
   });
 
   final String id;
   final String title;
-  final List<Task> tasks;
+  final List<KanbanGroupData> groups;
   final Color? accentColor;
+
+  /// Count of uncompleted tasks across all non-completed groups.
+  int get activeCount => groups
+      .where((g) => !g.isCompleted)
+      .fold(0, (sum, g) => sum + g.tasks.where((t) => !t.isCompleted).length);
 }
 
-/// Horizontally-scrolling Kanban board. Each column renders its tasks as cards
-/// that can be long-pressed and dragged onto another column. Dropping a card
-/// invokes [onMoveTask] with the dragged task id and the destination column id.
-class KanbanBoard extends StatelessWidget {
+/// Lets a host read the Kanban board's currently focused column and request a
+/// snap-to it. Attach via [KanbanBoard.boardController] (like a ScrollController).
+class KanbanBoardController {
+  _KanbanBoardState? _state;
+
+  void _attach(_KanbanBoardState s) => _state = s;
+  void _detach(_KanbanBoardState s) {
+    if (identical(_state, s)) _state = null;
+  }
+
+  /// Id of the column currently centered (snap) or nearest the viewport start
+  /// (free). `null` when no board is attached / there are no columns.
+  String? get focusedColumnId => _state?.focusedColumnId;
+
+  /// Animates the board so the focused column is aligned. A no-op in snap mode
+  /// (already aligned); in free mode it scrolls the nearest column into place.
+  Future<void> snapToFocused() async => _state?.snapToFocused();
+}
+
+/// Horizontally-scrolling Kanban board. Columns render their tasks as cards
+/// that can be long-pressed and dragged onto another column. The board also
+/// accepts the global Plus button as a drop target (per column / per section
+/// group) and supports free or snap (paged) horizontal scrolling.
+class KanbanBoard extends StatefulWidget {
   const KanbanBoard({
     super.key,
     required this.columns,
     required this.onMoveTask,
     required this.onTapTask,
     required this.onToggleTask,
+    this.scrollMode = KanbanScrollMode.snap,
+    this.boardController,
+    this.onCreateInColumn,
+    this.onCreateInGroup,
     this.emptyLabel,
   });
 
@@ -40,38 +99,214 @@ class KanbanBoard extends StatelessWidget {
   final void Function(String taskId, String toColumnId) onMoveTask;
   final void Function(Task task) onTapTask;
   final void Function(Task task) onToggleTask;
+  final KanbanScrollMode scrollMode;
+  final KanbanBoardController? boardController;
+
+  /// Plus button dropped on a column's body (or tapped while this column is
+  /// focused). [columnId] is the column's opaque id.
+  final void Function(String columnId)? onCreateInColumn;
+
+  /// Plus button dropped on a specific section group inside a column.
+  final void Function(String columnId, KanbanGroupData group)? onCreateInGroup;
+
   final String? emptyLabel;
 
-  static const double _columnWidth = 280;
+  /// Column width in free-scroll mode.
+  static const double _freeColumnWidth = 300;
+
+  /// Fraction of the viewport one page occupies in snap mode — slightly under
+  /// 1 so the next column peeks at the edge as a swipe affordance.
+  static const double _snapViewportFraction = 0.9;
+
+  @override
+  State<KanbanBoard> createState() => _KanbanBoardState();
+}
+
+class _KanbanBoardState extends State<KanbanBoard> {
+  // Collapse state lives in the board (ephemeral across rebuilds, keyed by the
+  // stable group id). Sections default expanded; completed groups default
+  // collapsed.
+  final Set<String> _collapsedSections = {};
+  final Set<String> _expandedCompleted = {};
+
+  // Free-scroll mode uses a plain ScrollController; snap mode uses a
+  // PageController. Only one is non-null at a time.
+  ScrollController? _scrollController;
+  PageController? _pageController;
+  int _focusedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initScrollers();
+    widget.boardController?._attach(this);
+  }
+
+  void _initScrollers() {
+    if (widget.scrollMode == KanbanScrollMode.snap) {
+      _pageController =
+          PageController(viewportFraction: KanbanBoard._snapViewportFraction)
+            ..addListener(_onPageScroll);
+    } else {
+      _scrollController = ScrollController()..addListener(_onFreeScroll);
+    }
+  }
+
+  @override
+  void didUpdateWidget(KanbanBoard old) {
+    super.didUpdateWidget(old);
+    if (old.boardController != widget.boardController) {
+      old.boardController?._detach(this);
+      widget.boardController?._attach(this);
+    }
+    if (old.scrollMode != widget.scrollMode) {
+      _disposeScrollers();
+      _initScrollers();
+    }
+    if (_focusedIndex >= widget.columns.length) {
+      _focusedIndex = widget.columns.isEmpty ? 0 : widget.columns.length - 1;
+    }
+  }
+
+  void _disposeScrollers() {
+    _scrollController?.removeListener(_onFreeScroll);
+    _scrollController?.dispose();
+    _scrollController = null;
+    _pageController?.removeListener(_onPageScroll);
+    _pageController?.dispose();
+    _pageController = null;
+  }
+
+  @override
+  void dispose() {
+    widget.boardController?._detach(this);
+    _disposeScrollers();
+    super.dispose();
+  }
+
+  void _onPageScroll() {
+    final page = _pageController?.page;
+    if (page == null) return;
+    final idx = page.round();
+    if (idx != _focusedIndex) setState(() => _focusedIndex = idx);
+  }
+
+  void _onFreeScroll() {
+    final c = _scrollController;
+    if (c == null || !c.hasClients) return;
+    final idx =
+        (c.offset / KanbanBoard._freeColumnWidth).round().clamp(0, 1 << 30);
+    if (idx != _focusedIndex && idx < widget.columns.length) {
+      setState(() => _focusedIndex = idx);
+    }
+  }
+
+  String? get focusedColumnId {
+    if (widget.columns.isEmpty) return null;
+    final i = _focusedIndex.clamp(0, widget.columns.length - 1);
+    return widget.columns[i].id;
+  }
+
+  Future<void> snapToFocused() async {
+    if (widget.columns.isEmpty) return;
+    final i = _focusedIndex.clamp(0, widget.columns.length - 1);
+    if (widget.scrollMode == KanbanScrollMode.snap) {
+      await _pageController?.animateToPage(
+        i,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      );
+    } else {
+      await _scrollController?.animateTo(
+        i * KanbanBoard._freeColumnWidth,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _toggleGroup(KanbanGroupData group) {
+    setState(() {
+      if (group.isCompleted) {
+        if (_expandedCompleted.contains(group.id)) {
+          _expandedCompleted.remove(group.id);
+        } else {
+          _expandedCompleted.add(group.id);
+        }
+      } else {
+        if (_collapsedSections.contains(group.id)) {
+          _collapsedSections.remove(group.id);
+        } else {
+          _collapsedSections.add(group.id);
+        }
+      }
+    });
+  }
+
+  bool _isExpanded(KanbanGroupData group) => group.isCompleted
+      ? _expandedCompleted.contains(group.id)
+      : !_collapsedSections.contains(group.id);
 
   @override
   Widget build(BuildContext context) {
-    if (columns.isEmpty) {
+    if (widget.columns.isEmpty) {
       return Center(
         child: Text(
-          emptyLabel ?? S.of(context).noItems,
+          widget.emptyLabel ?? S.of(context).noItems,
           style: const TextStyle(color: CupertinoColors.secondaryLabel),
         ),
       );
     }
+
+    Widget columnAt(int index) => _KanbanColumn(
+          data: widget.columns[index],
+          onMoveTask: widget.onMoveTask,
+          onTapTask: widget.onTapTask,
+          onToggleTask: widget.onToggleTask,
+          onCreateInColumn: widget.onCreateInColumn,
+          onCreateInGroup: widget.onCreateInGroup,
+          isExpanded: _isExpanded,
+          onToggleGroup: _toggleGroup,
+        );
+
+    if (widget.scrollMode == KanbanScrollMode.snap) {
+      return PageView.builder(
+        controller: _pageController,
+        padEnds: false,
+        itemCount: widget.columns.length,
+        itemBuilder: (context, index) => Padding(
+          padding: const EdgeInsets.fromLTRB(6, 12, 6, 80),
+          child: columnAt(index),
+        ),
+      );
+    }
+
     return ListView.separated(
+      controller: _scrollController,
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-      itemCount: columns.length,
+      itemCount: widget.columns.length,
       separatorBuilder: (_, __) => const SizedBox(width: 12),
-      itemBuilder: (context, index) {
-        return SizedBox(
-          width: _columnWidth,
-          child: _KanbanColumn(
-            data: columns[index],
-            onMoveTask: onMoveTask,
-            onTapTask: onTapTask,
-            onToggleTask: onToggleTask,
-          ),
-        );
-      },
+      itemBuilder: (context, index) => SizedBox(
+        width: KanbanBoard._freeColumnWidth -
+            12, // leave room for the separator/padding
+        child: columnAt(index),
+      ),
     );
   }
+}
+
+/// Column background (the "window-container"). Distinct from the page
+/// background in both light and dark — the dark default page bg is `1C1C1E`,
+/// so the column uses an elevated grey there to stay visible.
+Color _columnColor(BuildContext context) {
+  final dark = CupertinoTheme.brightnessOf(context) == Brightness.dark;
+  return dark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7);
+}
+
+Color _cardColor(BuildContext context) {
+  final dark = CupertinoTheme.brightnessOf(context) == Brightness.dark;
+  return dark ? const Color(0xFF1C1C1E) : const Color(0xFFFFFFFF);
 }
 
 class _KanbanColumn extends StatelessWidget {
@@ -80,29 +315,54 @@ class _KanbanColumn extends StatelessWidget {
     required this.onMoveTask,
     required this.onTapTask,
     required this.onToggleTask,
+    required this.onCreateInColumn,
+    required this.onCreateInGroup,
+    required this.isExpanded,
+    required this.onToggleGroup,
   });
 
   final KanbanColumnData data;
   final void Function(String taskId, String toColumnId) onMoveTask;
   final void Function(Task task) onTapTask;
   final void Function(Task task) onToggleTask;
+  final void Function(String columnId)? onCreateInColumn;
+  final void Function(String columnId, KanbanGroupData group)? onCreateInGroup;
+  final bool Function(KanbanGroupData group) isExpanded;
+  final void Function(KanbanGroupData group) onToggleGroup;
+
+  bool _containsTask(String taskId) =>
+      data.groups.any((g) => g.tasks.any((t) => t.id == taskId));
 
   @override
   Widget build(BuildContext context) {
     final accent = data.accentColor ?? AppColors.accent;
-    return DragTarget<String>(
-      onWillAcceptWithDetails: (d) => !data.tasks.any((t) => t.id == d.data),
-      onAcceptWithDetails: (d) => onMoveTask(d.data, data.id),
+    return DragTarget<Object>(
+      onWillAcceptWithDetails: (d) {
+        final v = d.data;
+        if (v is PlusDragPayload) return onCreateInColumn != null;
+        if (v is String) return !_containsTask(v);
+        return false;
+      },
+      onAcceptWithDetails: (d) {
+        final v = d.data;
+        if (v is PlusDragPayload) {
+          onCreateInColumn?.call(data.id);
+        } else if (v is String) {
+          onMoveTask(v, data.id);
+        }
+      },
       builder: (context, candidates, _) {
         final highlighted = candidates.isNotEmpty;
         return Container(
           decoration: BoxDecoration(
-            color: CupertinoColors.secondarySystemBackground
-                .resolveFrom(context),
+            color: _columnColor(context),
             borderRadius: BorderRadius.circular(14),
-            border: highlighted
-                ? Border.all(color: accent, width: 2)
-                : Border.all(color: CupertinoColors.transparent, width: 2),
+            border: Border.all(
+              color: highlighted
+                  ? accent
+                  : CupertinoColors.separator.resolveFrom(context),
+              width: highlighted ? 2 : 0.5,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -114,10 +374,8 @@ class _KanbanColumn extends StatelessWidget {
                     Container(
                       width: 10,
                       height: 10,
-                      decoration: BoxDecoration(
-                        color: accent,
-                        shape: BoxShape.circle,
-                      ),
+                      decoration:
+                          BoxDecoration(color: accent, shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -133,31 +391,18 @@ class _KanbanColumn extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '${data.tasks.where((t) => !t.isCompleted).length}',
+                      '${data.activeCount}',
                       style: TextStyle(
                         fontSize: 14,
-                        color: CupertinoColors.secondaryLabel
-                            .resolveFrom(context),
+                        color:
+                            CupertinoColors.secondaryLabel.resolveFrom(context),
                       ),
                     ),
                   ],
                 ),
               ),
               Expanded(
-                child: data.tasks.isEmpty
-                    ? const _EmptyColumnBody()
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-                        itemCount: data.tasks.length,
-                        itemBuilder: (context, i) {
-                          final task = data.tasks[i];
-                          return _KanbanCard(
-                            task: task,
-                            onTap: () => onTapTask(task),
-                            onToggle: () => onToggleTask(task),
-                          );
-                        },
-                      ),
+                child: _columnBody(context),
               ),
             ],
           ),
@@ -165,15 +410,160 @@ class _KanbanColumn extends StatelessWidget {
       },
     );
   }
+
+  Widget _columnBody(BuildContext context) {
+    final hasAnyTask = data.groups.any((g) => g.tasks.isNotEmpty);
+    if (!hasAnyTask) {
+      // Keep the empty column a tall Plus-drop / card-drop target.
+      return _GroupDropZone(
+        enabled: onCreateInColumn != null,
+        onAccept: () => onCreateInColumn?.call(data.id),
+        child: const SizedBox(height: double.infinity, width: double.infinity),
+      );
+    }
+
+    final children = <Widget>[];
+    for (final group in data.groups) {
+      // Skip empty headerless (top) and empty completed groups; keep empty
+      // section headers so a list's sections stay visible in the column.
+      if (group.tasks.isEmpty && (group.title == null || group.isCompleted)) {
+        continue;
+      }
+      final expanded = isExpanded(group);
+      if (group.title != null) {
+        children.add(_GroupHeader(
+          group: group,
+          expanded: expanded,
+          onToggle: () => onToggleGroup(group),
+        ));
+      }
+      if (group.title == null || expanded) {
+        final body = group.tasks.isEmpty
+            ? const SizedBox(height: 10, width: double.infinity)
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final task in group.tasks)
+                    _KanbanCard(
+                      task: task,
+                      onTap: () => onTapTask(task),
+                      onToggle: () => onToggleTask(task),
+                    ),
+                ],
+              );
+        // Section / top groups accept Plus drops; completed groups don't.
+        if (!group.isCompleted && onCreateInGroup != null) {
+          children.add(_GroupDropZone(
+            enabled: true,
+            onAccept: () => onCreateInGroup!(data.id, group),
+            child: body,
+          ));
+        } else {
+          children.add(body);
+        }
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+      children: children,
+    );
+  }
 }
 
-/// Keeps an empty column tall enough to be an easy drop target.
-class _EmptyColumnBody extends StatelessWidget {
-  const _EmptyColumnBody();
+/// Wraps a group body in a Plus-button drop target that highlights on hover.
+class _GroupDropZone extends StatelessWidget {
+  const _GroupDropZone({
+    required this.enabled,
+    required this.onAccept,
+    required this.child,
+  });
+
+  final bool enabled;
+  final VoidCallback onAccept;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(height: double.infinity, width: double.infinity);
+    if (!enabled) return child;
+    return DragTarget<PlusDragPayload>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (_) => onAccept(),
+      builder: (context, candidates, _) {
+        final hovering = candidates.isNotEmpty;
+        return Container(
+          decoration: hovering
+              ? BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                )
+              : null,
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+/// Collapsible header for a section / "Completed" group inside a column.
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({
+    required this.group,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  final KanbanGroupData group;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = group.isCompleted
+        ? group.tasks.length
+        : group.tasks.where((t) => !t.isCompleted).length;
+    return GestureDetector(
+      onTap: onToggle,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+        child: Row(
+          children: [
+            AnimatedRotation(
+              duration: const Duration(milliseconds: 180),
+              turns: expanded ? 0 : -0.25,
+              child: Icon(
+                CupertinoIcons.chevron_down,
+                size: 13,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                group.title!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.4,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -219,7 +609,7 @@ class _KanbanCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground.resolveFrom(context),
+          color: _cardColor(context),
           borderRadius: BorderRadius.circular(10),
           boxShadow: lifted
               ? const [

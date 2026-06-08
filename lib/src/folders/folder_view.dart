@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../contacts/contact_controller.dart';
 import '../localization/strings.dart';
 import '../models/app_folder.dart';
+import '../models/view_mode.dart';
 import '../settings/settings_controller.dart';
 import '../tasks/complete_with_undo.dart';
 import '../tasks/task_controller.dart';
@@ -57,13 +58,15 @@ class FolderView extends StatefulWidget {
   State<FolderView> createState() => _FolderViewState();
 }
 
-enum _FolderViewMode { list, kanban }
-
 class _FolderViewState extends State<FolderView>
     with DropdownOverlayMixin {
   late AppFolder _currentFolder;
   final Set<String> _expandedIds = {};
-  _FolderViewMode _viewMode = _FolderViewMode.list;
+  final _kanbanBoardController = KanbanBoardController();
+  late final bool Function() _kanbanTapHandler = _handleKanbanPlusTap;
+  PlusDragController? _plusScope;
+
+  ItemViewMode get _viewMode => _currentFolder.viewMode;
 
   @override
   void initState() {
@@ -78,11 +81,54 @@ class _FolderViewState extends State<FolderView>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _plusScope = PlusDragScope.of(context);
+  }
+
+  @override
   void dispose() {
     // Restore the active folder to this folder's parent so popping back to an
     // ancestor folder keeps the + button targeting the right folder.
     widget.activeFolderId?.value = _currentFolder.parentFolderId;
+    if (identical(_plusScope?.onKanbanPlusTap, _kanbanTapHandler)) {
+      _plusScope!.onKanbanPlusTap = null;
+    }
     super.dispose();
+  }
+
+  /// Registers (or clears) the Kanban + tap handler so the global Plus button
+  /// creates a task in the focused list-column while this folder's Kanban view
+  /// is on top.
+  void _syncKanbanHandler() {
+    final scope = _plusScope;
+    if (scope == null) return;
+    if (_viewMode == ItemViewMode.kanban) {
+      scope.onKanbanPlusTap = _kanbanTapHandler;
+    } else if (identical(scope.onKanbanPlusTap, _kanbanTapHandler)) {
+      scope.onKanbanPlusTap = null;
+    }
+  }
+
+  /// Creates a task in [listId] (a list directly inside this folder) by
+  /// routing through the host's Plus-drop handler (which also handles
+  /// Birthdays lists).
+  void _createInList(String listId) {
+    _plusScope?.onDropOnList?.call(listId);
+  }
+
+  bool _handleKanbanPlusTap() {
+    final focused = _kanbanBoardController.focusedColumnId;
+    if (focused == null) return false;
+    if (_currentFolder.kanbanScrollMode == KanbanScrollMode.free) {
+      _kanbanBoardController.snapToFocused().then((_) {
+        if (!mounted) return;
+        _createInList(_kanbanBoardController.focusedColumnId ?? focused);
+      });
+    } else {
+      _createInList(focused);
+    }
+    return true;
   }
 
   void _toggle(String id) {
@@ -232,11 +278,17 @@ class _FolderViewState extends State<FolderView>
     showDropdown(context, (dismiss) {
       return _FolderOptionsDropdown(
         onDismiss: dismiss,
-        isKanban: _viewMode == _FolderViewMode.kanban,
+        isKanban: _viewMode == ItemViewMode.kanban,
         onView: () {
           dismiss();
           _pickViewMode();
         },
+        onScrollMode: _viewMode == ItemViewMode.kanban
+            ? () {
+                dismiss();
+                _pickScrollMode();
+              }
+            : null,
         onAddList: () {
           dismiss();
           showCreateFolderListSheet(
@@ -292,7 +344,7 @@ class _FolderViewState extends State<FolderView>
 
   Future<void> _pickViewMode() async {
     final s = S.of(context);
-    final picked = await showSelectionMenu<_FolderViewMode>(
+    final picked = await showSelectionMenu<ItemViewMode>(
       context: context,
       title: s.viewLabel,
       current: _viewMode,
@@ -301,19 +353,51 @@ class _FolderViewState extends State<FolderView>
       anchor: SelectionMenuAnchor.topRight,
       options: [
         SelectionMenuOption(
-          value: _FolderViewMode.list,
+          value: ItemViewMode.list,
           label: s.viewAsList,
           icon: CupertinoIcons.list_bullet,
         ),
         SelectionMenuOption(
-          value: _FolderViewMode.kanban,
+          value: ItemViewMode.kanban,
           label: s.viewAsKanban,
           icon: CupertinoIcons.square_split_2x1,
         ),
       ],
     );
-    if (picked == null || !mounted) return;
-    setState(() => _viewMode = picked);
+    if (picked == null || !mounted || picked == _viewMode) return;
+    final updated = _currentFolder.copyWith(viewMode: picked);
+    await widget.folderController.updateFolder(updated);
+    if (mounted) setState(() => _currentFolder = updated);
+  }
+
+  Future<void> _pickScrollMode() async {
+    final s = S.of(context);
+    final picked = await showSelectionMenu<KanbanScrollMode>(
+      context: context,
+      title: s.kanbanScrollLabel,
+      current: _currentFolder.kanbanScrollMode,
+      anchor: SelectionMenuAnchor.topRight,
+      options: [
+        SelectionMenuOption(
+          value: KanbanScrollMode.snap,
+          label: s.kanbanScrollSnap,
+          icon: CupertinoIcons.rectangle_split_3x1,
+        ),
+        SelectionMenuOption(
+          value: KanbanScrollMode.free,
+          label: s.kanbanScrollFree,
+          icon: CupertinoIcons.arrow_left_right,
+        ),
+      ],
+    );
+    if (picked == null ||
+        !mounted ||
+        picked == _currentFolder.kanbanScrollMode) {
+      return;
+    }
+    final updated = _currentFolder.copyWith(kanbanScrollMode: picked);
+    await widget.folderController.updateFolder(updated);
+    if (mounted) setState(() => _currentFolder = updated);
   }
 
   /// Moves a task into [toListId] (a list directly inside this folder) when a
@@ -328,20 +412,63 @@ class _FolderViewState extends State<FolderView>
   }
 
   Widget _buildKanbanBoard(BuildContext context) {
+    final s = S.of(context);
     final lists = widget.folderController.listsIn(_currentFolder.id);
+
+    // Each list-column shows its headerless "top" tasks, then each of the
+    // list's sections (collapsible), then a collapsible "Completed" group.
+    List<KanbanGroupData> groupsForList(String listId) {
+      final sections = widget.folderController.sectionsForList(listId);
+      final completed =
+          widget.taskController.completedTasksForList(listId);
+      return [
+        KanbanGroupData(
+          id: '$listId::top',
+          tasks: widget.taskController.tasksForListSection(listId, null),
+          sectionId: null,
+        ),
+        for (final section in sections)
+          KanbanGroupData(
+            id: '$listId::${section.id}',
+            title: section.name,
+            tasks:
+                widget.taskController.tasksForListSection(listId, section.id),
+            sectionId: section.id,
+          ),
+        if (completed.isNotEmpty)
+          KanbanGroupData(
+            id: '$listId::completed',
+            title: s.sectionCompleted,
+            isCompleted: true,
+            tasks: completed,
+          ),
+      ];
+    }
+
     final columns = [
       for (final l in lists)
         KanbanColumnData(
           id: l.id,
           title: l.name,
           accentColor: l.color != null ? Color(l.color!) : null,
-          tasks: widget.taskController.tasksForList(l.id),
+          groups: groupsForList(l.id),
         ),
     ];
     return KanbanBoard(
       columns: columns,
-      emptyLabel: S.of(context).noItems,
+      scrollMode: _currentFolder.kanbanScrollMode,
+      boardController: _kanbanBoardController,
+      emptyLabel: s.noItems,
       onMoveTask: _moveTaskToList,
+      onCreateInColumn: _createInList,
+      onCreateInGroup: (listId, group) {
+        final sectionId = group.sectionId;
+        if (sectionId == null) {
+          _createInList(listId);
+        } else {
+          _plusScope?.onDropOnSection?.call(listId, sectionId);
+        }
+      },
       onToggleTask: (task) =>
           toggleTaskCompletedWithUndo(context, widget.taskController, task),
       onTapTask: (task) => Navigator.of(context).push(
@@ -434,6 +561,7 @@ class _FolderViewState extends State<FolderView>
 
   @override
   Widget build(BuildContext context) {
+    _syncKanbanHandler();
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
@@ -455,7 +583,7 @@ class _FolderViewState extends State<FolderView>
                   widget.settingsController!,
               ]),
               builder: (context, _) {
-                if (_viewMode == _FolderViewMode.kanban) {
+                if (_viewMode == ItemViewMode.kanban) {
                   return _buildKanbanBoard(context);
                 }
                 final subFolders =
@@ -742,6 +870,7 @@ class _FolderOptionsDropdown extends StatelessWidget {
     required this.onDismiss,
     required this.onView,
     required this.isKanban,
+    this.onScrollMode,
     required this.onAddList,
     required this.onAddFolder,
     required this.onEdit,
@@ -754,6 +883,7 @@ class _FolderOptionsDropdown extends StatelessWidget {
   final VoidCallback onDismiss;
   final VoidCallback onView;
   final bool isKanban;
+  final VoidCallback? onScrollMode;
   final VoidCallback onAddList;
   final VoidCallback onAddFolder;
   final VoidCallback onEdit;
@@ -783,6 +913,11 @@ class _FolderOptionsDropdown extends StatelessWidget {
                       ? CupertinoIcons.square_split_2x1
                       : CupertinoIcons.list_bullet,
                   onTap: onView),
+              if (onScrollMode != null)
+                _DropdownItem(
+                    label: S.of(context).kanbanScrollLabel,
+                    icon: CupertinoIcons.arrow_left_right,
+                    onTap: onScrollMode!),
               _DropdownItem(
                   label: S.of(context).addList,
                   icon: CupertinoIcons.add_circled,

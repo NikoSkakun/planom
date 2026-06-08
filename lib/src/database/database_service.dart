@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 33;
+  static const _dbVersion = 34;
 
   Database? _db;
 
@@ -91,7 +91,9 @@ class DatabaseService {
             description TEXT,
             defaultListId TEXT,
             isDeleted INTEGER NOT NULL DEFAULT 0,
-            deletedDate INTEGER
+            deletedDate INTEGER,
+            viewMode TEXT,
+            kanbanScrollMode TEXT
           )
         ''');
         await db.execute('''
@@ -107,7 +109,9 @@ class DatabaseService {
             description TEXT,
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
-            listType TEXT NOT NULL DEFAULT 'tasks'
+            listType TEXT NOT NULL DEFAULT 'tasks',
+            viewMode TEXT,
+            kanbanScrollMode TEXT
           )
         ''');
         await db.execute('''
@@ -578,6 +582,16 @@ class DatabaseService {
           // Recurring events: a JSON-encoded Recurrence rule on the event,
           // expanded onto each repeat day in the view layer.
           await db.execute('ALTER TABLE events ADD COLUMN recurrence TEXT');
+        }
+        if (oldVersion < 34) {
+          // Persisted per-list / per-folder view mode (list | kanban) and the
+          // Kanban horizontal-scroll mode (free | snap). Null → defaults.
+          await db.execute('ALTER TABLE folders ADD COLUMN viewMode TEXT');
+          await db.execute(
+              'ALTER TABLE folders ADD COLUMN kanbanScrollMode TEXT');
+          await db.execute('ALTER TABLE app_lists ADD COLUMN viewMode TEXT');
+          await db.execute(
+              'ALTER TABLE app_lists ADD COLUMN kanbanScrollMode TEXT');
         }
       },
     );

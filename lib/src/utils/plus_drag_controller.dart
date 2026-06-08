@@ -53,6 +53,12 @@ class PlusDragController {
   /// Called when the user drops on the Tasks-tab add-folder button.
   /// The receiver should open the create-folder/list sheet.
   void Function()? onDropOnAddFolderButton;
+
+  /// Set by a Kanban view that's on top and wants to handle Plus *taps*
+  /// itself (snap to the focused/nearest column, then create a task there).
+  /// Returns true when it handled the tap; the host then skips its normal
+  /// task-creation flow. Cleared when the Kanban view is dismissed.
+  bool Function()? onKanbanPlusTap;
 }
 
 class PlusDragScope extends InheritedWidget {
