@@ -759,7 +759,7 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
               ctx,
               task,
               sectionId: null,
-              beforeId: task.id,
+              group: topTasks,
             ),
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -806,7 +806,7 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
                   ctx,
                   task,
                   sectionId: section.id,
-                  beforeId: task.id,
+                  group: secTasks,
                 ),
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -855,14 +855,21 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
     BuildContext context,
     Task task, {
     required String? sectionId,
-    required String beforeId,
+    required List<Task> group,
   }) {
     if (widget.selection.active) {
       return _buildTaskRow(context, task);
     }
+    // The id of the row immediately after this one in the same group drives
+    // the midpoint hand-off: crossing this row's centre while dragging down
+    // hands the gap to [nextId] (or the section end when this is the last
+    // row). Computed from the live group order the list is rendering.
+    final idx = group.indexWhere((t) => t.id == task.id);
+    final nextId =
+        (idx >= 0 && idx + 1 < group.length) ? group[idx + 1].id : null;
     return _TaskReorderRow(
       task: task,
-      beforeId: beforeId,
+      nextId: nextId,
       sectionId: sectionId,
       listId: widget.list.id,
       taskController: widget.taskController,
@@ -946,14 +953,25 @@ class _SectionedListBodyState extends State<_SectionedListBody> {
   }
 }
 
-/// Long-press-to-drag wrapper for a task row. Collapses the source slot to
-/// zero (animated) while the drag is in flight and reports the row's height
-/// to [ReorderDragNotifier] so the matching drop zones can render an empty
-/// placeholder of the right size.
+/// Long-press-to-drag wrapper for a task row.
+///
+/// The reorder is driven by a single shared gap (see [ReorderDragNotifier]):
+///   • On pickup the gap is parked at the dragged row's own origin, so the
+///     space the row vacated stays open instead of the list snapping closed.
+///   • As the finger moves, whichever row's centre the *lifted card's* centre
+///     crosses hands the gap on (to that row, the next row, or the section
+///     end), so rows shift exactly on the midpoint — never a row too late.
+///   • Because exactly one target is ever set, the origin gap and the new gap
+///     animate as one hand-off (no double-shift jitter).
+///
+/// Each row's height (gap + collapsed source) is held in a single
+/// [AnimatedSize]: at pickup the gap grows to the row height in the very frame
+/// the source collapses to zero, so the net height is unchanged and nothing
+/// jumps; only a genuine hand-off animates.
 class _TaskReorderRow extends StatefulWidget {
   const _TaskReorderRow({
     required this.task,
-    required this.beforeId,
+    required this.nextId,
     required this.sectionId,
     required this.listId,
     required this.taskController,
@@ -961,7 +979,9 @@ class _TaskReorderRow extends StatefulWidget {
   });
 
   final Task task;
-  final String beforeId;
+
+  /// Id of the next row in the same group, or null when this is the last row.
+  final String? nextId;
   final String? sectionId;
   final String listId;
   final TaskController taskController;
@@ -983,13 +1003,80 @@ class _TaskReorderRowState extends State<_TaskReorderRow> {
     return 44;
   }
 
+  ReorderTarget get _beforeSelf => (
+        kind: 'before',
+        beforeId: widget.task.id,
+        listId: widget.listId,
+        sectionId: widget.sectionId,
+      );
+
+  /// Resolves the insertion target for a lifted-card centre at [draggedCentreY]
+  /// (global). Comparing the dragged card's centre against this row's centre
+  /// makes the hand-off independent of where the row was grabbed and lands it
+  /// right on the midpoint.
+  ReorderTarget _resolveTarget(double draggedCentreY) {
+    // The dragged row maps to its own origin so the gap stays parked there
+    // until the finger genuinely reaches another row.
+    if (widget.task.id == ReorderDragNotifier.instance.draggingId) {
+      return _beforeSelf;
+    }
+    final ro = _measureKey.currentContext?.findRenderObject();
+    if (ro is RenderBox && ro.hasSize) {
+      final centre = ro.localToGlobal(Offset.zero).dy + ro.size.height / 2;
+      if (draggedCentreY > centre) {
+        // Past this row's centre → hand the gap to the next row, or to the
+        // section end when there's nothing after this row.
+        if (widget.nextId != null) {
+          return (
+            kind: 'before',
+            beforeId: widget.nextId,
+            listId: widget.listId,
+            sectionId: widget.sectionId,
+          );
+        }
+        return (
+          kind: 'end',
+          beforeId: null,
+          listId: widget.listId,
+          sectionId: widget.sectionId,
+        );
+      }
+    }
+    return _beforeSelf;
+  }
+
   void _onDragStarted() {
-    ReorderDragNotifier.instance
-        .start(widget.task.id, 'task', _measureHeight());
+    final notifier = ReorderDragNotifier.instance;
+    notifier.start(widget.task.id, 'task', _measureHeight());
+    // Park the gap at this row's origin so the vacated space stays open.
+    notifier.setTarget(_beforeSelf);
+  }
+
+  void _onMove(DragTargetDetails<String> details) {
+    final notifier = ReorderDragNotifier.instance;
+    final centre = details.offset.dy + notifier.draggingHeight / 2;
+    notifier.setTarget(_resolveTarget(centre));
   }
 
   void _onDragEnded() {
     ReorderDragNotifier.instance.end();
+  }
+
+  void _applyDrop() {
+    final notifier = ReorderDragNotifier.instance;
+    final movedId = notifier.draggingId;
+    final target = notifier.target;
+    if (movedId == null || target == null) return;
+    // Dropping a row before itself is a no-op — and would otherwise slip
+    // through to "end of section" inside reorderTaskBefore (which excludes
+    // the moved row from its scope, so beforeId == movedId never matches).
+    if (target.kind == 'before' && target.beforeId == movedId) return;
+    widget.taskController.reorderTaskBefore(
+      movedTaskId: movedId,
+      beforeTaskId: target.kind == 'end' ? null : target.beforeId,
+      listId: target.listId,
+      sectionId: target.sectionId,
+    );
   }
 
   @override
@@ -1003,68 +1090,64 @@ class _TaskReorderRowState extends State<_TaskReorderRow> {
   @override
   Widget build(BuildContext context) {
     final feedbackWidth = MediaQuery.sizeOf(context).width;
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 160),
-      curve: Curves.easeOut,
-      alignment: Alignment.topCenter,
-      child: LongPressDraggable<String>(
-        data: widget.task.id,
-        delay: const Duration(milliseconds: 400),
-        onDragStarted: _onDragStarted,
-        onDragEnd: (_) => _onDragEnded(),
-        onDraggableCanceled: (_, __) => _onDragEnded(),
-        onDragCompleted: _onDragEnded,
-        // Render the actual row as the drag feedback so the lifted
-        // card matches the source row exactly (checkbox, date, list
-        // chip, multi-line wrapping, …) instead of a stripped-down
-        // title-only placeholder.
-        feedback: buildReorderDragFeedback(context, feedbackWidth, widget.child),
-        childWhenDragging: const SizedBox.shrink(),
-        child: DragTarget<String>(
-          onWillAcceptWithDetails: (d) => d.data != widget.task.id,
-          onAcceptWithDetails: (d) =>
-              widget.taskController.reorderTaskBefore(
-            movedTaskId: d.data,
-            beforeTaskId: widget.beforeId,
-            listId: widget.listId,
-            sectionId: widget.sectionId,
-          ),
+    return AnimatedBuilder(
+      animation: ReorderDragNotifier.instance,
+      builder: (context, _) {
+        final notifier = ReorderDragNotifier.instance;
+        final target = notifier.target;
+        final showGap = notifier.isDragging &&
+            target != null &&
+            target.kind == 'before' &&
+            target.beforeId == widget.task.id;
+        final gapHeight = showGap ? notifier.draggingHeight : 0.0;
+        return DragTarget<String>(
+          onWillAcceptWithDetails: (_) => true,
+          onMove: _onMove,
+          onAcceptWithDetails: (_) => _applyDrop(),
           builder: (context, candidates, _) {
-            final highlighted = candidates.isNotEmpty;
-            return AnimatedBuilder(
-              animation: ReorderDragNotifier.instance,
-              builder: (context, _) {
-                final placeholder = highlighted
-                    ? ReorderDragNotifier.instance.draggingHeight
-                    : 0.0;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 160),
-                      curve: Curves.easeOut,
-                      alignment: Alignment.topCenter,
-                      child: SizedBox(
-                          height: placeholder, width: double.infinity),
-                    ),
-                    KeyedSubtree(
+            // Gap + (collapsed-while-dragging) source held in one AnimatedSize
+            // so the two cancel on pickup and only real hand-offs animate.
+            return AnimatedSize(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: gapHeight, width: double.infinity),
+                  LongPressDraggable<String>(
+                    data: widget.task.id,
+                    delay: const Duration(milliseconds: 400),
+                    onDragStarted: _onDragStarted,
+                    onDragEnd: (_) => _onDragEnded(),
+                    onDraggableCanceled: (_, __) => _onDragEnded(),
+                    onDragCompleted: _onDragEnded,
+                    // Render the actual row as the drag feedback so the lifted
+                    // card matches the source row exactly (checkbox, date, list
+                    // chip, multi-line wrapping, …) instead of a stripped-down
+                    // title-only placeholder.
+                    feedback: buildReorderDragFeedback(
+                        context, feedbackWidth, widget.child),
+                    childWhenDragging: const SizedBox.shrink(),
+                    child: KeyedSubtree(
                       key: _measureKey,
                       child: widget.child,
                     ),
-                  ],
-                );
-              },
+                  ),
+                ],
+              ),
             );
           },
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
 /// Trailing slot after the last task in a section. Stays at a tiny constant
-/// height when idle (so the user has somewhere to aim for an end-of-list
-/// drop) and grows to the dragged row's height while hovering.
+/// height while a task drag is in flight (so the user has somewhere to aim for
+/// an end-of-list drop) and grows to the dragged row's height once the shared
+/// gap parks at this section's end.
 class _TaskReorderTrailingSlot extends StatelessWidget {
   const _TaskReorderTrailingSlot({
     required this.listId,
@@ -1076,30 +1159,50 @@ class _TaskReorderTrailingSlot extends StatelessWidget {
   final String? sectionId;
   final TaskController taskController;
 
+  ReorderTarget get _endTarget => (
+        kind: 'end',
+        beforeId: null,
+        listId: listId,
+        sectionId: sectionId,
+      );
+
+  void _applyDrop() {
+    final notifier = ReorderDragNotifier.instance;
+    final movedId = notifier.draggingId;
+    final target = notifier.target;
+    if (movedId == null || target == null) return;
+    if (target.kind == 'before' && target.beforeId == movedId) return;
+    taskController.reorderTaskBefore(
+      movedTaskId: movedId,
+      beforeTaskId: target.kind == 'end' ? null : target.beforeId,
+      listId: target.listId,
+      sectionId: target.sectionId,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DragTarget<String>(
       onWillAcceptWithDetails: (_) => true,
-      onAcceptWithDetails: (d) => taskController.reorderTaskBefore(
-        movedTaskId: d.data,
-        beforeTaskId: null,
-        listId: listId,
-        sectionId: sectionId,
-      ),
+      onMove: (_) => ReorderDragNotifier.instance.setTarget(_endTarget),
+      onAcceptWithDetails: (_) => _applyDrop(),
       builder: (context, candidates, _) {
         return AnimatedBuilder(
           animation: ReorderDragNotifier.instance,
           builder: (context, _) {
-            final hovering = candidates.isNotEmpty;
-            final placeholder = hovering
-                ? ReorderDragNotifier.instance.draggingHeight
-                : 0.0;
+            final notifier = ReorderDragNotifier.instance;
+            final draggingTask =
+                notifier.isDragging && notifier.draggingKind == 'task';
+            final isEndTarget = draggingTask && notifier.target == _endTarget;
+            final double height = isEndTarget
+                ? notifier.draggingHeight
+                : (draggingTask ? 12 : 0);
             return AnimatedSize(
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOut,
               alignment: Alignment.topCenter,
               child: SizedBox(
-                height: hovering ? placeholder : 12,
+                height: height,
                 width: double.infinity,
               ),
             );

@@ -12,6 +12,18 @@ class ReorderDragData<T> {
 
 enum ReorderKind { folder, list, noteFolder, note }
 
+/// Identifies the single insertion point of an in-flight task reorder. There
+/// is exactly one gap on screen at a time and it is described by this value
+/// (records compare structurally, so equality checks are exact and cheap):
+///   • `kind == 'before'` → the gap sits above the row whose id is [beforeId];
+///   • `kind == 'end'`    → the gap sits at the end of (`listId`, `sectionId`).
+typedef ReorderTarget = ({
+  String kind,
+  String? beforeId,
+  String? listId,
+  String? sectionId,
+});
+
 /// Tracks the currently-dragged reorderable row so drop zones can render a
 /// blank placeholder of the right height (the same size the dragged row will
 /// occupy after the drop). One drag is in flight at a time across the app —
@@ -24,11 +36,16 @@ class ReorderDragNotifier extends ChangeNotifier {
   String? _draggingId;
   Object? _draggingKind;
   double _draggingHeight = 0;
+  ReorderTarget? _target;
 
   String? get draggingId => _draggingId;
   Object? get draggingKind => _draggingKind;
   double get draggingHeight => _draggingHeight;
   bool get isDragging => _draggingId != null;
+
+  /// The single active insertion point for a task reorder (null until the
+  /// dragged row reports its origin). Used to render exactly one gap.
+  ReorderTarget? get target => _target;
 
   void start(String id, Object kind, double height) {
     _draggingId = id;
@@ -37,11 +54,20 @@ class ReorderDragNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Moves the single reorder gap. No-ops (and skips the rebuild) when the
+  /// target is unchanged so the high-frequency `onMove` stream stays cheap.
+  void setTarget(ReorderTarget? next) {
+    if (_target == next) return;
+    _target = next;
+    notifyListeners();
+  }
+
   void end() {
     if (_draggingId == null) return;
     _draggingId = null;
     _draggingKind = null;
     _draggingHeight = 0;
+    _target = null;
     notifyListeners();
   }
 }
@@ -138,23 +164,34 @@ class _ReorderableRowState extends State<ReorderableRow> {
 /// Wraps [child] in a Material layer (required because drags render in
 /// the root overlay) with the system background and a soft shadow so the
 /// row reads as picked up while staying visually identical to the source.
+///
+/// The feedback is rendered in the root [Overlay], which sits *above* the
+/// per-route `MediaQuery` that applies the user's text scale (see app.dart).
+/// Without re-supplying that `MediaQuery`, the lifted card would lay its text
+/// out at the unscaled system size — while the checkbox (sized off
+/// `AppScale.factor`, not the text scaler) stays put — leaving the title a
+/// few pixels lower than the source row. Copying the source `MediaQuery`
+/// keeps the lifted card a pixel-perfect mirror of its origin.
 Widget _dragFeedback(BuildContext context, double width, Widget child) {
-  return Material(
-    type: MaterialType.transparency,
-    child: SizedBox(
-      width: width,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground.resolveFrom(context),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 12,
-              offset: Offset(0, 4),
-            ),
-          ],
+  return MediaQuery(
+    data: MediaQuery.of(context),
+    child: Material(
+      type: MaterialType.transparency,
+      child: SizedBox(
+        width: width,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemBackground.resolveFrom(context),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1A000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: child,
         ),
-        child: child,
       ),
     ),
   );
