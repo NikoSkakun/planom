@@ -452,12 +452,18 @@ class _ListTaskViewState extends State<ListTaskView>
           emptyLabel: s.noTasks,
           onMoveTask: _moveTaskToColumn,
           onCreateInColumn: _createInColumn,
-          onCreateInGroup: (columnId, group) {
-            if (group.sectionId == null) {
-              _createInColumn(_kTopColumnId);
-            } else {
-              _createInColumn(group.sectionId!);
-            }
+          // Each kanban column IS a list-section here, so a Plus-drop on the
+          // column already targets that section — the per-group ("drag to
+          // section") drop is redundant and disabled. (Folder kanban, where
+          // columns are whole lists, keeps the per-section drop.)
+          onCreateInGroup: null,
+          onReorderTask: (columnId, group, movedTaskId, beforeTaskId) {
+            widget.taskController.reorderTaskBefore(
+              movedTaskId: movedTaskId,
+              beforeTaskId: beforeTaskId,
+              listId: _currentList.id,
+              sectionId: group.sectionId,
+            );
           },
           onToggleTask: (task) => toggleTaskCompletedWithUndo(
               context, widget.taskController, task),
