@@ -169,13 +169,26 @@ class _AnimatedItemListState<T> extends State<AnimatedItemList<T>> {
       initialItemCount: _items.length,
       itemBuilder: (context, index, animation) {
         if (index >= _items.length) return const SizedBox.shrink();
+        final item = _items[index];
         return SizeTransition(
           sizeFactor:
               CurvedAnimation(parent: animation, curve: Curves.easeInOut),
           axisAlignment: -1.0,
           child: FadeTransition(
             opacity: animation,
-            child: widget.itemBuilder(context, _items[index]),
+            // Key the row subtree by the item's stable id. AnimatedList only
+            // keys its slots by index, so after an insert/remove the rows
+            // shift between index slots while their wrapping element (and any
+            // stateful row internals like a reorder-collapse AnimatedSize) is
+            // reused for a *different* item. Without this key that stale state
+            // animates the height delta between the old and new row — the
+            // glitch seen when adding/deleting tasks in lists with mixed
+            // single/multi-line rows. Keying forces a fresh mount at the
+            // correct height whenever a slot is reassigned to another item.
+            child: KeyedSubtree(
+              key: ValueKey(widget.idOf(item)),
+              child: widget.itemBuilder(context, item),
+            ),
           ),
         );
       },
