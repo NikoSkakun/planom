@@ -165,32 +165,50 @@ class _ReorderableRowState extends State<ReorderableRow> {
 /// the root overlay) with the system background and a soft shadow so the
 /// row reads as picked up while staying visually identical to the source.
 ///
-/// The feedback is rendered in the root [Overlay], which sits *above* the
-/// per-route `MediaQuery` that applies the user's text scale (see app.dart).
-/// Without re-supplying that `MediaQuery`, the lifted card would lay its text
-/// out at the unscaled system size — while the checkbox (sized off
-/// `AppScale.factor`, not the text scaler) stays put — leaving the title a
-/// few pixels lower than the source row. Copying the source `MediaQuery`
-/// keeps the lifted card a pixel-perfect mirror of its origin.
+/// Two things otherwise make the lifted card diverge from its source row,
+/// because the feedback renders in the root [Overlay] — above the per-route
+/// `MediaQuery`, and inside a fresh `Material`:
+///   • text scale — the root overlay misses the per-route `MediaQuery` that
+///     carries the user's text scale, so we re-supply it;
+///   • font — `Material` injects its own `DefaultTextStyle`/`IconTheme` (the
+///     Material default font, which renders larger with wider letter-spacing),
+///     overriding the app's Cupertino Google-font default the in-list rows
+///     inherit. We re-assert the source row's `DefaultTextStyle`/`IconTheme`
+///     *inside* the Material so the title and note line are a pixel-perfect
+///     mirror of the origin.
 Widget _dragFeedback(BuildContext context, double width, Widget child) {
+  final defaultTextStyle = DefaultTextStyle.of(context);
+  final iconTheme = IconTheme.of(context);
   return MediaQuery(
     data: MediaQuery.of(context),
     child: Material(
       type: MaterialType.transparency,
-      child: SizedBox(
-        width: width,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemBackground.resolveFrom(context),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1A000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
+      child: DefaultTextStyle(
+        style: defaultTextStyle.style,
+        textAlign: defaultTextStyle.textAlign,
+        softWrap: defaultTextStyle.softWrap,
+        overflow: defaultTextStyle.overflow,
+        maxLines: defaultTextStyle.maxLines,
+        textWidthBasis: defaultTextStyle.textWidthBasis,
+        textHeightBehavior: defaultTextStyle.textHeightBehavior,
+        child: IconTheme(
+          data: iconTheme,
+          child: SizedBox(
+            width: width,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemBackground.resolveFrom(context),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1A000000),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
+              child: child,
+            ),
           ),
-          child: child,
         ),
       ),
     ),
