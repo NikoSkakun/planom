@@ -134,6 +134,10 @@ class KanbanBoard extends StatefulWidget {
   /// clear of the floating + button (which now draws over the column).
   static const double _columnBottomInset = 88;
 
+  /// Small gap below each column so its rounded bottom edge doesn't touch the
+  /// tab bar. The + button still overlaps the column's lower portion.
+  static const double _columnBottomGap = 12;
+
   @override
   State<KanbanBoard> createState() => _KanbanBoardState();
 }
@@ -288,13 +292,13 @@ class _KanbanBoardState extends State<KanbanBoard> {
 
     if (widget.scrollMode == KanbanScrollMode.snap) {
       // `padEnds: true` centres each page so the previous/next columns peek at
-      // both edges. Columns run to the bottom of the viewport (no bottom
-      // padding) so the floating + button draws over the focused column.
+      // both edges. A small bottom gap keeps the column's rounded bottom edge
+      // off the tab bar while the + button still overlaps its lower portion.
       return PageView.builder(
         controller: _pageController,
         itemCount: widget.columns.length,
         itemBuilder: (context, index) => Padding(
-          padding: const EdgeInsets.fromLTRB(6, 12, 6, 0),
+          padding: const EdgeInsets.fromLTRB(6, 12, 6, KanbanBoard._columnBottomGap),
           child: columnAt(index),
         ),
       );
@@ -303,7 +307,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     return ListView.separated(
       controller: _scrollController,
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, KanbanBoard._columnBottomGap),
       itemCount: widget.columns.length,
       separatorBuilder: (_, __) => const SizedBox(width: 12),
       itemBuilder: (context, index) => SizedBox(

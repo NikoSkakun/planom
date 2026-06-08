@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../folders/folder_controller.dart';
 import '../localization/strings.dart';
+import '../utils/notifier_reset.dart';
 import 'selectable_task_list_shell.dart';
 import 'task_controller.dart';
 
@@ -37,7 +38,8 @@ class _TomorrowViewState extends State<TomorrowView> {
 
   @override
   void dispose() {
-    widget.activeDueDate.value = null;
+    // Deferred to avoid notifying the shell while this view is unmounting.
+    resetNotifierAfterFrame(widget.activeDueDate, null);
     super.dispose();
   }
 

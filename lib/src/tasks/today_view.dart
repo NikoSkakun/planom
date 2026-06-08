@@ -7,6 +7,7 @@ import '../localization/strings.dart';
 import '../routines/routine_controller.dart';
 import '../routines/routines_today_section.dart';
 import '../settings/settings_controller.dart';
+import '../utils/notifier_reset.dart';
 import 'selectable_task_list_shell.dart';
 import 'task_controller.dart';
 
@@ -51,7 +52,8 @@ class _TodayViewState extends State<TodayView> {
 
   @override
   void dispose() {
-    widget.activeDueDate.value = null;
+    // Deferred to avoid notifying the shell while this view is unmounting.
+    resetNotifierAfterFrame(widget.activeDueDate, null);
     super.dispose();
   }
 

@@ -17,6 +17,7 @@ import '../utils/item_info_sheet.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
 import '../utils/reorder_drag.dart';
+import '../utils/notifier_reset.dart';
 import '../utils/selection_menu.dart';
 import '../utils/undo_controller.dart';
 import 'create_folder_list_sheet.dart'
@@ -89,8 +90,14 @@ class _FolderViewState extends State<FolderView>
   @override
   void dispose() {
     // Restore the active folder to this folder's parent so popping back to an
-    // ancestor folder keeps the + button targeting the right folder.
-    widget.activeFolderId?.value = _currentFolder.parentFolderId;
+    // ancestor folder keeps the + button targeting the right folder. Deferred
+    // past the current frame — writing it synchronously here notifies the
+    // shell's listeners while the tree is locked (this view is unmounting),
+    // which throws and can wedge the in-flight frame.
+    final activeFolderId = widget.activeFolderId;
+    if (activeFolderId != null) {
+      resetNotifierAfterFrame(activeFolderId, _currentFolder.parentFolderId);
+    }
     if (identical(_plusScope?.onKanbanPlusTap, _kanbanTapHandler)) {
       _plusScope!.onKanbanPlusTap = null;
     }

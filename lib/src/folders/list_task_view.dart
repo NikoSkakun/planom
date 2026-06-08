@@ -22,6 +22,7 @@ import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/plus_button_inset_scope.dart';
 import '../utils/plus_drag_controller.dart';
+import '../utils/notifier_reset.dart';
 import '../utils/plus_drag_payload.dart';
 import '../utils/reorder_drag.dart';
 import '../utils/selection_checkbox.dart';
@@ -88,7 +89,9 @@ class _ListTaskViewState extends State<ListTaskView>
 
   @override
   void dispose() {
-    widget.activeListId.value = null;
+    // Deferred past the current frame: a synchronous write here notifies the
+    // shell while this view is unmounting (tree locked), which throws.
+    resetNotifierAfterFrame(widget.activeListId, null);
     if (identical(_plusScope?.onKanbanPlusTap, _kanbanTapHandler)) {
       _plusScope!.onKanbanPlusTap = null;
     }

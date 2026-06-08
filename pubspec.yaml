@@ -48,6 +48,10 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^4.0.0
+  # Test-only: lets HomeShell widget tests stub path_provider (transitive deps
+  # of path_provider, referenced directly only from tests).
+  path_provider_platform_interface: ^2.1.0
+  plugin_platform_interface: ^2.1.0
 
 flutter:
   uses-material-design: true
