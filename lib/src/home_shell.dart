@@ -505,6 +505,14 @@ class _HomeShellState extends State<HomeShell> {
       return;
     }
 
+    // A Kanban view on top of the Tasks tab handles + taps itself (snaps to
+    // the focused/nearest column, then creates a task scoped to it).
+    if (_lastTabIndex == 0 &&
+        _plusDragController.onKanbanPlusTap != null &&
+        _plusDragController.onKanbanPlusTap!()) {
+      return;
+    }
+
     // No valid destination for a new task → the + button is grayed and
     // shouldn't fire. Guard here as well as at render time so a stray tap
     // (or programmatic invocation) doesn't open an empty creation sheet.
@@ -1254,8 +1262,9 @@ class _HomeShellState extends State<HomeShell> {
                           _undoController.pending != null ? 64.0 : 0.0;
                       // Only the Tasks tab can render the disabled state — the
                       // other tabs always have somewhere to create into.
-                      final plusEnabled =
-                          _lastTabIndex != 0 || _tasksPlusEnabled();
+                      final plusEnabled = _lastTabIndex != 0 ||
+                          _plusDragController.onKanbanPlusTap != null ||
+                          _tasksPlusEnabled();
                       return AnimatedPositioned(
                         duration: const Duration(milliseconds: 180),
                         curve: Curves.easeOut,

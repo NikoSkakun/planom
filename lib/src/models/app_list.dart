@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 
 import 'list_type.dart';
+import 'view_mode.dart';
 
 class AppList {
   final String id;
@@ -15,6 +16,8 @@ class AppList {
   final bool isDeleted;
   final DateTime? deletedDate;
   final ListType listType;
+  final ItemViewMode viewMode; // list | kanban — persisted per list
+  final KanbanScrollMode kanbanScrollMode; // free | snap horizontal scrolling
 
   AppList({
     String? id,
@@ -29,6 +32,8 @@ class AppList {
     this.isDeleted = false,
     this.deletedDate,
     this.listType = ListType.tasks,
+    this.viewMode = ItemViewMode.list,
+    this.kanbanScrollMode = KanbanScrollMode.snap,
   })  : id = id ?? const Uuid().v4(),
         creationDate = creationDate ?? DateTime.now();
 
@@ -49,6 +54,8 @@ class AppList {
     DateTime? deletedDate,
     bool clearDeletedDate = false,
     ListType? listType,
+    ItemViewMode? viewMode,
+    KanbanScrollMode? kanbanScrollMode,
   }) =>
       AppList(
         id: id,
@@ -64,6 +71,8 @@ class AppList {
         isDeleted: isDeleted ?? this.isDeleted,
         deletedDate: clearDeletedDate ? null : (deletedDate ?? this.deletedDate),
         listType: listType ?? this.listType,
+        viewMode: viewMode ?? this.viewMode,
+        kanbanScrollMode: kanbanScrollMode ?? this.kanbanScrollMode,
       );
 
   Map<String, dynamic> toMap() => {
@@ -79,6 +88,8 @@ class AppList {
         'isDeleted': isDeleted ? 1 : 0,
         'deletedDate': deletedDate?.millisecondsSinceEpoch,
         'listType': listType.value,
+        'viewMode': viewMode.value,
+        'kanbanScrollMode': kanbanScrollMode.value,
       };
 
   factory AppList.fromMap(Map<String, dynamic> map) => AppList(
@@ -97,5 +108,8 @@ class AppList {
             ? DateTime.fromMillisecondsSinceEpoch(map['deletedDate'] as int)
             : null,
         listType: ListType.fromString(map['listType'] as String?),
+        viewMode: ItemViewMode.fromString(map['viewMode'] as String?),
+        kanbanScrollMode:
+            KanbanScrollMode.fromString(map['kanbanScrollMode'] as String?),
       );
 }

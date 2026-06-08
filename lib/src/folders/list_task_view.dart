@@ -7,6 +7,7 @@ import '../models/app_list.dart';
 import '../models/list_section.dart';
 import '../models/list_type.dart';
 import '../models/task.dart';
+import '../models/view_mode.dart';
 import '../tasks/calendar_date_picker.dart';
 import '../tasks/complete_with_undo.dart';
 import '../tasks/completed_section_header.dart';
@@ -40,8 +41,6 @@ import 'section_name_sheet.dart';
 /// board (maps to a null sectionId).
 const String _kTopColumnId = '__top__';
 
-enum _ListViewMode { list, kanban }
-
 class ListTaskView extends StatefulWidget {
   const ListTaskView({
     super.key,
@@ -66,7 +65,11 @@ class _ListTaskViewState extends State<ListTaskView>
     with DropdownOverlayMixin {
   late AppList _currentList;
   final _selection = SelectionController();
-  _ListViewMode _viewMode = _ListViewMode.list;
+  final _kanbanBoardController = KanbanBoardController();
+  late final bool Function() _kanbanTapHandler = _handleKanbanPlusTap;
+  PlusDragController? _plusScope;
+
+  ItemViewMode get _viewMode => _currentList.viewMode;
 
   @override
   void initState() {
@@ -78,23 +81,81 @@ class _ListTaskViewState extends State<ListTaskView>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _plusScope = PlusDragScope.of(context);
+  }
+
+  @override
   void dispose() {
     widget.activeListId.value = null;
+    if (identical(_plusScope?.onKanbanPlusTap, _kanbanTapHandler)) {
+      _plusScope!.onKanbanPlusTap = null;
+    }
     _selection.dispose();
     super.dispose();
+  }
+
+  /// Registers (or clears) the Kanban + tap handler so the global Plus button
+  /// creates tasks in the focused column while this list's Kanban view is on
+  /// top. Called from build so it tracks view-mode / selection changes.
+  void _syncKanbanHandler() {
+    final scope = _plusScope;
+    if (scope == null) return;
+    final active = _viewMode == ItemViewMode.kanban &&
+        !_selection.active &&
+        _currentList.listType != ListType.birthdays;
+    if (active) {
+      scope.onKanbanPlusTap = _kanbanTapHandler;
+    } else if (identical(scope.onKanbanPlusTap, _kanbanTapHandler)) {
+      scope.onKanbanPlusTap = null;
+    }
+  }
+
+  /// Creates a task in the column identified by [columnId] (a section id or
+  /// the top-group sentinel) by routing through the host's Plus-drop handlers.
+  void _createInColumn(String columnId) {
+    final scope = _plusScope;
+    if (columnId == _kTopColumnId) {
+      scope?.onDropOnList?.call(_currentList.id);
+    } else {
+      scope?.onDropOnSection?.call(_currentList.id, columnId);
+    }
+  }
+
+  bool _handleKanbanPlusTap() {
+    final focused = _kanbanBoardController.focusedColumnId;
+    if (focused == null) return false;
+    if (_currentList.kanbanScrollMode == KanbanScrollMode.free) {
+      // Free scroll: snap to the nearest column first, then create there.
+      _kanbanBoardController.snapToFocused().then((_) {
+        if (!mounted) return;
+        _createInColumn(_kanbanBoardController.focusedColumnId ?? focused);
+      });
+    } else {
+      _createInColumn(focused);
+    }
+    return true;
   }
 
   void _showDropdown(BuildContext context) {
     showDropdown(context, (dismiss) {
       return _ListOptionsDropdown(
         onDismiss: dismiss,
-        isKanban: _viewMode == _ListViewMode.kanban,
+        isKanban: _viewMode == ItemViewMode.kanban,
         onView: _currentList.listType == ListType.birthdays
             ? null
             : () {
                 dismiss();
                 _pickViewMode();
               },
+        onScrollMode: (_currentList.listType != ListType.birthdays &&
+                _viewMode == ItemViewMode.kanban)
+            ? () {
+                dismiss();
+                _pickScrollMode();
+              }
+            : null,
         onSelect: _currentList.listType == ListType.birthdays
             ? null
             : () {
@@ -266,7 +327,7 @@ class _ListTaskViewState extends State<ListTaskView>
 
   Future<void> _pickViewMode() async {
     final s = S.of(context);
-    final picked = await showSelectionMenu<_ListViewMode>(
+    final picked = await showSelectionMenu<ItemViewMode>(
       context: context,
       title: s.viewLabel,
       current: _viewMode,
@@ -275,19 +336,49 @@ class _ListTaskViewState extends State<ListTaskView>
       anchor: SelectionMenuAnchor.topRight,
       options: [
         SelectionMenuOption(
-          value: _ListViewMode.list,
+          value: ItemViewMode.list,
           label: s.viewAsList,
           icon: CupertinoIcons.list_bullet,
         ),
         SelectionMenuOption(
-          value: _ListViewMode.kanban,
+          value: ItemViewMode.kanban,
           label: s.viewAsKanban,
           icon: CupertinoIcons.square_split_2x1,
         ),
       ],
     );
-    if (picked == null || !mounted) return;
-    setState(() => _viewMode = picked);
+    if (picked == null || !mounted || picked == _viewMode) return;
+    final updated = _currentList.copyWith(viewMode: picked);
+    await widget.folderController.updateList(updated);
+    if (mounted) setState(() => _currentList = updated);
+  }
+
+  Future<void> _pickScrollMode() async {
+    final s = S.of(context);
+    final picked = await showSelectionMenu<KanbanScrollMode>(
+      context: context,
+      title: s.kanbanScrollLabel,
+      current: _currentList.kanbanScrollMode,
+      anchor: SelectionMenuAnchor.topRight,
+      options: [
+        SelectionMenuOption(
+          value: KanbanScrollMode.snap,
+          label: s.kanbanScrollSnap,
+          icon: CupertinoIcons.rectangle_split_3x1,
+        ),
+        SelectionMenuOption(
+          value: KanbanScrollMode.free,
+          label: s.kanbanScrollFree,
+          icon: CupertinoIcons.arrow_left_right,
+        ),
+      ],
+    );
+    if (picked == null || !mounted || picked == _currentList.kanbanScrollMode) {
+      return;
+    }
+    final updated = _currentList.copyWith(kanbanScrollMode: picked);
+    await widget.folderController.updateList(updated);
+    if (mounted) setState(() => _currentList = updated);
   }
 
   /// Moves a task into the section identified by [toColumnId] when a Kanban
@@ -313,11 +404,29 @@ class _ListTaskViewState extends State<ListTaskView>
         final completed =
             widget.taskController.completedTasksForList(_currentList.id);
 
-        List<Task> tasksFor(String? sectionId) => [
-              ...widget.taskController
-                  .tasksForListSection(_currentList.id, sectionId),
-              ...completed.where((t) => t.sectionId == sectionId),
-            ];
+        // Each column (a section, or the implicit "No Section" group) holds an
+        // active group plus a collapsible "Completed" group for its own tasks.
+        List<KanbanGroupData> groupsFor(String columnId, String? sectionId) {
+          final active = widget.taskController
+              .tasksForListSection(_currentList.id, sectionId);
+          final done =
+              completed.where((t) => t.sectionId == sectionId).toList();
+          return [
+            KanbanGroupData(
+              id: '$columnId::active',
+              tasks: active,
+              sectionId: sectionId,
+            ),
+            if (done.isNotEmpty)
+              KanbanGroupData(
+                id: '$columnId::completed',
+                title: s.sectionCompleted,
+                isCompleted: true,
+                tasks: done,
+                sectionId: sectionId,
+              ),
+          ];
+        }
 
         final columns = <KanbanColumnData>[
           KanbanColumnData(
@@ -326,20 +435,30 @@ class _ListTaskViewState extends State<ListTaskView>
             accentColor: _currentList.color != null
                 ? Color(_currentList.color!)
                 : null,
-            tasks: tasksFor(null),
+            groups: groupsFor(_kTopColumnId, null),
           ),
           for (final section in sections)
             KanbanColumnData(
               id: section.id,
               title: section.name,
-              tasks: tasksFor(section.id),
+              groups: groupsFor(section.id, section.id),
             ),
         ];
 
         return KanbanBoard(
           columns: columns,
+          scrollMode: _currentList.kanbanScrollMode,
+          boardController: _kanbanBoardController,
           emptyLabel: s.noTasks,
           onMoveTask: _moveTaskToColumn,
+          onCreateInColumn: _createInColumn,
+          onCreateInGroup: (columnId, group) {
+            if (group.sectionId == null) {
+              _createInColumn(_kTopColumnId);
+            } else {
+              _createInColumn(group.sectionId!);
+            }
+          },
           onToggleTask: (task) => toggleTaskCompletedWithUndo(
               context, widget.taskController, task),
           onTapTask: (task) => Navigator.of(context).push(
@@ -414,9 +533,11 @@ class _ListTaskViewState extends State<ListTaskView>
 
   @override
   Widget build(BuildContext context) {
+    _syncKanbanHandler();
     return ListenableBuilder(
       listenable: _selection,
       builder: (context, _) {
+        _syncKanbanHandler();
         final selecting = _selection.active;
         final s = S.of(context);
         return PlusButtonLift(
@@ -466,7 +587,7 @@ class _ListTaskViewState extends State<ListTaskView>
                             listId: _currentList.id,
                             controller: widget.contactController,
                           )
-                        : (_viewMode == _ListViewMode.kanban && !selecting)
+                        : (_viewMode == ItemViewMode.kanban && !selecting)
                             ? _buildKanbanBody(context)
                             : _SectionedListBody(
                                 list: _currentList,
@@ -1093,6 +1214,7 @@ class _ListOptionsDropdown extends StatelessWidget {
     required this.onDelete,
     required this.isKanban,
     this.onView,
+    this.onScrollMode,
     this.onAddSection,
     this.onSelect,
   });
@@ -1104,6 +1226,7 @@ class _ListOptionsDropdown extends StatelessWidget {
   final VoidCallback onDelete;
   final bool isKanban;
   final VoidCallback? onView;
+  final VoidCallback? onScrollMode;
   final VoidCallback? onAddSection;
   final VoidCallback? onSelect;
 
@@ -1129,6 +1252,11 @@ class _ListOptionsDropdown extends StatelessWidget {
                         ? CupertinoIcons.square_split_2x1
                         : CupertinoIcons.list_bullet,
                     onTap: onView!),
+              if (onScrollMode != null)
+                _DropdownItem(
+                    label: S.of(context).kanbanScrollLabel,
+                    icon: CupertinoIcons.arrow_left_right,
+                    onTap: onScrollMode!),
               if (onSelect != null)
                 _DropdownItem(
                     label: S.of(context).select,
