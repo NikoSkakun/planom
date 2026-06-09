@@ -79,6 +79,9 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
   late String? _listId;
   int _priority = 0;
   bool _titleEmpty = true;
+  // Set once the user opens the list picker (or picks a list), which dismisses
+  // the empty-folder warning for the rest of the creation session.
+  bool _listDismissedWarning = false;
 
   @override
   void initState() {
@@ -167,6 +170,9 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
 
   Future<void> _pickList() async {
     final saved = _activeFocus;
+    // Opening the list picker means the user is taking control of where the
+    // task lands, so the empty-folder warning is no longer relevant — hide it.
+    if (!_listDismissedWarning) setState(() => _listDismissedWarning = true);
     final result = await showListPickerSheet(
       context,
       widget.folderController,
@@ -245,7 +251,7 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
             ),
           ),
           const SizedBox(height: 20),
-          if (widget.emptyFolderWarning) ...[
+          if (widget.emptyFolderWarning && !_listDismissedWarning) ...[
             _EmptyFolderWarning(
               message: s.emptyFolderTaskWarning(_listLabel(context)),
             ),
@@ -452,7 +458,9 @@ class _EmptyFolderWarning extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.only(top: 1),
-            child: Text('⚠️', style: TextStyle(fontSize: 15)),
+            // U+26A0 + U+FE0F variation selector forces the colored emoji
+            // presentation (rather than a monochrome glyph) on every platform.
+            child: Text('⚠️', style: TextStyle(fontSize: 16)),
           ),
           const SizedBox(width: 8),
           Expanded(
