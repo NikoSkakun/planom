@@ -563,6 +563,12 @@ class _HomeShellState extends State<HomeShell> {
     // otherwise — when Inbox is hidden — the user's configured "default
     // list" or the first available list.
     var initialListId = _activeListId.value;
+    // We're creating from inside a folder that has no lists of its own, so the
+    // task can't be scoped to a list in that folder and instead falls back to
+    // the global default list — warn the user in the sheet.
+    final emptyFolderWarning = _activeListId.value == null &&
+        _activeFolderId.value != null &&
+        _resolveFolderDefaultList(_activeFolderId.value!) == null;
     if (initialListId == null && _activeFolderId.value != null) {
       initialListId = _resolveFolderDefaultList(_activeFolderId.value!);
     }
@@ -593,6 +599,7 @@ class _HomeShellState extends State<HomeShell> {
       initialListId: initialListId,
       initialDueDate: _activeDueDate.value,
       settingsController: widget.settingsController,
+      emptyFolderWarning: emptyFolderWarning,
     );
   }
 
