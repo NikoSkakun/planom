@@ -60,7 +60,7 @@ class TaskCreationSheet extends StatefulWidget {
 
   /// When true, a banner is shown above the title field explaining that the
   /// task is being created from an empty folder (no lists inside) and will
-  /// therefore land in the global default list (Inbox).
+  /// therefore land in the resolved default list (named in the banner).
   final bool emptyFolderWarning;
 
   @override
@@ -246,7 +246,9 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
           ),
           const SizedBox(height: 20),
           if (widget.emptyFolderWarning) ...[
-            _EmptyFolderWarning(message: s.emptyFolderTaskWarning),
+            _EmptyFolderWarning(
+              message: s.emptyFolderTaskWarning(_listLabel(context)),
+            ),
             const SizedBox(height: 14),
           ],
           CupertinoTextField(
