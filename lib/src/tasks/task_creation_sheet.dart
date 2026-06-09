@@ -8,6 +8,7 @@ import '../models/task.dart';
 import '../settings/settings_controller.dart';
 import '../theme/app_theme.dart';
 import '../utils/duration_picker.dart';
+import '../utils/emoji_text.dart';
 import 'calendar_date_picker.dart';
 import 'task_controller.dart';
 import 'task_field_prefs.dart';
@@ -456,11 +457,16 @@ class _EmptyFolderWarning extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 1),
-            // U+26A0 + U+FE0F variation selector forces the colored emoji
-            // presentation (rather than a monochrome glyph) on every platform.
-            child: Text('⚠️', style: TextStyle(fontSize: 16)),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            // Route the warning sign (U+26A0 U+FE0F) through buildEmojiSpans so
+            // it draws from an emoji font and renders in colour — a plain Text
+            // would use the reading font's monochrome glyph instead.
+            child: Text.rich(
+              TextSpan(
+                children: buildEmojiSpans('⚠️', const TextStyle(fontSize: 16)),
+              ),
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
