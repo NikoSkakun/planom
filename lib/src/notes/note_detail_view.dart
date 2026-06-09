@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../models/note.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
+import '../utils/emoji_text.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/tap_offset.dart';
 import '../utils/undo_controller.dart';
@@ -483,9 +484,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
               padding: padding,
               child: Align(
                 alignment: Alignment.topLeft,
-                child: Text(
-                  _content.text,
-                  style: const TextStyle(fontSize: 16, height: 1.35),
+                child: Text.rich(
+                  TextSpan(
+                    children: buildEmojiSpans(
+                      _content.text,
+                      const TextStyle(fontSize: 16, height: 1.35),
+                    ),
+                  ),
                 ),
               ),
             ),
