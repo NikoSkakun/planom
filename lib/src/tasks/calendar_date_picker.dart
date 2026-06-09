@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
 import '../theme/app_theme.dart';
+import '../utils/day_boundary.dart';
 
 // Formats a task date (and optional time) for display.
 String formatTaskDate(BuildContext context, DateTime d, {int? doTime}) {
@@ -37,10 +38,14 @@ String formatTaskDateRelative(BuildContext context, DateTime d,
   return '$datePart ${formatDoTime(doTime)}';
 }
 
-// Formats minutes-since-midnight as "9:00 AM".
+// Formats minutes-since-midnight as "9:00 AM" (or "09:00" in 24-hour mode,
+// per the user's [TimeFormatPref.use24h] preference).
 String formatDoTime(int minutes) {
   final h = minutes ~/ 60;
   final m = minutes % 60;
+  if (TimeFormatPref.use24h) {
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+  }
   final ampm = h < 12 ? 'AM' : 'PM';
   final displayH = h == 0 ? 12 : (h > 12 ? h - 12 : h);
   return '$displayH:${m.toString().padLeft(2, '0')} $ampm';
@@ -258,7 +263,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                       child: CupertinoDatePicker(
                         mode: CupertinoDatePickerMode.time,
                         initialDateTime: _timeAsDateTime(),
-                        use24hFormat: false,
+                        use24hFormat: TimeFormatPref.use24h,
                         onDateTimeChanged: (dt) => setState(
                           () => _doTime = dt.hour * 60 + dt.minute,
                         ),

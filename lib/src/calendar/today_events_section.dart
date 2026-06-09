@@ -49,17 +49,27 @@ class _TodayEventsSectionState extends State<TodayEventsSection> {
           ..sort((a, b) => (a.doTime ?? -1).compareTo(b.doTime ?? -1));
         if (events.isEmpty) return const SizedBox.shrink();
         final s = S.of(context);
+        final now = DateTime.now();
+        // Don't fold already-finished events into the section count (the same
+        // events are excluded from the Today smart-list badge); they still
+        // render below, but greyed out.
+        final activeCount = events.where((e) => !e.isPastAt(now)).length;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _Header(
               label: s.tabCalendar,
-              count: events.length,
+              count: activeCount,
               expanded: _expanded,
               onToggle: () => setState(() => _expanded = !_expanded),
             ),
             if (_expanded)
-              for (final e in events) _Row(event: e, onTap: () => _open(e)),
+              for (final e in events)
+                _Row(
+                  event: e,
+                  past: e.isPastAt(now),
+                  onTap: () => _open(e),
+                ),
           ],
         );
       },
@@ -122,14 +132,25 @@ class _Header extends StatelessWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({required this.event, required this.onTap});
+  const _Row({required this.event, required this.onTap, this.past = false});
 
   final Event event;
   final VoidCallback onTap;
 
+  /// When true the event has already finished — render it greyed out.
+  final bool past;
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    // Past events are dimmed: a grey dot, secondary title color, and a tertiary
+    // time. The whole row also drops to 55% opacity so it visibly recedes.
+    final dotColor = past
+        ? CupertinoColors.systemGrey.resolveFrom(context)
+        : CupertinoColors.systemBlue;
+    final titleColor = past
+        ? CupertinoColors.secondaryLabel.resolveFrom(context)
+        : CupertinoColors.label.resolveFrom(context);
+    final row = GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
@@ -139,8 +160,8 @@ class _Row extends StatelessWidget {
             Container(
               width: 10,
               height: 10,
-              decoration: const BoxDecoration(
-                color: CupertinoColors.systemBlue,
+              decoration: BoxDecoration(
+                color: dotColor,
                 shape: BoxShape.circle,
               ),
             ),
@@ -150,7 +171,7 @@ class _Row extends StatelessWidget {
                 event.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 16),
+                style: TextStyle(fontSize: 16, color: titleColor),
               ),
             ),
             if (event.doTime != null) ...[
@@ -159,7 +180,9 @@ class _Row extends StatelessWidget {
                 formatDoTime(event.doTime!),
                 style: TextStyle(
                   fontSize: 13,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  color: past
+                      ? CupertinoColors.tertiaryLabel.resolveFrom(context)
+                      : CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
             ],
@@ -167,5 +190,6 @@ class _Row extends StatelessWidget {
         ),
       ),
     );
+    return past ? Opacity(opacity: 0.55, child: row) : row;
   }
 }

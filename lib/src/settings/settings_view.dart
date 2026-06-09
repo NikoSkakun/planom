@@ -19,6 +19,7 @@ import 'device_calendar_settings_view.dart';
 import 'google_calendar_settings_view.dart';
 import 'module_settings_views.dart';
 import 'notifications_view.dart';
+import 'plus_button_settings_view.dart';
 import 'security_view.dart';
 import 'settings_controller.dart';
 import 'spaces_view.dart';
@@ -199,6 +200,19 @@ class _SettingsViewState extends State<SettingsView> {
                 FastRoute<void>(
                   builder: (_) => TabBarSettingsView(
                     controller: widget.controller,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 1),
+            _NavRow(
+              label: s.plusButton,
+              icon: CupertinoIcons.add_circled,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => PlusButtonSettingsView(
+                    controller: widget.controller,
+                    googleCalendarController: widget.googleCalendarController,
                   ),
                 ),
               ),

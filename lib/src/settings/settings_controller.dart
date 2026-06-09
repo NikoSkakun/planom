@@ -111,6 +111,10 @@ class BadgeSource {
   static BadgeSource folder(String id) => BadgeSource('$folderPrefix$id');
 }
 
+/// Which side of the screen the floating + button sits on. Used both as the
+/// global default and as a per-tab override.
+enum PlusButtonSide { right, left }
+
 class SettingsController with ChangeNotifier {
   SettingsController(this._settingsService, this._db);
 
@@ -213,6 +217,48 @@ class SettingsController with ChangeNotifier {
   bool get showEventsInToday => _showEventsInToday;
   bool _countEventsInToday = false;
   bool get countEventsInToday => _countEventsInToday;
+
+  // Time-of-day display style. false = 12-hour AM/PM (default), true = 24-hour.
+  // Mirrored to [TimeFormatPref.use24h] so formatters can read it globally.
+  bool _use24hTime = false;
+  bool get use24hTime => _use24hTime;
+
+  // Automatically roll uncompleted overdue tasks forward to the current day the
+  // first time the app is opened on a new day. Disabled by default.
+  bool _autoPostponeOverdue = false;
+  bool get autoPostponeOverdue => _autoPostponeOverdue;
+
+  // Show the "Overdue Tasks" review popup on the first open of a new day (so the
+  // user can pick which overdue tasks to postpone / complete). Disabled by
+  // default. Ignored while [autoPostponeOverdue] is on (auto wins).
+  bool _showOverdueReview = false;
+  bool get showOverdueReview => _showOverdueReview;
+
+  // The last day (yyyy-mm-dd, local) the overdue auto-postpone / review ran, so
+  // it fires at most once per day even when the user skips days between opens.
+  String _lastOverdueCheckDay = '';
+  String get lastOverdueCheckDay => _lastOverdueCheckDay;
+
+  // Floating + button placement. Global default plus optional per-tab overrides
+  // (Tasks 0 / Notes 1 / Calendar 2 / Routines 3). A null override inherits the
+  // global side. Size is a multiplier on the stock 52 px button (1.0 = stock).
+  PlusButtonSide _plusButtonSide = PlusButtonSide.right;
+  PlusButtonSide get plusButtonSide => _plusButtonSide;
+  final Map<int, PlusButtonSide?> _plusButtonSideOverrides = {
+    0: null,
+    1: null,
+    2: null,
+    3: null,
+  };
+  PlusButtonSide? plusButtonSideOverride(int tab) =>
+      _plusButtonSideOverrides[tab];
+
+  /// Effective side for [tab]: the per-tab override if set, else the global.
+  PlusButtonSide plusButtonSideForTab(int tab) =>
+      _plusButtonSideOverrides[tab] ?? _plusButtonSide;
+
+  double _plusButtonScale = 1.0;
+  double get plusButtonScale => _plusButtonScale;
 
   AnimationSpeed _animationSpeed = AnimationSpeed.normal;
   AnimationSpeed get animationSpeed => _animationSpeed;
@@ -404,6 +450,24 @@ class SettingsController with ChangeNotifier {
         _showEventsInToday = value == 'true';
       } else if (key == 'count_events_in_today') {
         _countEventsInToday = value == 'true';
+      } else if (key == 'use_24h_time') {
+        _use24hTime = value == 'true';
+      } else if (key == 'auto_postpone_overdue') {
+        _autoPostponeOverdue = value == 'true';
+      } else if (key == 'show_overdue_review') {
+        _showOverdueReview = value == 'true';
+      } else if (key == 'last_overdue_check_day') {
+        _lastOverdueCheckDay = value;
+      } else if (key == 'plus_button_side') {
+        _plusButtonSide = _decodePlusSide(value) ?? PlusButtonSide.right;
+      } else if (key == 'plus_button_scale') {
+        final v = double.tryParse(value);
+        if (v != null && v >= 0.6 && v <= 1.6) _plusButtonScale = v;
+      } else if (key.startsWith('plus_button_side_tab_')) {
+        final tab = int.tryParse(key.substring('plus_button_side_tab_'.length));
+        if (tab != null && _plusButtonSideOverrides.containsKey(tab)) {
+          _plusButtonSideOverrides[tab] = _decodePlusSide(value);
+        }
       } else if (key == 'animation_speed') {
         _animationSpeed = _decodeAnimationSpeed(value);
       } else if (key == 'default_task_icon') {
@@ -447,6 +511,7 @@ class SettingsController with ChangeNotifier {
     AppDefaults.noteFolderIcon = _defaultNoteFolderIcon;
     AppScale.factor = _textScale;
     DayBoundary.hour = _dayBoundaryHour;
+    TimeFormatPref.use24h = _use24hTime;
     NotificationService.instance.customSoundName =
         _soundFileNameFromPath(_customNotificationSoundPath);
     S.useHabitNaming = _useHabitNaming;
@@ -616,6 +681,76 @@ class SettingsController with ChangeNotifier {
     _countEventsInToday = value;
     notifyListeners();
     await _db.setAppSetting('count_events_in_today', value.toString());
+  }
+
+  Future<void> updateUse24hTime(bool value) async {
+    if (value == _use24hTime) return;
+    _use24hTime = value;
+    TimeFormatPref.use24h = value;
+    notifyListeners();
+    await _db.setAppSetting('use_24h_time', value.toString());
+  }
+
+  Future<void> updateAutoPostponeOverdue(bool value) async {
+    if (value == _autoPostponeOverdue) return;
+    _autoPostponeOverdue = value;
+    notifyListeners();
+    await _db.setAppSetting('auto_postpone_overdue', value.toString());
+  }
+
+  Future<void> updateShowOverdueReview(bool value) async {
+    if (value == _showOverdueReview) return;
+    _showOverdueReview = value;
+    notifyListeners();
+    await _db.setAppSetting('show_overdue_review', value.toString());
+  }
+
+  /// Records the last day the overdue check ran (no [notifyListeners] — nothing
+  /// in the UI reacts to it live).
+  Future<void> setLastOverdueCheckDay(String day) async {
+    if (day == _lastOverdueCheckDay) return;
+    _lastOverdueCheckDay = day;
+    await _db.setAppSetting('last_overdue_check_day', day);
+  }
+
+  Future<void> updatePlusButtonSide(PlusButtonSide side) async {
+    if (side == _plusButtonSide) return;
+    _plusButtonSide = side;
+    notifyListeners();
+    await _db.setAppSetting('plus_button_side', _encodePlusSide(side));
+  }
+
+  /// Sets (or clears, with null) the per-[tab] + button side override.
+  Future<void> updatePlusButtonSideOverride(
+      int tab, PlusButtonSide? side) async {
+    if (!_plusButtonSideOverrides.containsKey(tab)) return;
+    if (_plusButtonSideOverrides[tab] == side) return;
+    _plusButtonSideOverrides[tab] = side;
+    notifyListeners();
+    await _db.setAppSetting(
+        'plus_button_side_tab_$tab', side == null ? '' : _encodePlusSide(side));
+  }
+
+  Future<void> updatePlusButtonScale(double scale) async {
+    final clamped = scale.clamp(0.6, 1.6).toDouble();
+    if (clamped == _plusButtonScale) return;
+    _plusButtonScale = clamped;
+    notifyListeners();
+    await _db.setAppSetting('plus_button_scale', clamped.toStringAsFixed(2));
+  }
+
+  static String _encodePlusSide(PlusButtonSide s) =>
+      s == PlusButtonSide.left ? 'left' : 'right';
+
+  static PlusButtonSide? _decodePlusSide(String v) {
+    switch (v) {
+      case 'left':
+        return PlusButtonSide.left;
+      case 'right':
+        return PlusButtonSide.right;
+      default:
+        return null;
+    }
   }
 
   Future<void> updateAnimationSpeed(AnimationSpeed speed) async {

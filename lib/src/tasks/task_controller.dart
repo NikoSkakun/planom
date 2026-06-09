@@ -143,6 +143,67 @@ class TaskController with ChangeNotifier {
   int get upcomingUncompletedCount =>
       upcomingTasks.where((t) => !t.isCompleted).length;
 
+  /// Uncompleted top-level tasks whose due date is strictly before today
+  /// (oldest first). Drives the auto-postpone and the "Overdue Tasks" review.
+  List<Task> get overdueTasks {
+    final today = DayBoundary.today();
+    final list = _topLevel.where((t) {
+      if (t.isCompleted || t.dueDate == null) return false;
+      final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);
+      return due.isBefore(today);
+    }).toList()
+      ..sort((a, b) {
+        final dc = a.dueDate!.compareTo(b.dueDate!);
+        if (dc != 0) return dc;
+        return (a.doTime ?? 0).compareTo(b.doTime ?? 0);
+      });
+    return List.unmodifiable(list);
+  }
+
+  /// Rolls the given overdue tasks' due dates forward to today (keeping their
+  /// time-of-day). Tasks that aren't actually overdue are skipped. Returns the
+  /// number of tasks moved.
+  Future<int> postponeTasksToToday(Iterable<String> ids) async {
+    final today = DayBoundary.today();
+    var moved = 0;
+    for (final id in ids) {
+      final i = _tasks.indexWhere((t) => t.id == id);
+      if (i == -1) continue;
+      final t = _tasks[i];
+      if (t.dueDate == null) continue;
+      final due = DateTime(t.dueDate!.year, t.dueDate!.month, t.dueDate!.day);
+      if (!due.isBefore(today)) continue;
+      final updated = t.copyWith(dueDate: today);
+      await _db.updateTask(updated);
+      _tasks = [..._tasks]..[i] = updated;
+      NotificationService.instance.scheduleTaskReminders(updated);
+      moved++;
+    }
+    if (moved > 0) {
+      _updateBadge();
+      notifyListeners();
+    }
+    return moved;
+  }
+
+  /// Marks a task completed with an explicit [completionDate] (used by the
+  /// Overdue review's "complete by yesterday" action). No-op if already done.
+  Future<void> markCompletedAt(String id, DateTime completionDate) async {
+    final i = _tasks.indexWhere((t) => t.id == id);
+    if (i == -1) return;
+    final original = _tasks[i];
+    if (original.isCompleted) return;
+    final updated =
+        original.copyWith(isCompleted: true, completionDate: completionDate);
+    await _db.updateTask(updated);
+    _tasks = [..._tasks]..[i] = updated;
+    _completionOrder.remove(id);
+    _completionOrder.insert(0, id);
+    _updateBadge();
+    notifyListeners();
+    NotificationService.instance.cancelTaskReminders(id);
+  }
+
   List<Task> tasksForDate(DateTime date) => _topLevel
       .where((t) =>
           t.dueDate != null &&

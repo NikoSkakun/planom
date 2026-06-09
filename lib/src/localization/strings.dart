@@ -777,7 +777,36 @@ class S {
   String get termsOfService => t('termsOfService');
   String get version => t('version');
 
+  // ── Time format ───────────────────────────────────────────────────────────
+  String get timeFormat => t('timeFormat');
+  String get timeFormat24h => t('timeFormat24h');
+  String get timeFormatAmPm => t('timeFormatAmPm');
+
+  // ── Overdue tasks ─────────────────────────────────────────────────────────
+  String get overdueTasksTitle => t('overdueTasksTitle');
+  String get autoPostponeOverdue => t('autoPostponeOverdue');
+  String get overdueReview => t('overdueReview');
+  String get overdueSettingsHint => t('overdueSettingsHint');
+  String get overdueReviewBody => t('overdueReviewBody');
+  String get overdueNone => t('overdueNone');
+  String get postponeAll => t('postponeAll');
+
+  // ── Plus button ───────────────────────────────────────────────────────────
+  String get plusButton => t('plusButton');
+  String get plusButtonPosition => t('plusButtonPosition');
+  String get plusButtonSize => t('plusButtonSize');
+  String get plusButtonSizeHint => t('plusButtonSizeHint');
+  String get plusButtonPerTab => t('plusButtonPerTab');
+  String get plusButtonPerTabHint => t('plusButtonPerTabHint');
+  String get plusButtonInherit => t('plusButtonInherit');
+  String get sideRight => t('sideRight');
+  String get sideLeft => t('sideLeft');
+
   // ── Parameterized helpers ────────────────────────────────────────────────
+  String postponeSelected(int n) =>
+      t('postponeSelected').replaceAll('{n}', '$n');
+  String completeSelected(int n) =>
+      t('completeSelected').replaceAll('{n}', '$n');
   String moveToTrashQuestion(String name) =>
       t('moveToTrashQuestion').replaceAll('{name}', name);
   String restoreQuestion(String name) =>
@@ -1260,6 +1289,16 @@ const Map<String, String> _en = {
   'goalAchieveAll': 'Achieve it all', 'goalCertainAmount': 'Reach certain amount',
   'dailyGoal': 'Daily goal', 'recordPerTap': 'Record per tap',
   'recordManual': 'Record manually', 'recordManualInfo': 'Type the amount each time you check this routine', 'recordAmountPrompt': 'Amount in {unit}', 'showEventsInToday': 'Show events in Today', 'includeInTodayCount': 'Include in Today\'s count',
+  'timeFormat': 'Time Format', 'timeFormat24h': '24-Hour', 'timeFormatAmPm': 'AM / PM',
+  'overdueTasksTitle': 'Overdue Tasks', 'autoPostponeOverdue': 'Auto-postpone to today',
+  'overdueReview': 'Review on first open', 'overdueSettingsHint': 'When enabled, the first time you open the app each day, overdue tasks are either moved to today automatically or shown in a review popup. Auto-postpone takes priority over the review.',
+  'overdueReviewBody': 'These tasks were due before today. Postpone them to today, or select specific tasks to postpone or complete.',
+  'overdueNone': 'No overdue tasks', 'postponeAll': 'Postpone All to Today',
+  'postponeSelected': 'Postpone ({n})', 'completeSelected': 'Complete ({n})',
+  'plusButton': 'Plus Button', 'plusButtonPosition': 'Position', 'plusButtonSize': 'Button Size',
+  'plusButtonSizeHint': 'Adjust the size of the floating + button.',
+  'plusButtonPerTab': 'Per-Tab Position', 'plusButtonPerTabHint': 'Override the + button side for individual tabs. These options also live inside each tab\'s settings.',
+  'plusButtonInherit': 'Default', 'sideRight': 'Right', 'sideLeft': 'Left',
   'unitName': 'Unit name', 'unitEgGlass': 'e.g. glass',
   'noRoutinesToday': 'No routines today', 'noRoutinesYet': 'No routines yet',
   'tapPlusFirstAdd': 'Tap + to add your first routine',
@@ -1502,6 +1541,14 @@ const Map<String, String> _uk = {
   'goalAchieveAll': 'Виконати все', 'goalCertainAmount': 'Досягти певної кількості',
   'dailyGoal': 'Денна ціль', 'recordPerTap': 'Запис за натискання',
   'recordManual': 'Ручний запис', 'recordManualInfo': 'Щоразу вводьте кількість, коли позначаєте звичку', 'recordAmountPrompt': 'Кількість у {unit}', 'showEventsInToday': 'Показувати події в «Сьогодні»', 'includeInTodayCount': 'Враховувати в лічильнику «Сьогодні»',
+  'timeFormat': 'Формат часу', 'timeFormat24h': '24 години', 'timeFormatAmPm': 'AM / PM',
+  'overdueTasksTitle': 'Прострочені задачі', 'autoPostponeOverdue': 'Переносити на сьогодні', 'overdueReview': 'Огляд при першому відкритті',
+  'overdueSettingsHint': 'Коли ввімкнено, під час першого відкриття застосунку щодня прострочені задачі або автоматично переносяться на сьогодні, або показуються у вікні огляду. Автоперенесення має пріоритет над оглядом.',
+  'overdueReviewBody': 'Ці задачі мали бути виконані до сьогодні. Перенесіть їх на сьогодні або виберіть окремі задачі, щоб перенести чи завершити.',
+  'overdueNone': 'Немає прострочених задач', 'postponeAll': 'Перенести всі на сьогодні', 'postponeSelected': 'Перенести ({n})', 'completeSelected': 'Завершити ({n})',
+  'plusButton': 'Кнопка «плюс»', 'plusButtonPosition': 'Розташування', 'plusButtonSize': 'Розмір кнопки', 'plusButtonSizeHint': 'Налаштуйте розмір плаваючої кнопки +.',
+  'plusButtonPerTab': 'Розташування для вкладок', 'plusButtonPerTabHint': 'Перевизначте бік кнопки + для окремих вкладок. Ці параметри також доступні в налаштуваннях кожної вкладки.',
+  'plusButtonInherit': 'За замовчуванням', 'sideRight': 'Праворуч', 'sideLeft': 'Ліворуч',
   'unitName': 'Одиниця', 'unitEgGlass': 'напр. склянка',
   'noRoutinesToday': 'Сьогодні звичок немає', 'noRoutinesYet': 'Ще немає звичок',
   'tapPlusFirstAdd': 'Натисніть +, щоб додати першу звичку',
@@ -1939,6 +1986,14 @@ const Map<String, String> _es = {
   'goalAchieveAll': 'Lograr todo', 'goalCertainAmount': 'Alcanzar cantidad',
   'dailyGoal': 'Meta diaria', 'recordPerTap': 'Registro por toque',
   'recordManual': 'Registro manual', 'recordManualInfo': 'Escribe la cantidad cada vez que marcas la rutina', 'recordAmountPrompt': 'Cantidad en {unit}', 'showEventsInToday': 'Mostrar eventos en Hoy', 'includeInTodayCount': 'Incluir en el contador de Hoy',
+  'timeFormat': 'Formato de hora', 'timeFormat24h': '24 horas', 'timeFormatAmPm': 'AM / PM',
+  'overdueTasksTitle': 'Tareas vencidas', 'autoPostponeOverdue': 'Posponer a hoy', 'overdueReview': 'Revisar al abrir',
+  'overdueSettingsHint': 'Cuando está activado, la primera vez que abres la app cada día, las tareas vencidas se mueven a hoy automáticamente o se muestran en una ventana de revisión. La posposición automática tiene prioridad sobre la revisión.',
+  'overdueReviewBody': 'Estas tareas vencían antes de hoy. Posponlas a hoy o selecciona tareas concretas para posponer o completar.',
+  'overdueNone': 'No hay tareas vencidas', 'postponeAll': 'Posponer todas a hoy', 'postponeSelected': 'Posponer ({n})', 'completeSelected': 'Completar ({n})',
+  'plusButton': 'Botón más', 'plusButtonPosition': 'Posición', 'plusButtonSize': 'Tamaño del botón', 'plusButtonSizeHint': 'Ajusta el tamaño del botón flotante +.',
+  'plusButtonPerTab': 'Posición por pestaña', 'plusButtonPerTabHint': 'Anula el lado del botón + para pestañas concretas. Estas opciones también están en los ajustes de cada pestaña.',
+  'plusButtonInherit': 'Predeterminado', 'sideRight': 'Derecha', 'sideLeft': 'Izquierda',
   'unitName': 'Unidad', 'unitEgGlass': 'ej. vaso',
   'noRoutinesToday': 'Sin rutinas hoy', 'noRoutinesYet': 'Aún sin rutinas',
   'tapPlusFirstAdd': 'Toca + para añadir tu primera rutina',
@@ -2376,6 +2431,14 @@ const Map<String, String> _fr = {
   'goalAchieveAll': 'Tout accomplir', 'goalCertainAmount': 'Atteindre un montant',
   'dailyGoal': 'Objectif quotidien', 'recordPerTap': 'Par appui',
   'recordManual': 'Saisie manuelle', 'recordManualInfo': 'Saisissez la quantité à chaque fois que vous cochez la routine', 'recordAmountPrompt': 'Quantité en {unit}', 'showEventsInToday': 'Afficher les événements dans Aujourd\'hui', 'includeInTodayCount': 'Inclure dans le compteur Aujourd\'hui',
+  'timeFormat': 'Format de l\'heure', 'timeFormat24h': '24 heures', 'timeFormatAmPm': 'AM / PM',
+  'overdueTasksTitle': 'Tâches en retard', 'autoPostponeOverdue': 'Reporter à aujourd\'hui', 'overdueReview': 'Vérifier à l\'ouverture',
+  'overdueSettingsHint': 'Lorsque cette option est activée, à la première ouverture de l\'app chaque jour, les tâches en retard sont déplacées à aujourd\'hui automatiquement ou affichées dans une fenêtre de révision. Le report automatique est prioritaire sur la révision.',
+  'overdueReviewBody': 'Ces tâches étaient dues avant aujourd\'hui. Reportez-les à aujourd\'hui ou sélectionnez des tâches précises à reporter ou terminer.',
+  'overdueNone': 'Aucune tâche en retard', 'postponeAll': 'Tout reporter à aujourd\'hui', 'postponeSelected': 'Reporter ({n})', 'completeSelected': 'Terminer ({n})',
+  'plusButton': 'Bouton plus', 'plusButtonPosition': 'Position', 'plusButtonSize': 'Taille du bouton', 'plusButtonSizeHint': 'Ajustez la taille du bouton + flottant.',
+  'plusButtonPerTab': 'Position par onglet', 'plusButtonPerTabHint': 'Remplacez le côté du bouton + pour des onglets précis. Ces options figurent aussi dans les réglages de chaque onglet.',
+  'plusButtonInherit': 'Par défaut', 'sideRight': 'Droite', 'sideLeft': 'Gauche',
   'unitName': 'Unité', 'unitEgGlass': 'ex. verre',
   'noRoutinesToday': 'Aucune routine aujourd\'hui', 'noRoutinesYet': 'Aucune routine',
   'tapPlusFirstAdd': 'Appuyez sur + pour ajouter votre première routine',
@@ -2813,6 +2876,14 @@ const Map<String, String> _de = {
   'goalAchieveAll': 'Alles erreichen', 'goalCertainAmount': 'Bestimmte Menge',
   'dailyGoal': 'Tagesziel', 'recordPerTap': 'Pro Tipp aufzeichnen',
   'recordManual': 'Manuell erfassen', 'recordManualInfo': 'Gib jedes Mal die Menge ein, wenn du die Routine abhakst', 'recordAmountPrompt': 'Menge in {unit}', 'showEventsInToday': 'Termine in Heute anzeigen', 'includeInTodayCount': 'In Heute-Zähler einbeziehen',
+  'timeFormat': 'Zeitformat', 'timeFormat24h': '24 Stunden', 'timeFormatAmPm': 'AM / PM',
+  'overdueTasksTitle': 'Überfällige Aufgaben', 'autoPostponeOverdue': 'Auf heute verschieben', 'overdueReview': 'Beim Öffnen prüfen',
+  'overdueSettingsHint': 'Wenn aktiviert, werden überfällige Aufgaben beim ersten täglichen Öffnen der App automatisch auf heute verschoben oder in einem Überprüfungsfenster angezeigt. Das automatische Verschieben hat Vorrang vor der Überprüfung.',
+  'overdueReviewBody': 'Diese Aufgaben waren vor heute fällig. Verschiebe sie auf heute oder wähle einzelne Aufgaben zum Verschieben oder Abschließen.',
+  'overdueNone': 'Keine überfälligen Aufgaben', 'postponeAll': 'Alle auf heute verschieben', 'postponeSelected': 'Verschieben ({n})', 'completeSelected': 'Abschließen ({n})',
+  'plusButton': 'Plus-Schaltfläche', 'plusButtonPosition': 'Position', 'plusButtonSize': 'Schaltflächengröße', 'plusButtonSizeHint': 'Passe die Größe der schwebenden +-Schaltfläche an.',
+  'plusButtonPerTab': 'Position pro Tab', 'plusButtonPerTabHint': 'Überschreibe die Seite der +-Schaltfläche für einzelne Tabs. Diese Optionen sind auch in den Einstellungen jedes Tabs verfügbar.',
+  'plusButtonInherit': 'Standard', 'sideRight': 'Rechts', 'sideLeft': 'Links',
   'unitName': 'Einheit', 'unitEgGlass': 'z. B. Glas',
   'noRoutinesToday': 'Heute keine Routinen', 'noRoutinesYet': 'Noch keine Routinen',
   'tapPlusFirstAdd': 'Tippe +, um deine erste Routine hinzuzufügen',
@@ -3250,6 +3321,14 @@ const Map<String, String> _it = {
   'goalAchieveAll': 'Realizza tutto', 'goalCertainAmount': 'Raggiungi quantità',
   'dailyGoal': 'Obiettivo giornaliero', 'recordPerTap': 'Registra per tocco',
   'recordManual': 'Inserimento manuale', 'recordManualInfo': 'Inserisci la quantità ogni volta che segni la routine', 'recordAmountPrompt': 'Quantità in {unit}', 'showEventsInToday': 'Mostra gli eventi in Oggi', 'includeInTodayCount': 'Includi nel conteggio di Oggi',
+  'timeFormat': 'Formato ora', 'timeFormat24h': '24 ore', 'timeFormatAmPm': 'AM / PM',
+  'overdueTasksTitle': 'Attività scadute', 'autoPostponeOverdue': 'Rinvia a oggi', 'overdueReview': 'Rivedi all\'apertura',
+  'overdueSettingsHint': 'Se attivo, alla prima apertura dell\'app ogni giorno le attività scadute vengono spostate a oggi automaticamente o mostrate in una finestra di revisione. Il rinvio automatico ha la priorità sulla revisione.',
+  'overdueReviewBody': 'Queste attività erano in scadenza prima di oggi. Rinviale a oggi o seleziona attività specifiche da rinviare o completare.',
+  'overdueNone': 'Nessuna attività scaduta', 'postponeAll': 'Rinvia tutte a oggi', 'postponeSelected': 'Rinvia ({n})', 'completeSelected': 'Completa ({n})',
+  'plusButton': 'Pulsante più', 'plusButtonPosition': 'Posizione', 'plusButtonSize': 'Dimensione pulsante', 'plusButtonSizeHint': 'Regola la dimensione del pulsante + fluttuante.',
+  'plusButtonPerTab': 'Posizione per scheda', 'plusButtonPerTabHint': 'Sostituisci il lato del pulsante + per singole schede. Queste opzioni sono anche nelle impostazioni di ogni scheda.',
+  'plusButtonInherit': 'Predefinito', 'sideRight': 'Destra', 'sideLeft': 'Sinistra',
   'unitName': 'Unità', 'unitEgGlass': 'es. bicchiere',
   'noRoutinesToday': 'Nessuna abitudine oggi', 'noRoutinesYet': 'Nessuna abitudine',
   'tapPlusFirstAdd': 'Tocca + per aggiungere la prima abitudine',
@@ -3687,6 +3766,14 @@ const Map<String, String> _pt = {
   'goalAchieveAll': 'Concluir tudo', 'goalCertainAmount': 'Atingir quantidade',
   'dailyGoal': 'Meta diária', 'recordPerTap': 'Por toque',
   'recordManual': 'Registro manual', 'recordManualInfo': 'Digite a quantidade sempre que marcar a rotina', 'recordAmountPrompt': 'Quantidade em {unit}', 'showEventsInToday': 'Mostrar eventos em Hoje', 'includeInTodayCount': 'Incluir na contagem de Hoje',
+  'timeFormat': 'Formato de hora', 'timeFormat24h': '24 horas', 'timeFormatAmPm': 'AM / PM',
+  'overdueTasksTitle': 'Tarefas atrasadas', 'autoPostponeOverdue': 'Adiar para hoje', 'overdueReview': 'Rever ao abrir',
+  'overdueSettingsHint': 'Quando ativado, na primeira vez que abre a app a cada dia, as tarefas atrasadas são movidas para hoje automaticamente ou mostradas numa janela de revisão. O adiamento automático tem prioridade sobre a revisão.',
+  'overdueReviewBody': 'Estas tarefas venciam antes de hoje. Adie-as para hoje ou selecione tarefas específicas para adiar ou concluir.',
+  'overdueNone': 'Sem tarefas atrasadas', 'postponeAll': 'Adiar todas para hoje', 'postponeSelected': 'Adiar ({n})', 'completeSelected': 'Concluir ({n})',
+  'plusButton': 'Botão mais', 'plusButtonPosition': 'Posição', 'plusButtonSize': 'Tamanho do botão', 'plusButtonSizeHint': 'Ajuste o tamanho do botão + flutuante.',
+  'plusButtonPerTab': 'Posição por separador', 'plusButtonPerTabHint': 'Substitua o lado do botão + para separadores específicos. Estas opções também estão nas definições de cada separador.',
+  'plusButtonInherit': 'Predefinição', 'sideRight': 'Direita', 'sideLeft': 'Esquerda',
   'unitName': 'Unidade', 'unitEgGlass': 'ex. copo',
   'noRoutinesToday': 'Sem rotinas hoje', 'noRoutinesYet': 'Ainda sem rotinas',
   'tapPlusFirstAdd': 'Toque + para adicionar sua primeira rotina',
@@ -4124,6 +4211,14 @@ const Map<String, String> _ru = {
   'goalAchieveAll': 'Выполнить всё', 'goalCertainAmount': 'Достичь количества',
   'dailyGoal': 'Дневная цель', 'recordPerTap': 'За одно нажатие',
   'recordManual': 'Ручной ввод', 'recordManualInfo': 'Вводите количество каждый раз при отметке привычки', 'recordAmountPrompt': 'Количество в {unit}', 'showEventsInToday': 'Показывать события в «Сегодня»', 'includeInTodayCount': 'Учитывать в счётчике «Сегодня»',
+  'timeFormat': 'Формат времени', 'timeFormat24h': '24 часа', 'timeFormatAmPm': 'AM / PM',
+  'overdueTasksTitle': 'Просроченные задачи', 'autoPostponeOverdue': 'Переносить на сегодня', 'overdueReview': 'Просмотр при открытии',
+  'overdueSettingsHint': 'Когда включено, при первом открытии приложения каждый день просроченные задачи либо автоматически переносятся на сегодня, либо показываются в окне просмотра. Автоперенос имеет приоритет над просмотром.',
+  'overdueReviewBody': 'Срок этих задач истёк до сегодня. Перенесите их на сегодня или выберите отдельные задачи, чтобы перенести или завершить.',
+  'overdueNone': 'Нет просроченных задач', 'postponeAll': 'Перенести все на сегодня', 'postponeSelected': 'Перенести ({n})', 'completeSelected': 'Завершить ({n})',
+  'plusButton': 'Кнопка «плюс»', 'plusButtonPosition': 'Расположение', 'plusButtonSize': 'Размер кнопки', 'plusButtonSizeHint': 'Настройте размер плавающей кнопки +.',
+  'plusButtonPerTab': 'Расположение для вкладок', 'plusButtonPerTabHint': 'Переопределите сторону кнопки + для отдельных вкладок. Эти параметры также есть в настройках каждой вкладки.',
+  'plusButtonInherit': 'По умолчанию', 'sideRight': 'Справа', 'sideLeft': 'Слева',
   'unitName': 'Единица', 'unitEgGlass': 'напр. стакан',
   'noRoutinesToday': 'Сегодня привычек нет', 'noRoutinesYet': 'Пока нет привычек',
   'tapPlusFirstAdd': 'Нажмите +, чтобы добавить первую привычку',
@@ -4560,6 +4655,14 @@ const Map<String, String> _zh = {
   'goalAchieveAll': '全部完成', 'goalCertainAmount': '达到一定数量',
   'dailyGoal': '每日目标', 'recordPerTap': '每次点击记录',
   'recordManual': '手动记录', 'recordManualInfo': '每次勾选该习惯时输入数量', 'recordAmountPrompt': '数量（{unit}）', 'showEventsInToday': '在“今天”中显示事件', 'includeInTodayCount': '计入“今天”的计数',
+  'timeFormat': '时间格式', 'timeFormat24h': '24 小时', 'timeFormatAmPm': 'AM / PM',
+  'overdueTasksTitle': '逾期任务', 'autoPostponeOverdue': '自动顺延到今天', 'overdueReview': '打开时查看',
+  'overdueSettingsHint': '启用后，每天首次打开应用时，逾期任务会自动移到今天，或在查看弹窗中显示。自动顺延优先于查看。',
+  'overdueReviewBody': '这些任务在今天之前到期。将它们顺延到今天，或选择特定任务进行顺延或完成。',
+  'overdueNone': '没有逾期任务', 'postponeAll': '全部顺延到今天', 'postponeSelected': '顺延（{n}）', 'completeSelected': '完成（{n}）',
+  'plusButton': '加号按钮', 'plusButtonPosition': '位置', 'plusButtonSize': '按钮大小', 'plusButtonSizeHint': '调整浮动 + 按钮的大小。',
+  'plusButtonPerTab': '各标签页位置', 'plusButtonPerTabHint': '为单个标签页覆盖 + 按钮的方向。这些选项也在每个标签页的设置中。',
+  'plusButtonInherit': '默认', 'sideRight': '右侧', 'sideLeft': '左侧',
   'unitName': '单位', 'unitEgGlass': '例如：杯',
   'noRoutinesToday': '今天没有习惯', 'noRoutinesYet': '还没有习惯',
   'tapPlusFirstAdd': '点击 + 添加第一个习惯',
@@ -4996,6 +5099,14 @@ const Map<String, String> _ja = {
   'goalAchieveAll': 'すべて達成', 'goalCertainAmount': '一定量に達する',
   'dailyGoal': '1日の目標', 'recordPerTap': 'タップごとに記録',
   'recordManual': '手動で記録', 'recordManualInfo': 'このルーティンをチェックするたびに数量を入力', 'recordAmountPrompt': '数量（{unit}）', 'showEventsInToday': '「今日」にイベントを表示', 'includeInTodayCount': '「今日」のカウントに含める',
+  'timeFormat': '時刻表示', 'timeFormat24h': '24時間', 'timeFormatAmPm': 'AM / PM',
+  'overdueTasksTitle': '期限切れタスク', 'autoPostponeOverdue': '今日に自動延期', 'overdueReview': '起動時に確認',
+  'overdueSettingsHint': '有効にすると、毎日アプリを最初に開いたときに、期限切れのタスクが自動的に今日へ移動するか、確認ポップアップに表示されます。自動延期は確認より優先されます。',
+  'overdueReviewBody': 'これらのタスクは今日より前が期限でした。今日に延期するか、特定のタスクを選んで延期または完了してください。',
+  'overdueNone': '期限切れのタスクはありません', 'postponeAll': 'すべて今日に延期', 'postponeSelected': '延期（{n}）', 'completeSelected': '完了（{n}）',
+  'plusButton': 'プラスボタン', 'plusButtonPosition': '位置', 'plusButtonSize': 'ボタンサイズ', 'plusButtonSizeHint': 'フローティング + ボタンのサイズを調整します。',
+  'plusButtonPerTab': 'タブごとの位置', 'plusButtonPerTabHint': '個々のタブで + ボタンの位置を上書きします。これらのオプションは各タブの設定にもあります。',
+  'plusButtonInherit': 'デフォルト', 'sideRight': '右', 'sideLeft': '左',
   'unitName': '単位', 'unitEgGlass': '例: グラス',
   'noRoutinesToday': '今日の習慣はありません', 'noRoutinesYet': 'まだ習慣がありません',
   'tapPlusFirstAdd': '＋ をタップして最初の習慣を追加',

@@ -25,10 +25,12 @@ import 'settings/settings_view.dart';
 import 'settings/smart_list_prefs.dart';
 import 'settings/tab_bar_config.dart';
 import 'utils/shortcut_router.dart';
+import 'tasks/overdue_tasks_view.dart';
 import 'tasks/task_controller.dart';
 import 'tasks/task_creation_sheet.dart';
 import 'tasks/tasks_view.dart';
 import 'theme/app_theme.dart';
+import 'utils/day_boundary.dart';
 import 'utils/fast_route.dart';
 import 'utils/platform_capabilities.dart';
 import 'utils/plus_button_inset_scope.dart';
@@ -201,6 +203,44 @@ class _HomeShellState extends State<HomeShell> {
         _handleDropOnAddFolderButton;
     _plusDragController.onDropOnNotesAddFolderButton =
         _handleDropOnNotesAddFolderButton;
+
+    // First-open-of-a-new-day overdue handling (auto-postpone / review popup).
+    // Deferred to after the first frame so the shell (and any unlock) settles
+    // before we touch the navigator. HomeShell isn't built until the security
+    // gate is unlocked, so this naturally runs post-unlock.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeRunOverdueCheck();
+    });
+  }
+
+  /// Runs at most once per calendar day (across spaces, since the marker lives
+  /// in the global settings): if enabled, auto-postpones overdue tasks to
+  /// today, or shows the "Overdue Tasks" review popup.
+  Future<void> _maybeRunOverdueCheck() async {
+    final sc = widget.settingsController;
+    if (!sc.autoPostponeOverdue && !sc.showOverdueReview) return;
+
+    final today = DayBoundary.today();
+    final todayKey = '${today.year.toString().padLeft(4, '0')}-'
+        '${today.month.toString().padLeft(2, '0')}-'
+        '${today.day.toString().padLeft(2, '0')}';
+    if (sc.lastOverdueCheckDay == todayKey) return;
+    // Record immediately so we don't re-prompt within the same day even if the
+    // user dismisses without acting.
+    await sc.setLastOverdueCheckDay(todayKey);
+
+    final overdue = widget.taskController.overdueTasks;
+    if (overdue.isEmpty) return;
+
+    if (sc.autoPostponeOverdue) {
+      await widget.taskController
+          .postponeTasksToToday(overdue.map((t) => t.id).toList());
+      return;
+    }
+    // Review popup (only when auto-postpone is off).
+    if (sc.showOverdueReview && mounted) {
+      await showOverdueTasksReview(context, widget.taskController);
+    }
   }
 
   void _handleDropOnAddFolderButton() {
@@ -1275,14 +1315,25 @@ class _HomeShellState extends State<HomeShell> {
                       final plusEnabled = _lastTabIndex != 0 ||
                           _plusDragController.onKanbanPlusTap != null ||
                           _tasksPlusEnabled();
+                      // Per-tab + button placement (falls back to the global
+                      // side) and user-configurable size. In the wide layout
+                      // the left edge is taken by the sidebar, so the button
+                      // always stays on the right there.
+                      final onLeft = !isWide &&
+                          widget.settingsController
+                                  .plusButtonSideForTab(_lastTabIndex) ==
+                              PlusButtonSide.left;
+                      final scale = widget.settingsController.plusButtonScale;
                       return AnimatedPositioned(
                         duration: const Duration(milliseconds: 180),
                         curve: Curves.easeOut,
-                        right: 20,
+                        left: onLeft ? 20 : null,
+                        right: onLeft ? null : 20,
                         bottom: baseBottom + lift + undoLift,
                         child: _PlusButton(
                           onPressed: _onPlusPressed,
                           enabled: plusEnabled,
+                          scale: scale,
                         ),
                       );
                     },
@@ -1607,7 +1658,11 @@ class _DepthObserver extends NavigatorObserver {
 }
 
 class _PlusButton extends StatelessWidget {
-  const _PlusButton({required this.onPressed, this.enabled = true});
+  const _PlusButton({
+    required this.onPressed,
+    this.enabled = true,
+    this.scale = 1.0,
+  });
 
   final VoidCallback onPressed;
   // When false, render the button greyed and don't fire onPressed. Dragging
@@ -1615,11 +1670,16 @@ class _PlusButton extends StatelessWidget {
   // create a task in.
   final bool enabled;
 
+  // Multiplier on the stock 52 px button (1.0 = stock). Drives both the circle
+  // and the icon so the lifted drag feedback scales with it too.
+  final double scale;
+
   @override
   Widget build(BuildContext context) {
+    final dimension = 52.0 * scale;
     final visual = Container(
-      width: 52,
-      height: 52,
+      width: dimension,
+      height: dimension,
       decoration: BoxDecoration(
         color: enabled
             ? AppColors.accent
@@ -1635,10 +1695,10 @@ class _PlusButton extends StatelessWidget {
               ]
             : null,
       ),
-      child: const Icon(
+      child: Icon(
         CupertinoIcons.plus,
         color: CupertinoColors.white,
-        size: 24,
+        size: 24 * scale,
       ),
     );
     if (!enabled) {

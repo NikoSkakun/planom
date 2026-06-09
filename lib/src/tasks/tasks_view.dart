@@ -523,8 +523,11 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
                     sc.countEventsInToday &&
                     widget.eventController != null) {
                   final now = DateTime.now();
+                  // Exclude events that have already finished — they show in
+                  // the Today section greyed out but don't inflate the badge.
                   todayCount += widget.eventController!
                       .eventsForDate(DateTime(now.year, now.month, now.day))
+                      .where((e) => !e.isPastAt(now))
                       .length;
                 }
                 final tomorrowCount =

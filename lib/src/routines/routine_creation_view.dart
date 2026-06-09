@@ -10,6 +10,7 @@ import '../models/routine_reminder.dart';
 import '../tasks/calendar_date_picker.dart'
     show formatDoTime, formatTaskDateRelative;
 import '../theme/app_theme.dart';
+import '../utils/day_boundary.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
 import 'routine_controller.dart';
@@ -1096,7 +1097,7 @@ Future<int?> _showTimeOfDayPicker(BuildContext context, int initialMinute) {
       child: CupertinoDatePicker(
         mode: CupertinoDatePickerMode.time,
         initialDateTime: base,
-        use24hFormat: false,
+        use24hFormat: TimeFormatPref.use24h,
         onDateTimeChanged: (d) => selected = d,
       ),
     ),

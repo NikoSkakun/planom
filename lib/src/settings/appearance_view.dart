@@ -266,6 +266,14 @@ class AppearanceView extends StatelessWidget {
                 ),
                 const SizedBox(height: 1),
                 SettingsNavRow(
+                  label: s.timeFormat,
+                  trailingLabel: controller.use24hTime
+                      ? s.timeFormat24h
+                      : s.timeFormatAmPm,
+                  onTap: () => _pickTimeFormat(context, controller),
+                ),
+                const SizedBox(height: 1),
+                SettingsNavRow(
                   label: s.dayBoundary,
                   trailingLabel: _hourLabel(controller.dayBoundaryHour),
                   onTap: () => _pickDayBoundary(context, controller),
@@ -290,6 +298,21 @@ class AppearanceView extends StatelessWidget {
     final hour = h % 24;
     final twoDigit = hour.toString().padLeft(2, '0');
     return '$twoDigit:00';
+  }
+
+  Future<void> _pickTimeFormat(
+      BuildContext context, SettingsController controller) async {
+    final s = S.of(context);
+    final selected = await showSelectionMenu<bool>(
+      context: context,
+      title: s.timeFormat,
+      current: controller.use24hTime,
+      options: [
+        SelectionMenuOption(value: false, label: s.timeFormatAmPm),
+        SelectionMenuOption(value: true, label: s.timeFormat24h),
+      ],
+    );
+    if (selected != null) await controller.updateUse24hTime(selected);
   }
 
   Future<void> _pickDayBoundary(

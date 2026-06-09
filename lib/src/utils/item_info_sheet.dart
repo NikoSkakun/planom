@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
+import 'day_boundary.dart';
 
 void showItemInfoSheet(
   BuildContext context, {
@@ -72,8 +73,12 @@ class _InfoRow extends StatelessWidget {
 
 String _formatDateTime(DateTime dt, List<String> months) {
   final h = dt.hour;
+  final min = dt.minute.toString().padLeft(2, '0');
+  final datePart = '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+  if (TimeFormatPref.use24h) {
+    return '$datePart, ${h.toString().padLeft(2, '0')}:$min';
+  }
   final period = h >= 12 ? 'PM' : 'AM';
   final h12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
-  final min = dt.minute.toString().padLeft(2, '0');
-  return '${months[dt.month - 1]} ${dt.day}, ${dt.year}, $h12:$min $period';
+  return '$datePart, $h12:$min $period';
 }

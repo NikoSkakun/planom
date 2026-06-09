@@ -4,6 +4,7 @@ import '../folders/folder_icon_picker.dart';
 import '../integrations/google/google_calendar_controller.dart';
 import '../localization/strings.dart';
 import '../utils/selection_menu.dart';
+import 'plus_button_settings_view.dart';
 import 'settings_controller.dart';
 import 'settings_widgets.dart';
 import 'smart_list_prefs.dart';
@@ -96,6 +97,9 @@ class NotesSettingsView extends StatelessWidget {
                     value: controller.smartListPrefs.showNotesAddFolderButton,
                     onChanged: controller.updateShowNotesAddFolderButton,
                   ),
+                  const SizedBox(height: 18),
+                  SettingsSectionHeader(s.plusButton),
+                  PlusButtonOverrideRow(controller: controller, tab: 1),
                   const SizedBox(height: 18),
                   SettingsSectionHeader(s.sectionDefaults),
                   GestureDetector(
@@ -268,6 +272,9 @@ class CalendarSettingsView extends StatelessWidget {
                           controller.updateShowFutureRoutinesInCalendar,
                     ),
                   ],
+                  const SizedBox(height: 18),
+                  SettingsSectionHeader(s.plusButton),
+                  PlusButtonOverrideRow(controller: controller, tab: 2),
                 ],
               ),
             );
@@ -363,6 +370,9 @@ class RoutinesSettingsView extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 24),
+                  SettingsSectionHeader(s.plusButton),
+                  PlusButtonOverrideRow(controller: controller, tab: 3),
                 ],
               ),
             );

@@ -40,3 +40,16 @@ class DayBoundary {
   /// Local date that represents "tomorrow" (the day after [today]).
   static DateTime tomorrow() => today().add(const Duration(days: 1));
 }
+
+/// Globally-mutable mirror of [SettingsController.use24hTime] so the top-level
+/// [formatDoTime] helper and the Cupertino date/time pickers can read the
+/// time-of-day display style without plumbing it through every call site
+/// (same pattern as [DayBoundary.hour]). Mirrored from
+/// [SettingsController.loadSettings] and bumped on every change to
+/// [SettingsController.updateUse24hTime].
+class TimeFormatPref {
+  TimeFormatPref._();
+
+  /// When true, times render as 24-hour ("14:30"); otherwise AM/PM ("2:30 PM").
+  static bool use24h = false;
+}

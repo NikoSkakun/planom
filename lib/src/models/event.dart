@@ -38,6 +38,20 @@ class Event extends AppItem {
           iconId: iconId,
         );
 
+  /// Whether this event has already finished relative to [now]. A timed event
+  /// is past once its end (start + duration) has elapsed; an all-day / untimed
+  /// event is past only once the whole day has rolled over. Mirrors the logic
+  /// the Calendar grid uses to dim past events.
+  bool isPastAt(DateTime now) {
+    if (doTime != null) {
+      final endMinutes = doTime! + (duration ?? 0);
+      return date.add(Duration(minutes: endMinutes)).isBefore(now);
+    }
+    final eventDay = DateTime(date.year, date.month, date.day);
+    final today = DateTime(now.year, now.month, now.day);
+    return eventDay.isBefore(today);
+  }
+
   Event copyWith({
     String? title,
     String? note,

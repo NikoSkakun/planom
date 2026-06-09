@@ -6,6 +6,7 @@ import '../spaces/space_manager.dart';
 import '../tasks/task_field_prefs.dart';
 import '../theme/app_theme.dart';
 import '../utils/selection_menu.dart';
+import 'plus_button_settings_view.dart';
 import 'settings_controller.dart';
 import 'settings_widgets.dart';
 import 'smart_list_prefs.dart';
@@ -252,6 +253,34 @@ class TasksSettingsView extends StatelessWidget {
                 ],
 
                 const SizedBox(height: 18),
+                SettingsSectionHeader(s.overdueTasksTitle),
+                SettingsToggleRow(
+                  label: s.autoPostponeOverdue,
+                  value: controller.autoPostponeOverdue,
+                  onChanged: controller.updateAutoPostponeOverdue,
+                ),
+                const SizedBox(height: 1),
+                SettingsToggleRow(
+                  label: s.overdueReview,
+                  value: controller.showOverdueReview &&
+                      !controller.autoPostponeOverdue,
+                  enabled: !controller.autoPostponeOverdue,
+                  onChanged: controller.updateShowOverdueReview,
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    s.overdueSettingsHint,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: CupertinoColors.secondaryLabel
+                          .resolveFrom(context),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 18),
                 SettingsSectionHeader(s.sectionTaskCounters),
                 SettingsNavRow(
                   label: s.folderCounter,
@@ -354,6 +383,8 @@ class TasksSettingsView extends StatelessWidget {
                   value: controller.smartListPrefs.showAddFolderButton,
                   onChanged: controller.updateShowAddFolderButton,
                 ),
+                const SizedBox(height: 1),
+                PlusButtonOverrideRow(controller: controller, tab: 0),
                 const SizedBox(height: 1),
                 SettingsNavRow(
                   label: s.checkboxStyle,
