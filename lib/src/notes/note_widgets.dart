@@ -6,6 +6,7 @@ import '../folders/folder_icon_picker.dart';
 import '../localization/strings.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
+import '../utils/emoji_text.dart';
 import '../utils/plus_drag_payload.dart';
 import '../utils/reorder_drag.dart';
 
@@ -21,23 +22,27 @@ List<InlineSpan> _parseInlineMarkdown(String text, TextStyle base) {
   int last = 0;
   for (final m in pattern.allMatches(text)) {
     if (m.start > last) {
-      spans.add(TextSpan(text: text.substring(last, m.start), style: base));
+      spans.addAll(buildEmojiSpans(text.substring(last, m.start), base));
     }
     if (m.group(1) != null) {
-      spans.add(TextSpan(text: m.group(1), style: base.copyWith(fontWeight: FontWeight.w700)));
+      spans.addAll(buildEmojiSpans(
+          m.group(1)!, base.copyWith(fontWeight: FontWeight.w700)));
     } else if (m.group(2) != null) {
-      spans.add(TextSpan(text: m.group(2), style: base.copyWith(fontStyle: FontStyle.italic)));
+      spans.addAll(buildEmojiSpans(
+          m.group(2)!, base.copyWith(fontStyle: FontStyle.italic)));
     } else if (m.group(3) != null) {
-      spans.add(TextSpan(text: m.group(3), style: base.copyWith(decoration: TextDecoration.lineThrough)));
+      spans.addAll(buildEmojiSpans(
+          m.group(3)!, base.copyWith(decoration: TextDecoration.lineThrough)));
     } else if (m.group(4) != null) {
-      spans.add(TextSpan(text: m.group(4), style: base.copyWith(fontFamily: 'Menlo', fontSize: 12.0)));
+      spans.addAll(buildEmojiSpans(
+          m.group(4)!, base.copyWith(fontFamily: 'Menlo', fontSize: 12.0)));
     } else if (m.group(5) != null) {
-      spans.add(TextSpan(text: m.group(5), style: base));
+      spans.addAll(buildEmojiSpans(m.group(5)!, base));
     }
     last = m.end;
   }
   if (last < text.length) {
-    spans.add(TextSpan(text: text.substring(last), style: base));
+    spans.addAll(buildEmojiSpans(text.substring(last), base));
   }
   return spans;
 }
