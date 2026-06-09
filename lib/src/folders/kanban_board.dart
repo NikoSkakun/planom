@@ -387,11 +387,13 @@ class _KanbanColumn extends StatelessWidget {
           decoration: BoxDecoration(
             color: _columnColor(context),
             borderRadius: BorderRadius.circular(14),
+            // Border is always 2px wide so toggling the highlight can't reflow
+            // the column's contents; only the colour changes. When not a drop
+            // target the border is fully transparent (no visible outline), and
+            // it turns accent while the Plus button hovers over the column.
             border: Border.all(
-              color: highlighted
-                  ? accent
-                  : CupertinoColors.separator.resolveFrom(context),
-              width: highlighted ? 2 : 0.5,
+              color: highlighted ? accent : const Color(0x00000000),
+              width: 2,
             ),
           ),
           child: Column(

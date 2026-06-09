@@ -542,6 +542,7 @@ class S {
   String get moveToTrashListBody => t('moveToTrashListBody');
   String get moveToTrashItemBody => t('moveToTrashItemBody');
   String get taskName => t('taskName');
+  String get emptyFolderTaskWarning => t('emptyFolderTaskWarning');
   String get eventName => t('eventName');
   String get note => t('note');
   String get subtasks => t('subtasks');
@@ -1220,6 +1221,8 @@ const Map<String, String> _en = {
   'restoreBody': 'This will be moved back to {destination}.',
   'deletePermanentlyQuestion': 'Delete "{name}" permanently?',
   'taskName': 'Task name', 'eventName': 'Event name', 'note': 'Note',
+  'emptyFolderTaskWarning':
+      'This folder has no lists yet, so this task will be added to your default list (Inbox).',
   'subtasks': 'Subtasks', 'addSubtask': 'Add subtask',
   'repeat': 'Repeat', 'repeatNone': 'No Repeat',
   'repeatDaily': 'Daily', 'repeatWeekly': 'Weekly',
@@ -1472,6 +1475,8 @@ const Map<String, String> _uk = {
   'restoreBody': 'Буде повернуто до {destination}.',
   'deletePermanentlyQuestion': 'Видалити «{name}» назавжди?',
   'taskName': 'Назва завдання', 'eventName': 'Назва події', 'note': 'Нотатка',
+  'emptyFolderTaskWarning':
+      'У цій папці ще немає списків, тож завдання буде додано до типового списку (Вхідні).',
   'subtasks': 'Підзавдання', 'addSubtask': 'Додати підзавдання',
   'repeat': 'Повтор', 'repeatNone': 'Без повтору',
   'repeatDaily': 'Щодня', 'repeatWeekly': 'Щотижня',
@@ -1917,6 +1922,8 @@ const Map<String, String> _es = {
   'restoreBody': 'Se moverá a {destination}.',
   'deletePermanentlyQuestion': '¿Eliminar "{name}" permanentemente?',
   'taskName': 'Nombre de la tarea', 'eventName': 'Nombre del evento', 'note': 'Nota',
+  'emptyFolderTaskWarning':
+      'Esta carpeta aún no tiene listas, por lo que esta tarea se añadirá a tu lista predeterminada (Entrada).',
   'subtasks': 'Subtareas', 'addSubtask': 'Añadir subtarea',
   'repeat': 'Repetir', 'repeatNone': 'Sin repetición',
   'repeatDaily': 'Diariamente', 'repeatWeekly': 'Semanalmente',
@@ -2362,6 +2369,8 @@ const Map<String, String> _fr = {
   'restoreBody': 'Sera déplacé vers {destination}.',
   'deletePermanentlyQuestion': 'Supprimer « {name} » définitivement ?',
   'taskName': 'Nom de la tâche', 'eventName': 'Nom de l\'événement', 'note': 'Note',
+  'emptyFolderTaskWarning':
+      'Ce dossier ne contient encore aucune liste, cette tâche sera donc ajoutée à votre liste par défaut (Boîte de réception).',
   'subtasks': 'Sous-tâches', 'addSubtask': 'Ajouter une sous-tâche',
   'repeat': 'Répéter', 'repeatNone': 'Aucune répétition',
   'repeatDaily': 'Quotidien', 'repeatWeekly': 'Hebdomadaire',
@@ -2807,6 +2816,8 @@ const Map<String, String> _de = {
   'restoreBody': 'Wird zurück nach {destination} verschoben.',
   'deletePermanentlyQuestion': '„{name}" endgültig löschen?',
   'taskName': 'Aufgabenname', 'eventName': 'Ereignisname', 'note': 'Notiz',
+  'emptyFolderTaskWarning':
+      'Dieser Ordner hat noch keine Listen, daher wird diese Aufgabe deiner Standardliste (Eingang) hinzugefügt.',
   'subtasks': 'Unteraufgaben', 'addSubtask': 'Unteraufgabe hinzufügen',
   'repeat': 'Wiederholung', 'repeatNone': 'Keine Wiederholung',
   'repeatDaily': 'Täglich', 'repeatWeekly': 'Wöchentlich',
@@ -3252,6 +3263,8 @@ const Map<String, String> _it = {
   'restoreBody': 'Verrà ripristinato in {destination}.',
   'deletePermanentlyQuestion': 'Eliminare "{name}" definitivamente?',
   'taskName': 'Nome attività', 'eventName': 'Nome evento', 'note': 'Nota',
+  'emptyFolderTaskWarning':
+      'Questa cartella non ha ancora elenchi, quindi questa attività verrà aggiunta al tuo elenco predefinito (In arrivo).',
   'subtasks': 'Sotto-attività', 'addSubtask': 'Aggiungi sotto-attività',
   'repeat': 'Ripeti', 'repeatNone': 'Nessuna ripetizione',
   'repeatDaily': 'Giornalmente', 'repeatWeekly': 'Settimanalmente',
@@ -3697,6 +3710,8 @@ const Map<String, String> _pt = {
   'restoreBody': 'Será movido de volta para {destination}.',
   'deletePermanentlyQuestion': 'Excluir "{name}" permanentemente?',
   'taskName': 'Nome da tarefa', 'eventName': 'Nome do evento', 'note': 'Nota',
+  'emptyFolderTaskWarning':
+      'Esta pasta ainda não tem listas, então esta tarefa será adicionada à sua lista padrão (Entrada).',
   'subtasks': 'Subtarefas', 'addSubtask': 'Adicionar subtarefa',
   'repeat': 'Repetir', 'repeatNone': 'Sem repetição',
   'repeatDaily': 'Diariamente', 'repeatWeekly': 'Semanalmente',
@@ -4142,6 +4157,8 @@ const Map<String, String> _ru = {
   'restoreBody': 'Будет восстановлено в {destination}.',
   'deletePermanentlyQuestion': 'Удалить «{name}» навсегда?',
   'taskName': 'Название задачи', 'eventName': 'Название события', 'note': 'Заметка',
+  'emptyFolderTaskWarning':
+      'В этой папке пока нет списков, поэтому задача будет добавлена в список по умолчанию (Входящие).',
   'subtasks': 'Подзадачи', 'addSubtask': 'Добавить подзадачу',
   'repeat': 'Повтор', 'repeatNone': 'Без повтора',
   'repeatDaily': 'Ежедневно', 'repeatWeekly': 'Еженедельно',
@@ -4586,6 +4603,7 @@ const Map<String, String> _zh = {
   'restoreBody': '将被恢复到 {destination}。',
   'deletePermanentlyQuestion': '永久删除"{name}"？',
   'taskName': '任务名称', 'eventName': '事件名称', 'note': '笔记',
+  'emptyFolderTaskWarning': '此文件夹还没有列表，因此该任务将被添加到你的默认列表（收件箱）。',
   'subtasks': '子任务', 'addSubtask': '添加子任务',
   'repeat': '重复', 'repeatNone': '不重复',
   'repeatDaily': '每天', 'repeatWeekly': '每周',
@@ -5030,6 +5048,7 @@ const Map<String, String> _ja = {
   'restoreBody': '{destination} に戻されます。',
   'deletePermanentlyQuestion': '「{name}」を完全に削除しますか？',
   'taskName': 'タスク名', 'eventName': 'イベント名', 'note': 'ノート',
+  'emptyFolderTaskWarning': 'このフォルダにはまだリストがないため、このタスクは既定のリスト（受信箱）に追加されます。',
   'subtasks': 'サブタスク', 'addSubtask': 'サブタスクを追加',
   'repeat': '繰り返し', 'repeatNone': '繰り返しなし',
   'repeatDaily': '毎日', 'repeatWeekly': '毎週',

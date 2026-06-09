@@ -20,6 +20,7 @@ void showTaskCreationSheet(
   DateTime? initialDueDate,
   String? initialSectionId,
   SettingsController? settingsController,
+  bool emptyFolderWarning = false,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -33,6 +34,7 @@ void showTaskCreationSheet(
       initialDueDate: initialDueDate,
       initialSectionId: initialSectionId,
       settingsController: settingsController,
+      emptyFolderWarning: emptyFolderWarning,
     ),
   );
 }
@@ -46,6 +48,7 @@ class TaskCreationSheet extends StatefulWidget {
     this.initialDueDate,
     this.initialSectionId,
     this.settingsController,
+    this.emptyFolderWarning = false,
   });
 
   final TaskController controller;
@@ -54,6 +57,11 @@ class TaskCreationSheet extends StatefulWidget {
   final DateTime? initialDueDate;
   final String? initialSectionId;
   final SettingsController? settingsController;
+
+  /// When true, a banner is shown above the title field explaining that the
+  /// task is being created from an empty folder (no lists inside) and will
+  /// therefore land in the global default list (Inbox).
+  final bool emptyFolderWarning;
 
   @override
   State<TaskCreationSheet> createState() => _TaskCreationSheetState();
@@ -237,6 +245,10 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
             ),
           ),
           const SizedBox(height: 20),
+          if (widget.emptyFolderWarning) ...[
+            _EmptyFolderWarning(message: s.emptyFolderTaskWarning),
+            const SizedBox(height: 14),
+          ],
           CupertinoTextField(
             controller: _titleCtrl,
             focusNode: _titleFocus,
@@ -409,6 +421,48 @@ class _TaskCreationSheetState extends State<TaskCreationSheet> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A soft amber banner shown atop the creation sheet when a task is being
+/// created from an empty folder. Uses a tinted background + leading warning
+/// glyph so it reads clearly in both light and dark mode.
+class _EmptyFolderWarning extends StatelessWidget {
+  const _EmptyFolderWarning({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final amber = CupertinoColors.systemOrange.resolveFrom(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: amber.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Text('⚠️', style: TextStyle(fontSize: 15)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.3,
+                fontWeight: FontWeight.w500,
+                color: amber,
+              ),
+            ),
           ),
         ],
       ),
