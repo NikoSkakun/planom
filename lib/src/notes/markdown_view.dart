@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../utils/emoji_text.dart';
+
 /// Renders markdown to a view with tappable links.
 /// Supports web (http/https), email (mailto:), telephone (tel:), and any
 /// custom app URL scheme (myapp://...) — anything `url_launcher` can resolve.
@@ -169,6 +171,8 @@ class MarkdownView extends StatelessWidget {
                 fitContent: true,
                 styleSheet: styleSheet,
                 softLineBreak: true,
+                inlineSyntaxes: [EmojiInlineSyntax()],
+                builders: {'emoji': EmojiElementBuilder()},
                 onTapLink: (text, href, title) => _openLink(href),
               ),
             ),
@@ -179,6 +183,8 @@ class MarkdownView extends StatelessWidget {
             padding: padding,
             styleSheet: styleSheet,
             softLineBreak: true,
+            inlineSyntaxes: [EmojiInlineSyntax()],
+            builders: {'emoji': EmojiElementBuilder()},
             onTapLink: (text, href, title) => _openLink(href),
           );
 
