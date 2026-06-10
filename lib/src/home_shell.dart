@@ -1572,17 +1572,21 @@ class _HomeShellState extends State<HomeShell> {
         width: slotWidth,
         bottom: 0,
         height: barHeight,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            _onTabTapped(slot.partnerTab);
-            _tabController.index = _visualForBuiltin(slot.partnerTab);
-          },
-          child: LongPressDraggable<_TabDragPayload>(
-            data: payload,
-            feedback: _SplitTabDragFeedback(label: _tabName(slot.partnerTab)),
-            onDragStarted: () => setState(() => _splitDragging = true),
-            onDragEnd: (d) => _onSplitDragEnd(payload, d.wasAccepted),
+        // The draggable must be the outer widget so its long-press recognizer
+        // is actually in the hit-test path; the inner opaque GestureDetector
+        // gives the area a hittable surface (and forwards a plain tap so the
+        // tab still switches normally).
+        child: LongPressDraggable<_TabDragPayload>(
+          data: payload,
+          feedback: _SplitTabDragFeedback(label: _tabName(slot.partnerTab)),
+          onDragStarted: () => setState(() => _splitDragging = true),
+          onDragEnd: (d) => _onSplitDragEnd(payload, d.wasAccepted),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              _onTabTapped(slot.partnerTab);
+              _tabController.index = _visualForBuiltin(slot.partnerTab);
+            },
             child: const SizedBox.expand(),
           ),
         ),
@@ -1624,76 +1628,124 @@ class _HomeShellState extends State<HomeShell> {
   Widget _buildSplitShell(
       BuildContext context, _SplitConfig cfg, bool hideLabels, bool isWide) {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final topInset = MediaQuery.paddingOf(context).top;
     final barHeight = 50 + bottomInset;
     final separator = Container(
       height: 0.5,
       color: CupertinoColors.separator.resolveFrom(context),
     );
-    return Stack(
-      children: [
-        SafeArea(
-          bottom: false,
-          child: Column(
+    // A solid backdrop so the status-bar strip (and any home-indicator gap)
+    // isn't a black void; it also reads as a continuation of the top pane's
+    // header bar behind the system clock / battery icons.
+    return ColoredBox(
+      color: CupertinoColors.secondarySystemBackground.resolveFrom(context),
+      child: Stack(
+        children: [
+          Column(
             children: [
-              Expanded(child: _splitPane(cfg.topTab)),
+              // Top pane: its header extends up behind the status bar.
+              Expanded(child: _splitPane(cfg.topTab, topInset: topInset)),
               separator,
-              Expanded(child: _splitPane(cfg.bottomTab)),
-              _SplitTabBar(
-                items: [
-                  for (final it in _pageItems())
-                    _renderTabItem(context, it, hideLabels, false)
-                ],
-                builtinIndices: [
-                  for (final it in _pageItems())
-                    it.kind == TabKind.builtin ? (it.builtinIndex ?? -1) : -1
-                ],
-                highlighted: {cfg.topTab, cfg.bottomTab},
-                onTap: _onSplitTabBarTap,
-              ),
+              Expanded(child: _splitPane(cfg.bottomTab, topInset: 0)),
+              _buildSplitTabBar(cfg, hideLabels),
             ],
           ),
-        ),
-        // Reconfigure drop region (resolves top/bottom half during a header
-        // drag). Covers the panes but not the tab bar.
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: barHeight,
-          child: _SplitDropRegion(
-            regionKey: _splitRegionKey,
-            onMove: _setSplitPreview,
-            onLeave: _onSplitDragLeave,
-            onAccept: _commitSplitPreview,
-          ),
-        ),
-        if (_splitDragging && _splitPreview != null)
+          // Reconfigure drop region (resolves top/bottom half during a header
+          // drag). Covers the panes but not the tab bar.
           Positioned(
             left: 0,
             right: 0,
             top: 0,
             bottom: barHeight,
-            child: IgnorePointer(
-              child: _SplitPreview(
-                config: _splitPreview!,
-                topName: _tabName(_splitPreview!.topTab),
-                bottomName: _tabName(_splitPreview!.bottomTab),
-              ),
+            child: _SplitDropRegion(
+              regionKey: _splitRegionKey,
+              onMove: _setSplitPreview,
+              onLeave: _onSplitDragLeave,
+              onAccept: _commitSplitPreview,
             ),
           ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: barHeight,
-          child: UndoBanner(controller: _undoController),
-        ),
-      ],
+          if (_splitDragging && _splitPreview != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: barHeight,
+              child: IgnorePointer(
+                child: _SplitPreview(
+                  config: _splitPreview!,
+                  topName: _tabName(_splitPreview!.topTab),
+                  bottomName: _tabName(_splitPreview!.bottomTab),
+                ),
+              ),
+            ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: barHeight,
+            child: UndoBanner(controller: _undoController),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Bottom bar for split mode. Reuses the real [CupertinoTabBar] (so it's
+  /// pixel-identical to the normal bar) and forces both split tabs to render
+  /// their accent "active" icon so they read as selected. Falls back to a
+  /// minimal bar when the current page somehow holds fewer than two tabs
+  /// (CupertinoTabBar requires ≥2 items).
+  Widget _buildSplitTabBar(_SplitConfig cfg, bool hideLabels) {
+    final items = _pageItems();
+    final highlighted = {cfg.topTab, cfg.bottomTab};
+    final built = <BottomNavigationBarItem>[];
+    var current = 0;
+    for (var i = 0; i < items.length; i++) {
+      final it = items[i];
+      final base = _renderTabItem(context, it, hideLabels, false);
+      final isHi =
+          it.kind == TabKind.builtin && highlighted.contains(it.builtinIndex);
+      if (isHi) {
+        // Force the accent (active) icon regardless of CupertinoTabBar's single
+        // currentIndex so BOTH split tabs look selected.
+        built.add(BottomNavigationBarItem(
+          icon: base.activeIcon,
+          activeIcon: base.activeIcon,
+          label: base.label,
+        ));
+        if (it.builtinIndex == cfg.topTab) current = i;
+      } else {
+        built.add(base);
+      }
+    }
+    if (items.length < 2) {
+      return _SplitTabBar(
+        items: built,
+        builtinIndices: [
+          for (final it in items)
+            it.kind == TabKind.builtin ? (it.builtinIndex ?? -1) : -1
+        ],
+        highlighted: highlighted,
+        onTap: _onSplitTabBarTap,
+      );
+    }
+    return CupertinoTabBar(
+      currentIndex: current.clamp(0, items.length - 1),
+      activeColor: CupertinoColors.label,
+      inactiveColor: CupertinoColors.secondaryLabel,
+      backgroundColor: const CupertinoDynamicColor.withBrightness(
+        color: Color(0xF0F9F9F9),
+        darkColor: Color(0xF01D1D1D),
+      ),
+      onTap: _onSplitTabBarTap,
+      items: built,
     );
   }
 
   /// One subwindow: a draggable header (long-press to reconfigure placement,
-  /// tap ✕ to close) atop the tab's live content.
-  Widget _splitPane(int tab) {
+  /// tap ✕ to close) atop the tab's live content. [topInset] reserves room for
+  /// the status bar (top pane only); the inner view's own top/bottom safe-area
+  /// padding is stripped so its nav bar sits flush under the header.
+  Widget _splitPane(int tab, {required double topInset}) {
     final payload =
         _TabDragPayload(draggedTab: tab, hostTab: _otherSplitTab(tab));
     return Column(
@@ -1705,14 +1757,20 @@ class _HomeShellState extends State<HomeShell> {
           onDragEnd: (d) => _onSplitDragEnd(payload, d.wasAccepted),
           child: _SplitPaneHeader(
             title: _tabName(tab),
+            topInset: topInset,
             onClose: () => _closeSplitWindow(tab),
           ),
         ),
         Expanded(
-          child: CupertinoTabView(
-            navigatorKey: _navigatorKeys[tab],
-            navigatorObservers: [_depthObservers[tab]],
-            builder: (ctx) => _tabContent(ctx, tab),
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            removeBottom: true,
+            child: CupertinoTabView(
+              navigatorKey: _navigatorKeys[tab],
+              navigatorObservers: [_depthObservers[tab]],
+              builder: (ctx) => _tabContent(ctx, tab),
+            ),
           ),
         ),
       ],
@@ -2243,16 +2301,23 @@ class _SplitTabDragFeedback extends StatelessWidget {
 /// enclosing draggable) re-enters placement configuration; the ✕ closes the
 /// window.
 class _SplitPaneHeader extends StatelessWidget {
-  const _SplitPaneHeader({required this.title, required this.onClose});
+  const _SplitPaneHeader({
+    required this.title,
+    required this.onClose,
+    this.topInset = 0,
+  });
 
   final String title;
   final VoidCallback onClose;
 
+  /// Extra padding above the header row, used by the top pane so the header's
+  /// background fills behind the status bar.
+  final double topInset;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 34,
-      padding: const EdgeInsets.only(left: 12, right: 2),
+      padding: EdgeInsets.only(left: 12, right: 2, top: topInset),
       decoration: BoxDecoration(
         color: CupertinoColors.secondarySystemBackground.resolveFrom(context),
         border: Border(
@@ -2262,46 +2327,49 @@ class _SplitPaneHeader extends StatelessWidget {
           ),
         ),
       ),
-      child: Row(
-        children: [
-          Icon(
-            CupertinoIcons.rectangle_grid_1x2,
-            size: 14,
-            color: CupertinoColors.secondaryLabel.resolveFrom(context),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: CupertinoColors.label.resolveFrom(context),
+      child: SizedBox(
+        height: 34,
+        child: Row(
+          children: [
+            Icon(
+              CupertinoIcons.rectangle_grid_1x2,
+              size: 14,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
               ),
             ),
-          ),
-          Icon(
-            CupertinoIcons.line_horizontal_3,
-            size: 15,
-            color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-          ),
-          Semantics(
-            label: S.of(context).closeWindow,
-            button: true,
-            child: CupertinoButton(
-              padding: const EdgeInsets.all(8),
-              minSize: 0,
-              onPressed: onClose,
-              child: Icon(
-                CupertinoIcons.xmark,
-                size: 16,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            Icon(
+              CupertinoIcons.line_horizontal_3,
+              size: 15,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+            Semantics(
+              label: S.of(context).closeWindow,
+              button: true,
+              child: CupertinoButton(
+                padding: const EdgeInsets.all(8),
+                minSize: 0,
+                onPressed: onClose,
+                child: Icon(
+                  CupertinoIcons.xmark,
+                  size: 16,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
