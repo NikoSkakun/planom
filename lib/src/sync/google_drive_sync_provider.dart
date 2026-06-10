@@ -68,10 +68,26 @@ class GoogleDriveSyncProvider extends SyncProvider {
     await _auth.storeRefreshToken(_accountId, result.refreshToken);
     _auth.cacheAccessToken(_accountId, result.accessToken, result.expiry);
 
+    final api = await _driveApi();
+    // Verify Drive is actually reachable with the granted scope before we mark
+    // the connection configured — listing the appDataFolder is always allowed
+    // by drive.appdata. Failing loudly here means a disabled API or an
+    // ungranted scope surfaces its real reason instead of masquerading as
+    // "Connected".
+    try {
+      await api.files
+          .list(spaces: _appDataFolder, $fields: 'files(id)', pageSize: 1);
+    } on gdrive.DetailedApiRequestError catch (e) {
+      await _auth.forget(_accountId); // don't leave a half-connected state
+      throw SyncException(_friendlyError('connect', e));
+    } on SocketException {
+      await _auth.forget(_accountId);
+      throw SyncException('No internet connection.');
+    }
+
     // Best-effort: discover the account email for the "Connected as …" row.
     String? email;
     try {
-      final api = await _driveApi();
       final about = await api.about.get($fields: 'user/emailAddress');
       email = about.user?.emailAddress;
     } catch (_) {/* non-fatal — fall back to a generic label */}
@@ -191,13 +207,31 @@ class GoogleDriveSyncProvider extends SyncProvider {
   }
 
   static String _friendlyError(String op, gdrive.DetailedApiRequestError e) {
+    final detail = e.message ?? '';
+    final lower = detail.toLowerCase();
+    // 403 with this wording means the Drive API isn't enabled for the app's
+    // Google Cloud project — a one-time setup step, NOT something reconnecting
+    // fixes. Call that out specifically so the user knows where to look.
+    if (e.status == 403 &&
+        (lower.contains('has not been used') ||
+            lower.contains('is disabled') ||
+            lower.contains('accessnotconfigured') ||
+            lower.contains('drive api'))) {
+      return 'The Google Drive API is not enabled for this app yet. Enable it '
+          'in the Google Cloud project (and add the drive.appdata scope to the '
+          'consent screen), then reconnect.';
+    }
     if (e.status == 401 || e.status == 403) {
-      return 'Google Drive access was denied. Reconnect it in '
-          'Settings → Sync.';
+      // Surface Google's own reason verbatim — far more actionable than a
+      // canned "access denied" line.
+      return detail.isNotEmpty
+          ? 'Google Drive access was denied: $detail'
+          : 'Google Drive access was denied. Reconnect it in '
+              'Settings → Sync.';
     }
     if (e.status == 404) {
       return 'No backup found in Google Drive yet.';
     }
-    return 'Google Drive $op failed: ${e.message ?? e.status}';
+    return 'Google Drive $op failed: ${detail.isNotEmpty ? detail : e.status}';
   }
 }

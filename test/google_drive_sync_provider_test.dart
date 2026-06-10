@@ -91,6 +91,32 @@ void main() {
     expect(utf8.decode(bytes!), 'cipher-bytes');
   });
 
+  test('push surfaces a clear message when the Drive API is disabled',
+      () async {
+    final mock = MockClient((req) async {
+      // Drive returns 403 "has not been used / disabled" when the API isn't
+      // enabled for the project. googleapis turns this into a
+      // DetailedApiRequestError the provider must translate.
+      return http.Response(
+          jsonEncode({
+            'error': {
+              'code': 403,
+              'message':
+                  'Google Drive API has not been used in project 264060209270 '
+                      'before or it is disabled.'
+            }
+          }),
+          403,
+          headers: {'content-type': 'application/json; charset=utf-8'});
+    });
+    final provider = GoogleDriveSyncProvider(auth: _FakeAuth(mock));
+    expect(
+      () => provider.push(utf8.encode('payload')),
+      throwsA(predicate((e) =>
+          e.toString().contains('Google Drive API is not enabled'))),
+    );
+  });
+
   test('wipeRemote is a no-op when nothing is stored', () async {
     final mock = MockClient((req) async {
       return http.Response(jsonEncode({'files': []}), 200,
