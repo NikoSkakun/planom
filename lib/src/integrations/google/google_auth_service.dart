@@ -53,7 +53,7 @@ class GoogleAuthService {
     try {
       final result = await _appAuth.authorizeAndExchangeCode(
         AuthorizationTokenRequest(
-          kGoogleIosClientId,
+          kGoogleClientId,
           kGoogleRedirectUri,
           serviceConfiguration: _serviceConfig,
           scopes: scopes,
@@ -111,7 +111,7 @@ class GoogleAuthService {
     try {
       final result = await _appAuth.token(
         TokenRequest(
-          kGoogleIosClientId,
+          kGoogleClientId,
           kGoogleRedirectUri,
           serviceConfiguration: _serviceConfig,
           refreshToken: refresh,

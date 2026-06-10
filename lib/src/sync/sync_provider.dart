@@ -36,6 +36,19 @@ abstract class SyncProvider {
 
   /// Removes the remote payload. Used when the user disables sync.
   Future<void> wipeRemote();
+
+  /// Runs any interactive setup the backend needs before it can sync — e.g. an
+  /// OAuth sign-in. Returns `true` when the provider is now [isConfigured].
+  /// Default: nothing to do (iCloud relies on the device's OS-level account).
+  Future<bool> connect() async => true;
+
+  /// Tears down whatever [connect] established (e.g. forgets OAuth tokens).
+  /// Called when the user disables this backend. Default: no-op.
+  Future<void> disconnect() async {}
+
+  /// Optional human-readable label for the connected account (e.g. the Google
+  /// email), shown in Settings → Sync. Null when not applicable / unknown.
+  Future<String?> connectedAccount() async => null;
 }
 
 /// Thrown by providers for user-actionable failures. Message is shown

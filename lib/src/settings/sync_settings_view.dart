@@ -20,6 +20,7 @@ class SyncSettingsView extends StatefulWidget {
 class _SyncSettingsViewState extends State<SyncSettingsView> {
   bool _busy = false;
   bool _hasPassphrase = false;
+  String? _googleAccount;
 
   @override
   void initState() {
@@ -27,6 +28,43 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     widget.controller.hasPassphrase().then((v) {
       if (mounted) setState(() => _hasPassphrase = v);
     });
+    _refreshGoogleAccount();
+  }
+
+  Future<void> _refreshGoogleAccount() async {
+    final account = await widget.controller.connectedAccount();
+    if (mounted) setState(() => _googleAccount = account);
+  }
+
+  Future<void> _enableGoogleDrive() async {
+    final s = S.of(context);
+    setState(() => _busy = true);
+    await widget.controller.setBackend(SyncBackend.googleDrive);
+    bool ok = false;
+    try {
+      ok = await widget.controller.connectProvider();
+    } catch (e) {
+      if (mounted) _showAlert(s.syncConnectFailed, e.toString());
+    }
+    await _refreshGoogleAccount();
+    // If the user cancelled (or it failed) and we never got connected, back out
+    // to "off" so the operational controls don't dangle on an unusable backend.
+    if (!ok && _googleAccount == null) {
+      await widget.controller.setBackend(SyncBackend.none);
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  Future<void> _connectGoogleDrive() async {
+    final s = S.of(context);
+    setState(() => _busy = true);
+    try {
+      await widget.controller.connectProvider();
+    } catch (e) {
+      if (mounted) _showAlert(s.syncConnectFailed, e.toString());
+    }
+    await _refreshGoogleAccount();
+    if (mounted) setState(() => _busy = false);
   }
 
   Future<void> _refreshPassphraseState() async {
@@ -191,6 +229,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     if (confirmed != true) return;
     setState(() => _busy = true);
     await widget.controller.disableAndWipeRemote();
+    await _refreshGoogleAccount();
     if (mounted) setState(() => _busy = false);
   }
 
@@ -298,16 +337,35 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                 _SectionLabel(text: s.syncFreeSection, color: labelColor),
                 _BackendCard(
                   bg: cardBg,
-                  // iCloud is shown as "Coming soon" until the Apple Developer
-                  // Portal one-time setup (iCloud container + capability link)
-                  // is done. The Dart side is ready; toggling on without those
-                  // entitlements produces opaque runtime errors, so guard it.
-                  child: _BackendRow(
-                    label: s.syncICloudTitle,
-                    sublabel: s.syncICloudSublabel,
-                    selected: snap.backend == SyncBackend.icloud,
-                    tag: s.tagComingSoon,
-                    onTap: null,
+                  child: Column(
+                    children: [
+                      // iCloud is shown as "Coming soon" until the Apple
+                      // Developer Portal one-time setup (iCloud container +
+                      // capability link) is done. The Dart side is ready;
+                      // toggling on without those entitlements produces opaque
+                      // runtime errors, so guard it.
+                      _BackendRow(
+                        label: s.syncICloudTitle,
+                        sublabel: s.syncICloudSublabel,
+                        selected: snap.backend == SyncBackend.icloud,
+                        tag: s.tagComingSoon,
+                        onTap: null,
+                      ),
+                      Container(
+                        height: 0.5,
+                        color: CupertinoColors.separator.resolveFrom(context),
+                      ),
+                      _BackendRow(
+                        label: s.syncGoogleDriveTitle,
+                        sublabel: s.syncGoogleDriveSublabel,
+                        selected: snap.backend == SyncBackend.googleDrive,
+                        tag: s.tagFree,
+                        onTap: _busy ||
+                                snap.backend == SyncBackend.googleDrive
+                            ? null
+                            : _enableGoogleDrive,
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -337,6 +395,41 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                     ],
                   ),
                 ),
+
+                // Google Drive account section — connect / connected-as.
+                if (snap.backend == SyncBackend.googleDrive) ...[
+                  const SizedBox(height: 24),
+                  _SectionLabel(
+                      text: s.syncGoogleDriveTitle, color: labelColor),
+                  _BackendCard(
+                    bg: cardBg,
+                    child: _googleAccount != null
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  CupertinoIcons.checkmark_circle_fill,
+                                  color: AppColors.systemGreen,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    s.syncConnectedAs(_googleAccount!),
+                                    style: const TextStyle(fontSize: 15),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _TapRow(
+                            label: s.syncConnectGoogleDrive,
+                            onTap: _busy ? null : _connectGoogleDrive,
+                          ),
+                  ),
+                ],
 
                 // Operational controls — only useful when a backend is active.
                 if (snap.backend != SyncBackend.none) ...[
