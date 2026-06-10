@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../database/database_service.dart';
 import '../settings/backup_crypto.dart';
 import '../settings/backup_service.dart';
+import 'google_drive_sync_provider.dart';
 import 'icloud_sync_provider.dart';
 import 'sync_provider.dart';
 import 'sync_secrets.dart';
@@ -93,6 +94,35 @@ class SyncController with ChangeNotifier {
   Future<bool> hasPassphrase() => _secrets.hasPassphrase();
 
   Future<void> clearPassphrase() => _secrets.clear();
+
+  /// Runs the active provider's interactive setup (e.g. Google Drive OAuth
+  /// sign-in). Returns `true` once the provider is configured. Refreshes the
+  /// snapshot so the UI flips from "not configured" to "idle" on success.
+  Future<bool> connectProvider() async {
+    final provider = _provider;
+    if (provider == null) return false;
+    try {
+      final ok = await provider.connect();
+      if (ok && await provider.isConfigured()) {
+        _snapshot = _snapshot.copyWith(status: SyncStatus.idle, clearError: true);
+      } else if (!ok) {
+        // User cancelled — leave the backend selected but not configured.
+        _snapshot = _snapshot.copyWith(status: SyncStatus.notConfigured);
+      }
+      notifyListeners();
+      return ok;
+    } on SyncException catch (e) {
+      _snapshot = _snapshot.copyWith(
+          status: SyncStatus.failed, lastError: e.message);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Human-readable label for the connected account (e.g. Google email), or
+  /// null when the active backend has no such concept.
+  Future<String?> connectedAccount() =>
+      _provider?.connectedAccount() ?? Future.value(null);
 
   /// Encrypts (when a passphrase is set) and uploads the active space's
   /// current state. When no passphrase is set the payload goes up as plain
@@ -208,6 +238,9 @@ class SyncController with ChangeNotifier {
       try {
         await provider.wipeRemote();
       } catch (_) {/* best effort */}
+      try {
+        await provider.disconnect();
+      } catch (_) {/* best effort — forget OAuth tokens etc. */}
     }
     await _secrets.clear();
     await setBackend(SyncBackend.none);
@@ -226,6 +259,8 @@ class SyncController with ChangeNotifier {
         return null;
       case SyncBackend.icloud:
         return ICloudSyncProvider();
+      case SyncBackend.googleDrive:
+        return GoogleDriveSyncProvider();
       case SyncBackend.planom:
       case SyncBackend.custom:
         // Planom-hosted + custom-server providers slot in here — the rest of

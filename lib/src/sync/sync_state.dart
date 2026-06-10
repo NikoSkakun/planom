@@ -11,6 +11,10 @@ enum SyncBackend {
   /// iOS / iPadOS / macOS only.
   icloud,
 
+  /// Google Drive (the app's hidden appDataFolder). Free on the user's own
+  /// Google account; works on iOS, Android and macOS.
+  googleDrive,
+
   /// Planom-hosted (Supabase or PocketBase, decided later). Paid tier.
   /// Cross-platform.
   planom,
