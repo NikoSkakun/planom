@@ -16,7 +16,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 34;
+  static const _dbVersion = 35;
 
   Database? _db;
 
@@ -49,7 +49,8 @@ class DatabaseService {
             parentTaskId TEXT,
             tagIds TEXT,
             recurrence TEXT,
-            sectionId TEXT
+            sectionId TEXT,
+            updatedAt INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -68,7 +69,8 @@ class DatabaseService {
             creationDate INTEGER NOT NULL,
             sortOrder INTEGER NOT NULL DEFAULT 0,
             isDeleted INTEGER NOT NULL DEFAULT 0,
-            deletedDate INTEGER
+            deletedDate INTEGER,
+            updatedAt INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -76,7 +78,8 @@ class DatabaseService {
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             color INTEGER,
-            creationDate INTEGER NOT NULL
+            creationDate INTEGER NOT NULL,
+            updatedAt INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -93,7 +96,8 @@ class DatabaseService {
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
             viewMode TEXT,
-            kanbanScrollMode TEXT
+            kanbanScrollMode TEXT,
+            updatedAt INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -111,7 +115,8 @@ class DatabaseService {
             deletedDate INTEGER,
             listType TEXT NOT NULL DEFAULT 'tasks',
             viewMode TEXT,
-            kanbanScrollMode TEXT
+            kanbanScrollMode TEXT,
+            updatedAt INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -123,7 +128,8 @@ class DatabaseService {
             sortOrder INTEGER NOT NULL DEFAULT 0,
             iconId TEXT,
             isDeleted INTEGER NOT NULL DEFAULT 0,
-            deletedDate INTEGER
+            deletedDate INTEGER,
+            updatedAt INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -136,7 +142,8 @@ class DatabaseService {
             modifiedDate INTEGER NOT NULL,
             sortOrder INTEGER NOT NULL DEFAULT 0,
             isDeleted INTEGER NOT NULL DEFAULT 0,
-            deletedDate INTEGER
+            deletedDate INTEGER,
+            updatedAt INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -157,7 +164,8 @@ class DatabaseService {
             waitForCompletion INTEGER NOT NULL DEFAULT 0,
             reminders TEXT,
             sortOrder INTEGER NOT NULL DEFAULT 0,
-            manualEntry INTEGER NOT NULL DEFAULT 0
+            manualEntry INTEGER NOT NULL DEFAULT 0,
+            updatedAt INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -165,7 +173,8 @@ class DatabaseService {
             id TEXT PRIMARY KEY,
             routineId TEXT NOT NULL,
             date INTEGER NOT NULL,
-            amount INTEGER NOT NULL DEFAULT 0
+            amount INTEGER NOT NULL DEFAULT 0,
+            updatedAt INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -187,7 +196,8 @@ class DatabaseService {
             isDeleted INTEGER NOT NULL DEFAULT 0,
             deletedDate INTEGER,
             reminderOffsets TEXT,
-            recurrence TEXT
+            recurrence TEXT,
+            updatedAt INTEGER NOT NULL DEFAULT 0
           )
         ''');
         await db.execute('''
@@ -197,7 +207,16 @@ class DatabaseService {
             name TEXT NOT NULL,
             sortOrder INTEGER NOT NULL DEFAULT 0,
             isCollapsed INTEGER NOT NULL DEFAULT 0,
-            creationDate INTEGER NOT NULL
+            creationDate INTEGER NOT NULL,
+            updatedAt INTEGER NOT NULL DEFAULT 0
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE tombstones (
+            tbl TEXT NOT NULL,
+            id TEXT NOT NULL,
+            deletedAt INTEGER NOT NULL,
+            PRIMARY KEY (tbl, id)
           )
         ''');
         await _createFtsTables(db);
@@ -593,6 +612,62 @@ class DatabaseService {
           await db.execute(
               'ALTER TABLE app_lists ADD COLUMN kanbanScrollMode TEXT');
         }
+        if (oldVersion < 35) {
+          // Per-record updatedAt (merge-sync foundation) + a tombstones table
+          // that records permanent deletions so they propagate across devices.
+          await db.execute(
+              'ALTER TABLE tasks ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE contacts ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE tags ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE folders ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE app_lists ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE note_folders ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE notes ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE routines ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE routine_entries ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE events ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+              'ALTER TABLE list_sections ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS tombstones (
+              tbl TEXT NOT NULL, id TEXT NOT NULL, deletedAt INTEGER NOT NULL,
+              PRIMARY KEY (tbl, id)
+            )
+          ''');
+          // Backfill updatedAt from the best existing timestamp so an unchanged
+          // device doesn't clobber a newer one on first merge.
+          await db.execute(
+              'UPDATE tasks SET updatedAt = COALESCE(deletedDate, completionDate, creationDate, 0)');
+          await db.execute(
+              'UPDATE contacts SET updatedAt = COALESCE(deletedDate, creationDate, 0)');
+          await db.execute(
+              'UPDATE tags SET updatedAt = COALESCE(creationDate, 0)');
+          await db.execute(
+              'UPDATE folders SET updatedAt = COALESCE(deletedDate, creationDate, 0)');
+          await db.execute(
+              'UPDATE app_lists SET updatedAt = COALESCE(deletedDate, creationDate, 0)');
+          await db.execute(
+              'UPDATE note_folders SET updatedAt = COALESCE(deletedDate, creationDate, 0)');
+          await db.execute(
+              'UPDATE notes SET updatedAt = COALESCE(deletedDate, modifiedDate, creationDate, 0)');
+          await db.execute(
+              'UPDATE routines SET updatedAt = COALESCE(creationDate, 0)');
+          await db.execute(
+              'UPDATE routine_entries SET updatedAt = COALESCE(date, 0)');
+          await db.execute(
+              'UPDATE events SET updatedAt = COALESCE(deletedDate, creationDate, 0)');
+          await db.execute(
+              'UPDATE list_sections SET updatedAt = COALESCE(creationDate, 0)');
+        }
       },
     );
   }
@@ -629,6 +704,31 @@ class DatabaseService {
     }
   }
 
+  int _nowMs() => DateTime.now().millisecondsSinceEpoch;
+
+  /// Insert-or-replace a user row, stamping updatedAt = now. Use for all
+  /// user-initiated creates/edits so merge can tell which copy is newer.
+  Future<void> _putRow(
+      DatabaseExecutor db, String table, Map<String, Object?> values) {
+    return db.insert(table, {...values, 'updatedAt': _nowMs()},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Patch a user row, stamping updatedAt = now.
+  Future<int> _patchRow(
+      DatabaseExecutor db, String table, Map<String, Object?> values,
+      {required String where, required List<Object?> whereArgs}) {
+    return db.update(table, {...values, 'updatedAt': _nowMs()},
+        where: where, whereArgs: whereArgs);
+  }
+
+  /// Records a permanent deletion so it propagates across devices on merge.
+  Future<void> _recordTombstone(DatabaseExecutor db, String table, String id) {
+    return db.insert('tombstones',
+        {'tbl': table, 'id': id, 'deletedAt': _nowMs()},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
   // Tasks — active (non-deleted), sorted by manual order first, then newest first
   Future<List<Task>> getTasks() async {
     final db = await _database;
@@ -648,19 +748,19 @@ class DatabaseService {
 
   Future<void> insertTask(Task task) async {
     final db = await _database;
-    await db.insert('tasks', task.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'tasks', task.toMap());
   }
 
   Future<void> updateTask(Task task) async {
     final db = await _database;
-    await db.update('tasks', task.toMap(),
+    await _patchRow(db, 'tasks', task.toMap(),
         where: 'id = ?', whereArgs: [task.id]);
   }
 
   Future<void> softDeleteTask(String id, DateTime deletedDate) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'tasks',
       {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
       where: 'id = ?',
@@ -671,7 +771,8 @@ class DatabaseService {
   Future<void> softDeleteTasksForList(
       String listId, DateTime deletedDate) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'tasks',
       {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
       where: 'listId = ? AND isDeleted = 0',
@@ -681,7 +782,8 @@ class DatabaseService {
 
   Future<void> restoreTask(String id) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'tasks',
       {'isDeleted': 0, 'deletedDate': null},
       where: 'id = ?',
@@ -692,11 +794,19 @@ class DatabaseService {
   Future<void> permanentlyDeleteTask(String id) async {
     final db = await _database;
     await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'tasks', id);
   }
 
   Future<void> deleteTasksForList(String listId) async {
     final db = await _database;
+    final ids = (await db.query('tasks',
+            columns: ['id'], where: 'listId = ?', whereArgs: [listId]))
+        .map((r) => r['id'] as String)
+        .toList();
     await db.delete('tasks', where: 'listId = ?', whereArgs: [listId]);
+    for (final id in ids) {
+      await _recordTombstone(db, 'tasks', id);
+    }
   }
 
   Future<void> updateTaskSortOrders(List<Task> tasks) async {
@@ -728,19 +838,19 @@ class DatabaseService {
 
   Future<void> insertFolder(AppFolder folder) async {
     final db = await _database;
-    await db.insert('folders', folder.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'folders', folder.toMap());
   }
 
   Future<void> updateFolder(AppFolder folder) async {
     final db = await _database;
-    await db.update('folders', folder.toMap(),
+    await _patchRow(db, 'folders', folder.toMap(),
         where: 'id = ?', whereArgs: [folder.id]);
   }
 
   Future<void> softDeleteFolder(String id, DateTime deletedDate) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'folders',
       {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
       where: 'id = ?',
@@ -750,7 +860,8 @@ class DatabaseService {
 
   Future<void> restoreFolder(String id) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'folders',
       {'isDeleted': 0, 'deletedDate': null},
       where: 'id = ?',
@@ -761,6 +872,7 @@ class DatabaseService {
   Future<void> deleteFolder(String id) async {
     final db = await _database;
     await db.delete('folders', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'folders', id);
   }
 
   Future<void> updateFolderSortOrders(List<AppFolder> folders) async {
@@ -792,19 +904,19 @@ class DatabaseService {
 
   Future<void> insertList(AppList list) async {
     final db = await _database;
-    await db.insert('app_lists', list.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'app_lists', list.toMap());
   }
 
   Future<void> updateList(AppList list) async {
     final db = await _database;
-    await db.update('app_lists', list.toMap(),
+    await _patchRow(db, 'app_lists', list.toMap(),
         where: 'id = ?', whereArgs: [list.id]);
   }
 
   Future<void> softDeleteList(String id, DateTime deletedDate) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'app_lists',
       {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
       where: 'id = ?',
@@ -814,7 +926,8 @@ class DatabaseService {
 
   Future<void> restoreList(String id) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'app_lists',
       {'isDeleted': 0, 'deletedDate': null},
       where: 'id = ?',
@@ -825,6 +938,7 @@ class DatabaseService {
   Future<void> deleteList(String id) async {
     final db = await _database;
     await db.delete('app_lists', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'app_lists', id);
   }
 
   Future<void> updateListSortOrders(List<AppList> lists) async {
@@ -855,19 +969,19 @@ class DatabaseService {
 
   Future<void> insertNoteFolder(NoteFolder folder) async {
     final db = await _database;
-    await db.insert('note_folders', folder.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'note_folders', folder.toMap());
   }
 
   Future<void> updateNoteFolder(NoteFolder folder) async {
     final db = await _database;
-    await db.update('note_folders', folder.toMap(),
+    await _patchRow(db, 'note_folders', folder.toMap(),
         where: 'id = ?', whereArgs: [folder.id]);
   }
 
   Future<void> softDeleteNoteFolder(String id, DateTime deletedDate) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'note_folders',
       {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
       where: 'id = ?',
@@ -877,7 +991,8 @@ class DatabaseService {
 
   Future<void> restoreNoteFolder(String id) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'note_folders',
       {'isDeleted': 0, 'deletedDate': null},
       where: 'id = ?',
@@ -888,11 +1003,19 @@ class DatabaseService {
   Future<void> deleteNoteFolder(String id) async {
     final db = await _database;
     await db.delete('note_folders', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'note_folders', id);
   }
 
   Future<void> clearTrashedNoteFolders() async {
     final db = await _database;
+    final ids = (await db.query('note_folders',
+            columns: ['id'], where: 'isDeleted = 1'))
+        .map((r) => r['id'] as String)
+        .toList();
     await db.delete('note_folders', where: 'isDeleted = 1');
+    for (final id in ids) {
+      await _recordTombstone(db, 'note_folders', id);
+    }
   }
 
   Future<void> updateNoteFolderSortOrders(List<NoteFolder> folders) async {
@@ -923,19 +1046,19 @@ class DatabaseService {
 
   Future<void> insertNote(Note note) async {
     final db = await _database;
-    await db.insert('notes', note.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'notes', note.toMap());
   }
 
   Future<void> updateNote(Note note) async {
     final db = await _database;
-    await db.update('notes', note.toMap(),
+    await _patchRow(db, 'notes', note.toMap(),
         where: 'id = ?', whereArgs: [note.id]);
   }
 
   Future<void> softDeleteNote(String id, DateTime deletedDate) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'notes',
       {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
       where: 'id = ?',
@@ -946,7 +1069,8 @@ class DatabaseService {
   Future<void> softDeleteNotesForFolder(
       String folderId, DateTime deletedDate) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'notes',
       {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
       where: 'folderId = ? AND isDeleted = 0',
@@ -956,7 +1080,8 @@ class DatabaseService {
 
   Future<void> restoreNote(String id) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'notes',
       {'isDeleted': 0, 'deletedDate': null},
       where: 'id = ?',
@@ -967,16 +1092,31 @@ class DatabaseService {
   Future<void> deleteNote(String id) async {
     final db = await _database;
     await db.delete('notes', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'notes', id);
   }
 
   Future<void> deleteNotesForFolder(String folderId) async {
     final db = await _database;
+    final ids = (await db.query('notes',
+            columns: ['id'], where: 'folderId = ?', whereArgs: [folderId]))
+        .map((r) => r['id'] as String)
+        .toList();
     await db.delete('notes', where: 'folderId = ?', whereArgs: [folderId]);
+    for (final id in ids) {
+      await _recordTombstone(db, 'notes', id);
+    }
   }
 
   Future<void> clearTrashedNotes() async {
     final db = await _database;
+    final ids =
+        (await db.query('notes', columns: ['id'], where: 'isDeleted = 1'))
+            .map((r) => r['id'] as String)
+            .toList();
     await db.delete('notes', where: 'isDeleted = 1');
+    for (final id in ids) {
+      await _recordTombstone(db, 'notes', id);
+    }
   }
 
   Future<void> updateNoteSortOrders(List<Note> notes) async {
@@ -1009,21 +1149,28 @@ class DatabaseService {
 
   Future<void> insertRoutine(Routine routine) async {
     final db = await _database;
-    await db.insert('routines', routine.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'routines', routine.toMap());
   }
 
   Future<void> updateRoutine(Routine routine) async {
     final db = await _database;
-    await db.update('routines', routine.toMap(),
+    await _patchRow(db, 'routines', routine.toMap(),
         where: 'id = ?', whereArgs: [routine.id]);
   }
 
   Future<void> deleteRoutine(String id) async {
     final db = await _database;
+    final entryIds = (await db.query('routine_entries',
+            columns: ['id'], where: 'routineId = ?', whereArgs: [id]))
+        .map((r) => r['id'] as String)
+        .toList();
     await db.delete('routines', where: 'id = ?', whereArgs: [id]);
     await db.delete('routine_entries',
         where: 'routineId = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'routines', id);
+    for (final entryId in entryIds) {
+      await _recordTombstone(db, 'routine_entries', entryId);
+    }
   }
 
   // Routine entries
@@ -1036,13 +1183,12 @@ class DatabaseService {
 
   Future<void> insertRoutineEntry(RoutineEntry entry) async {
     final db = await _database;
-    await db.insert('routine_entries', entry.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'routine_entries', entry.toMap());
   }
 
   Future<void> updateRoutineEntry(RoutineEntry entry) async {
     final db = await _database;
-    await db.update('routine_entries', entry.toMap(),
+    await _patchRow(db, 'routine_entries', entry.toMap(),
         where: 'id = ?', whereArgs: [entry.id]);
   }
 
@@ -1056,19 +1202,19 @@ class DatabaseService {
 
   Future<void> insertEvent(Event event) async {
     final db = await _database;
-    await db.insert('events', event.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'events', event.toMap());
   }
 
   Future<void> updateEvent(Event event) async {
     final db = await _database;
-    await db.update('events', event.toMap(),
+    await _patchRow(db, 'events', event.toMap(),
         where: 'id = ?', whereArgs: [event.id]);
   }
 
   Future<void> permanentlyDeleteEvent(String id) async {
     final db = await _database;
     await db.delete('events', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'events', id);
   }
 
   Future<List<Map<String, dynamic>>> exportEvents() async {
@@ -1087,25 +1233,32 @@ class DatabaseService {
 
   Future<void> insertListSection(ListSection section) async {
     final db = await _database;
-    await db.insert('list_sections', section.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'list_sections', section.toMap());
   }
 
   Future<void> updateListSection(ListSection section) async {
     final db = await _database;
-    await db.update('list_sections', section.toMap(),
+    await _patchRow(db, 'list_sections', section.toMap(),
         where: 'id = ?', whereArgs: [section.id]);
   }
 
   Future<void> deleteListSection(String id) async {
     final db = await _database;
     await db.delete('list_sections', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'list_sections', id);
   }
 
   Future<void> deleteSectionsForList(String listId) async {
     final db = await _database;
+    final ids = (await db.query('list_sections',
+            columns: ['id'], where: 'listId = ?', whereArgs: [listId]))
+        .map((r) => r['id'] as String)
+        .toList();
     await db.delete('list_sections',
         where: 'listId = ?', whereArgs: [listId]);
+    for (final id in ids) {
+      await _recordTombstone(db, 'list_sections', id);
+    }
   }
 
   Future<void> updateListSectionSortOrders(List<ListSection> sections) async {
@@ -1142,19 +1295,19 @@ class DatabaseService {
 
   Future<void> insertContact(Contact contact) async {
     final db = await _database;
-    await db.insert('contacts', contact.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'contacts', contact.toMap());
   }
 
   Future<void> updateContact(Contact contact) async {
     final db = await _database;
-    await db.update('contacts', contact.toMap(),
+    await _patchRow(db, 'contacts', contact.toMap(),
         where: 'id = ?', whereArgs: [contact.id]);
   }
 
   Future<void> softDeleteContact(String id, DateTime deletedDate) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'contacts',
       {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
       where: 'id = ?',
@@ -1165,7 +1318,8 @@ class DatabaseService {
   Future<void> softDeleteContactsForList(
       String listId, DateTime deletedDate) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'contacts',
       {'isDeleted': 1, 'deletedDate': deletedDate.millisecondsSinceEpoch},
       where: 'listId = ? AND isDeleted = 0',
@@ -1175,7 +1329,8 @@ class DatabaseService {
 
   Future<void> restoreContact(String id) async {
     final db = await _database;
-    await db.update(
+    await _patchRow(
+      db,
       'contacts',
       {'isDeleted': 0, 'deletedDate': null},
       where: 'id = ?',
@@ -1186,16 +1341,31 @@ class DatabaseService {
   Future<void> permanentlyDeleteContact(String id) async {
     final db = await _database;
     await db.delete('contacts', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'contacts', id);
   }
 
   Future<void> deleteContactsForList(String listId) async {
     final db = await _database;
+    final ids = (await db.query('contacts',
+            columns: ['id'], where: 'listId = ?', whereArgs: [listId]))
+        .map((r) => r['id'] as String)
+        .toList();
     await db.delete('contacts', where: 'listId = ?', whereArgs: [listId]);
+    for (final id in ids) {
+      await _recordTombstone(db, 'contacts', id);
+    }
   }
 
   Future<void> clearTrashedContacts() async {
     final db = await _database;
+    final ids =
+        (await db.query('contacts', columns: ['id'], where: 'isDeleted = 1'))
+            .map((r) => r['id'] as String)
+            .toList();
     await db.delete('contacts', where: 'isDeleted = 1');
+    for (final id in ids) {
+      await _recordTombstone(db, 'contacts', id);
+    }
   }
 
   Future<List<Map<String, dynamic>>> exportContacts() async {
@@ -1207,17 +1377,38 @@ class DatabaseService {
 
   Future<void> clearTrashedTasks() async {
     final db = await _database;
+    final ids =
+        (await db.query('tasks', columns: ['id'], where: 'isDeleted = 1'))
+            .map((r) => r['id'] as String)
+            .toList();
     await db.delete('tasks', where: 'isDeleted = 1');
+    for (final id in ids) {
+      await _recordTombstone(db, 'tasks', id);
+    }
   }
 
   Future<void> clearTrashedFolders() async {
     final db = await _database;
+    final ids =
+        (await db.query('folders', columns: ['id'], where: 'isDeleted = 1'))
+            .map((r) => r['id'] as String)
+            .toList();
     await db.delete('folders', where: 'isDeleted = 1');
+    for (final id in ids) {
+      await _recordTombstone(db, 'folders', id);
+    }
   }
 
   Future<void> clearTrashedLists() async {
     final db = await _database;
+    final ids =
+        (await db.query('app_lists', columns: ['id'], where: 'isDeleted = 1'))
+            .map((r) => r['id'] as String)
+            .toList();
     await db.delete('app_lists', where: 'isDeleted = 1');
+    for (final id in ids) {
+      await _recordTombstone(db, 'app_lists', id);
+    }
   }
 
   // Tags — flat, name-uniqueness enforced in the controller
@@ -1229,18 +1420,18 @@ class DatabaseService {
 
   Future<void> insertTag(Map<String, dynamic> tag) async {
     final db = await _database;
-    await db.insert('tags', tag,
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await _putRow(db, 'tags', tag);
   }
 
   Future<void> updateTag(Map<String, dynamic> tag) async {
     final db = await _database;
-    await db.update('tags', tag, where: 'id = ?', whereArgs: [tag['id']]);
+    await _patchRow(db, 'tags', tag, where: 'id = ?', whereArgs: [tag['id']]);
   }
 
   Future<void> deleteTag(String id) async {
     final db = await _database;
     await db.delete('tags', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'tags', id);
   }
 
   Future<List<Map<String, dynamic>>> exportTags() async {
@@ -1319,7 +1510,14 @@ class DatabaseService {
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
+  Future<List<Map<String, dynamic>>> exportTombstones() async {
+    final db = await _database;
+    final rows = await db.query('tombstones');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
   static const _allTables = [
+    'tombstones',
     'contacts',
     'events',
     'list_sections',
@@ -1370,6 +1568,7 @@ class DatabaseService {
     await db.delete('folders');
     await db.delete('tags');
     await db.delete('tasks');
+    await db.delete('tombstones');
   }
 
   Future<void> close() async {
