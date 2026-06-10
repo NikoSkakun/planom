@@ -77,6 +77,7 @@ class BackupService {
       'events': await db.exportEvents(),
       'list_sections': await db.exportListSections(),
       'contacts': await db.exportContacts(),
+      'tombstones': await db.exportTombstones(),
       'app_settings': (await db.exportAppSettings())
           .where((r) =>
               !SecurityService.authSettingKeys.contains(r['key']) &&
@@ -241,6 +242,7 @@ class BackupService {
         'events': asMaps(data['events']),
         'list_sections': asMaps(data['list_sections']),
         'contacts': asMaps(data['contacts']),
+        'tombstones': asMaps(data['tombstones']),
         'app_settings': [
           ...asMaps(data['app_settings']).where((r) =>
               !SecurityService.authSettingKeys.contains(r['key']) &&
