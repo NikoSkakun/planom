@@ -37,21 +37,15 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
   }
 
   Future<void> _enableGoogleDrive() async {
-    final s = S.of(context);
     setState(() => _busy = true);
     await widget.controller.setBackend(SyncBackend.googleDrive);
-    bool ok = false;
-    try {
-      ok = await widget.controller.connectProvider();
-    } catch (e) {
-      if (mounted) _showAlert(s.syncConnectFailed, e.toString());
-    }
+    // connectProvider surfaces any failure via the snapshot status banner
+    // (e.g. "Drive API not enabled"). Leave the backend selected either way:
+    // when not connected the UI shows a "Connect Google Drive" row to retry,
+    // and a "Disable sync" row to back out — so we never silently swallow the
+    // reason it failed.
+    await widget.controller.connectProvider();
     await _refreshGoogleAccount();
-    // If the user cancelled (or it failed) and we never got connected, back out
-    // to "off" so the operational controls don't dangle on an unusable backend.
-    if (!ok && _googleAccount == null) {
-      await widget.controller.setBackend(SyncBackend.none);
-    }
     if (mounted) setState(() => _busy = false);
   }
 
