@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter/widgets.dart' show WidgetsBindingObserver, AppLifecycleState;
 
 import '../folders/move_to_sheet.dart';
@@ -86,6 +87,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
   EditableTextState? _contentEditableState;
   TextSelection? _lastContentSelection;
 
+  // Deferred check that decides whether a focus drop should be treated as a
+  // real "user dismissed the editor" event, or as a transient detach caused
+  // by iOS's system undo dialog (shake-to-undo + Cancel). The dialog steals
+  // first-responder briefly; if the keyboard is still up after the focus
+  // drop we restore focus so caret + markdown toolbar reappear.
+  Timer? _focusRestoreTimer;
+
   @override
   void initState() {
     super.initState();
@@ -146,6 +154,8 @@ class _NoteDetailViewState extends State<NoteDetailView>
       // Gaining focus (e.g. via the title's "Next" key, tapping the body, or
       // a programmatic requestFocus). The toolbar's visibility is tied to
       // hasFocus, so we need a rebuild to render it.
+      _focusRestoreTimer?.cancel();
+      _focusRestoreTimer = null;
       setState(() => _isEditing = true);
       return;
     }
@@ -153,11 +163,46 @@ class _NoteDetailViewState extends State<NoteDetailView>
     // tapping the title) must persist immediately — the debounce timer might
     // not fire before the app is killed or this view is torn down.
     _flushSave();
-    setState(() => _isEditing = false);
+
+    // If the keyboard is still up at this moment the focus may have been
+    // stolen by iOS's shake-to-undo system dialog — tapping Cancel leaves
+    // the keyboard visible but our FocusNode in `hasFocus = false`, which
+    // would otherwise hide the caret + markdown toolbar. Defer the
+    // "exit editing" rebuild and re-check once the system dialog has had a
+    // chance to resolve; if the keyboard's still up we restore focus, else
+    // we treat it as a normal dismiss. In test environments (no platform
+    // keyboard) viewInsets is always zero so we take the immediate path and
+    // existing behaviour is preserved.
+    final keyboardUp = MediaQuery.viewInsetsOf(context).bottom > 0;
+    if (!keyboardUp) {
+      setState(() => _isEditing = false);
+      return;
+    }
+    _focusRestoreTimer?.cancel();
+    _focusRestoreTimer = Timer(const Duration(milliseconds: 350), () {
+      _focusRestoreTimer = null;
+      if (!mounted) return;
+      // Title gained focus in the meantime (user tapped title) — the
+      // keyboard staying up isn't a system-dialog signal in that case.
+      if (_contentFocus.hasFocus || _titleFocus.hasFocus) return;
+      final stillUp = MediaQuery.viewInsetsOf(context).bottom > 0;
+      if (stillUp) {
+        _contentFocus.requestFocus();
+        return;
+      }
+      setState(() => _isEditing = false);
+    });
   }
 
   void _onTitleFocusChanged() {
-    if (!_titleFocus.hasFocus) _flushSave();
+    if (_titleFocus.hasFocus) {
+      // Tapping the title cancels any pending "content lost focus due to a
+      // system dialog" check — the user has explicitly moved focus.
+      _focusRestoreTimer?.cancel();
+      _focusRestoreTimer = null;
+      return;
+    }
+    _flushSave();
   }
 
   /// Called from [build] whenever the hosting tab's active state flips. When
@@ -348,6 +393,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
   void dispose() {
     _disposed = true;
     _autosaveTimer?.cancel();
+    _focusRestoreTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     // Detach the change/focus listeners first so disposing the controllers
     // and focus nodes below can't re-enter the save path.
@@ -557,8 +603,19 @@ class _NoteDetailViewState extends State<NoteDetailView>
           // typed word isn't lost.
           canPop: true,
           onPopInvokedWithResult: (didPop, _) {
+            // Cancel any pending "restore focus" check so a focus drop
+            // racing with the pop doesn't re-open the keyboard against
+            // a half-disposed view.
+            _focusRestoreTimer?.cancel();
+            _focusRestoreTimer = null;
             _titleFocus.unfocus();
             _contentFocus.unfocus();
+            // Forcibly close the keyboard at the platform layer. If our
+            // FocusNode tracking ever diverges from the IME state (iOS
+            // shake-undo + Cancel can leave the keyboard up with no Flutter
+            // focus owner), unfocus() above is a no-op — explicitly hiding
+            // guarantees the keyboard goes away when leaving the note.
+            SystemChannels.textInput.invokeMethod('TextInput.hide');
             _flushSave();
           },
           child: CupertinoPageScaffold(
