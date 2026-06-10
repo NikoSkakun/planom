@@ -536,7 +536,11 @@ class SettingsController with ChangeNotifier {
     AppDefaults.listIcon = _defaultListIcon;
     AppDefaults.folderIcon = _defaultFolderIcon;
     AppDefaults.noteFolderIcon = _defaultNoteFolderIcon;
-    AppScale.factor = _textScale;
+    // When the OS-level text scale is honored, UI widgets that read
+    // AppScale.factor must NOT also scale by the stashed custom value —
+    // otherwise toggling "use system text size" back on would leave
+    // checkboxes / row icons stuck at their previously enlarged sizes.
+    AppScale.factor = _useSystemTextScale ? 1.0 : _textScale;
     DayBoundary.hour = _dayBoundaryHour;
     TimeFormatPref.use24h = _use24hTime;
     NotificationService.instance.customSoundName =
@@ -913,7 +917,10 @@ class SettingsController with ChangeNotifier {
     final clamped = scale.clamp(0.5, 2.5).toDouble();
     if (clamped == _textScale) return;
     _textScale = clamped;
-    AppScale.factor = clamped;
+    // While system scaling is on the custom value is stashed but inert —
+    // it only takes effect for UI widgets once the user toggles system
+    // scaling back off.
+    if (!_useSystemTextScale) AppScale.factor = clamped;
     notifyListeners();
     await _db.setAppSetting('text_scale', clamped.toStringAsFixed(2));
   }
@@ -921,6 +928,10 @@ class SettingsController with ChangeNotifier {
   Future<void> updateUseSystemTextScale(bool value) async {
     if (value == _useSystemTextScale) return;
     _useSystemTextScale = value;
+    // Toggling on returns UI widgets (checkboxes, row icons) to their stock
+    // sizes regardless of any previously chosen custom scale; toggling off
+    // re-applies whatever custom scale is currently stashed.
+    AppScale.factor = value ? 1.0 : _textScale;
     notifyListeners();
     await _db.setAppSetting('use_system_text_scale', value.toString());
   }

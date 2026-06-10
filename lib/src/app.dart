@@ -195,20 +195,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                       );
                 return MediaQuery(
                   data: mq,
-                  child: _SecurityGate(
-                    securityService: widget.securityService,
-                    child: HomeShell(
-                      settingsController: settingsController,
-                      taskController: widget.taskController,
-                      folderController: widget.folderController,
-                      noteController: widget.noteController,
-                      routineController: widget.routineController,
-                      eventController: widget.eventController,
-                      contactController: widget.contactController,
-                      backupService: widget.backupService,
+                  child: _KeyboardBrightnessReactor(
+                    child: _SecurityGate(
                       securityService: widget.securityService,
-                      googleCalendarController: widget.googleCalendarController,
-                      deviceCalendarController: widget.deviceCalendarController,
+                      child: HomeShell(
+                        settingsController: settingsController,
+                        taskController: widget.taskController,
+                        folderController: widget.folderController,
+                        noteController: widget.noteController,
+                        routineController: widget.routineController,
+                        eventController: widget.eventController,
+                        contactController: widget.contactController,
+                        backupService: widget.backupService,
+                        securityService: widget.securityService,
+                        googleCalendarController: widget.googleCalendarController,
+                        deviceCalendarController: widget.deviceCalendarController,
+                      ),
                     ),
                   ),
                 );
@@ -321,5 +323,48 @@ class _SecurityGateState extends State<_SecurityGate>
       );
     }
     return widget.child;
+  }
+}
+
+/// Watches the effective Cupertino brightness and, when it flips while a text
+/// field is focused, forces the IME to re-attach so the open keyboard adopts
+/// the new appearance. Without this, iOS keeps the keyboard in its previous
+/// light/dark style until the field is unfocused and refocused — the
+/// keyboardAppearance value baked into the TextInputConfiguration is set once
+/// at attach time and the OS doesn't refresh a live keyboard.
+class _KeyboardBrightnessReactor extends StatefulWidget {
+  const _KeyboardBrightnessReactor({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeyboardBrightnessReactor> createState() =>
+      _KeyboardBrightnessReactorState();
+}
+
+class _KeyboardBrightnessReactorState
+    extends State<_KeyboardBrightnessReactor> {
+  Brightness? _lastBrightness;
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = CupertinoTheme.brightnessOf(context);
+    if (_lastBrightness != null && _lastBrightness != brightness) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshKeyboard());
+    }
+    _lastBrightness = brightness;
+    return widget.child;
+  }
+
+  void _refreshKeyboard() {
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus == null || !focus.hasFocus) return;
+    // Toggle focus to close + reopen the input connection. The IME picks up
+    // the new keyboardAppearance from the freshly-attached configuration.
+    focus.unfocus(disposition: UnfocusDisposition.scope);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      focus.requestFocus();
+    });
   }
 }

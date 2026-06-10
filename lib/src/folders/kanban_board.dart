@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 
 import '../localization/strings.dart';
@@ -138,6 +140,16 @@ class KanbanBoard extends StatefulWidget {
   /// tab bar. The + button still overlaps the column's lower portion.
   static const double _columnBottomGap = 12;
 
+  /// Horizontal distance from the board's left/right edge that triggers an
+  /// auto-scroll to the adjacent column when a card is dragged into that
+  /// margin. Big enough to be easy to hit with a thumb on the move.
+  static const double _edgeScrollMargin = 72;
+
+  /// Interval between auto-paging steps while the dragged card stays inside
+  /// the edge margin. Tuned so adjacent columns flip past at a readable but
+  /// purposeful pace.
+  static const Duration _edgeScrollInterval = Duration(milliseconds: 600);
+
   @override
   State<KanbanBoard> createState() => _KanbanBoardState();
 }
@@ -154,6 +166,14 @@ class _KanbanBoardState extends State<KanbanBoard> {
   ScrollController? _scrollController;
   PageController? _pageController;
   int _focusedIndex = 0;
+
+  // Edge-scroll state while a card is being dragged. The timer ticks once per
+  // [_edgeScrollInterval] while the pointer stays inside the left/right
+  // margin, paging the board one column toward that edge until either the
+  // pointer leaves the margin or the board reaches its end.
+  Timer? _edgeScrollTimer;
+  int _edgeScrollDirection = 0; // -1 left, +1 right, 0 idle
+  bool _autoScrolling = false;
 
   @override
   void initState() {
@@ -200,8 +220,73 @@ class _KanbanBoardState extends State<KanbanBoard> {
   @override
   void dispose() {
     widget.boardController?._detach(this);
+    _stopEdgeScroll();
     _disposeScrollers();
     super.dispose();
+  }
+
+  void _onCardDragUpdate(DragUpdateDetails details) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return;
+    final local = box.globalToLocal(details.globalPosition);
+    final width = box.size.width;
+    if (width <= 0) return;
+    int direction = 0;
+    if (local.dx < KanbanBoard._edgeScrollMargin) {
+      direction = -1;
+    } else if (local.dx > width - KanbanBoard._edgeScrollMargin) {
+      direction = 1;
+    }
+    if (direction == 0) {
+      _stopEdgeScroll();
+      return;
+    }
+    if (direction != _edgeScrollDirection) {
+      _edgeScrollDirection = direction;
+      _edgeScrollTimer?.cancel();
+      // Fire immediately so the first column flip happens as soon as the
+      // pointer crosses the margin; subsequent flips are paced by the timer.
+      _stepEdgeScroll();
+      _edgeScrollTimer = Timer.periodic(
+        KanbanBoard._edgeScrollInterval,
+        (_) => _stepEdgeScroll(),
+      );
+    }
+  }
+
+  void _stopEdgeScroll() {
+    _edgeScrollTimer?.cancel();
+    _edgeScrollTimer = null;
+    _edgeScrollDirection = 0;
+  }
+
+  Future<void> _stepEdgeScroll() async {
+    if (_autoScrolling) return;
+    final direction = _edgeScrollDirection;
+    if (direction == 0 || widget.columns.isEmpty) return;
+    final target = _focusedIndex + direction;
+    if (target < 0 || target >= widget.columns.length) {
+      _stopEdgeScroll();
+      return;
+    }
+    _autoScrolling = true;
+    try {
+      if (widget.scrollMode == KanbanScrollMode.snap) {
+        await _pageController?.animateToPage(
+          target,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOut,
+        );
+      } else {
+        await _scrollController?.animateTo(
+          target * KanbanBoard._freeColumnWidth,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOut,
+        );
+      }
+    } finally {
+      _autoScrolling = false;
+    }
   }
 
   void _onPageScroll() {
@@ -288,6 +373,8 @@ class _KanbanBoardState extends State<KanbanBoard> {
           onReorderTask: widget.onReorderTask,
           isExpanded: _isExpanded,
           onToggleGroup: _toggleGroup,
+          onCardDragUpdate: _onCardDragUpdate,
+          onCardDragEnded: _stopEdgeScroll,
         );
 
     if (widget.scrollMode == KanbanScrollMode.snap) {
@@ -343,6 +430,8 @@ class _KanbanColumn extends StatelessWidget {
     required this.onReorderTask,
     required this.isExpanded,
     required this.onToggleGroup,
+    required this.onCardDragUpdate,
+    required this.onCardDragEnded,
   });
 
   final KanbanColumnData data;
@@ -359,6 +448,8 @@ class _KanbanColumn extends StatelessWidget {
   )? onReorderTask;
   final bool Function(KanbanGroupData group) isExpanded;
   final void Function(KanbanGroupData group) onToggleGroup;
+  final void Function(DragUpdateDetails details) onCardDragUpdate;
+  final VoidCallback onCardDragEnded;
 
   bool _containsTask(String taskId) =>
       data.groups.any((g) => g.tasks.any((t) => t.id == taskId));
@@ -521,6 +612,8 @@ class _KanbanColumn extends StatelessWidget {
                 task: task,
                 onTap: () => onTapTask(task),
                 onToggle: () => onToggleTask(task),
+                onDragUpdate: onCardDragUpdate,
+                onDragEnded: onCardDragEnded,
               ),
             )
           else
@@ -528,6 +621,8 @@ class _KanbanColumn extends StatelessWidget {
               task: task,
               onTap: () => onTapTask(task),
               onToggle: () => onToggleTask(task),
+              onDragUpdate: onCardDragUpdate,
+              onDragEnded: onCardDragEnded,
             ),
         if (reorderable)
           _KanbanReorderSlot(
@@ -714,11 +809,15 @@ class _KanbanCard extends StatelessWidget {
     required this.task,
     required this.onTap,
     required this.onToggle,
+    required this.onDragUpdate,
+    required this.onDragEnded,
   });
 
   final Task task;
   final VoidCallback onTap;
   final VoidCallback onToggle;
+  final void Function(DragUpdateDetails details) onDragUpdate;
+  final VoidCallback onDragEnded;
 
   @override
   Widget build(BuildContext context) {
@@ -728,6 +827,10 @@ class _KanbanCard extends StatelessWidget {
       child: LongPressDraggable<String>(
         data: task.id,
         delay: const Duration(milliseconds: 300),
+        onDragUpdate: onDragUpdate,
+        onDragEnd: (_) => onDragEnded(),
+        onDraggableCanceled: (_, __) => onDragEnded(),
+        onDragCompleted: onDragEnded,
         feedback: Opacity(
           opacity: 0.9,
           child: SizedBox(
