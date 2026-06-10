@@ -135,12 +135,7 @@ class SyncController with ChangeNotifier {
 
     _setStatus(SyncStatus.pushing);
     try {
-      final plain = await _backupService.buildPayloadJson();
-      final passphrase = await _secrets.readPassphrase();
-      final payload = (passphrase != null && passphrase.isNotEmpty)
-          ? await encryptBackup(plain, passphrase)
-          : plain;
-      await provider.push(utf8.encode(payload));
+      await _pushCurrent(provider);
       _snapshot = _snapshot.copyWith(
         status: SyncStatus.succeeded,
         lastSyncAt: DateTime.now(),
@@ -157,8 +152,58 @@ class SyncController with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Pulls the remote snapshot and replaces local data with it. Returns
-  /// `true` when something was actually applied.
+  /// Two-way sync: pull the remote snapshot, MERGE it into local data
+  /// (per-record, newest wins, tombstones honoured), then push the merged
+  /// result back so the remote converges too. This is the default sync action
+  /// — neither device clobbers the other's independent edits.
+  Future<bool> syncNow() async {
+    final provider = _provider;
+    if (provider == null) return false;
+
+    _setStatus(SyncStatus.pulling);
+    try {
+      final bytes = await provider.pull();
+      if (bytes != null) {
+        final plain = await _decryptRemote(bytes);
+        if (plain == null) return false; // passphraseRequired already surfaced
+        final merged = await _backupService.mergePayloadJson(plain);
+        if (!merged) {
+          _snapshot = _snapshot.copyWith(
+              status: SyncStatus.failed,
+              lastError: 'Could not merge the cloud data.');
+          notifyListeners();
+          return false;
+        }
+      }
+
+      // Push the merged (or, if the remote was empty, the local) state so the
+      // remote reflects the union of both devices.
+      _setStatus(SyncStatus.pushing);
+      await _pushCurrent(provider);
+      _snapshot = _snapshot.copyWith(
+        status: SyncStatus.succeeded,
+        lastSyncAt: DateTime.now(),
+        clearError: true,
+      );
+      notifyListeners();
+      return true;
+    } on SyncException catch (e) {
+      _snapshot =
+          _snapshot.copyWith(status: SyncStatus.failed, lastError: e.message);
+      notifyListeners();
+      return false;
+    } catch (e, st) {
+      debugPrint('sync failed: $e\n$st');
+      _snapshot = _snapshot.copyWith(
+          status: SyncStatus.failed, lastError: 'Sync failed: $e');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Pulls the remote snapshot and REPLACES local data with it (no merge).
+  /// Kept as an explicit "restore from cloud" escape hatch. Returns `true`
+  /// when something was actually applied.
   Future<bool> pullNow() async {
     final provider = _provider;
     if (provider == null) return false;
@@ -176,35 +221,8 @@ class SyncController with ChangeNotifier {
         return false;
       }
 
-      final content = utf8.decode(bytes);
-      Map<String, dynamic> envelope;
-      try {
-        envelope = jsonDecode(content) as Map<String, dynamic>;
-      } catch (_) {
-        throw SyncException('Remote backup is corrupted.');
-      }
-
-      // Two payload shapes share the same iCloud filename: encrypted (v2
-      // envelope) when the producer had a passphrase, plain (v1) otherwise.
-      // Sniff which one we got and route accordingly — a device that never
-      // set a passphrase can still pull a plain payload someone else pushed.
-      String plain;
-      if (isEncryptedBackup(envelope)) {
-        final pass = await _secrets.readPassphrase();
-        if (pass == null || pass.isEmpty) {
-          _snapshot = _snapshot.copyWith(
-            status: SyncStatus.passphraseRequired,
-            lastError:
-                'The cloud backup is encrypted. Set the matching passphrase '
-                'in Settings → Sync → Encryption to pull it.',
-          );
-          notifyListeners();
-          return false;
-        }
-        plain = await decryptBackup(envelope, pass);
-      } else {
-        plain = content;
-      }
+      final plain = await _decryptRemote(bytes);
+      if (plain == null) return false; // passphraseRequired already surfaced
 
       final applied = await _backupService.importPayloadJson(plain);
       _snapshot = _snapshot.copyWith(
@@ -228,6 +246,47 @@ class SyncController with ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Builds, encrypts (when a passphrase is set), and uploads the current
+  /// local state. Shared by [pushNow] and [syncNow].
+  Future<void> _pushCurrent(SyncProvider provider) async {
+    final plain = await _backupService.buildPayloadJson();
+    final passphrase = await _secrets.readPassphrase();
+    final payload = (passphrase != null && passphrase.isNotEmpty)
+        ? await encryptBackup(plain, passphrase)
+        : plain;
+    await provider.push(utf8.encode(payload));
+  }
+
+  /// Decodes a downloaded payload to plaintext JSON. Returns null (and sets
+  /// [SyncStatus.passphraseRequired]) when it's encrypted but we have no — or
+  /// the wrong — passphrase. Throws [SyncException] on a corrupt blob.
+  Future<String?> _decryptRemote(List<int> bytes) async {
+    final content = utf8.decode(bytes);
+    Map<String, dynamic> envelope;
+    try {
+      envelope = jsonDecode(content) as Map<String, dynamic>;
+    } catch (_) {
+      throw SyncException('Remote backup is corrupted.');
+    }
+    // Encrypted (v2 envelope) when the producer had a passphrase, plain (v1)
+    // otherwise. A device with no passphrase can still read a plain payload.
+    if (isEncryptedBackup(envelope)) {
+      final pass = await _secrets.readPassphrase();
+      if (pass == null || pass.isEmpty) {
+        _snapshot = _snapshot.copyWith(
+          status: SyncStatus.passphraseRequired,
+          lastError:
+              'The cloud backup is encrypted. Set the matching passphrase '
+              'in Settings → Sync → Encryption to pull it.',
+        );
+        notifyListeners();
+        return null;
+      }
+      return decryptBackup(envelope, pass);
+    }
+    return content;
   }
 
   /// Removes the remote payload (e.g. user disabling sync) and clears local

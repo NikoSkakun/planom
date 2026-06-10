@@ -199,7 +199,58 @@ class BackupService {
 
   Future<bool> _applyImportedPayload(Map<String, dynamic> data) async {
     if (data['version'] != 1) return false;
+    final tables = await _buildTables(data);
+    if (tables == null) return false;
+    await _restoreIcons(data);
 
+    try {
+      await db.replaceAllData(tables);
+    } catch (_) {
+      return false;
+    }
+
+    // Smart-list prefs were added in a later format revision; ignore if absent.
+    final smartListMap = data['smart_list_prefs'];
+    if (smartListMap is Map<String, dynamic>) {
+      await settingsController.importSmartListPrefs(smartListMap);
+    }
+
+    await _reloadControllers();
+    await settingsController.loadSettings();
+    return true;
+  }
+
+  /// Sync-side entry point for MERGE: takes already-decrypted JSON and merges
+  /// it into local data per-record (newest wins, tombstones honoured) instead
+  /// of replacing everything. Device-local config (app_settings, smart-list
+  /// prefs) is intentionally left untouched. Returns `true` when it committed.
+  Future<bool> mergePayloadJson(String plainJson) async {
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(plainJson) as Map<String, dynamic>;
+    } catch (_) {
+      return false;
+    }
+    if (data['version'] != 1) return false;
+    final tables = await _buildTables(data);
+    if (tables == null) return false;
+    await _restoreIcons(data); // union of custom icons referenced by merged rows
+
+    try {
+      await db.mergeAllData(tables);
+    } catch (_) {
+      return false;
+    }
+
+    await _reloadControllers();
+    return true;
+  }
+
+  /// Parses the payload's data tables into the shape replaceAllData /
+  /// mergeAllData expect, preserving the device's own auth / Google-calendar /
+  /// device-calendar settings rows. Returns null if the payload is malformed.
+  Future<Map<String, List<Map<String, dynamic>>>?> _buildTables(
+      Map<String, dynamic> data) async {
     List<Map<String, dynamic>> asMaps(dynamic value) {
       if (value == null) return [];
       return (value as List<dynamic>)
@@ -210,23 +261,20 @@ class BackupService {
     // Keep the device's local passcode and calendar-integration connection
     // state and never let an imported payload change them: preserve our own
     // auth_*, gcal_* and ekcal_* rows and drop any the payload carries.
-    final localAuth = (await db.exportAppSettings())
+    final settings = await db.exportAppSettings();
+    final localAuth = settings
         .where((r) => SecurityService.authSettingKeys.contains(r['key']))
         .toList();
-    final localGcal = (await db.exportAppSettings())
-        .where((r) =>
-            GoogleCalendarController.isReservedKey(r['key'] as String))
+    final localGcal = settings
+        .where(
+            (r) => GoogleCalendarController.isReservedKey(r['key'] as String))
         .toList();
-    final localDeviceCal = (await db.exportAppSettings())
-        .where((r) =>
-            DeviceCalendarController.isReservedKey(r['key'] as String))
+    final localDeviceCal = settings
+        .where((r) => DeviceCalendarController.isReservedKey(r['key'] as String))
         .toList();
 
-    final Map<String, dynamic> customIcons;
-    final Map<String, List<Map<String, dynamic>>> tables;
     try {
-      customIcons = (data['customIcons'] as Map<String, dynamic>?) ?? {};
-      tables = {
+      return {
         'tasks': asMaps(data['tasks']),
         'tags': asMaps(data['tags']),
         'folders': asMaps(data['folders']),
@@ -236,8 +284,9 @@ class BackupService {
         // Normalise routine rows through the model so legacy backups (which
         // carried weekdays / daysAfterComplete / autoReset columns no longer
         // present in the schema) drop those keys and import cleanly.
-        'routines':
-            asMaps(data['routines']).map((r) => Routine.fromMap(r).toMap()).toList(),
+        'routines': asMaps(data['routines'])
+            .map((r) => Routine.fromMap(r).toMap())
+            .toList(),
         'routine_entries': asMaps(data['routine_entries']),
         'events': asMaps(data['events']),
         'list_sections': asMaps(data['list_sections']),
@@ -254,39 +303,29 @@ class BackupService {
         ],
       };
     } catch (_) {
-      return false;
+      return null;
     }
+  }
 
+  /// Writes the base64-inlined custom icon files from a payload back to disk.
+  Future<void> _restoreIcons(Map<String, dynamic> data) async {
+    final customIcons = (data['customIcons'] as Map<String, dynamic>?) ?? {};
     final docsPath = (await getApplicationDocumentsDirectory()).path;
     final iconsDir = Directory('$docsPath/icons');
     if (!iconsDir.existsSync()) iconsDir.createSync(recursive: true);
     for (final entry in customIcons.entries) {
-      final relPath = entry.key;
       final bytes = base64Decode(entry.value as String);
-      await File('$docsPath/$relPath').writeAsBytes(bytes);
+      await File('$docsPath/${entry.key}').writeAsBytes(bytes);
     }
+  }
 
-    try {
-      await db.replaceAllData(tables);
-    } catch (_) {
-      return false;
-    }
-
-    // Smart-list prefs were added in a later format revision; ignore if absent.
-    final smartListMap = data['smart_list_prefs'];
-    if (smartListMap is Map<String, dynamic>) {
-      await settingsController.importSmartListPrefs(smartListMap);
-    }
-
+  Future<void> _reloadControllers() async {
     await taskController.load();
     await folderController.load();
     await noteController.load();
     await routineController.load();
     await eventController.load();
     await contactController.load();
-    await settingsController.loadSettings();
-
-    return true;
   }
 
   Future<void> hardReset() async {

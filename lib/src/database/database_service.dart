@@ -1555,6 +1555,100 @@ class DatabaseService {
     });
   }
 
+  /// Data tables eligible for per-record merge (everything synced except
+  /// `app_settings`, which is device-local config, and `tombstones`, which is
+  /// merged separately as the deletion ledger).
+  static const _mergeTables = [
+    'tags',
+    'folders',
+    'app_lists',
+    'list_sections',
+    'tasks',
+    'note_folders',
+    'notes',
+    'routines',
+    'routine_entries',
+    'events',
+    'contacts',
+  ];
+
+  /// Merges [tables] into local data **per record** instead of replacing
+  /// everything. For each row, whichever copy has the greater `updatedAt`
+  /// wins; a tombstone (incoming or local) removes/suppresses a row whose
+  /// `updatedAt` is not newer than the deletion. Runs in one transaction so a
+  /// failure leaves local data untouched.
+  ///
+  /// This is the cross-device convergence primitive: pulling a remote payload
+  /// and merging it, then pushing the result, makes two devices agree without
+  /// either clobbering the other's independent edits.
+  Future<void> mergeAllData(
+      Map<String, List<Map<String, dynamic>>> tables) async {
+    final db = await _database;
+    await db.transaction((txn) async {
+      // 1. Merge the tombstone ledger (union; newest deletion wins).
+      for (final t in tables['tombstones'] ?? const []) {
+        final tbl = t['tbl'];
+        final id = t['id'];
+        final at = (t['deletedAt'] as int?) ?? 0;
+        final existing = await txn.query('tombstones',
+            where: 'tbl = ? AND id = ?', whereArgs: [tbl, id]);
+        final localAt =
+            existing.isEmpty ? -1 : (existing.first['deletedAt'] as int? ?? 0);
+        if (at > localAt) {
+          await txn.insert(
+              'tombstones', {'tbl': tbl, 'id': id, 'deletedAt': at},
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      }
+
+      // 2. Snapshot the merged tombstones as table -> id -> deletedAt.
+      final tomb = <String, Map<String, int>>{};
+      for (final row in await txn.query('tombstones')) {
+        (tomb[row['tbl'] as String] ??= {})[row['id'] as String] =
+            (row['deletedAt'] as int?) ?? 0;
+      }
+
+      // 3. Merge each data table by id, newest updatedAt wins, skipping rows a
+      //    tombstone has buried.
+      for (final table in _mergeTables) {
+        for (final row in tables[table] ?? const []) {
+          final id = row['id'] as String;
+          final incoming = (row['updatedAt'] as int?) ?? 0;
+          final deletedAt = tomb[table]?[id];
+          if (deletedAt != null && deletedAt >= incoming) continue;
+          final existing =
+              await txn.query(table, where: 'id = ?', whereArgs: [id]);
+          if (existing.isEmpty) {
+            await txn.insert(table, row,
+                conflictAlgorithm: ConflictAlgorithm.replace);
+          } else {
+            final local = (existing.first['updatedAt'] as int?) ?? 0;
+            if (incoming > local) {
+              await txn.insert(table, row,
+                  conflictAlgorithm: ConflictAlgorithm.replace);
+            }
+          }
+        }
+      }
+
+      // 4. Apply tombstones to local rows: drop any local row the deletion
+      //    ledger has buried (deletion not older than the row).
+      for (final table in _mergeTables) {
+        final ids = tomb[table];
+        if (ids == null) continue;
+        for (final entry in ids.entries) {
+          final local =
+              await txn.query(table, where: 'id = ?', whereArgs: [entry.key]);
+          if (local.isEmpty) continue;
+          final localUpdated = (local.first['updatedAt'] as int?) ?? 0;
+          if (entry.value >= localUpdated) {
+            await txn.delete(table, where: 'id = ?', whereArgs: [entry.key]);
+          }
+        }
+      }
+    });
+  }
+
   Future<void> resetUserData() async {
     final db = await _database;
     await db.delete('contacts');

@@ -227,9 +227,9 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
     if (mounted) setState(() => _busy = false);
   }
 
-  Future<void> _pushNow() async {
+  Future<void> _syncNow() async {
     setState(() => _busy = true);
-    await widget.controller.pushNow();
+    await widget.controller.syncNow();
     if (mounted) setState(() => _busy = false);
   }
 
@@ -446,7 +446,7 @@ class _SyncSettingsViewState extends State<SyncSettingsView> {
                         ),
                         _TapRow(
                           label: s.syncNow,
-                          onTap: _busy ? null : _pushNow,
+                          onTap: _busy ? null : _syncNow,
                         ),
                         Container(
                           height: 0.5,
