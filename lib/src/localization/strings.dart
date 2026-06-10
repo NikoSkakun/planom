@@ -212,6 +212,14 @@ class S {
   String get completionColor => t('completionColor');
   String get sectionSmartLists => t('sectionSmartLists');
   String get sectionCustomization => t('sectionCustomization');
+  String get sectionAdvanced => t('sectionAdvanced');
+  String get splitScreen => t('splitScreen');
+  String get splitScreenEnable => t('splitScreenEnable');
+  String get splitScreenFromMenu => t('splitScreenFromMenu');
+  String get splitScreenFromDrag => t('splitScreenFromDrag');
+  String get splitScreenHint => t('splitScreenHint');
+  String get splitScreenWith => t('splitScreenWith');
+  String get closeWindow => t('closeWindow');
   String get tabBar => t('tabBar');
   String get sectionLanguage => t('sectionLanguage');
   String get language => t('language');
@@ -960,6 +968,14 @@ const Map<String, String> _en = {
   'themeSystem': 'System', 'themeDark': 'Dark',
   'theme': 'Theme', 'accentColor': 'Accent Color', 'completionColor': 'Completion Color',
   'sectionSmartLists': 'Smart Lists', 'sectionCustomization': 'Customization',
+  'sectionAdvanced': 'Advanced',
+  'splitScreen': 'Split Screen',
+  'splitScreenEnable': 'Enable Split Screen',
+  'splitScreenFromMenu': 'Enter from menu',
+  'splitScreenFromDrag': 'Enter by dragging tab buttons',
+  'splitScreenHint': 'View two tabs at once, stacked vertically. Currently available for Tasks with Calendar — drag tasks onto a day to schedule them.',
+  'splitScreenWith': 'Split with…',
+  'closeWindow': 'Close',
   'tabBar': 'Tab Bar', 'sectionLanguage': 'Language', 'language': 'Language', 'font': 'Font', 'searchFonts': 'Search fonts', 'systemFont': 'System', 'fontOfflineWarning': 'Offline — only cached fonts show previews', 'editPreviewText': 'Edit Preview Text', 'previewText': 'Preview Text',
   'sectionData': 'Data',
   'sectionAbout': 'About', 'legal': 'Legal',
@@ -1394,6 +1410,14 @@ const Map<String, String> _en = {
 };
 
 const Map<String, String> _uk = {
+  'sectionAdvanced': 'Додатково',
+  'splitScreen': 'Розділений екран',
+  'splitScreenEnable': 'Увімкнути розділений екран',
+  'splitScreenFromMenu': 'Вхід із меню',
+  'splitScreenFromDrag': 'Вхід перетягуванням кнопок вкладок',
+  'splitScreenHint': 'Перегляд двох вкладок одночасно, одна над одною. Зараз доступно для Завдань і Календаря — перетягніть завдання на день, щоб запланувати його.',
+  'splitScreenWith': 'Розділити з…',
+  'closeWindow': 'Закрити',
   'appTitle': 'planom',
   'cancel': 'Скасувати', 'done': 'Готово', 'ok': 'OK', 'add': 'Додати',
   'create': 'Створити', 'save': 'Зберегти', 'delete': 'Видалити',
@@ -1841,6 +1865,14 @@ const Map<String, String> _uk = {
 };
 
 const Map<String, String> _es = {
+  'sectionAdvanced': 'Avanzado',
+  'splitScreen': 'Pantalla dividida',
+  'splitScreenEnable': 'Activar pantalla dividida',
+  'splitScreenFromMenu': 'Entrar desde el menú',
+  'splitScreenFromDrag': 'Entrar arrastrando los botones de pestaña',
+  'splitScreenHint': 'Ve dos pestañas a la vez, apiladas verticalmente. Disponible actualmente para Tareas con Calendario: arrastra una tarea a un día para programarla.',
+  'splitScreenWith': 'Dividir con…',
+  'closeWindow': 'Cerrar',
   'appTitle': 'planom',
   'cancel': 'Cancelar', 'done': 'Listo', 'ok': 'OK', 'add': 'Añadir',
   'create': 'Crear', 'save': 'Guardar', 'delete': 'Eliminar',
@@ -2288,6 +2320,14 @@ const Map<String, String> _es = {
 };
 
 const Map<String, String> _fr = {
+  'sectionAdvanced': 'Avancé',
+  'splitScreen': 'Écran partagé',
+  'splitScreenEnable': 'Activer l\'écran partagé',
+  'splitScreenFromMenu': 'Entrer depuis le menu',
+  'splitScreenFromDrag': 'Entrer en glissant les boutons d\'onglet',
+  'splitScreenHint': 'Affichez deux onglets à la fois, empilés verticalement. Disponible actuellement pour Tâches avec Calendrier — faites glisser une tâche sur un jour pour la planifier.',
+  'splitScreenWith': 'Partager avec…',
+  'closeWindow': 'Fermer',
   'appTitle': 'planom',
   'cancel': 'Annuler', 'done': 'Terminé', 'ok': 'OK', 'add': 'Ajouter',
   'create': 'Créer', 'save': 'Enregistrer', 'delete': 'Supprimer',
@@ -2735,6 +2775,14 @@ const Map<String, String> _fr = {
 };
 
 const Map<String, String> _de = {
+  'sectionAdvanced': 'Erweitert',
+  'splitScreen': 'Geteilter Bildschirm',
+  'splitScreenEnable': 'Geteilten Bildschirm aktivieren',
+  'splitScreenFromMenu': 'Über Menü öffnen',
+  'splitScreenFromDrag': 'Durch Ziehen der Tab-Schaltflächen öffnen',
+  'splitScreenHint': 'Zeige zwei Tabs gleichzeitig, vertikal gestapelt. Derzeit für Aufgaben mit Kalender verfügbar – ziehe eine Aufgabe auf einen Tag, um sie zu planen.',
+  'splitScreenWith': 'Teilen mit…',
+  'closeWindow': 'Schließen',
   'appTitle': 'planom',
   'cancel': 'Abbrechen', 'done': 'Fertig', 'ok': 'OK', 'add': 'Hinzufügen',
   'create': 'Erstellen', 'save': 'Speichern', 'delete': 'Löschen',
@@ -3182,6 +3230,14 @@ const Map<String, String> _de = {
 };
 
 const Map<String, String> _it = {
+  'sectionAdvanced': 'Avanzate',
+  'splitScreen': 'Schermo diviso',
+  'splitScreenEnable': 'Abilita schermo diviso',
+  'splitScreenFromMenu': 'Apri dal menu',
+  'splitScreenFromDrag': 'Apri trascinando i pulsanti delle schede',
+  'splitScreenHint': 'Visualizza due schede contemporaneamente, impilate in verticale. Attualmente disponibile per Attività con Calendario: trascina un\'attività su un giorno per pianificarla.',
+  'splitScreenWith': 'Dividi con…',
+  'closeWindow': 'Chiudi',
   'appTitle': 'planom',
   'cancel': 'Annulla', 'done': 'Fatto', 'ok': 'OK', 'add': 'Aggiungi',
   'create': 'Crea', 'save': 'Salva', 'delete': 'Elimina',
@@ -3629,6 +3685,14 @@ const Map<String, String> _it = {
 };
 
 const Map<String, String> _pt = {
+  'sectionAdvanced': 'Avançado',
+  'splitScreen': 'Tela dividida',
+  'splitScreenEnable': 'Ativar tela dividida',
+  'splitScreenFromMenu': 'Entrar pelo menu',
+  'splitScreenFromDrag': 'Entrar arrastando os botões das abas',
+  'splitScreenHint': 'Veja duas abas ao mesmo tempo, empilhadas verticalmente. Atualmente disponível para Tarefas com Calendário — arraste uma tarefa para um dia para agendá-la.',
+  'splitScreenWith': 'Dividir com…',
+  'closeWindow': 'Fechar',
   'appTitle': 'planom',
   'cancel': 'Cancelar', 'done': 'Concluído', 'ok': 'OK', 'add': 'Adicionar',
   'create': 'Criar', 'save': 'Salvar', 'delete': 'Excluir',
@@ -4076,6 +4140,14 @@ const Map<String, String> _pt = {
 };
 
 const Map<String, String> _ru = {
+  'sectionAdvanced': 'Дополнительно',
+  'splitScreen': 'Разделённый экран',
+  'splitScreenEnable': 'Включить разделённый экран',
+  'splitScreenFromMenu': 'Вход из меню',
+  'splitScreenFromDrag': 'Вход перетаскиванием кнопок вкладок',
+  'splitScreenHint': 'Просмотр двух вкладок одновременно, одна над другой. Сейчас доступно для Задач и Календаря — перетащите задачу на день, чтобы запланировать её.',
+  'splitScreenWith': 'Разделить с…',
+  'closeWindow': 'Закрыть',
   'appTitle': 'planom',
   'cancel': 'Отмена', 'done': 'Готово', 'ok': 'OK', 'add': 'Добавить',
   'create': 'Создать', 'save': 'Сохранить', 'delete': 'Удалить',
@@ -4523,6 +4595,14 @@ const Map<String, String> _ru = {
 };
 
 const Map<String, String> _zh = {
+  'sectionAdvanced': '高级',
+  'splitScreen': '分屏',
+  'splitScreenEnable': '启用分屏',
+  'splitScreenFromMenu': '从菜单进入',
+  'splitScreenFromDrag': '拖动标签按钮进入',
+  'splitScreenHint': '同时查看两个标签页，上下排列。目前支持任务与日历——将任务拖到某一天即可安排日程。',
+  'splitScreenWith': '分屏搭配…',
+  'closeWindow': '关闭',
   'appTitle': 'planom',
   'cancel': '取消', 'done': '完成', 'ok': '好', 'add': '添加',
   'create': '创建', 'save': '保存', 'delete': '删除',
@@ -4968,6 +5048,14 @@ const Map<String, String> _zh = {
 };
 
 const Map<String, String> _ja = {
+  'sectionAdvanced': '詳細設定',
+  'splitScreen': '分割画面',
+  'splitScreenEnable': '分割画面を有効にする',
+  'splitScreenFromMenu': 'メニューから開く',
+  'splitScreenFromDrag': 'タブボタンのドラッグで開く',
+  'splitScreenHint': '2つのタブを上下に並べて同時に表示します。現在はタスクとカレンダーで利用可能 — タスクを日付にドラッグして予定を設定できます。',
+  'splitScreenWith': '分割表示の相手…',
+  'closeWindow': '閉じる',
   'appTitle': 'planom',
   'cancel': 'キャンセル', 'done': '完了', 'ok': 'OK', 'add': '追加',
   'create': '作成', 'save': '保存', 'delete': '削除',

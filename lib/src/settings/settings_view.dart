@@ -23,6 +23,7 @@ import 'plus_button_settings_view.dart';
 import 'security_view.dart';
 import 'settings_controller.dart';
 import 'spaces_view.dart';
+import 'split_screen_settings_view.dart';
 import 'sync_settings_view.dart';
 import 'tab_bar_pages_view.dart';
 import 'tasks_settings_view.dart';
@@ -339,6 +340,21 @@ class _SettingsViewState extends State<SettingsView> {
                 ),
               ),
             ],
+
+            // ── Advanced ────────────────────────────────────────────────
+            const SizedBox(height: 18),
+            _SectionHeader(s.sectionAdvanced),
+            _NavRow(
+              label: s.splitScreen,
+              icon: CupertinoIcons.rectangle_grid_1x2,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => SplitScreenSettingsView(
+                    controller: widget.controller,
+                  ),
+                ),
+              ),
+            ),
 
             // ── About ─────────────────────────────────────────────────
             const SizedBox(height: 18),

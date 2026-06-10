@@ -37,6 +37,7 @@ import 'utils/plus_button_inset_scope.dart';
 import 'utils/plus_drag_controller.dart';
 import 'utils/plus_drag_payload.dart';
 import 'utils/selection_menu.dart';
+import 'utils/task_drag_scope.dart';
 import 'notes/note_detail_view.dart';
 import 'models/note.dart';
 import 'utils/undo_controller.dart';
@@ -66,6 +67,16 @@ class HomeShell extends StatefulWidget {
     context
         .findRootAncestorStateOfType<_HomeShellState>()
         ?._openGlobalSettings();
+  }
+
+  /// Enters Split Screen mode pairing the currently-active tab (the host) with
+  /// [withTab]. Invoked from the Tasks / Calendar ⋯ menus. The host renders on
+  /// top, [withTab] on the bottom; the arrangement can be flipped afterwards by
+  /// dragging a window header.
+  static void enterSplitScreen(BuildContext context, {required int withTab}) {
+    context
+        .findRootAncestorStateOfType<_HomeShellState>()
+        ?._enterSplitFromMenu(withTab);
   }
 
   final SettingsController settingsController;
@@ -116,6 +127,19 @@ class _HomeShellState extends State<HomeShell> {
   int _currentPage = 0;
   late CupertinoTabController _tabController;
 
+  // ── Split Screen ──────────────────────────────────────────────────────────
+  // The committed arrangement (null = single-tab mode). When non-null the shell
+  // renders two stacked subwindows instead of the normal tab content.
+  _SplitConfig? _splitConfig;
+  // The proposed arrangement shown as a live (ghosted) preview while a tab
+  // button or window header is being dragged. Cleared on release.
+  _SplitConfig? _splitPreview;
+  // True between drag-start and drag-end of a tab button / window header.
+  bool _splitDragging = false;
+  // Measures the content region so a drag's vertical position resolves to the
+  // top or bottom half. Lives on whichever shell (normal / split) is mounted.
+  final GlobalKey _splitRegionKey = GlobalKey();
+
   void _openGlobalSettings() {
     if (_globalSettingsOpen.value) return;
     final route = FastRoute<void>(
@@ -134,6 +158,110 @@ class _HomeShellState extends State<HomeShell> {
       _globalSettingsRoute = null;
       _globalSettingsOpen.value = false;
     });
+  }
+
+  // ── Split Screen ──────────────────────────────────────────────────────────
+
+  /// The tab paired with [tab] in the current split arrangement.
+  int _otherSplitTab(int tab) {
+    final cfg = _splitConfig ?? _splitPreview;
+    if (cfg == null) return tab;
+    return cfg.topTab == tab ? cfg.bottomTab : cfg.topTab;
+  }
+
+  String _tabName(int tab) {
+    final s = S.of(context);
+    switch (tab) {
+      case 0:
+        return s.tabTasks;
+      case 1:
+        return s.tabNotes;
+      case 2:
+        return s.tabCalendar;
+      case 3:
+        return s.tabRoutines;
+      default:
+        return s.tabSettings;
+    }
+  }
+
+  /// Enters split mode from a tab ⋯ menu: the active tab on top, [withTab]
+  /// below.
+  void _enterSplitFromMenu(int withTab) {
+    final host = _lastTabIndex;
+    if (host == withTab) return;
+    setState(() {
+      _splitConfig = _SplitConfig(topTab: host, bottomTab: withTab);
+      _splitPreview = null;
+      _splitDragging = false;
+    });
+  }
+
+  /// Updates the live preview from a drag hovering over the content area.
+  void _setSplitPreview(_TabDragPayload p, bool topHalf) {
+    final cfg = topHalf
+        ? _SplitConfig(
+            topTab: p.draggedTab, bottomTab: p.hostTab, draggedTab: p.draggedTab)
+        : _SplitConfig(
+            topTab: p.hostTab, bottomTab: p.draggedTab, draggedTab: p.draggedTab);
+    if (_splitDragging && _splitPreview == cfg) return;
+    setState(() {
+      _splitDragging = true;
+      _splitPreview = cfg;
+    });
+  }
+
+  /// The drag left the content area (moved back over the tab bar) — drop the
+  /// preview so the underlying view shows through again.
+  void _onSplitDragLeave() {
+    if (_splitPreview != null) setState(() => _splitPreview = null);
+  }
+
+  /// Commits the previewed arrangement when a drag is released over the content.
+  void _commitSplitPreview(_TabDragPayload p) {
+    final preview = _splitPreview ??
+        _SplitConfig(topTab: p.hostTab, bottomTab: p.draggedTab);
+    setState(() {
+      _splitConfig =
+          _SplitConfig(topTab: preview.topTab, bottomTab: preview.bottomTab);
+      _splitPreview = null;
+      _splitDragging = false;
+    });
+  }
+
+  /// Drag released. When not accepted by the content target (i.e. over the tab
+  /// bar / outside), an active split closes, and an entering drag is cancelled.
+  void _onSplitDragEnd(_TabDragPayload p, bool accepted) {
+    if (accepted) return; // _commitSplitPreview already handled the drop.
+    if (_splitConfig != null) {
+      _exitSplitTo(p.hostTab);
+    } else {
+      setState(() {
+        _splitPreview = null;
+        _splitDragging = false;
+      });
+    }
+  }
+
+  /// Closes the [tabToClose] subwindow and switches fully to the other one,
+  /// preserving its in-split state.
+  void _closeSplitWindow(int tabToClose) {
+    final cfg = _splitConfig;
+    if (cfg == null) return;
+    _exitSplitTo(_otherSplitTab(tabToClose));
+  }
+
+  /// Leaves split mode and shows [tab] full-screen.
+  void _exitSplitTo(int tab) {
+    setState(() {
+      _splitConfig = null;
+      _splitPreview = null;
+      _splitDragging = false;
+      _lastTabIndex = tab;
+    });
+    widget.settingsController.setLastOpenedTab(tab);
+    _tabController.index = _visualForBuiltin(tab);
+    _refreshPlusForTab(tab);
   }
 
   @override
@@ -1082,16 +1210,34 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Task rows become draggable (onto calendar days) only when an active
+    // split pairs Tasks with Calendar.
+    final cfg = _splitConfig;
+    final taskDragEnabled = cfg != null &&
+        {cfg.topTab, cfg.bottomTab}.containsAll(const {0, 2});
     return UndoScope(
       controller: _undoController,
       child: PlusDragScope(
         controller: _plusDragController,
         child: PlusButtonInsetScope(
           inset: _plusButtonInset,
-          child: _buildShell(context),
+          child: TaskDragScope(
+            enabled: taskDragEnabled,
+            onDropOnDay: _setTaskDueDate,
+            child: _buildShell(context),
+          ),
         ),
       ),
     );
+  }
+
+  /// Sets [taskId]'s due date to [date] — the effect of dropping a task onto a
+  /// calendar day in split mode.
+  void _setTaskDueDate(String taskId, DateTime date) {
+    final task = widget.taskController.taskById(taskId);
+    if (task == null) return;
+    final normalized = DateTime(date.year, date.month, date.day);
+    widget.taskController.updateTask(task.copyWith(dueDate: normalized));
   }
 
   Widget _buildShell(BuildContext context) {
@@ -1106,6 +1252,11 @@ class _HomeShellState extends State<HomeShell> {
         // 700 px threshold so iPhone stays on the bottom tab bar.
         final isWide = PlatformCapabilities.isDesktop ||
             MediaQuery.sizeOf(context).width >= 700;
+
+        // Committed split mode renders a wholly different two-pane shell.
+        if (_splitConfig != null) {
+          return _buildSplitShell(context, _splitConfig!, hideLabels, isWide);
+        }
 
         final navigablePages = _navigablePageIndices();
         // Only pages that actually hold tabs count toward the multi-page UI —
@@ -1358,10 +1509,231 @@ class _HomeShellState extends State<HomeShell> {
                       : 50 + MediaQuery.paddingOf(context).bottom,
               child: UndoBanner(controller: _undoController),
             ),
+            // ── Split Screen entry (drag a tab button into the view) ────────
+            // Only in the narrow bottom-bar layout, and only when the active
+            // tab has a split partner (Tasks↔Calendar).
+            ..._buildSplitEntryOverlays(context, hasBottomBar && !isWide),
           ],
         );
       },
     );
+  }
+
+  /// Overlays that power entering split mode by dragging a tab-bar button: an
+  /// invisible long-press-draggable handle over the partner tab's slot, a
+  /// translucent drop region over the content (to resolve top/bottom half), and
+  /// the live ghosted preview. Returns an empty list when unavailable.
+  List<Widget> _buildSplitEntryOverlays(BuildContext context, bool narrowBar) {
+    if (!narrowBar || !widget.settingsController.splitScreenDragAvailable) {
+      return const [];
+    }
+    final slot = _partnerTabSlot();
+    if (slot == null) return const [];
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final barHeight = 50 + bottomInset;
+    final width = MediaQuery.sizeOf(context).width;
+    final slotWidth = width / slot.itemCount;
+    final payload =
+        _TabDragPayload(draggedTab: slot.partnerTab, hostTab: slot.hostTab);
+
+    return [
+      // Drop region over the content (everything above the tab bar).
+      Positioned(
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: barHeight,
+        child: _SplitDropRegion(
+          regionKey: _splitRegionKey,
+          onMove: _setSplitPreview,
+          onLeave: _onSplitDragLeave,
+          onAccept: _commitSplitPreview,
+        ),
+      ),
+      // Live preview (ghosted) while dragging over the content.
+      if (_splitDragging && _splitPreview != null)
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: barHeight,
+          child: IgnorePointer(
+            child: _SplitPreview(
+              config: _splitPreview!,
+              topName: _tabName(_splitPreview!.topTab),
+              bottomName: _tabName(_splitPreview!.bottomTab),
+            ),
+          ),
+        ),
+      // Invisible long-press-drag handle over the partner tab's slot. It also
+      // forwards a normal tap so the tab still switches as usual.
+      Positioned(
+        left: slot.visualIndex * slotWidth,
+        width: slotWidth,
+        bottom: 0,
+        height: barHeight,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            _onTabTapped(slot.partnerTab);
+            _tabController.index = _visualForBuiltin(slot.partnerTab);
+          },
+          child: LongPressDraggable<_TabDragPayload>(
+            data: payload,
+            feedback: _SplitTabDragFeedback(label: _tabName(slot.partnerTab)),
+            onDragStarted: () => setState(() => _splitDragging = true),
+            onDragEnd: (d) => _onSplitDragEnd(payload, d.wasAccepted),
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  /// Resolves the partner tab (and its tab-bar slot) for entering split mode
+  /// from the active tab. Only the Tasks↔Calendar pair is supported, and both
+  /// must be present on the current tab-bar page.
+  _PartnerSlot? _partnerTabSlot() {
+    int? partner;
+    if (_lastTabIndex == 0) {
+      partner = 2;
+    } else if (_lastTabIndex == 2) {
+      partner = 0;
+    }
+    if (partner == null) return null;
+    final items = _pageItems();
+    var partnerVisual = -1;
+    var hostVisual = -1;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind == TabKind.builtin) {
+        if (items[i].builtinIndex == partner) partnerVisual = i;
+        if (items[i].builtinIndex == _lastTabIndex) hostVisual = i;
+      }
+    }
+    if (partnerVisual < 0 || hostVisual < 0) return null;
+    return _PartnerSlot(
+      partnerTab: partner,
+      hostTab: _lastTabIndex,
+      visualIndex: partnerVisual,
+      itemCount: items.length,
+    );
+  }
+
+  // ── Split shell (two stacked subwindows) ──────────────────────────────────
+
+  Widget _buildSplitShell(
+      BuildContext context, _SplitConfig cfg, bool hideLabels, bool isWide) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final barHeight = 50 + bottomInset;
+    final separator = Container(
+      height: 0.5,
+      color: CupertinoColors.separator.resolveFrom(context),
+    );
+    return Stack(
+      children: [
+        SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Expanded(child: _splitPane(cfg.topTab)),
+              separator,
+              Expanded(child: _splitPane(cfg.bottomTab)),
+              _SplitTabBar(
+                items: [
+                  for (final it in _pageItems())
+                    _renderTabItem(context, it, hideLabels, false)
+                ],
+                builtinIndices: [
+                  for (final it in _pageItems())
+                    it.kind == TabKind.builtin ? (it.builtinIndex ?? -1) : -1
+                ],
+                highlighted: {cfg.topTab, cfg.bottomTab},
+                onTap: _onSplitTabBarTap,
+              ),
+            ],
+          ),
+        ),
+        // Reconfigure drop region (resolves top/bottom half during a header
+        // drag). Covers the panes but not the tab bar.
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: barHeight,
+          child: _SplitDropRegion(
+            regionKey: _splitRegionKey,
+            onMove: _setSplitPreview,
+            onLeave: _onSplitDragLeave,
+            onAccept: _commitSplitPreview,
+          ),
+        ),
+        if (_splitDragging && _splitPreview != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: barHeight,
+            child: IgnorePointer(
+              child: _SplitPreview(
+                config: _splitPreview!,
+                topName: _tabName(_splitPreview!.topTab),
+                bottomName: _tabName(_splitPreview!.bottomTab),
+              ),
+            ),
+          ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: barHeight,
+          child: UndoBanner(controller: _undoController),
+        ),
+      ],
+    );
+  }
+
+  /// One subwindow: a draggable header (long-press to reconfigure placement,
+  /// tap ✕ to close) atop the tab's live content.
+  Widget _splitPane(int tab) {
+    final payload =
+        _TabDragPayload(draggedTab: tab, hostTab: _otherSplitTab(tab));
+    return Column(
+      children: [
+        LongPressDraggable<_TabDragPayload>(
+          data: payload,
+          feedback: _SplitTabDragFeedback(label: _tabName(tab)),
+          onDragStarted: () => setState(() => _splitDragging = true),
+          onDragEnd: (d) => _onSplitDragEnd(payload, d.wasAccepted),
+          child: _SplitPaneHeader(
+            title: _tabName(tab),
+            onClose: () => _closeSplitWindow(tab),
+          ),
+        ),
+        Expanded(
+          child: CupertinoTabView(
+            navigatorKey: _navigatorKeys[tab],
+            navigatorObservers: [_depthObservers[tab]],
+            builder: (ctx) => _tabContent(ctx, tab),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _onSplitTabBarTap(int visualIndex) {
+    final items = _pageItems();
+    if (visualIndex < 0 || visualIndex >= items.length) return;
+    final item = items[visualIndex];
+    if (item.kind == TabKind.builtin && item.builtinIndex != null) {
+      final b = item.builtinIndex!;
+      final cfg = _splitConfig;
+      // Tapping a tab that's already part of the split keeps the split as-is.
+      if (cfg != null && (cfg.topTab == b || cfg.bottomTab == b)) return;
+      _exitSplitTo(b);
+      return;
+    }
+    // Shortcut: leave split, then route the shortcut normally.
+    _exitSplitTo(_lastTabIndex);
+    _handleTabTap(visualIndex);
   }
 
   void _switchPage(int delta) {
@@ -1734,5 +2106,349 @@ class _PlusButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ── Split Screen support types & widgets ─────────────────────────────────────
+
+/// A committed (or previewed) split arrangement: which logical tab renders on
+/// top and which on the bottom. [draggedTab] (preview only) is the window shown
+/// ghosted while the user is still dragging.
+class _SplitConfig {
+  const _SplitConfig({
+    required this.topTab,
+    required this.bottomTab,
+    this.draggedTab,
+  });
+
+  final int topTab;
+  final int bottomTab;
+  final int? draggedTab;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _SplitConfig &&
+      other.topTab == topTab &&
+      other.bottomTab == bottomTab &&
+      other.draggedTab == draggedTab;
+
+  @override
+  int get hashCode => Object.hash(topTab, bottomTab, draggedTab);
+}
+
+/// Payload carried while dragging a tab-bar button or a subwindow header.
+class _TabDragPayload {
+  const _TabDragPayload({required this.draggedTab, required this.hostTab});
+
+  /// The tab being moved (the window that follows the finger / gets ghosted).
+  final int draggedTab;
+
+  /// The tab it pairs with (the other window).
+  final int hostTab;
+}
+
+/// Geometry for the partner tab's slot in the bottom bar, used to position the
+/// invisible drag handle that enters split mode.
+class _PartnerSlot {
+  const _PartnerSlot({
+    required this.partnerTab,
+    required this.hostTab,
+    required this.visualIndex,
+    required this.itemCount,
+  });
+
+  final int partnerTab;
+  final int hostTab;
+  final int visualIndex;
+  final int itemCount;
+}
+
+/// Translucent drop region over the content. Resolves a hovering tab-drag to
+/// the top or bottom half (driving the preview) and commits on release.
+class _SplitDropRegion extends StatelessWidget {
+  const _SplitDropRegion({
+    required this.regionKey,
+    required this.onMove,
+    required this.onLeave,
+    required this.onAccept,
+  });
+
+  final GlobalKey regionKey;
+  final void Function(_TabDragPayload payload, bool topHalf) onMove;
+  final VoidCallback onLeave;
+  final void Function(_TabDragPayload payload) onAccept;
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<_TabDragPayload>(
+      builder: (_, __, ___) => SizedBox.expand(key: regionKey),
+      onWillAcceptWithDetails: (_) => true,
+      onMove: (details) {
+        final box = regionKey.currentContext?.findRenderObject() as RenderBox?;
+        if (box == null) return;
+        final local = box.globalToLocal(details.offset);
+        onMove(details.data, local.dy < box.size.height / 2);
+      },
+      onLeave: (_) => onLeave(),
+      onAcceptWithDetails: (details) => onAccept(details.data),
+    );
+  }
+}
+
+/// Pill shown under the finger while dragging a tab button / window header.
+class _SplitTabDragFeedback extends StatelessWidget {
+  const _SplitTabDragFeedback({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      offset: const Offset(-24, -44),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: AppColors.accent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x40000000),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(CupertinoIcons.rectangle_grid_1x2,
+                size: 16, color: CupertinoColors.white),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: CupertinoColors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The thin header strip atop each subwindow. Long-pressing it (handled by the
+/// enclosing draggable) re-enters placement configuration; the ✕ closes the
+/// window.
+class _SplitPaneHeader extends StatelessWidget {
+  const _SplitPaneHeader({required this.title, required this.onClose});
+
+  final String title;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 34,
+      padding: const EdgeInsets.only(left: 12, right: 2),
+      decoration: BoxDecoration(
+        color: CupertinoColors.secondarySystemBackground.resolveFrom(context),
+        border: Border(
+          bottom: BorderSide(
+            color: CupertinoColors.separator.resolveFrom(context),
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            CupertinoIcons.rectangle_grid_1x2,
+            size: 14,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
+            ),
+          ),
+          Icon(
+            CupertinoIcons.line_horizontal_3,
+            size: 15,
+            color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+          ),
+          Semantics(
+            label: S.of(context).closeWindow,
+            button: true,
+            child: CupertinoButton(
+              padding: const EdgeInsets.all(8),
+              minSize: 0,
+              onPressed: onClose,
+              child: Icon(
+                CupertinoIcons.xmark,
+                size: 16,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Custom bottom bar for split mode that highlights every tab in [highlighted]
+/// (so both split windows read as "selected").
+class _SplitTabBar extends StatelessWidget {
+  const _SplitTabBar({
+    required this.items,
+    required this.builtinIndices,
+    required this.highlighted,
+    required this.onTap,
+  });
+
+  final List<BottomNavigationBarItem> items;
+  final List<int> builtinIndices;
+  final Set<int> highlighted;
+  final void Function(int visualIndex) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    const bg = CupertinoDynamicColor.withBrightness(
+      color: Color(0xF0F9F9F9),
+      darkColor: Color(0xF01D1D1D),
+    );
+    final active = CupertinoColors.label.resolveFrom(context);
+    final inactive = CupertinoColors.secondaryLabel.resolveFrom(context);
+    return Container(
+      height: 50 + bottom,
+      padding: EdgeInsets.only(bottom: bottom),
+      decoration: BoxDecoration(
+        color: bg.resolveFrom(context),
+        border: Border(
+          top: BorderSide(
+            color: CupertinoColors.separator.resolveFrom(context),
+            width: 0.0,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < items.length; i++)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onTap(i),
+                child: _cell(
+                  context,
+                  items[i],
+                  highlighted.contains(builtinIndices[i]),
+                  active,
+                  inactive,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cell(BuildContext context, BottomNavigationBarItem item,
+      bool isActive, Color active, Color inactive) {
+    final color = isActive ? active : inactive;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconTheme(
+          data: IconThemeData(color: color, size: 28),
+          child: isActive ? item.activeIcon : item.icon,
+        ),
+        if (item.label != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(item.label!, style: TextStyle(fontSize: 10, color: color)),
+          ),
+      ],
+    );
+  }
+}
+
+/// Ghosted preview of the proposed split arrangement shown while dragging.
+class _SplitPreview extends StatelessWidget {
+  const _SplitPreview({
+    required this.config,
+    required this.topName,
+    required this.bottomName,
+  });
+
+  final _SplitConfig config;
+  final String topName;
+  final String bottomName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: _pane(
+            context,
+            topName,
+            ghosted: config.draggedTab == config.topTab,
+          ),
+        ),
+        Expanded(
+          child: _pane(
+            context,
+            bottomName,
+            ghosted: config.draggedTab == config.bottomTab,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _pane(BuildContext context, String name, {required bool ghosted}) {
+    final pane = Container(
+      margin: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent, width: 2),
+        boxShadow: const [
+          BoxShadow(color: AppColors.shadow, blurRadius: 16, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.rectangle_grid_1x2,
+                size: 22, color: AppColors.accent),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return Opacity(opacity: ghosted ? 0.45 : 0.95, child: pane);
   }
 }

@@ -25,6 +25,7 @@ import '../tasks/task_controller.dart';
 import '../utils/selection_menu.dart';
 import '../utils/plus_drag_controller.dart';
 import '../utils/plus_drag_payload.dart';
+import '../utils/task_drag_scope.dart';
 import 'day_view_sheet.dart';
 import 'event_controller.dart';
 
@@ -380,6 +381,7 @@ class _CalendarViewState extends State<CalendarView> {
   Future<void> _showCalendarMenu(BuildContext context) async {
     final sc = widget.settingsController;
     final settingsHidden = sc != null && !sc.isTabVisible(4);
+    final showSplit = sc != null && sc.splitScreenMenuAvailable;
     final s = S.of(context);
     final action = await showSelectionMenu<String>(
       context: context,
@@ -390,6 +392,12 @@ class _CalendarViewState extends State<CalendarView> {
           label: s.calendarView,
           icon: CupertinoIcons.calendar,
         ),
+        if (showSplit)
+          SelectionMenuOption(
+            value: 'split',
+            label: s.splitScreen,
+            icon: CupertinoIcons.rectangle_grid_1x2,
+          ),
         if (settingsHidden)
           SelectionMenuOption(
             value: 'settings',
@@ -401,9 +409,31 @@ class _CalendarViewState extends State<CalendarView> {
     if (!context.mounted) return;
     if (action == 'view') {
       await _showViewModeMenu(context);
+    } else if (action == 'split') {
+      await _pickSplitScreen(context);
     } else if (action == 'settings') {
       _openSettings(context);
     }
+  }
+
+  /// Shows the nested "Split with…" submenu. Calendar can currently only pair
+  /// with the Tasks tab.
+  Future<void> _pickSplitScreen(BuildContext context) async {
+    final s = S.of(context);
+    final choice = await showSelectionMenu<int>(
+      context: context,
+      title: s.splitScreenWith,
+      anchor: SelectionMenuAnchor.topRight,
+      options: [
+        SelectionMenuOption(
+          value: 0,
+          label: s.tabTasks,
+          icon: CupertinoIcons.checkmark_square,
+        ),
+      ],
+    );
+    if (choice == null || !context.mounted) return;
+    HomeShell.enterSplitScreen(context, withTab: choice);
   }
 
   Future<void> _showViewModeMenu(BuildContext context) async {
@@ -960,12 +990,23 @@ class _DayCell extends StatelessWidget {
     final visibleCount = chips.length <= 4 ? chips.length : 3;
     final overflowCount = chips.length - visibleCount;
 
-    return DragTarget<PlusDragPayload>(
+    // Outer target accepts a task dragged from the Tasks subwindow in Split
+    // Screen mode (drops set the task's due date); inner target accepts the
+    // global Plus button.
+    final taskDragScope = TaskDragScope.of(context);
+    return DragTarget<TaskDragData>(
+      onWillAcceptWithDetails: (_) =>
+          date != null && taskDragScope?.enabled == true,
+      onAcceptWithDetails: (d) =>
+          taskDragScope?.onDropOnDay?.call(d.data.taskId, date!),
+      builder: (context, taskCandidates, __) {
+        final taskHover = taskCandidates.isNotEmpty;
+        return DragTarget<PlusDragPayload>(
       onWillAcceptWithDetails: (_) => true,
       onAcceptWithDetails: (_) =>
           PlusDragScope.of(context)?.onDropOnDay?.call(date!),
       builder: (context, candidates, _) {
-        final highlighted = candidates.isNotEmpty;
+        final highlighted = candidates.isNotEmpty || taskHover;
         return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -1030,6 +1071,8 @@ class _DayCell extends StatelessWidget {
           ],
         ),
       ),
+    );
+      },
     );
       },
     );

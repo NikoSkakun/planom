@@ -192,10 +192,17 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
         SmartListVisibility.hidden;
     final hasLists = widget.folderController.lists.isNotEmpty;
     final showDefaultList = inboxHidden && hasLists;
+    final showSplit = widget.settingsController.splitScreenMenuAvailable;
     showDropdown(context, (dismiss) {
       return _TasksOptionsDropdown(
         onDismiss: dismiss,
         showSettings: settingsHidden,
+        onSplitScreen: showSplit
+            ? () {
+                dismiss();
+                _pickSplitScreen(context);
+              }
+            : null,
         onSettings: settingsHidden
             ? () {
                 dismiss();
@@ -229,6 +236,26 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
             : null,
       );
     });
+  }
+
+  /// Shows the nested "Split with…" submenu. Tasks can currently only pair
+  /// with the Calendar tab.
+  Future<void> _pickSplitScreen(BuildContext context) async {
+    final s = S.of(context);
+    final choice = await showSelectionMenu<int>(
+      context: context,
+      title: s.splitScreenWith,
+      anchor: SelectionMenuAnchor.topRight,
+      options: [
+        SelectionMenuOption(
+          value: 2,
+          label: s.tabCalendar,
+          icon: CupertinoIcons.calendar,
+        ),
+      ],
+    );
+    if (choice == null || !context.mounted) return;
+    HomeShell.enterSplitScreen(context, withTab: choice);
   }
 
   Future<void> _pickDefaultList(BuildContext context) async {
@@ -1306,6 +1333,7 @@ class _TasksOptionsDropdown extends StatelessWidget {
     this.showSettings = false,
     this.onSettings,
     this.onDefaultList,
+    this.onSplitScreen,
   });
 
   final VoidCallback onDismiss;
@@ -1317,6 +1345,8 @@ class _TasksOptionsDropdown extends StatelessWidget {
   // When non-null, render a "Default list" row that opens a list picker —
   // shown only when Inbox is hidden so new tasks need a destination.
   final VoidCallback? onDefaultList;
+  // When non-null, render a "Split Screen" row that opens the pairing submenu.
+  final VoidCallback? onSplitScreen;
 
   @override
   Widget build(BuildContext context) {
@@ -1350,6 +1380,14 @@ class _TasksOptionsDropdown extends StatelessWidget {
           label: s.defaultList,
           icon: CupertinoIcons.list_bullet_below_rectangle,
           onTap: onDefaultList!,
+        ),
+      ],
+      if (onSplitScreen != null) ...[
+        separator,
+        DropdownRow(
+          label: s.splitScreen,
+          icon: CupertinoIcons.rectangle_grid_1x2,
+          onTap: onSplitScreen!,
         ),
       ],
     ];

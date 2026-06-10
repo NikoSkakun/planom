@@ -279,6 +279,27 @@ class SettingsController with ChangeNotifier {
   bool _useSystemTextScale = false;
   bool get useSystemTextScale => _useSystemTextScale;
 
+  // ── Split Screen (Advanced) ───────────────────────────────────────────────
+  // Master switch for the Split Screen feature plus the two entry-method
+  // toggles. All default on. Invariant: when both entry methods are off the
+  // master switch is forced off (there'd be no way to enter the mode).
+  bool _splitScreenEnabled = true;
+  bool get splitScreenEnabled => _splitScreenEnabled;
+  bool _splitScreenFromMenu = true;
+  bool get splitScreenFromMenu => _splitScreenFromMenu;
+  bool _splitScreenFromDrag = true;
+  bool get splitScreenFromDrag => _splitScreenFromDrag;
+
+  /// Whether the "Split Screen" option should appear in the Tasks / Calendar
+  /// ⋯ menus.
+  bool get splitScreenMenuAvailable =>
+      _splitScreenEnabled && _splitScreenFromMenu;
+
+  /// Whether the Tasks / Calendar tab-bar buttons can be dragged into a view to
+  /// enter Split Screen mode.
+  bool get splitScreenDragAvailable =>
+      _splitScreenEnabled && _splitScreenFromDrag;
+
   /// Multi-page tab bar layout — supersedes the legacy [tabOrder] +
   /// [tabVisibility] booleans. On first load the legacy values are migrated
   /// into a single-page layout if no `tab_bar_config` row exists yet.
@@ -490,6 +511,12 @@ class SettingsController with ChangeNotifier {
         if (v != null && v >= 0.5 && v <= 2.5) _textScale = v;
       } else if (key == 'use_system_text_scale') {
         _useSystemTextScale = value == 'true';
+      } else if (key == 'split_screen_enabled') {
+        _splitScreenEnabled = value != 'false';
+      } else if (key == 'split_screen_from_menu') {
+        _splitScreenFromMenu = value != 'false';
+      } else if (key == 'split_screen_from_drag') {
+        _splitScreenFromDrag = value != 'false';
       } else if (key == 'tab_bar_config') {
         final parsed = TabBarConfig.tryParse(value);
         if (parsed != null) _tabBarConfig = parsed;
@@ -530,7 +557,50 @@ class SettingsController with ChangeNotifier {
       );
     }
 
+    // Enforce the Split Screen invariant: with no entry method enabled the
+    // feature can't be reached, so the master switch reads as off.
+    if (!_splitScreenFromMenu && !_splitScreenFromDrag) {
+      _splitScreenEnabled = false;
+    }
+
     notifyListeners();
+  }
+
+  Future<void> updateSplitScreenEnabled(bool value) async {
+    if (value == _splitScreenEnabled) return;
+    _splitScreenEnabled = value;
+    // Turning the feature on while both entry methods are off would leave it
+    // unreachable (and immediately re-disabled by the invariant). Re-enable
+    // both so the toggle is meaningful.
+    if (value && !_splitScreenFromMenu && !_splitScreenFromDrag) {
+      _splitScreenFromMenu = true;
+      _splitScreenFromDrag = true;
+      await _db.setAppSetting('split_screen_from_menu', 'true');
+      await _db.setAppSetting('split_screen_from_drag', 'true');
+    }
+    notifyListeners();
+    await _db.setAppSetting('split_screen_enabled', value.toString());
+  }
+
+  Future<void> updateSplitScreenFromMenu(bool value) async {
+    if (value == _splitScreenFromMenu) return;
+    _splitScreenFromMenu = value;
+    notifyListeners();
+    await _db.setAppSetting('split_screen_from_menu', value.toString());
+    // Both entry methods off → the feature is unreachable; force it off.
+    if (!_splitScreenFromMenu && !_splitScreenFromDrag) {
+      await updateSplitScreenEnabled(false);
+    }
+  }
+
+  Future<void> updateSplitScreenFromDrag(bool value) async {
+    if (value == _splitScreenFromDrag) return;
+    _splitScreenFromDrag = value;
+    notifyListeners();
+    await _db.setAppSetting('split_screen_from_drag', value.toString());
+    if (!_splitScreenFromMenu && !_splitScreenFromDrag) {
+      await updateSplitScreenEnabled(false);
+    }
   }
 
   Future<void> updateTabBarConfig(TabBarConfig config) async {

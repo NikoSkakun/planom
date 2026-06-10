@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 
 import '../localization/strings.dart';
 import '../models/task.dart';
+import '../utils/task_drag_scope.dart';
 import 'calendar_date_picker.dart';
 import 'task_field_prefs.dart';
 
@@ -76,7 +77,7 @@ class TaskRow extends StatelessWidget {
         ? CupertinoColors.destructiveRed
         : CupertinoColors.secondaryLabel.resolveFrom(context);
 
-    return Row(
+    final content = Row(
       // Top-align so the checkbox lines up with the first line of the
       // title when the title wraps to multiple lines.
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,6 +185,20 @@ class TaskRow extends StatelessWidget {
         ),
       ],
     );
+
+    // In Split Screen mode (Tasks paired with Calendar) task rows become
+    // draggable: long-press and drop onto a calendar day to set the due date.
+    final dragScope = TaskDragScope.of(context);
+    if (dragScope?.enabled == true) {
+      return LongPressDraggable<TaskDragData>(
+        data: TaskDragData(task.id, task.title),
+        dragAnchorStrategy: pointerDragAnchorStrategy,
+        feedback: _DragFeedback(title: task.title),
+        childWhenDragging: Opacity(opacity: 0.4, child: content),
+        child: content,
+      );
+    }
+    return content;
   }
 
   static Color _priorityColor(int priority) {
@@ -197,6 +212,47 @@ class TaskRow extends StatelessWidget {
       default:
         return CupertinoColors.systemGrey;
     }
+  }
+}
+
+/// Small pill shown under the finger while dragging a task row onto the
+/// calendar in Split Screen mode.
+class _DragFeedback extends StatelessWidget {
+  const _DragFeedback({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      // Offset so the pill sits up-left of the fingertip rather than under it.
+      offset: const Offset(8, 8),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.accent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Text(
+          title.isEmpty ? S.of(context).untitled : title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: CupertinoColors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
   }
 }
 
