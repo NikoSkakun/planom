@@ -327,11 +327,18 @@ class _SecurityGateState extends State<_SecurityGate>
 }
 
 /// Watches the effective Cupertino brightness and, when it flips while a text
-/// field is focused, forces the IME to re-attach so the open keyboard adopts
-/// the new appearance. Without this, iOS keeps the keyboard in its previous
-/// light/dark style until the field is unfocused and refocused — the
-/// keyboardAppearance value baked into the TextInputConfiguration is set once
-/// at attach time and the OS doesn't refresh a live keyboard.
+/// field is focused AND the keyboard is up, forces the IME to re-attach so the
+/// open keyboard adopts the new appearance. Without this, iOS keeps the
+/// keyboard in its previous light/dark style until the field is unfocused and
+/// refocused — the keyboardAppearance baked into the TextInputConfiguration
+/// is set once at attach time and the OS doesn't refresh a live keyboard.
+///
+/// The refresh is gated to skip during app resume: after a background+resume
+/// (e.g. the user switched the OS theme in Settings), iOS won't let us
+/// programmatically bring the keyboard back after an unfocus until the user
+/// interacts with the field again. Without this gate the refresh dismisses
+/// the keyboard and is unable to restore it, which is a worse regression
+/// than the stale appearance it was trying to fix.
 class _KeyboardBrightnessReactor extends StatefulWidget {
   const _KeyboardBrightnessReactor({required this.child});
 
@@ -343,8 +350,33 @@ class _KeyboardBrightnessReactor extends StatefulWidget {
 }
 
 class _KeyboardBrightnessReactorState
-    extends State<_KeyboardBrightnessReactor> {
+    extends State<_KeyboardBrightnessReactor> with WidgetsBindingObserver {
   Brightness? _lastBrightness;
+  DateTime? _lastResumeAt;
+
+  /// Window after [AppLifecycleState.resumed] during which we ignore
+  /// brightness changes. Long enough to cover any stale-frame brightness
+  /// transitions caused by the resume itself.
+  static const Duration _postResumeQuietWindow = Duration(seconds: 2);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _lastResumeAt = DateTime.now();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -359,6 +391,22 @@ class _KeyboardBrightnessReactorState
   void _refreshKeyboard() {
     final focus = FocusManager.instance.primaryFocus;
     if (focus == null || !focus.hasFocus) return;
+
+    // If the brightness flip is happening as part of an app-resume (e.g. the
+    // user came back from OS Settings after toggling Dark Mode), iOS will
+    // refuse to re-show the keyboard after our programmatic unfocus, leaving
+    // it permanently hidden. Skip the refresh in that window and let the
+    // normal next-attach pick up the new appearance.
+    if (_lastResumeAt != null &&
+        DateTime.now().difference(_lastResumeAt!) < _postResumeQuietWindow) {
+      return;
+    }
+
+    // No live keyboard → nothing to refresh; the IME picks up the new
+    // brightness on its next attach.
+    final mq = MediaQuery.maybeOf(context);
+    if (mq == null || mq.viewInsets.bottom <= 0) return;
+
     // Toggle focus to close + reopen the input connection. The IME picks up
     // the new keyboardAppearance from the freshly-attached configuration.
     focus.unfocus(disposition: UnfocusDisposition.scope);
