@@ -23,6 +23,7 @@ import 'theme/app_background.dart';
 import 'theme/app_fonts.dart';
 import 'theme/appearance_prefs.dart';
 import 'utils/fast_route.dart';
+import 'utils/keyboard_insets.dart';
 
 class MyApp extends StatefulWidget {
   const MyApp({
@@ -427,22 +428,45 @@ class _KeyboardBrightnessReactorState
     if (focus == null || !focus.hasFocus || focus.context == null) return;
 
     // No live keyboard → nothing to refresh; the IME picks up the new
-    // brightness on its next attach.
-    final mq = MediaQuery.maybeOf(context);
-    if (mq == null || mq.viewInsets.bottom <= 0) return;
+    // brightness on its next attach. Read the root view's insets — inherited
+    // MediaQueries below the Cupertino scaffolds have the bottom inset
+    // consumed and always read 0.
+    if (!isKeyboardVisible(context)) return;
 
     // Toggle focus to close + reopen the input connection. The IME picks up
     // the new keyboardAppearance from the freshly-attached configuration.
+    // The owning view must keep the field mounted across this gap (see the
+    // deferred exit-editing checks in NoteDetailView / TaskDetailView) or
+    // the refocus lands on a detached node and silently no-ops.
     focus.unfocus(disposition: UnfocusDisposition.scope);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       focus.requestFocus();
-      // If the platform still dropped the implicit show that comes with the
-      // fresh connection, nudge it explicitly once the refocus has settled.
-      Future<void>.delayed(const Duration(milliseconds: 120), () {
-        if (!mounted || !focus.hasFocus) return;
+      _verifyKeyboardRestored(focus, retriesLeft: 2);
+    });
+  }
+
+  /// iOS can swallow the keyboard re-show if it lands while the dismissal
+  /// animation from the unfocus is still running. Check after the animation
+  /// window has passed and nudge the keyboard back if the focus survived but
+  /// the keyboard didn't.
+  void _verifyKeyboardRestored(FocusNode focus, {required int retriesLeft}) {
+    Future<void>.delayed(const Duration(milliseconds: 450), () {
+      if (!mounted || !focus.hasFocus) return;
+      if (isKeyboardVisible(context)) return;
+      final focusContext = focus.context;
+      final state =
+          focusContext is StatefulElement ? focusContext.state : null;
+      if (state is EditableTextState) {
+        // Re-shows the keyboard for the existing connection (or attaches a
+        // fresh one if it was lost) without touching focus.
+        state.requestKeyboard();
+      } else {
         SystemChannels.textInput.invokeMethod<void>('TextInput.show');
-      });
+      }
+      if (retriesLeft > 1) {
+        _verifyKeyboardRestored(focus, retriesLeft: retriesLeft - 1);
+      }
     });
   }
 }

@@ -18,6 +18,7 @@ import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/keyboard_insets.dart';
 import '../utils/reminder_picker.dart';
 import '../utils/selection_menu.dart';
 import '../utils/tap_offset.dart';
@@ -67,6 +68,14 @@ class _TaskDetailViewState extends State<TaskDetailView>
   bool _isEditingNote = false;
   Timer? _autosaveTimer;
 
+  // Deferred exit-editing check for the note field, mirroring
+  // NoteDetailView: when focus drops while the keyboard is still up, the
+  // focus was stolen (iOS shake-to-undo dialog, keyboard-appearance
+  // refresh) rather than dismissed — keep the editor mounted and restore
+  // focus instead of tearing the field down, which would detach its
+  // FocusNode and break the pending programmatic refocus.
+  Timer? _noteFocusRestoreTimer;
+
   // Single-flight guard for the async save: only one write runs at a time,
   // and any change arriving mid-write queues exactly one more pass with the
   // latest text, so writes stay ordered and trailing edits are never dropped.
@@ -95,12 +104,36 @@ class _TaskDetailViewState extends State<TaskDetailView>
 
   void _onNoteFocusChanged() {
     if (!mounted) return;
+    if (_noteFocus.hasFocus) {
+      _noteFocusRestoreTimer?.cancel();
+      _noteFocusRestoreTimer = null;
+      setState(() {});
+      return;
+    }
     // Losing note focus (keyboard dismissed, tab switch, tapping elsewhere)
     // must persist immediately — the debounce might not fire before the view
     // is torn down or the process is killed.
-    if (!_noteFocus.hasFocus) _flushSave();
-    setState(() {
-      if (!_noteFocus.hasFocus) _isEditingNote = false;
+    _flushSave();
+    // Keyboard already gone → a real dismissal; exit editing. Keyboard still
+    // up → the focus was stolen; defer the decision (see field comment).
+    if (!isKeyboardVisible(context)) {
+      setState(() => _isEditingNote = false);
+      return;
+    }
+    // No rebuild here: the field (and toolbar) stay rendered as-is until the
+    // deferred check decides between restore and exit.
+    _noteFocusRestoreTimer?.cancel();
+    _noteFocusRestoreTimer = Timer(const Duration(milliseconds: 350), () {
+      _noteFocusRestoreTimer = null;
+      if (!mounted || _noteFocus.hasFocus) return;
+      // Another editable took the focus (e.g. the title or a subtask row)
+      // — that's a deliberate move, leave it alone.
+      if (FocusManager.instance.primaryFocus is! FocusScopeNode) return;
+      if (isKeyboardVisible(context)) {
+        _noteFocus.requestFocus();
+        return;
+      }
+      setState(() => _isEditingNote = false);
     });
   }
 
@@ -217,6 +250,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
   void dispose() {
     _disposed = true;
     _autosaveTimer?.cancel();
+    _noteFocusRestoreTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     // Detach the change/focus listeners first so disposing the controllers
     // and focus node below can't re-enter the save path.
@@ -503,6 +537,10 @@ class _TaskDetailViewState extends State<TaskDetailView>
           // dispose() runs the final save, so the last typed word isn't lost.
           canPop: true,
           onPopInvokedWithResult: (didPop, _) {
+            // Cancel any pending "restore focus" check so it can't re-open
+            // the keyboard against the popped route.
+            _noteFocusRestoreTimer?.cancel();
+            _noteFocusRestoreTimer = null;
             _noteFocus.unfocus();
             FocusManager.instance.primaryFocus?.unfocus();
             _flushSave();

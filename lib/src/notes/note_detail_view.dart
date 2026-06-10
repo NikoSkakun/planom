@@ -13,6 +13,7 @@ import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
 import '../utils/emoji_text.dart';
 import '../utils/item_info_sheet.dart';
+import '../utils/keyboard_insets.dart';
 import '../utils/tap_offset.dart';
 import '../utils/undo_controller.dart';
 import 'markdown_toolbar.dart';
@@ -89,10 +90,15 @@ class _NoteDetailViewState extends State<NoteDetailView>
 
   // Deferred check that decides whether a focus drop should be treated as a
   // real "user dismissed the editor" event, or as a transient detach caused
-  // by iOS's system undo dialog (shake-to-undo + Cancel). The dialog steals
-  // first-responder briefly; if the keyboard is still up after the focus
-  // drop we restore focus so caret + markdown toolbar reappear.
+  // by iOS's system undo dialog (shake-to-undo + Cancel) or the app's own
+  // keyboard-appearance refresh (_KeyboardBrightnessReactor). Both steal the
+  // field's focus while the keyboard stays up; if it's still up after the
+  // focus drop we restore focus so caret + markdown toolbar reappear.
+  // Crucially, the editor widget must NOT be torn down in the meantime —
+  // removing the text field detaches its FocusNode and makes any pending
+  // programmatic refocus a silent no-op.
   Timer? _focusRestoreTimer;
+  FocusNode? _focusRestoreTarget;
 
   @override
   void initState() {
@@ -154,8 +160,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
       // Gaining focus (e.g. via the title's "Next" key, tapping the body, or
       // a programmatic requestFocus). The toolbar's visibility is tied to
       // hasFocus, so we need a rebuild to render it.
-      _focusRestoreTimer?.cancel();
-      _focusRestoreTimer = null;
+      _cancelFocusRestore();
       setState(() => _isEditing = true);
       return;
     }
@@ -164,45 +169,65 @@ class _NoteDetailViewState extends State<NoteDetailView>
     // not fire before the app is killed or this view is torn down.
     _flushSave();
 
-    // If the keyboard is still up at this moment the focus may have been
-    // stolen by iOS's shake-to-undo system dialog — tapping Cancel leaves
-    // the keyboard visible but our FocusNode in `hasFocus = false`, which
-    // would otherwise hide the caret + markdown toolbar. Defer the
-    // "exit editing" rebuild and re-check once the system dialog has had a
-    // chance to resolve; if the keyboard's still up we restore focus, else
-    // we treat it as a normal dismiss. In test environments (no platform
-    // keyboard) viewInsets is always zero so we take the immediate path and
-    // existing behaviour is preserved.
-    final keyboardUp = MediaQuery.viewInsetsOf(context).bottom > 0;
-    if (!keyboardUp) {
+    // If the keyboard is still up at this moment the focus was likely stolen
+    // out from under us — by iOS's shake-to-undo dialog, or by the
+    // keyboard-appearance refresh — rather than dismissed by the user. Keep
+    // the editor mounted and defer the exit-editing decision; tearing the
+    // field down right now would detach its FocusNode and break the
+    // programmatic refocus that's about to happen. In test environments
+    // (no platform keyboard) the insets are always zero so we take the
+    // immediate path and existing behaviour is preserved.
+    if (!isKeyboardVisible(context)) {
       setState(() => _isEditing = false);
       return;
     }
+    _scheduleFocusRestoreCheck(_contentFocus);
+  }
+
+  void _onTitleFocusChanged() {
+    if (!mounted) return;
+    if (_titleFocus.hasFocus) {
+      // Tapping the title cancels any pending "content lost focus due to a
+      // system dialog" check — the user has explicitly moved focus.
+      _cancelFocusRestore();
+      return;
+    }
+    _flushSave();
+    // Mirror the content field: with the keyboard still up the focus drop is
+    // a steal, not a dismissal — restore it. With the keyboard going away,
+    // let the deferred check flip the body back to preview mode if content
+    // focus isn't held either (otherwise _isEditing would stay latched on).
+    if (_isEditing && !_contentFocus.hasFocus) {
+      _scheduleFocusRestoreCheck(_titleFocus);
+    }
+  }
+
+  void _cancelFocusRestore() {
     _focusRestoreTimer?.cancel();
+    _focusRestoreTimer = null;
+    _focusRestoreTarget = null;
+  }
+
+  /// Arms a deferred check after [dropped] lost focus while the keyboard was
+  /// up. By the time it fires either (a) some field regained focus — nothing
+  /// to do; (b) the keyboard survived the drop (system dialog / appearance
+  /// refresh) — refocus [dropped]; or (c) the keyboard is gone — a real
+  /// dismissal, so exit editing mode.
+  void _scheduleFocusRestoreCheck(FocusNode dropped) {
+    _focusRestoreTimer?.cancel();
+    _focusRestoreTarget = dropped;
     _focusRestoreTimer = Timer(const Duration(milliseconds: 350), () {
       _focusRestoreTimer = null;
+      final target = _focusRestoreTarget;
+      _focusRestoreTarget = null;
       if (!mounted) return;
-      // Title gained focus in the meantime (user tapped title) — the
-      // keyboard staying up isn't a system-dialog signal in that case.
       if (_contentFocus.hasFocus || _titleFocus.hasFocus) return;
-      final stillUp = MediaQuery.viewInsetsOf(context).bottom > 0;
-      if (stillUp) {
-        _contentFocus.requestFocus();
+      if (isKeyboardVisible(context)) {
+        target?.requestFocus();
         return;
       }
       setState(() => _isEditing = false);
     });
-  }
-
-  void _onTitleFocusChanged() {
-    if (_titleFocus.hasFocus) {
-      // Tapping the title cancels any pending "content lost focus due to a
-      // system dialog" check — the user has explicitly moved focus.
-      _focusRestoreTimer?.cancel();
-      _focusRestoreTimer = null;
-      return;
-    }
-    _flushSave();
   }
 
   /// Called from [build] whenever the hosting tab's active state flips. When
@@ -606,8 +631,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
             // Cancel any pending "restore focus" check so a focus drop
             // racing with the pop doesn't re-open the keyboard against
             // a half-disposed view.
-            _focusRestoreTimer?.cancel();
-            _focusRestoreTimer = null;
+            _cancelFocusRestore();
             _titleFocus.unfocus();
             _contentFocus.unfocus();
             // Forcibly close the keyboard at the platform layer. If our
