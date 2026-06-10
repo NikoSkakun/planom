@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show ThemeMode;
+import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'calendar/event_controller.dart';
@@ -333,12 +334,15 @@ class _SecurityGateState extends State<_SecurityGate>
 /// refocused — the keyboardAppearance baked into the TextInputConfiguration
 /// is set once at attach time and the OS doesn't refresh a live keyboard.
 ///
-/// The refresh is gated to skip during app resume: after a background+resume
-/// (e.g. the user switched the OS theme in Settings), iOS won't let us
-/// programmatically bring the keyboard back after an unfocus until the user
-/// interacts with the field again. Without this gate the refresh dismisses
-/// the keyboard and is unable to restore it, which is a worse regression
-/// than the stale appearance it was trying to fix.
+/// Timing is the hard part. When the user toggles the OS theme from Settings
+/// and returns, the brightness change is usually delivered (and this widget
+/// rebuilt) BEFORE the `resumed` lifecycle event — and an unfocus/refocus run
+/// during that transition hides the keyboard for good, because iOS drops the
+/// programmatic re-show while the app isn't fully active. So instead of
+/// refreshing on the spot, the flip arms a deferred refresh that only fires
+/// once the app is firmly resumed plus a settle delay, with the focus dance
+/// followed by a belt-and-braces `TextInput.show` in case the platform still
+/// swallowed the implicit show.
 class _KeyboardBrightnessReactor extends StatefulWidget {
   const _KeyboardBrightnessReactor({required this.child});
 
@@ -352,12 +356,16 @@ class _KeyboardBrightnessReactor extends StatefulWidget {
 class _KeyboardBrightnessReactorState
     extends State<_KeyboardBrightnessReactor> with WidgetsBindingObserver {
   Brightness? _lastBrightness;
-  DateTime? _lastResumeAt;
+  Timer? _pendingRefresh;
 
-  /// Window after [AppLifecycleState.resumed] during which we ignore
-  /// brightness changes. Long enough to cover any stale-frame brightness
-  /// transitions caused by the resume itself.
-  static const Duration _postResumeQuietWindow = Duration(seconds: 2);
+  /// Set when a brightness flip arrives while the app isn't resumed (theme
+  /// switched in the background); the refresh is re-armed on the next resume.
+  bool _refreshWhenResumed = false;
+
+  /// Delay between (the later of) the brightness flip / app resume and the
+  /// focus dance, so the resume's own keyboard restore has finished and iOS
+  /// honours the re-show.
+  static const Duration _settleDelay = Duration(milliseconds: 800);
 
   @override
   void initState() {
@@ -367,14 +375,16 @@ class _KeyboardBrightnessReactorState
 
   @override
   void dispose() {
+    _pendingRefresh?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _lastResumeAt = DateTime.now();
+    if (state == AppLifecycleState.resumed && _refreshWhenResumed) {
+      _refreshWhenResumed = false;
+      _armRefresh();
     }
   }
 
@@ -382,25 +392,39 @@ class _KeyboardBrightnessReactorState
   Widget build(BuildContext context) {
     final brightness = CupertinoTheme.brightnessOf(context);
     if (_lastBrightness != null && _lastBrightness != brightness) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshKeyboard());
+      // Lifecycle ordering isn't guaranteed: on a background theme switch the
+      // brightness rebuild often lands while the app is still inactive. Defer
+      // to the resume handler in that case; refresh (after the settle delay)
+      // when the flip happens while already active.
+      if (WidgetsBinding.instance.lifecycleState ==
+          AppLifecycleState.resumed) {
+        _armRefresh();
+      } else {
+        _refreshWhenResumed = true;
+      }
     }
     _lastBrightness = brightness;
     return widget.child;
   }
 
+  void _armRefresh() {
+    _pendingRefresh?.cancel();
+    _pendingRefresh = Timer(_settleDelay, () {
+      _pendingRefresh = null;
+      if (!mounted) return;
+      // Backgrounded again before the timer fired — try again next resume.
+      if (WidgetsBinding.instance.lifecycleState !=
+          AppLifecycleState.resumed) {
+        _refreshWhenResumed = true;
+        return;
+      }
+      _refreshKeyboard();
+    });
+  }
+
   void _refreshKeyboard() {
     final focus = FocusManager.instance.primaryFocus;
-    if (focus == null || !focus.hasFocus) return;
-
-    // If the brightness flip is happening as part of an app-resume (e.g. the
-    // user came back from OS Settings after toggling Dark Mode), iOS will
-    // refuse to re-show the keyboard after our programmatic unfocus, leaving
-    // it permanently hidden. Skip the refresh in that window and let the
-    // normal next-attach pick up the new appearance.
-    if (_lastResumeAt != null &&
-        DateTime.now().difference(_lastResumeAt!) < _postResumeQuietWindow) {
-      return;
-    }
+    if (focus == null || !focus.hasFocus || focus.context == null) return;
 
     // No live keyboard → nothing to refresh; the IME picks up the new
     // brightness on its next attach.
@@ -413,6 +437,12 @@ class _KeyboardBrightnessReactorState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       focus.requestFocus();
+      // If the platform still dropped the implicit show that comes with the
+      // fresh connection, nudge it explicitly once the refocus has settled.
+      Future<void>.delayed(const Duration(milliseconds: 120), () {
+        if (!mounted || !focus.hasFocus) return;
+        SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+      });
     });
   }
 }
