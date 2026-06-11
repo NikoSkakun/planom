@@ -435,9 +435,12 @@ class _KeyboardBrightnessReactorState
 
     // Toggle focus to close + reopen the input connection. The IME picks up
     // the new keyboardAppearance from the freshly-attached configuration.
-    // The owning view must keep the field mounted across this gap (see the
-    // deferred exit-editing checks in NoteDetailView / TaskDetailView) or
-    // the refocus lands on a detached node and silently no-ops.
+    // Announce the refresh window first: the owning view keeps its field
+    // mounted across the gap only while KeyboardAppearanceRefresh.isActive
+    // (see NoteDetailView / TaskDetailView) — otherwise the focus drop would
+    // be treated as a user dismissal and the field torn down, detaching the
+    // node and turning the refocus into a silent no-op.
+    KeyboardAppearanceRefresh.begin();
     focus.unfocus(disposition: UnfocusDisposition.scope);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -452,8 +455,15 @@ class _KeyboardBrightnessReactorState
   /// the keyboard didn't.
   void _verifyKeyboardRestored(FocusNode focus, {required int retriesLeft}) {
     Future<void>.delayed(const Duration(milliseconds: 450), () {
-      if (!mounted || !focus.hasFocus) return;
-      if (isKeyboardVisible(context)) return;
+      if (!mounted || !focus.hasFocus) {
+        KeyboardAppearanceRefresh.end();
+        return;
+      }
+      if (isKeyboardVisible(context)) {
+        // Keyboard is back in the new style — the refresh is complete.
+        KeyboardAppearanceRefresh.end();
+        return;
+      }
       final focusContext = focus.context;
       final state =
           focusContext is StatefulElement ? focusContext.state : null;
@@ -466,6 +476,8 @@ class _KeyboardBrightnessReactorState
       }
       if (retriesLeft > 1) {
         _verifyKeyboardRestored(focus, retriesLeft: retriesLeft - 1);
+      } else {
+        KeyboardAppearanceRefresh.end();
       }
     });
   }
