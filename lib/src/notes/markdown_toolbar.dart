@@ -12,12 +12,19 @@ class MarkdownToolbar extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.onPromptLink,
+    this.onHideKeyboard,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final Future<({String text, String url})?> Function(String selectedText)
       onPromptLink;
+
+  /// Optional override for the trailing keyboard-down button. The owning view
+  /// uses it to flag the focus drop as user-initiated, so its focus listener
+  /// can distinguish a deliberate dismiss from an iOS-stolen focus (system
+  /// undo dialog) and tear the editor down only in the former case.
+  final VoidCallback? onHideKeyboard;
 
   void _wrap(String prefix, String suffix, {String placeholder = ''}) {
     final value = controller.value;
@@ -167,7 +174,7 @@ class MarkdownToolbar extends StatelessWidget {
               Container(width: 0.5, color: border),
               _ToolbarButton(
                 icon: CupertinoIcons.keyboard_chevron_compact_down,
-                onTap: () => focusNode.unfocus(),
+                onTap: onHideKeyboard ?? () => focusNode.unfocus(),
                 color: AppColors.accent,
               ),
             ],

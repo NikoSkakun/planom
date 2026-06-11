@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter/widgets.dart' show WidgetsBindingObserver, AppLifecycleState;
 
 import '../theme/app_theme.dart';
@@ -68,12 +69,17 @@ class _TaskDetailViewState extends State<TaskDetailView>
   bool _isEditingNote = false;
   Timer? _autosaveTimer;
 
-  // Safety net armed when note focus drops during the app's own
-  // keyboard-appearance refresh (KeyboardAppearanceRefresh.isActive),
-  // mirroring NoteDetailView: the editor must stay mounted across that gap
-  // or the reactor's refocus lands on a detached node. If the refocus never
-  // arrives, this timer exits editing mode.
+  // Deferred handling for note focus loss, mirroring NoteDetailView. See
+  // its block comment for the full reasoning. Three cases:
+  //   - User tapped the toolbar's hide-keyboard button → exit immediately.
+  //   - KeyboardAppearanceRefresh stole focus → short safety net.
+  //   - iOS shake-to-undo dialog stole focus → keep the field mounted (so
+  //     Undo can operate on its undo manager) and refocus once the
+  //     keyboard reappears (didChangeMetrics).
   Timer? _noteFocusRestoreTimer;
+  bool _userHidKeyboard = false;
+  bool _waitingForSystemDialog = false;
+  double _lastKeyboardInsetBottom = 0;
 
   // Single-flight guard for the async save: only one write runs at a time,
   // and any change arriving mid-write queues exactly one more pass with the
@@ -106,6 +112,8 @@ class _TaskDetailViewState extends State<TaskDetailView>
     if (_noteFocus.hasFocus) {
       _noteFocusRestoreTimer?.cancel();
       _noteFocusRestoreTimer = null;
+      _userHidKeyboard = false;
+      _waitingForSystemDialog = false;
       setState(() {});
       return;
     }
@@ -113,11 +121,18 @@ class _TaskDetailViewState extends State<TaskDetailView>
     // must persist immediately — the debounce might not fire before the view
     // is torn down or the process is killed.
     _flushSave();
-    // Only the app's own keyboard-appearance refresh may take the focus and
-    // bring it straight back — keep the editor mounted for it. Every other
-    // focus drop is a real dismissal: exit editing immediately and never
-    // auto-refocus (doing so re-opens a keyboard the user or a system
-    // dialog just dismissed).
+
+    // Hide-button tap: exit editing now; no system event will bring focus
+    // back.
+    if (_userHidKeyboard) {
+      _userHidKeyboard = false;
+      _noteFocusRestoreTimer?.cancel();
+      _noteFocusRestoreTimer = null;
+      setState(() => _isEditingNote = false);
+      return;
+    }
+
+    // Keyboard-appearance refresh window: short safety net.
     if (KeyboardAppearanceRefresh.isActive) {
       _noteFocusRestoreTimer?.cancel();
       _noteFocusRestoreTimer = Timer(const Duration(milliseconds: 1200), () {
@@ -127,7 +142,43 @@ class _TaskDetailViewState extends State<TaskDetailView>
       });
       return;
     }
-    setState(() => _isEditingNote = false);
+
+    // Probable iOS shake-undo dialog. Keep the field mounted so iOS's undo
+    // manager remains usable. didChangeMetrics will refocus when the
+    // keyboard returns; a long fallback covers the case where it never does.
+    _waitingForSystemDialog = true;
+    _noteFocusRestoreTimer?.cancel();
+    _noteFocusRestoreTimer = Timer(const Duration(seconds: 8), () {
+      _noteFocusRestoreTimer = null;
+      if (!mounted) return;
+      _waitingForSystemDialog = false;
+      if (_noteFocus.hasFocus) return;
+      SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+      setState(() => _isEditingNote = false);
+    });
+  }
+
+  void _hideNoteKeyboardViaToolbar() {
+    _userHidKeyboard = true;
+    _noteFocus.unfocus();
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    final bottom = View.of(context).viewInsets.bottom;
+    final wasDown = _lastKeyboardInsetBottom == 0;
+    final isUp = bottom > 0;
+    _lastKeyboardInsetBottom = bottom;
+    if (!_waitingForSystemDialog) return;
+    if (_noteFocus.hasFocus) return;
+    if (!(wasDown && isUp)) return;
+    // Keyboard came back without focus → system dialog dismissed. Refocus
+    // so the caret + toolbar return.
+    _waitingForSystemDialog = false;
+    _noteFocusRestoreTimer?.cancel();
+    _noteFocusRestoreTimer = null;
+    _noteFocus.requestFocus();
   }
 
   void _startEditingNote({int? cursorOffset}) {
@@ -722,6 +773,7 @@ class _TaskDetailViewState extends State<TaskDetailView>
             MarkdownToolbar(
               controller: _note,
               focusNode: _noteFocus,
+              onHideKeyboard: _hideNoteKeyboardViaToolbar,
               onPromptLink: (selected) =>
                   showLinkPromptDialog(context, initialText: selected),
             ),
