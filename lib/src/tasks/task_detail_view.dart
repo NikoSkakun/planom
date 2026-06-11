@@ -68,12 +68,11 @@ class _TaskDetailViewState extends State<TaskDetailView>
   bool _isEditingNote = false;
   Timer? _autosaveTimer;
 
-  // Deferred exit-editing check for the note field, mirroring
-  // NoteDetailView: when focus drops while the keyboard is still up, the
-  // focus was stolen (iOS shake-to-undo dialog, keyboard-appearance
-  // refresh) rather than dismissed — keep the editor mounted and restore
-  // focus instead of tearing the field down, which would detach its
-  // FocusNode and break the pending programmatic refocus.
+  // Safety net armed when note focus drops during the app's own
+  // keyboard-appearance refresh (KeyboardAppearanceRefresh.isActive),
+  // mirroring NoteDetailView: the editor must stay mounted across that gap
+  // or the reactor's refocus lands on a detached node. If the refocus never
+  // arrives, this timer exits editing mode.
   Timer? _noteFocusRestoreTimer;
 
   // Single-flight guard for the async save: only one write runs at a time,
@@ -114,27 +113,21 @@ class _TaskDetailViewState extends State<TaskDetailView>
     // must persist immediately — the debounce might not fire before the view
     // is torn down or the process is killed.
     _flushSave();
-    // Keyboard already gone → a real dismissal; exit editing. Keyboard still
-    // up → the focus was stolen; defer the decision (see field comment).
-    if (!isKeyboardVisible(context)) {
-      setState(() => _isEditingNote = false);
+    // Only the app's own keyboard-appearance refresh may take the focus and
+    // bring it straight back — keep the editor mounted for it. Every other
+    // focus drop is a real dismissal: exit editing immediately and never
+    // auto-refocus (doing so re-opens a keyboard the user or a system
+    // dialog just dismissed).
+    if (KeyboardAppearanceRefresh.isActive) {
+      _noteFocusRestoreTimer?.cancel();
+      _noteFocusRestoreTimer = Timer(const Duration(milliseconds: 1200), () {
+        _noteFocusRestoreTimer = null;
+        if (!mounted || _noteFocus.hasFocus) return;
+        setState(() => _isEditingNote = false);
+      });
       return;
     }
-    // No rebuild here: the field (and toolbar) stay rendered as-is until the
-    // deferred check decides between restore and exit.
-    _noteFocusRestoreTimer?.cancel();
-    _noteFocusRestoreTimer = Timer(const Duration(milliseconds: 350), () {
-      _noteFocusRestoreTimer = null;
-      if (!mounted || _noteFocus.hasFocus) return;
-      // Another editable took the focus (e.g. the title or a subtask row)
-      // — that's a deliberate move, leave it alone.
-      if (FocusManager.instance.primaryFocus is! FocusScopeNode) return;
-      if (isKeyboardVisible(context)) {
-        _noteFocus.requestFocus();
-        return;
-      }
-      setState(() => _isEditingNote = false);
-    });
+    setState(() => _isEditingNote = false);
   }
 
   void _startEditingNote({int? cursorOffset}) {

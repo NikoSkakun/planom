@@ -88,17 +88,13 @@ class _NoteDetailViewState extends State<NoteDetailView>
   EditableTextState? _contentEditableState;
   TextSelection? _lastContentSelection;
 
-  // Deferred check that decides whether a focus drop should be treated as a
-  // real "user dismissed the editor" event, or as a transient detach caused
-  // by iOS's system undo dialog (shake-to-undo + Cancel) or the app's own
-  // keyboard-appearance refresh (_KeyboardBrightnessReactor). Both steal the
-  // field's focus while the keyboard stays up; if it's still up after the
-  // focus drop we restore focus so caret + markdown toolbar reappear.
-  // Crucially, the editor widget must NOT be torn down in the meantime —
-  // removing the text field detaches its FocusNode and makes any pending
-  // programmatic refocus a silent no-op.
+  // Safety net armed when content focus drops during the app's own
+  // keyboard-appearance refresh (KeyboardAppearanceRefresh.isActive): the
+  // editor must stay mounted across that gap — tearing it down detaches the
+  // FocusNode and turns the reactor's refocus into a silent no-op. If the
+  // refocus never lands, this timer exits editing mode so the view can't
+  // stay latched in a focusless editing state.
   Timer? _focusRestoreTimer;
-  FocusNode? _focusRestoreTarget;
 
   @override
   void initState() {
@@ -169,63 +165,45 @@ class _NoteDetailViewState extends State<NoteDetailView>
     // not fire before the app is killed or this view is torn down.
     _flushSave();
 
-    // If the keyboard is still up at this moment the focus was likely stolen
-    // out from under us — by iOS's shake-to-undo dialog, or by the
-    // keyboard-appearance refresh — rather than dismissed by the user. Keep
-    // the editor mounted and defer the exit-editing decision; tearing the
-    // field down right now would detach its FocusNode and break the
-    // programmatic refocus that's about to happen. In test environments
-    // (no platform keyboard) the insets are always zero so we take the
-    // immediate path and existing behaviour is preserved.
-    if (!isKeyboardVisible(context)) {
-      setState(() => _isEditing = false);
+    // Only the app's own keyboard-appearance refresh is allowed to take the
+    // focus and bring it straight back — keep the editor mounted for it and
+    // arm a safety net in case its refocus never lands. EVERY other focus
+    // drop (hide-keyboard button, iOS shake-to-undo dialog stealing first
+    // responder, tap elsewhere) is a real dismissal: exit editing
+    // immediately and never auto-refocus, otherwise we'd re-open the
+    // keyboard the user (or the system dialog) just dismissed.
+    if (KeyboardAppearanceRefresh.isActive) {
+      _armRefreshSafetyNet();
       return;
     }
-    _scheduleFocusRestoreCheck(_contentFocus);
+    setState(() => _isEditing = false);
   }
 
   void _onTitleFocusChanged() {
     if (!mounted) return;
     if (_titleFocus.hasFocus) {
-      // Tapping the title cancels any pending "content lost focus due to a
-      // system dialog" check — the user has explicitly moved focus.
+      // The user explicitly moved focus to the title — any pending
+      // refresh-window safety net is moot.
       _cancelFocusRestore();
       return;
     }
     _flushSave();
-    // Mirror the content field: with the keyboard still up the focus drop is
-    // a steal, not a dismissal — restore it. With the keyboard going away,
-    // let the deferred check flip the body back to preview mode if content
-    // focus isn't held either (otherwise _isEditing would stay latched on).
-    if (_isEditing && !_contentFocus.hasFocus) {
-      _scheduleFocusRestoreCheck(_titleFocus);
-    }
   }
 
   void _cancelFocusRestore() {
     _focusRestoreTimer?.cancel();
     _focusRestoreTimer = null;
-    _focusRestoreTarget = null;
   }
 
-  /// Arms a deferred check after [dropped] lost focus while the keyboard was
-  /// up. By the time it fires either (a) some field regained focus — nothing
-  /// to do; (b) the keyboard survived the drop (system dialog / appearance
-  /// refresh) — refocus [dropped]; or (c) the keyboard is gone — a real
-  /// dismissal, so exit editing mode.
-  void _scheduleFocusRestoreCheck(FocusNode dropped) {
+  /// Keeps `_isEditing` latched while the keyboard-appearance refresh
+  /// round-trips, then exits editing mode if no field regained focus —
+  /// the refresh either failed or focus went elsewhere.
+  void _armRefreshSafetyNet() {
     _focusRestoreTimer?.cancel();
-    _focusRestoreTarget = dropped;
-    _focusRestoreTimer = Timer(const Duration(milliseconds: 350), () {
+    _focusRestoreTimer = Timer(const Duration(milliseconds: 1200), () {
       _focusRestoreTimer = null;
-      final target = _focusRestoreTarget;
-      _focusRestoreTarget = null;
       if (!mounted) return;
       if (_contentFocus.hasFocus || _titleFocus.hasFocus) return;
-      if (isKeyboardVisible(context)) {
-        target?.requestFocus();
-        return;
-      }
       setState(() => _isEditing = false);
     });
   }
