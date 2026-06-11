@@ -88,13 +88,30 @@ class _NoteDetailViewState extends State<NoteDetailView>
   EditableTextState? _contentEditableState;
   TextSelection? _lastContentSelection;
 
-  // Safety net armed when content focus drops during the app's own
-  // keyboard-appearance refresh (KeyboardAppearanceRefresh.isActive): the
-  // editor must stay mounted across that gap — tearing it down detaches the
-  // FocusNode and turns the reactor's refocus into a silent no-op. If the
-  // refocus never lands, this timer exits editing mode so the view can't
-  // stay latched in a focusless editing state.
+  // Two-mode deferred handling for content focus loss.
+  //
+  // The CupertinoTextField is unmounted when [_isEditing] flips to false
+  // (the body re-renders as a preview / placeholder), and tearing it down
+  // destroys the underlying iOS UITextField — which would take its undo
+  // manager with it. We therefore CANNOT exit editing mode on every focus
+  // drop; we have to recognise the cases where focus will (or might) come
+  // back and keep the field mounted across the gap.
+  //
+  // Cases:
+  // 1. User tapped the toolbar's hide-keyboard button → [_userHidKeyboard]
+  //    is set true around the focusNode.unfocus() call. The listener sees
+  //    the flag and exits editing immediately — no field needed afterwards.
+  // 2. _KeyboardBrightnessReactor refresh → handled by
+  //    KeyboardAppearanceRefresh.isActive + the safety net timer below.
+  // 3. iOS shake-to-undo dialog → the system resigns the field's first
+  //    responder; tapping Cancel/Undo restores the keyboard, but the
+  //    Flutter focus has been lost. We keep the field mounted so iOS's
+  //    Undo can still operate on its undo manager, then refocus when
+  //    didChangeMetrics reports the keyboard coming back.
   Timer? _focusRestoreTimer;
+  bool _userHidKeyboard = false;
+  bool _waitingForSystemDialog = false;
+  double _lastKeyboardInsetBottom = 0;
 
   @override
   void initState() {
@@ -157,6 +174,8 @@ class _NoteDetailViewState extends State<NoteDetailView>
       // a programmatic requestFocus). The toolbar's visibility is tied to
       // hasFocus, so we need a rebuild to render it.
       _cancelFocusRestore();
+      _userHidKeyboard = false;
+      _waitingForSystemDialog = false;
       setState(() => _isEditing = true);
       return;
     }
@@ -165,29 +184,61 @@ class _NoteDetailViewState extends State<NoteDetailView>
     // not fire before the app is killed or this view is torn down.
     _flushSave();
 
-    // Only the app's own keyboard-appearance refresh is allowed to take the
-    // focus and bring it straight back — keep the editor mounted for it and
-    // arm a safety net in case its refocus never lands. EVERY other focus
-    // drop (hide-keyboard button, iOS shake-to-undo dialog stealing first
-    // responder, tap elsewhere) is a real dismissal: exit editing
-    // immediately and never auto-refocus, otherwise we'd re-open the
-    // keyboard the user (or the system dialog) just dismissed.
+    // Case 1: user tapped the toolbar's hide-keyboard button. Exit editing
+    // immediately; no system event will bring focus back.
+    if (_userHidKeyboard) {
+      _userHidKeyboard = false;
+      _cancelFocusRestore();
+      setState(() => _isEditing = false);
+      return;
+    }
+
+    // Case 2: the app's own keyboard-appearance refresh stole the focus and
+    // will refocus very soon. Keep the editor mounted across that gap with
+    // a short safety net.
     if (KeyboardAppearanceRefresh.isActive) {
       _armRefreshSafetyNet();
       return;
     }
-    setState(() => _isEditing = false);
+
+    // Case 3: iOS likely just resigned the field's first responder to show
+    // the shake-to-undo dialog (or some other system overlay). Keep the
+    // field mounted so iOS's undo manager remains operative on Undo, and
+    // wait for the keyboard to come back (signalling the dialog has
+    // dismissed) — at that point we refocus so the caret + toolbar return.
+    // Fallback timer covers the case where the keyboard never returns
+    // (e.g. shake-to-undo is disabled and the focus drop happened for some
+    // other reason).
+    _waitingForSystemDialog = true;
+    _focusRestoreTimer?.cancel();
+    _focusRestoreTimer = Timer(const Duration(seconds: 8), () {
+      _focusRestoreTimer = null;
+      if (!mounted) return;
+      _waitingForSystemDialog = false;
+      if (_contentFocus.hasFocus || _titleFocus.hasFocus) return;
+      // Force-dismiss any lingering keyboard so the resting state matches
+      // editing being off (no caret + no toolbar shouldn't share the screen
+      // with an open keyboard).
+      SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+      setState(() => _isEditing = false);
+    });
   }
 
   void _onTitleFocusChanged() {
     if (!mounted) return;
     if (_titleFocus.hasFocus) {
       // The user explicitly moved focus to the title — any pending
-      // refresh-window safety net is moot.
+      // post-focus-drop check on the content field is moot.
       _cancelFocusRestore();
+      _waitingForSystemDialog = false;
       return;
     }
     _flushSave();
+  }
+
+  void _hideKeyboardViaToolbar() {
+    _userHidKeyboard = true;
+    _contentFocus.unfocus();
   }
 
   void _cancelFocusRestore() {
@@ -208,6 +259,28 @@ class _NoteDetailViewState extends State<NoteDetailView>
     });
   }
 
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    final bottom = View.of(context).viewInsets.bottom;
+    final wasDown = _lastKeyboardInsetBottom == 0;
+    final isUp = bottom > 0;
+    _lastKeyboardInsetBottom = bottom;
+
+    if (!_waitingForSystemDialog) return;
+    if (_contentFocus.hasFocus || _titleFocus.hasFocus) return;
+    if (!(wasDown && isUp)) return;
+
+    // The keyboard reappeared without us regaining focus — that's the
+    // system shake-undo dialog dismissing (Cancel or Undo). Restore focus
+    // so the caret + markdown toolbar come back and the user can continue
+    // typing where they left off.
+    _waitingForSystemDialog = false;
+    _focusRestoreTimer?.cancel();
+    _focusRestoreTimer = null;
+    _contentFocus.requestFocus();
+  }
+
   /// Called from [build] whenever the hosting tab's active state flips. When
   /// the tab goes offstage (the user switched to another tab), commit any
   /// pending text and drop focus, so the keyboard's input connection is torn
@@ -223,9 +296,20 @@ class _NoteDetailViewState extends State<NoteDetailView>
     // the offstage transition is mid-build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // Mark the focus drops as deliberate so the listener takes the
+      // immediate-exit path, skipping the system-dialog wait.
+      _userHidKeyboard = true;
       _titleFocus.unfocus();
       _contentFocus.unfocus();
       _flushSave();
+      // The listener may not fire if focus was already false — force the
+      // exit transition so the body re-renders as preview and a fresh
+      // editor is reopened on the user's next tap.
+      _waitingForSystemDialog = false;
+      _focusRestoreTimer?.cancel();
+      _focusRestoreTimer = null;
+      _userHidKeyboard = false;
+      if (_isEditing) setState(() => _isEditing = false);
     });
   }
 
@@ -706,6 +790,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
                   MarkdownToolbar(
                     controller: _content,
                     focusNode: _contentFocus,
+                    onHideKeyboard: _hideKeyboardViaToolbar,
                     onPromptLink: (selected) =>
                         showLinkPromptDialog(context, initialText: selected),
                   ),
