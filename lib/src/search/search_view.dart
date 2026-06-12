@@ -122,7 +122,7 @@ class _SearchViewState extends State<SearchView> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: CupertinoSearchTextField(
                 controller: _ctrl,
-                placeholder: s.searchPlaceholder,
+                placeholder: s.search,
                 autofocus: true,
               ),
             ),

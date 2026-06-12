@@ -72,7 +72,7 @@ void main() {
     await pumpScope(tester);
     expect(barHeight(tester), 0);
     await latchBar(tester);
-    expect(find.text('Search tasks, notes, events'), findsOneWidget);
+    expect(find.text('Search'), findsOneWidget);
   });
 
   testWidgets('release mid-pull continues the reveal without waiting',
