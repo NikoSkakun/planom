@@ -145,7 +145,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // the user is on light, dark, or system-following mode.
         final scaffoldColor = _scaffoldBackgroundColor(prefs, _minuteOfDay);
         final fontColor = _fontColor(prefs, _minuteOfDay);
-        final barColor = _barBackgroundColor(prefs);
+        final barColor = _barBackgroundColor(prefs, _minuteOfDay);
 
         return CupertinoApp(
           restorationScopeId: 'app',
@@ -266,16 +266,23 @@ Color? _fontColor(AppearancePrefs prefs, int minute) {
   );
 }
 
-/// Nav/tab bar background. Stays the opaque system background unless a custom
-/// app background is active, in which case it becomes a frosted translucent
-/// bar so the background shows through with the standard iOS blur.
-Color _barBackgroundColor(AppearancePrefs prefs) {
-  final custom = prefs.light.backgroundMode != BackgroundMode.defaultBg ||
-      prefs.dark.backgroundMode != BackgroundMode.defaultBg;
-  if (!custom) return CupertinoColors.systemBackground;
-  return const CupertinoDynamicColor.withBrightness(
-    color: Color(0xCCF8F8F8),
-    darkColor: Color(0xCC1C1C1E),
+/// Nav/tab bar background. Matches the scaffold background — the default
+/// (white / dark-gray) or the custom solid/dynamic color — so scrolling
+/// content under the header doesn't reveal a contrasting band. Image
+/// backgrounds keep a frosted translucent bar so the image shows through
+/// with the standard iOS blur.
+Color _barBackgroundColor(AppearancePrefs prefs, int minute) {
+  Color side(ThemeAppearance a,
+      {required Color frosted, required Color fallback}) {
+    if (a.backgroundMode == BackgroundMode.image) return frosted;
+    return a.backgroundColorAt(minute) ?? fallback;
+  }
+
+  return CupertinoDynamicColor.withBrightness(
+    color: side(prefs.light,
+        frosted: const Color(0xCCF8F8F8), fallback: const Color(0xFFFFFFFF)),
+    darkColor: side(prefs.dark,
+        frosted: const Color(0xCC1C1C1E), fallback: const Color(0xFF1C1C1E)),
   );
 }
 
