@@ -36,8 +36,15 @@ class SearchPullScope extends StatefulWidget {
 
 class _SearchPullScopeState extends State<SearchPullScope>
     with SingleTickerProviderStateMixin {
-  /// Pixels of overscroll required to fully reveal the bar.
+  /// Pixels of swipe required to fully collapse (or re-grow) the bar, and
+  /// the raw overscroll distance on clamping-physics platforms.
   static const double _revealDistance = 56.0;
+
+  /// Overscroll pixels required to fully reveal the bar on iOS-style
+  /// bouncing physics. BouncingScrollPhysics attenuates the drag to about
+  /// half once past the edge, so a smaller threshold keeps the *finger
+  /// travel* of the reveal swipe the same as the dismissal swipe.
+  static const double _pullRevealDistance = 28.0;
 
   /// Full height of the revealed bar (vertical margins + the 36 px
   /// intrinsic height of a stock [CupertinoSearchTextField]).
@@ -163,7 +170,7 @@ class _SearchPullScopeState extends State<SearchPullScope>
           // the pull back shrinks the bar exactly the way it grew.
           _pulling = true;
           _accumulated = minExtent - pixels;
-          _ctrl.value = (_accumulated / _revealDistance).clamp(0.0, 1.0);
+          _ctrl.value = (_accumulated / _pullRevealDistance).clamp(0.0, 1.0);
         } else if (_pulling && !finger) {
           // First ballistic frame after the release: settle right away —
           // waiting for ScrollEnd would freeze the bar until the
@@ -299,7 +306,7 @@ class _SearchPullScopeState extends State<SearchPullScope>
                               const SizedBox(width: 5.5),
                               Expanded(
                                 child: Text(
-                                  s.searchPlaceholder,
+                                  s.search,
                                   maxLines: 1,
                                   overflow: TextOverflow.clip,
                                   style: placeholderStyle,
