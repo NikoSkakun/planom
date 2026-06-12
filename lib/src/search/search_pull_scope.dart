@@ -214,54 +214,50 @@ class _SearchPullScopeState extends State<SearchPullScope>
             .clamp(0.0, 1.0);
         return Column(
           children: [
-            // The bar keeps its full intrinsic layout at all times and is
-            // bottom-anchored inside a clipped, growing strip — it slides
-            // into place instead of being squashed while it appears.
+            // The pill stretches vertically with the pull (and squashes
+            // back on dismissal); only the icon + placeholder wait for
+            // enough space before fading in.
             ClipRect(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                heightFactor: reveal,
-                child: SizedBox(
-                  height: _barHeight,
-                  child: Opacity(
-                    opacity: reveal,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: _openSearch,
-                        onVerticalDragUpdate: _onBarDragUpdate,
-                        onVerticalDragEnd: _onBarDragEnd,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: CupertinoColors.tertiarySystemFill
-                                .resolveFrom(context),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 12),
-                          alignment: Alignment.centerLeft,
-                          child: Opacity(
-                            opacity: contentOpacity,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  CupertinoIcons.search,
-                                  size: 16,
+              child: SizedBox(
+                height: _barHeight * reveal,
+                child: Opacity(
+                  opacity: reveal,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _openSearch,
+                      onVerticalDragUpdate: _onBarDragUpdate,
+                      onVerticalDragEnd: _onBarDragEnd,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: CupertinoColors.tertiarySystemFill
+                              .resolveFrom(context),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                        alignment: Alignment.centerLeft,
+                        child: Opacity(
+                          opacity: contentOpacity,
+                          child: Row(
+                            children: [
+                              Icon(
+                                CupertinoIcons.search,
+                                size: 16,
+                                color: CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                s.searchPlaceholder,
+                                style: TextStyle(
+                                  fontSize: 15,
                                   color: CupertinoColors.secondaryLabel
                                       .resolveFrom(context),
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  s.searchPlaceholder,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: CupertinoColors.secondaryLabel
-                                        .resolveFrom(context),
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
