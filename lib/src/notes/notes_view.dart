@@ -834,7 +834,10 @@ class _NotesViewState extends State<NotesView> with DropdownOverlayMixin {
               ),
             Positioned(
               right: 20,
-              bottom: 16,
+              // 12 — not 16 — so the button lines up with the global plus
+              // button that HomeShell shows on the other tabs (50 px bar +
+              // safe area + 12).
+              bottom: 12,
               child: NoteOrangeAddButton(
                 onPressed: () {
                   // Stable placeholder (see onAddNote above): created outside
