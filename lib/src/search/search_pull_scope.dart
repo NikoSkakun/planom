@@ -39,6 +39,15 @@ class _SearchPullScopeState extends State<SearchPullScope>
   /// Pixels of overscroll required to fully reveal the bar.
   static const double _revealDistance = 56.0;
 
+  /// Full height of the revealed bar (including outer padding).
+  static const double _barHeight = 48.0;
+
+  /// Reveal fraction below which the icon + placeholder stay invisible.
+  /// They fade in only over the last stretch of the reveal, once the bar
+  /// is tall enough to show them without clipping — and fade out first
+  /// on the way back.
+  static const double _contentFadeStart = 0.6;
+
   late final AnimationController _ctrl = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 220),
@@ -49,10 +58,10 @@ class _SearchPullScopeState extends State<SearchPullScope>
   // until they dismiss the bar by swiping the list up or by opening the
   // search screen.
   bool _locked = false;
-  // True while a user-initiated drag is in flight. We use this to tell a
-  // genuine upward swipe (which should dismiss the bar) apart from the
-  // ballistic bounce-back that runs after a pull release.
-  bool _userDragging = false;
+  // True once a latched bar has started collapsing under an upward swipe.
+  // Lets the fling's ballistic follow-through keep collapsing the bar and
+  // tells ScrollEnd to settle the dismissal instead of re-latching.
+  bool _dismissing = false;
 
   @override
   void dispose() {
@@ -64,12 +73,12 @@ class _SearchPullScopeState extends State<SearchPullScope>
     if (_opening) return false;
     if (n.metrics.axis != Axis.vertical) return false;
 
+    // dragDetails is non-null only for finger-driven scrolls; ballistic
+    // simulations leave it null. That distinction is what lets a real
+    // upward swipe collapse the latched bar while the bounce-back after a
+    // pull-release does not.
     if (n is ScrollStartNotification) {
-      // dragDetails is non-null only for finger-driven scrolls; ballistic
-      // simulations leave it null. That distinction is exactly what lets a
-      // real upward swipe dismiss the latched bar while the bounce-back
-      // after a pull-release does not.
-      _userDragging = n.dragDetails != null;
+      _dismissing = false;
     } else if (n is OverscrollNotification) {
       // ClampingScrollPhysics: scrolling past the boundary emits an
       // OverscrollNotification with negative overscroll at the top.
@@ -86,31 +95,58 @@ class _SearchPullScopeState extends State<SearchPullScope>
       final minExtent = n.metrics.minScrollExtent;
       if (pixels < minExtent) {
         _accumulated = minExtent - pixels;
-        // Only grow the reveal during a pull — never let an in-flight bounce
-        // back collapse the bar that the user already revealed.
         final next = (_accumulated / _revealDistance).clamp(0.0, 1.0);
-        if (next > _ctrl.value) _ctrl.value = next;
+        if (!_locked && n.dragDetails != null) {
+          // Finger-driven pull: track it in both directions, so easing
+          // the pull back shrinks the bar exactly the way it grew.
+          _ctrl.value = next;
+        } else if (next > _ctrl.value) {
+          // Ballistic bounce-back after release: only grow — never let it
+          // collapse the bar the user already revealed.
+          _ctrl.value = next;
+        }
       } else if (pixels > minExtent && _ctrl.value > 0) {
-        // The bar is visible and the list has scrolled past the top. If
-        // this is an unlatched in-progress reveal, dismiss it on any
-        // forward scroll. If the bar is latched, only dismiss when the
-        // scroll is finger-driven (a real upward swipe) — the ballistic
-        // bounce after release is not.
-        if (!_locked || _userDragging) {
+        // The bar is visible and the list has scrolled past the top.
+        final delta = n.scrollDelta ?? 0;
+        if (_locked && delta > 0 && (n.dragDetails != null || _dismissing)) {
+          // Upward swipe on a latched bar: collapse it in step with the
+          // scroll — the reverse of the pull that revealed it. Once the
+          // dismissal has begun, the fling's ballistic follow-through
+          // keeps collapsing it too.
+          _dismissing = true;
+          _ctrl.value =
+              (_ctrl.value - delta / _revealDistance).clamp(0.0, 1.0);
+          if (_ctrl.value == 0) {
+            _accumulated = 0;
+            _locked = false;
+            _dismissing = false;
+          }
+        } else if (!_locked) {
+          // Unlatched in-progress reveal: dismiss on any forward scroll.
           _accumulated = 0;
-          _locked = false;
           _ctrl.reverse();
         }
       }
     } else if (n is ScrollEndNotification) {
-      _userDragging = false;
-      // Pull-and-release: latch the bar fully open once the user has
-      // committed to revealing it (≥ 30 % of the threshold). Matches the
-      // Mail / Notes / TickTick pattern where the search bar stays put
-      // after a pull and waits for an explicit upward swipe (or a tap on
-      // the bar) to disappear. Anything less is treated as an accidental
-      // tug and snaps back.
-      if (_ctrl.value >= 0.3) {
+      if (_dismissing) {
+        // Finger lifted mid-dismissal: settle the bar the same way a drag
+        // on the bar itself does — mostly collapsed snaps shut, otherwise
+        // it springs back open.
+        _dismissing = false;
+        if (_ctrl.value < 0.5) {
+          _accumulated = 0;
+          _locked = false;
+          _ctrl.reverse();
+        } else {
+          _ctrl.forward();
+        }
+      } else if (_ctrl.value >= 0.3) {
+        // Pull-and-release: latch the bar fully open once the user has
+        // committed to revealing it (≥ 30 % of the threshold). Matches the
+        // Mail / Notes / TickTick pattern where the search bar stays put
+        // after a pull and waits for an explicit upward swipe (or a tap on
+        // the bar) to disappear. Anything less is treated as an accidental
+        // tug and snaps back.
         _locked = true;
         _ctrl.forward();
       } else if (_ctrl.value > 0 && !_locked) {
@@ -171,46 +207,62 @@ class _SearchPullScopeState extends State<SearchPullScope>
       animation: _ctrl,
       builder: (context, _) {
         final reveal = _ctrl.value;
+        // The icon + placeholder only fade in once the bar is tall enough
+        // to show them fully; until then the empty pill slides into view.
+        final contentOpacity = ((reveal - _contentFadeStart) /
+                (1.0 - _contentFadeStart))
+            .clamp(0.0, 1.0);
         return Column(
           children: [
+            // The bar keeps its full intrinsic layout at all times and is
+            // bottom-anchored inside a clipped, growing strip — it slides
+            // into place instead of being squashed while it appears.
             ClipRect(
-              child: SizedBox(
-                height: 48 * reveal,
-                child: Opacity(
-                  opacity: reveal,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _openSearch,
-                      onVerticalDragUpdate: _onBarDragUpdate,
-                      onVerticalDragEnd: _onBarDragEnd,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: CupertinoColors.tertiarySystemFill
-                              .resolveFrom(context),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        child: Row(
-                          children: [
-                            Icon(
-                              CupertinoIcons.search,
-                              size: 16,
-                              color: CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                heightFactor: reveal,
+                child: SizedBox(
+                  height: _barHeight,
+                  child: Opacity(
+                    opacity: reveal,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _openSearch,
+                        onVerticalDragUpdate: _onBarDragUpdate,
+                        onVerticalDragEnd: _onBarDragEnd,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.tertiarySystemFill
+                                .resolveFrom(context),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 12),
+                          alignment: Alignment.centerLeft,
+                          child: Opacity(
+                            opacity: contentOpacity,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  CupertinoIcons.search,
+                                  size: 16,
+                                  color: CupertinoColors.secondaryLabel
+                                      .resolveFrom(context),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  s.searchPlaceholder,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: CupertinoColors.secondaryLabel
+                                        .resolveFrom(context),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              s.searchPlaceholder,
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
