@@ -743,7 +743,9 @@ class _NoteFolderViewState extends State<NoteFolderView>
               ),
             Positioned(
               right: 20,
-              bottom: 16,
+              // 12 matches the global plus button on the other tabs (see
+              // notes_view.dart).
+              bottom: 12,
               child: NoteOrangeAddButton(
                 onPressed: () {
                   // Stable placeholder (see onAddNote above): created outside
