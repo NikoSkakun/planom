@@ -101,7 +101,7 @@ class TabItem {
 class TabBarConfig {
   TabBarConfig({required this.pages});
 
-  static const int maxItemsPerPage = 5;
+  static const int maxItemsPerPage = 7;
 
   /// Default config = single page mirroring the historical 5 built-in tabs.
   factory TabBarConfig.defaultLayout() => TabBarConfig(pages: [
