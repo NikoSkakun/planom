@@ -283,8 +283,12 @@ class _SearchPullScopeState extends State<SearchPullScope>
                           child: Row(
                             children: [
                               Padding(
-                                padding: const EdgeInsetsDirectional.fromSTEB(
-                                    6, 0, 0, 3),
+                                // The real field's prefixInsets carry a 3 px
+                                // bottom offset that compensates for the
+                                // editable text's metrics; a plain Text has
+                                // none, so the icon centers without it.
+                                padding: const EdgeInsetsDirectional.only(
+                                    start: 6),
                                 child: Icon(
                                   CupertinoIcons.search,
                                   size: 20,
