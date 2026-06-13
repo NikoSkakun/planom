@@ -218,6 +218,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
           showCreateFolderListSheet(
             context,
             widget.folderController,
+            showTypeSwitcher: false,
           );
         },
         onAddFolder: () {
@@ -226,6 +227,7 @@ class _TasksViewState extends State<TasksView> with DropdownOverlayMixin {
             context,
             widget.folderController,
             initialType: CreateSheetInitial.folder,
+            showTypeSwitcher: false,
           );
         },
         onDefaultList: showDefaultList
