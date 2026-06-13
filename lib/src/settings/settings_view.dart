@@ -105,10 +105,10 @@ class _SettingsViewState extends State<SettingsView> {
                   if (!show || widget.onClose == null) {
                     return const SizedBox.shrink();
                   }
-                  return CupertinoButton(
-                    padding: EdgeInsets.zero,
+                  // Native back button (standard chevron + alignment); the
+                  // custom onPressed leaves the overlay instead of popping.
+                  return CupertinoNavigationBarBackButton(
                     onPressed: widget.onClose,
-                    child: const Icon(CupertinoIcons.chevron_back, size: 28),
                   );
                 },
               ),

@@ -1220,9 +1220,14 @@ class _HomeShellState extends State<HomeShell> {
           return const SizedBox.shrink();
         }
         final double left = isWide ? (hideLabels ? 72.0 : 200.0) : 0.0;
-        final double bottom = (!isWide && hasBottomBar)
-            ? 50 + MediaQuery.paddingOf(context).bottom
-            : 0.0;
+        final hasBar = !isWide && hasBottomBar;
+        final double bottom =
+            hasBar ? 50 + MediaQuery.paddingOf(context).bottom : 0.0;
+        final overlay = CupertinoTabView(
+          navigatorKey: _navigatorKeys[4],
+          navigatorObservers: [_depthObservers[4]],
+          builder: (ctx) => _tabContent(ctx, 4),
+        );
         return Positioned(
           left: left,
           top: 0,
@@ -1233,11 +1238,17 @@ class _HomeShellState extends State<HomeShell> {
             onPopInvokedWithResult: (didPop, _) {
               if (!didPop) _handleSettingsOverlayBack();
             },
-            child: CupertinoTabView(
-              navigatorKey: _navigatorKeys[4],
-              navigatorObservers: [_depthObservers[4]],
-              builder: (ctx) => _tabContent(ctx, 4),
-            ),
+            // The overlay already sits above the tab bar, which owns the
+            // bottom safe-area inset. Zero out the inset inside so the
+            // Settings page's own SafeArea doesn't add a second one — that
+            // double-count left a white gap between the content and the bar.
+            child: hasBar
+                ? MediaQuery.removePadding(
+                    context: context,
+                    removeBottom: true,
+                    child: overlay,
+                  )
+                : overlay,
           ),
         );
       },
