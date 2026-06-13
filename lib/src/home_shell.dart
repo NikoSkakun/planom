@@ -118,9 +118,13 @@ class _HomeShellState extends State<HomeShell> {
   final _plusDragController = PlusDragController();
   // True while the user is viewing Settings via the global overlay (i.e. the
   // Settings tab is hidden but they opened Settings from another tab's ⋯
-  // menu). The tab bar repaints all tabs as inactive while this is true.
+  // menu, or hid the Settings tab while in it). The overlay is rendered
+  // inside the shell's Stack — above the tab content but leaving the tab bar
+  // (or the wide-layout sidebar) visible — and the bar repaints all tabs as
+  // inactive while this is true. It reuses the Settings tab's navigator
+  // (`_navigatorKeys[4]`) so hiding the tab while in Settings reparents the
+  // live navigator with no rebuild / transition.
   final ValueNotifier<bool> _globalSettingsOpen = ValueNotifier<bool>(false);
-  Route<void>? _globalSettingsRoute;
   int _lastTabIndex = 0;
   // Which page of the multi-page tab bar is currently visible. Swiping
   // horizontally on the tab bar moves between pages.
@@ -142,22 +146,33 @@ class _HomeShellState extends State<HomeShell> {
 
   void _openGlobalSettings() {
     if (_globalSettingsOpen.value) return;
-    final route = FastRoute<void>(
-      builder: (_) => SettingsView(
-        controller: widget.settingsController,
-        backupService: widget.backupService,
-        securityService: widget.securityService,
-        googleCalendarController: widget.googleCalendarController,
-        deviceCalendarController: widget.deviceCalendarController,
-      ),
-    );
-    _globalSettingsRoute = route;
+    // No route push: the overlay is part of the shell's Stack (built when
+    // `_globalSettingsOpen` is true), so the tab bar / sidebar stays visible
+    // and there's no full-screen transition. The Settings tab navigator
+    // (`_navigatorKeys[4]`) is built fresh here since the tab is hidden.
     _globalSettingsOpen.value = true;
-    Navigator.of(context, rootNavigator: true).push(route).then((_) {
-      if (!mounted) return;
-      _globalSettingsRoute = null;
-      _globalSettingsOpen.value = false;
-    });
+    _showPlusButton.value = false;
+    if (mounted) setState(() {});
+  }
+
+  void _closeGlobalSettings() {
+    if (!_globalSettingsOpen.value) return;
+    _globalSettingsOpen.value = false;
+    // Reset the Settings stack so the next open starts at the root page.
+    _navigatorKeys[4].currentState?.popUntil((r) => r.isFirst);
+    _refreshPlusForTab(_lastTabIndex);
+    if (mounted) setState(() {});
+  }
+
+  /// Android system-back / predictive-back while the Settings overlay is open:
+  /// pop within Settings if it has sub-pages, otherwise leave the overlay.
+  void _handleSettingsOverlayBack() {
+    final nav = _navigatorKeys[4].currentState;
+    if (nav != null && nav.canPop()) {
+      nav.pop();
+    } else {
+      _closeGlobalSettings();
+    }
   }
 
   // ── Split Screen ──────────────────────────────────────────────────────────
@@ -575,13 +590,10 @@ class _HomeShellState extends State<HomeShell> {
     final visibleIndices = _computeVisibleIndices();
 
     // Settings tab just became visible while the user is viewing Settings via
-    // the global overlay → silently promote the overlay to the real tab.
+    // the global overlay → silently promote the overlay to the real tab. The
+    // Settings navigator (`_navigatorKeys[4]`) reparents from the overlay back
+    // into the tab scaffold with its stack intact.
     if (_globalSettingsOpen.value && visibleIndices.contains(4)) {
-      final route = _globalSettingsRoute;
-      _globalSettingsRoute = null;
-      if (route != null) {
-        Navigator.of(context, rootNavigator: true).removeRoute(route);
-      }
       _globalSettingsOpen.value = false;
       _lastTabIndex = 4;
       _tabController.index = _visualForBuiltin(4);
@@ -604,6 +616,16 @@ class _HomeShellState extends State<HomeShell> {
     final fallback = visibleIndices.contains(0) ? 0 : visibleIndices.first;
     _lastTabIndex = fallback;
     _tabController.index = _visualForBuiltin(fallback);
+    // Hiding the Settings tab while the user is in it must not yank them out:
+    // open the global Settings overlay instead. The Settings navigator
+    // reparents from the (now-removed) tab into the overlay with its stack
+    // intact, so there's no transition and the tab bar stays visible. The
+    // overlay covers the fallback tab's content, so suppress the + button.
+    if (wasSettings) {
+      _globalSettingsOpen.value = true;
+      _showPlusButton.value = false;
+      return;
+    }
     switch (fallback) {
       case 0:
         _showPlusButton.value = _depthObservers[0].trackedCount == 0;
@@ -612,41 +634,6 @@ class _HomeShellState extends State<HomeShell> {
       default:
         _showPlusButton.value = _depthObservers[fallback].depth <= 1;
     }
-    // Hiding the Settings tab only removes its tab-bar item — it must not yank
-    // the user out of Settings. Re-open it full-screen (with the Tab Bar
-    // sub-page they were on) so the screen stays put.
-    if (wasSettings) _reopenSettingsFullScreen();
-  }
-
-  void _reopenSettingsFullScreen() {
-    // Pushed synchronously (this runs from the visibility-toggle tap, not a
-    // build) so the full-screen Settings covers the scaffold before it repaints
-    // — otherwise the fallback tab would flash for a frame. The base Settings
-    // page is tracked so it can be removed when the user re-enables the tab.
-    final nav = Navigator.of(context, rootNavigator: true);
-    final base = FastRoute<void>(
-      builder: (_) => SettingsView(
-        controller: widget.settingsController,
-        backupService: widget.backupService,
-        securityService: widget.securityService,
-        googleCalendarController: widget.googleCalendarController,
-        deviceCalendarController: widget.deviceCalendarController,
-      ),
-    );
-    _globalSettingsRoute = base;
-    _globalSettingsOpen.value = true;
-    nav.push(base).then((_) {
-      if (!mounted) return;
-      _globalSettingsRoute = null;
-      _globalSettingsOpen.value = false;
-    });
-    nav.push(
-      FastRoute<void>(
-        builder: (_) => TabBarSettingsView(
-          controller: widget.settingsController,
-        ),
-      ),
-    );
   }
 
   void _onPlusPressed() {
@@ -844,6 +831,12 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _onTabTapped(int tappedIndex) {
+    // Tapping any tab while the global Settings overlay is open leaves
+    // Settings and highlights that tab.
+    if (_globalSettingsOpen.value) {
+      _globalSettingsOpen.value = false;
+      _navigatorKeys[4].currentState?.popUntil((r) => r.isFirst);
+    }
     if (tappedIndex == _lastTabIndex) {
       _navigatorKeys[tappedIndex].currentState
           ?.popUntil((route) => route.isFirst);
@@ -1204,8 +1197,51 @@ class _HomeShellState extends State<HomeShell> {
           securityService: widget.securityService,
           googleCalendarController: widget.googleCalendarController,
           deviceCalendarController: widget.deviceCalendarController,
+          // Shown reactively only while Settings is the global overlay (tab
+          // hidden); as a normal tab the listenable stays false → no button.
+          onClose: _closeGlobalSettings,
+          showCloseButton: _globalSettingsOpen,
         ),
     };
+  }
+
+  /// The Settings overlay layer: rendered above the tab content but inset to
+  /// leave the tab bar (narrow) or the sidebar (wide) visible, so hiding the
+  /// Settings tab — or opening Settings from another tab's ⋯ menu — keeps the
+  /// bar on screen with no tab highlighted instead of a full-screen cover.
+  Widget _buildSettingsOverlay(
+      BuildContext context, bool isWide, bool hideLabels, bool hasBottomBar) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: _globalSettingsOpen,
+      builder: (context, open, _) {
+        // Guard against ever building `_navigatorKeys[4]` in two places at
+        // once: when Settings is a visible tab the scaffold/sidebar owns it.
+        if (!open || _computeVisibleIndices().contains(4)) {
+          return const SizedBox.shrink();
+        }
+        final double left = isWide ? (hideLabels ? 72.0 : 200.0) : 0.0;
+        final double bottom = (!isWide && hasBottomBar)
+            ? 50 + MediaQuery.paddingOf(context).bottom
+            : 0.0;
+        return Positioned(
+          left: left,
+          top: 0,
+          right: 0,
+          bottom: bottom,
+          child: PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop) _handleSettingsOverlayBack();
+            },
+            child: CupertinoTabView(
+              navigatorKey: _navigatorKeys[4],
+              navigatorObservers: [_depthObservers[4]],
+              builder: (ctx) => _tabContent(ctx, 4),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -1296,6 +1332,9 @@ class _HomeShellState extends State<HomeShell> {
                 visibleIndices: visibleIndices,
                 hideLabels: hideLabels,
                 lastTabIndex: _lastTabIndex,
+                // While the Settings overlay is open no sidebar tile reads as
+                // selected — the user is in Settings, not in any tab.
+                showSelection: !_globalSettingsOpen.value,
                 navigatorKeys: _navigatorKeys,
                 depthObservers: _depthObservers,
                 tabItem: (ctx, i) => _tabItem(ctx, i, hideLabels),
@@ -1408,6 +1447,8 @@ class _HomeShellState extends State<HomeShell> {
                   );
                 },
               ),
+            // Global Settings overlay — leaves the tab bar / sidebar visible.
+            _buildSettingsOverlay(context, isWide, hideLabels, hasBottomBar),
             // Multi-page tab bar swipe overlay — covers the tab bar area and
             // detects horizontal pan to switch between (non-empty) pages.
             // Active whenever there's more than one non-empty page and we're in
@@ -1913,6 +1954,7 @@ class _WideLayout extends StatelessWidget {
     required this.visibleIndices,
     required this.hideLabels,
     required this.lastTabIndex,
+    required this.showSelection,
     required this.navigatorKeys,
     required this.depthObservers,
     required this.tabItem,
@@ -1923,6 +1965,7 @@ class _WideLayout extends StatelessWidget {
   final List<int> visibleIndices;
   final bool hideLabels;
   final int lastTabIndex;
+  final bool showSelection;
   final List<GlobalKey<NavigatorState>> navigatorKeys;
   final List<NavigatorObserver> depthObservers;
   final BottomNavigationBarItem Function(BuildContext, int) tabItem;
@@ -1961,7 +2004,7 @@ class _WideLayout extends StatelessWidget {
                   for (int i = 0; i < visibleIndices.length; i++)
                     _SidebarTile(
                       item: tabItem(context, visibleIndices[i]),
-                      selected: i == safeActive,
+                      selected: showSelection && i == safeActive,
                       hideLabel: hideLabels,
                       onTap: () => onTap(visibleIndices[i]),
                     ),
