@@ -92,6 +92,13 @@ class _SettingsViewState extends State<SettingsView> {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
+        // Zero the leading inset: CupertinoNavigationBar pads a *custom*
+        // leading by an extra 16 px that the auto-implied back button never
+        // gets, which pushed our close chevron one button-width to the right
+        // of every other screen's back button. With start:0 the custom
+        // CupertinoNavigationBarBackButton lines up exactly with the native
+        // one. (end is unused — this page has no trailing.)
+        padding: const EdgeInsetsDirectional.only(start: 0),
         middle: Text(s.settings),
         // When shown as the global overlay (Settings tab hidden), the root
         // page has no route to pop back to, so it exposes its own close
