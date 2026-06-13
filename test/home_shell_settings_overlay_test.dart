@@ -151,7 +151,7 @@ void main() {
         reason: 'remaining tabs still in the sidebar');
 
     // Leave Settings via its close button → returns to the underlying tab.
-    await tester.tap(find.byIcon(CupertinoIcons.chevron_back));
+    await tester.tap(find.byType(CupertinoNavigationBarBackButton));
     await beat();
     expect(find.byType(SettingsView), findsNothing,
         reason: 'closed the Settings overlay');
@@ -252,7 +252,7 @@ void main() {
         reason: 'sidebar stays visible behind the overlay');
 
     // Close → back to the Tasks tab.
-    await tester.tap(find.byIcon(CupertinoIcons.chevron_back));
+    await tester.tap(find.byType(CupertinoNavigationBarBackButton));
     await beat();
     expect(find.byType(SettingsView), findsNothing);
     expect(find.text('Inbox'), findsWidgets);
