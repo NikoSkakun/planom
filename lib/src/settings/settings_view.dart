@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 
 import 'package:flutter/material.dart' show ThemeMode;
 
@@ -36,6 +37,8 @@ class SettingsView extends StatefulWidget {
     this.securityService,
     this.googleCalendarController,
     this.deviceCalendarController,
+    this.onClose,
+    this.showCloseButton,
   });
 
   final SettingsController controller;
@@ -43,6 +46,16 @@ class SettingsView extends StatefulWidget {
   final SecurityService? securityService;
   final GoogleCalendarController? googleCalendarController;
   final DeviceCalendarController? deviceCalendarController;
+
+  /// Called to leave Settings when it's shown as the global overlay (the
+  /// Settings tab is hidden). Null when Settings is a normal tab — then the
+  /// view has no leading button.
+  final VoidCallback? onClose;
+
+  /// Drives whether the leading close button is shown. Reactive so the same
+  /// (reparented) SettingsView gains/loses the button as the overlay opens
+  /// and closes. Null → never show it.
+  final ValueListenable<bool>? showCloseButton;
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -75,10 +88,30 @@ class _SettingsViewState extends State<SettingsView> {
     final s = S.of(context);
     final hasBackup = widget.backupService != null;
 
+    final closeListenable = widget.showCloseButton;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         border: null,
         middle: Text(s.settings),
+        // When shown as the global overlay (Settings tab hidden), the root
+        // page has no route to pop back to, so it exposes its own close
+        // button that returns to the underlying tab. Reactive so the
+        // reparented view shows/hides it as the overlay opens/closes.
+        leading: closeListenable == null
+            ? null
+            : ValueListenableBuilder<bool>(
+                valueListenable: closeListenable,
+                builder: (context, show, _) {
+                  if (!show || widget.onClose == null) {
+                    return const SizedBox.shrink();
+                  }
+                  return CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: widget.onClose,
+                    child: const Icon(CupertinoIcons.chevron_back, size: 28),
+                  );
+                },
+              ),
       ),
       child: SafeArea(
         child: ListView(
