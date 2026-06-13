@@ -179,6 +179,7 @@ void showCreateFolderListSheet(
   FolderController controller, {
   String? parentFolderId,
   CreateSheetInitial initialType = CreateSheetInitial.list,
+  bool showTypeSwitcher = true,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -191,6 +192,7 @@ void showCreateFolderListSheet(
       initialType: initialType == CreateSheetInitial.folder
           ? _CreateType.folder
           : _CreateType.list,
+      showTypeSwitcher: showTypeSwitcher,
     ),
   );
 }
@@ -202,11 +204,17 @@ class _CreateSheet extends StatefulWidget {
     required this.controller,
     this.parentFolderId,
     this.initialType = _CreateType.list,
+    this.showTypeSwitcher = true,
   });
 
   final FolderController controller;
   final String? parentFolderId;
   final _CreateType initialType;
+
+  /// Whether the List/Folder segmented control is shown. Hidden when the
+  /// sheet is opened from a type-specific entry point ("Add List" / "Add
+  /// Folder" in the Tasks menu) — there the type is fixed.
+  final bool showTypeSwitcher;
 
   @override
   State<_CreateSheet> createState() => _CreateSheetState();
@@ -344,32 +352,34 @@ class _CreateSheetState extends State<_CreateSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          CupertinoSlidingSegmentedControl<_CreateType>(
-            groupValue: _type,
-            children: {
-              _CreateType.list: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset('assets/icons/list.png', width: 16, height: 16),
-                  const SizedBox(width: 6),
-                  Text(S.of(context).list),
-                ],
-              ),
-              _CreateType.folder: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset('assets/icons/folder.png',
-                      width: 16, height: 16),
-                  const SizedBox(width: 6),
-                  Text(S.of(context).folder),
-                ],
-              ),
-            },
-            onValueChanged: (v) {
-              if (v != null) _onTypeChanged(v);
-            },
-          ),
-          const SizedBox(height: 16),
+          if (widget.showTypeSwitcher) ...[
+            CupertinoSlidingSegmentedControl<_CreateType>(
+              groupValue: _type,
+              children: {
+                _CreateType.list: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset('assets/icons/list.png', width: 16, height: 16),
+                    const SizedBox(width: 6),
+                    Text(S.of(context).list),
+                  ],
+                ),
+                _CreateType.folder: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset('assets/icons/folder.png',
+                        width: 16, height: 16),
+                    const SizedBox(width: 6),
+                    Text(S.of(context).folder),
+                  ],
+                ),
+              },
+              onValueChanged: (v) {
+                if (v != null) _onTypeChanged(v);
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
           Row(
             children: [
               GestureDetector(

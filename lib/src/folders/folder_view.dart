@@ -302,6 +302,7 @@ class _FolderViewState extends State<FolderView>
             context,
             widget.folderController,
             parentFolderId: _currentFolder.id,
+            showTypeSwitcher: false,
           );
         },
         onAddFolder: () {
@@ -311,6 +312,7 @@ class _FolderViewState extends State<FolderView>
             widget.folderController,
             parentFolderId: _currentFolder.id,
             initialType: CreateSheetInitial.folder,
+            showTypeSwitcher: false,
           );
         },
         onEdit: () {
