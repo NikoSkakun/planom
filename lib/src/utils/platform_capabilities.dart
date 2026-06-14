@@ -29,9 +29,14 @@ class PlatformCapabilities {
   /// have room for it.
   static bool get isDesktop => isMacOS || isLinux || isWindows;
 
-  /// Whether `sqflite` can talk to SQLite natively here. Mobile + macOS yes;
-  /// Linux and Windows need `sqflite_common_ffi` installed as the factory.
-  static bool get sqfliteNeedsFfi => isLinux || isWindows;
+  /// Whether to use the `sqflite_common_ffi` factory backed by the SQLite the
+  /// `sqlite3` package bundles (built with FTS5) instead of the platform's native
+  /// sqflite. Linux and Windows have no native sqflite plugin at all. Android has
+  /// one, but its *system* SQLite is frequently compiled without the FTS5 module
+  /// the app's full-text search depends on ("no such module: fts5"), so Android
+  /// also uses the bundled SQLite. iOS and macOS keep the native plugin — Apple's
+  /// system SQLite includes FTS5.
+  static bool get sqfliteNeedsFfi => isLinux || isWindows || isAndroid;
 
   /// Whether the app icon badge can be set. `flutter_app_badger` is iOS/Android
   /// only — calling it elsewhere silently no-ops at best, crashes at worst.

@@ -1,6 +1,8 @@
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../utils/platform_capabilities.dart';
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import '../models/contact.dart';
@@ -22,8 +24,20 @@ class DatabaseService {
 
   Future<Database> get _database async => _db ??= await _open();
 
+  /// Directory the DB file lives in. On Android we use the FFI factory (for the
+  /// bundled SQLite with FTS5), but its `getDatabasesPath()` doesn't resolve to a
+  /// writable app directory there ("unable to open database file"), so fall back
+  /// to the app support dir. Native sqflite (iOS/macOS) and the desktop FFI
+  /// default already return valid paths.
+  Future<String> _databasesDir() async {
+    if (PlatformCapabilities.isAndroid) {
+      return (await getApplicationSupportDirectory()).path;
+    }
+    return getDatabasesPath();
+  }
+
   Future<Database> _open() async {
-    final dbPath = await getDatabasesPath();
+    final dbPath = await _databasesDir();
     return openDatabase(
       join(dbPath, dbName),
       version: _dbVersion,

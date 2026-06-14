@@ -1,4 +1,4 @@
-package com.example.planom
+package app.planom
 
 import io.flutter.embedding.android.FlutterActivity
 

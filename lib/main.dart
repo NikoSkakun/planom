@@ -19,8 +19,11 @@ import 'src/utils/platform_capabilities.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Linux/Windows have no native sqflite backend; swap in the FFI factory
-  // before any controller opens a database. macOS uses the native plugin.
+  // Swap in the FFI factory (backed by the SQLite the `sqlite3` package bundles,
+  // built with FTS5) before any controller opens a database. Linux/Windows have
+  // no native sqflite backend; Android has one but its system SQLite often lacks
+  // the FTS5 module search needs, so it uses the bundled SQLite too. iOS/macOS
+  // use the native plugin. See PlatformCapabilities.sqfliteNeedsFfi.
   if (PlatformCapabilities.sqfliteNeedsFfi) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;

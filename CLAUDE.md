@@ -12,14 +12,23 @@ flutter test test/widget_test.dart  # Run a single test file
 flutter run              # Run on connected device or emulator
 ```
 
-Flutter binary is at `~/dev/flutter/bin/flutter` (not on PATH by default).
+Flutter is on PATH (`flutter`, resolving to `/usr/local/bin/flutter` → SDK at `/usr/local/share/flutter`, **3.44.1** stable as of this writing).
+
+### Android build configuration
+
+The Android Gradle toolchain was upgraded for Flutter 3.44.1 / JDK 21 (Flutter runs Gradle with Android Studio's bundled JDK 21, ignoring `JAVA_HOME`):
+
+- **Gradle wrapper 8.11.1** (`android/gradle/wrapper/gradle-wrapper.properties`), **AGP 8.9.1** (`android/settings.gradle`), **Kotlin 2.1.0** (`android/build.gradle` `ext.kotlin_version`). Older combos fail: Gradle < 8.5 can't run under JDK 21 (`Unsupported class file major version 65`); AGP < 8.9.1 / compileSdk < 36 trip newer AndroidX (`androidx.browser:browser:1.9.0`).
+- **compileSdk 36 + namespace back-fill**: `android/build.gradle` has a root `subprojects { afterEvaluate {...} }` hook that forces `compileSdk 36` on every Android module and back-fills the AGP-8-required `namespace` from the legacy manifest `package` for old plugins that omit it (e.g. the discontinued `flutter_app_badger 1.5.0`, which otherwise fails with "Namespace not specified"). The legacy `evaluationDependsOn(':app')` block was removed — it forced premature variant creation that defeated the namespace fix.
+- **App id / `MainActivity`**: namespace + applicationId are `app.planom`; `MainActivity.kt` lives at `android/app/src/main/kotlin/app/planom/` (must match the namespace, else the manifest's `.MainActivity` resolves to a missing class → `ClassNotFoundException` at launch).
+- **Google sign-in on Android is unconfigured** — `appAuthRedirectScheme` in `android/app/build.gradle` is still the iOS placeholder; Drive/Calendar sign-in stays disabled on Android until an Android OAuth client id is set.
 
 > Localization is **hand-rolled** in `lib/src/localization/strings.dart` (no `gen-l10n` / `.arb` codegen). Add new keys to the `_translations` map there — there is no build step. A stale `app_en.arb` file is kept in-tree but unused. See "Localization" below.
 
 ## Tech stack
 
 - **Framework**: Flutter / Dart, Cupertino (iOS-native) widgets throughout — no Material widgets in UI except `showModalBottomSheet` (which requires `GlobalMaterialLocalizations.delegate` already registered)
-- **Database**: `sqflite` v2 (mobile/macOS), `sqflite_common_ffi` (Linux/Windows). Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **33**. FTS5 virtual tables for search.
+- **Database**: native `sqflite` on iOS/macOS; `sqflite_common_ffi` everywhere else (Linux/Windows **and Android**), backed by the SQLite the `sqlite3` package bundles (built with `SQLITE_ENABLE_FTS5`). Android uses the bundled SQLite because its *system* SQLite is frequently compiled without FTS5 (`no such module: fts5`), which the app's search needs. Per-space DB files (default space = `planom.db`, others `planom_<id>.db`), current schema version **33**. FTS5 virtual tables for search.
 - **Multi-space**: `SpaceManager` (`lib/src/spaces/`) owns a list of `Space`s and swaps the active space's controllers; the default space shares the global `planom.db` handle.
 - **App lock**: `SecurityService` (`lib/src/security/`) — optional PIN (4–8 digit) / custom password + optional biometric (Face ID, Touch ID, Windows Hello via `local_auth`); salted + key-stretched PBKDF2/HMAC-SHA256 hash in `app_settings` (`auth_*` keys), excluded from backups.
 - **Local notifications**: `NotificationService` (`lib/src/notifications/`) — `flutter_local_notifications` + `timezone`; per-task / per-event reminder scheduling via slot-based IDs. iOS + macOS only today.
@@ -42,7 +51,7 @@ Centralised in `PlatformCapabilities` (`lib/src/utils/platform_capabilities.dart
 
 - `isMobile` (iOS + Android) — gates `flutter_app_badger`, `SystemChrome.setPreferredOrientations`, `image_picker`'s system gallery.
 - `isDesktop` (macOS + Linux + Windows) — Planom always uses the iPad sidebar layout regardless of window width on these platforms.
-- `sqfliteNeedsFfi` (Linux + Windows) — `main.dart` swaps in `databaseFactoryFfi` from `sqflite_common_ffi` before any controller opens a DB.
+- `sqfliteNeedsFfi` (Linux + Windows + **Android**) — `main.dart` swaps in `databaseFactoryFfi` from `sqflite_common_ffi` before any controller opens a DB (Android needs it for the bundled FTS5-enabled SQLite; iOS/macOS keep native sqflite). On Android the FFI factory's `getDatabasesPath()` isn't a writable app dir, so `DatabaseService._databasesDir()` falls back to `getApplicationSupportDirectory()`.
 - `supportsBiometricAuth` (iOS + Android + Windows) — macOS/Linux have no `local_auth` implementation; PIN/password fallback only.
 - `supportsLocalNotifications` (iOS + macOS today) — Android/Linux/Windows would need their own `InitializationSettings`.
 - `supportsImagePicker` (mobile) — desktop falls back to `file_picker` with image filetype filters.
