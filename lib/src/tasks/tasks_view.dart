@@ -1413,17 +1413,7 @@ class _TasksOptionsDropdown extends StatelessWidget {
           right: 8,
           child: Container(
             width: 220,
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 20,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
+            decoration: AppColors.menuDecoration(context),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1452,8 +1442,7 @@ class _CircleAddButton extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: CupertinoColors.secondarySystemBackground
-              .resolveFrom(context),
+          color: AppColors.circleButtonBackground.resolveFrom(context),
           shape: BoxShape.circle,
         ),
         child: Icon(

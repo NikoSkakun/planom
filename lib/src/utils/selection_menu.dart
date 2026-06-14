@@ -89,21 +89,10 @@ class _SelectionMenuOverlay<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = CupertinoColors.systemBackground.resolveFrom(context);
     final separator = CupertinoColors.separator.resolveFrom(context);
 
     final panel = Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 20,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
+      decoration: AppColors.menuDecoration(context),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

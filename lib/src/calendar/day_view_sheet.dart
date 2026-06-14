@@ -755,17 +755,7 @@ class _AddPickerMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 160,
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemBackground.resolveFrom(context),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 20,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
+      decoration: AppColors.menuDecoration(context, radius: 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

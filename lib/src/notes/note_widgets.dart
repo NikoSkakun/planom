@@ -325,7 +325,7 @@ class NoteFolderCircleButton extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: CupertinoColors.secondarySystemBackground.resolveFrom(context),
+          color: AppColors.circleButtonBackground.resolveFrom(context),
           shape: BoxShape.circle,
         ),
         child: Icon(
