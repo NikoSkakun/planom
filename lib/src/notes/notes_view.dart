@@ -926,17 +926,7 @@ class _NotesOptionsDropdown extends StatelessWidget {
           right: 8,
           child: Container(
             width: 220,
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 20,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
+            decoration: AppColors.menuDecoration(context),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,

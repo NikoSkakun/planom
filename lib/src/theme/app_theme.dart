@@ -18,6 +18,64 @@ class AppColors {
 
   /// Subtle drop-shadow used by floating panels and dropdowns.
   static const Color shadow = Color(0x30000000);
+
+  /// The app's base surface tone — matches the default scaffold background
+  /// (white in light, dark gray in dark). Use this instead of
+  /// [CupertinoColors.systemBackground] for surfaces that should blend with
+  /// the app background: systemBackground is **pure black** in dark mode,
+  /// which reads as a harsh block against the dark-gray scaffold.
+  static const CupertinoDynamicColor surface =
+      CupertinoDynamicColor.withBrightness(
+    color: Color(0xFFFFFFFF),
+    darkColor: Color(0xFF1C1C1E),
+  );
+
+  /// Hairline edge that delineates a menu/popover from a same-toned
+  /// background — important in dark mode, where the drop shadow over the
+  /// near-black scaffold barely registers on its own. Transparent in light,
+  /// where the existing white-on-shadow look already reads fine.
+  static const CupertinoDynamicColor menuBorder =
+      CupertinoDynamicColor.withBrightness(
+    color: Color(0x00000000),
+    darkColor: Color(0x33FFFFFF),
+  );
+
+  /// Drop shadow for menus / popovers. Heavier in dark so the panel still
+  /// reads as elevated over the dark scaffold.
+  static const CupertinoDynamicColor menuShadow =
+      CupertinoDynamicColor.withBrightness(
+    color: Color(0x30000000),
+    darkColor: Color(0x80000000),
+  );
+
+  /// Fill for small circular icon buttons (e.g. the Add-Folder button).
+  /// [CupertinoColors.secondarySystemBackground] is identical to the dark
+  /// scaffold, making the circle invisible; this keeps a subtle but visible
+  /// fill in both modes.
+  static const CupertinoDynamicColor circleButtonBackground =
+      CupertinoDynamicColor.withBrightness(
+    color: Color(0xFFF2F2F7),
+    darkColor: Color(0xFF2C2C2E),
+  );
+
+  /// Standard decoration for a floating dropdown menu / popover: app-surface
+  /// fill, a hairline border, and an elevation shadow — all dark-mode aware
+  /// so menus never render as a pure-black block.
+  static BoxDecoration menuDecoration(BuildContext context,
+      {double radius = 14}) {
+    return BoxDecoration(
+      color: surface.resolveFrom(context),
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: menuBorder.resolveFrom(context), width: 0.5),
+      boxShadow: [
+        BoxShadow(
+          color: menuShadow.resolveFrom(context),
+          blurRadius: 20,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    );
+  }
 }
 
 class AppDurations {

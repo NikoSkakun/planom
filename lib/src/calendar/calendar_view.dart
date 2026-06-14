@@ -614,7 +614,9 @@ class _WeekdayHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 32,
-      color: CupertinoColors.systemBackground.resolveFrom(context),
+      // Matches the scaffold background; systemBackground is pure black in
+      // dark mode, which left a black strip under the nav bar.
+      color: AppColors.surface.resolveFrom(context),
       child: Row(
         children:
             rotateWeekdays(weekdaysShort(context), firstDayOfWeek)
