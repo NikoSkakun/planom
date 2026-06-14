@@ -229,6 +229,9 @@ class _CreateSheetState extends State<_CreateSheet> {
       _type == _CreateType.folder ? AppDefaults.folderIcon : AppDefaults.listIcon;
   int? _selectedIconColor;
   ListType _listType = ListType.tasks;
+  // Optional fields (description / list type / color) are collapsed by
+  // default and revealed by the "…" button next to Create.
+  bool _expanded = false;
 
   void _onTypeChanged(_CreateType next) {
     if (next == _type) return;
@@ -423,39 +426,84 @@ class _CreateSheetState extends State<_CreateSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          _DescriptionField(controller: _descCtrl),
-          if (_type == _CreateType.list) ...[
-            const SizedBox(height: 16),
-            _ListTypeButton(
-              label: _listTypeLabel(S.of(context), _listType),
-              onTap: _pickListType,
-            ),
-            const SizedBox(height: 16),
-            _ColorPickerButton(
-              selectedColor: _selectedColor,
-              onTap: () => showListColorPickerSheet(
-                context,
-                _selectedColor,
-                (c) {
-                  if (mounted) setState(() => _selectedColor = c);
-                },
-              ),
-            ),
-          ],
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: _expanded
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 12),
+                      _DescriptionField(controller: _descCtrl),
+                      if (_type == _CreateType.list) ...[
+                        const SizedBox(height: 16),
+                        _ListTypeButton(
+                          label: _listTypeLabel(S.of(context), _listType),
+                          onTap: _pickListType,
+                        ),
+                        const SizedBox(height: 16),
+                        _ColorPickerButton(
+                          selectedColor: _selectedColor,
+                          onTap: () => showListColorPickerSheet(
+                            context,
+                            _selectedColor,
+                            (c) {
+                              if (mounted) setState(() => _selectedColor = c);
+                            },
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
           const SizedBox(height: 16),
-          CupertinoButton(
-            color: AppColors.accent,
-            borderRadius: BorderRadius.circular(12),
-            onPressed: _submit,
-            child: Text(
-              isFolder
-                  ? S.of(context).createFolder
-                  : S.of(context).createList,
-              style: const TextStyle(
-                color: CupertinoColors.white,
-                fontWeight: FontWeight.w600,
-              ),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Expand / collapse the optional fields above.
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  child: Container(
+                    width: 52,
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.tertiarySystemFill
+                          .resolveFrom(context),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        CupertinoIcons.ellipsis,
+                        size: 22,
+                        color: _expanded
+                            ? AppColors.accent
+                            : CupertinoColors.secondaryLabel
+                                .resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: CupertinoButton(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(12),
+                    onPressed: _submit,
+                    child: Text(
+                      isFolder
+                          ? S.of(context).createFolder
+                          : S.of(context).createList,
+                      style: const TextStyle(
+                        color: CupertinoColors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
