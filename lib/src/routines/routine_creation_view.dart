@@ -67,12 +67,15 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
   late String _goalUnit;
   late bool _useCustomUnit;
   late String _frequencyType; // 'daily' | 'specific_days' | 'interval'
+  late String _specificMode; // 'week' | 'month' (specific_days only)
   late List<int> _weekdays; // 0=Mon … 6=Sun
+  late List<int> _monthdays; // 1 … 31
   late DateTime _startDate;
   late int _intervalDays;
   late bool _waitForCompletion;
   late List<RoutineReminder> _reminders;
   late bool _manualEntry;
+  late bool _continueAfterCompletion;
 
   bool _nameEmpty = true;
   bool _showIconPicker = false;
@@ -90,12 +93,19 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
     _useCustomUnit = !_kUnits.contains(unit);
     _goalUnit = _useCustomUnit ? 'count' : unit;
     _frequencyType = r?.frequencyType ?? 'daily';
+    final existingMonthdays = r?.monthdays;
+    final hasMonthdays =
+        existingMonthdays != null && existingMonthdays.isNotEmpty;
+    _specificMode = hasMonthdays ? 'month' : 'week';
     // Default to all days selected so switching to "specific days" starts from
     // a sensible base the user can pare down.
     _weekdays = (r?.weekdays != null && r!.weekdays!.isNotEmpty)
         ? List<int>.from(r.weekdays!)
         : [0, 1, 2, 3, 4, 5, 6];
     final now = DateTime.now();
+    // Default month selection to today's day-of-month.
+    _monthdays =
+        hasMonthdays ? List<int>.from(existingMonthdays) : [now.day];
     _startDate = RoutineController.normalizeDate(
         r?.startDate ?? r?.creationDate ?? now);
     _intervalDays = (r?.intervalDays != null && r!.intervalDays! >= 1)
@@ -104,6 +114,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
     _waitForCompletion = r?.waitForCompletion ?? false;
     _reminders = List<RoutineReminder>.from(r?.reminders ?? const []);
     _manualEntry = r?.manualEntry ?? false;
+    _continueAfterCompletion = r?.continueAfterCompletion ?? false;
 
     _nameCtrl = TextEditingController(text: r?.name ?? '');
     _customUnitCtrl =
@@ -142,6 +153,7 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
         : _goalUnit;
 
     final specificDays = _frequencyType == 'specific_days';
+    final monthMode = specificDays && _specificMode == 'month';
     final isInterval = _frequencyType == 'interval';
     final isAmount = _goalType == 'certain_amount';
     // Manual entry only applies to amount goals; it replaces per-tap recording.
@@ -157,7 +169,11 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
       goalUnit: isAmount ? unit : null,
       recordAmount: (isAmount && !manual) ? recordAmount : null,
       frequencyType: _frequencyType,
-      weekdays: specificDays ? (List<int>.from(_weekdays)..sort()) : null,
+      weekdays: (specificDays && !monthMode)
+          ? (List<int>.from(_weekdays)..sort())
+          : null,
+      monthdays: monthMode ? (List<int>.from(_monthdays)..sort()) : null,
+      continueAfterCompletion: _continueAfterCompletion,
       startDate: _startDate,
       intervalDays: isInterval ? _intervalDays : null,
       waitForCompletion: isInterval && _waitForCompletion,
@@ -371,10 +387,23 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
               ),
               if (_frequencyType == 'specific_days') ...[
                 const _Divider(),
-                _WeekdayPicker(
-                  selected: _weekdays,
-                  onChanged: (days) => setState(() => _weekdays = days),
+                _SegmentedRow(
+                  options: [s.specificWeek, s.specificMonth],
+                  selected: _specificMode == 'week' ? 0 : 1,
+                  onChanged: (i) => setState(
+                      () => _specificMode = i == 0 ? 'week' : 'month'),
                 ),
+                const _Divider(),
+                if (_specificMode == 'week')
+                  _WeekdayPicker(
+                    selected: _weekdays,
+                    onChanged: (days) => setState(() => _weekdays = days),
+                  )
+                else
+                  _MonthdayPicker(
+                    selected: _monthdays,
+                    onChanged: (days) => setState(() => _monthdays = days),
+                  ),
               ],
               if (_frequencyType == 'interval') ...[
                 const _Divider(),
@@ -406,6 +435,14 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
                 selected: _goalType == 'achieve_all' ? 0 : 1,
                 onChanged: (i) => setState(() =>
                     _goalType = i == 0 ? 'achieve_all' : 'certain_amount'),
+              ),
+              const _Divider(),
+              _SwitchRow(
+                label: s.continueAfterCompletion,
+                sublabel: s.continueAfterCompletionInfo,
+                value: _continueAfterCompletion,
+                onChanged: (v) =>
+                    setState(() => _continueAfterCompletion = v),
               ),
               if (_goalType == 'certain_amount') ...[
                 const _Divider(),
@@ -769,6 +806,81 @@ class _WeekdayPicker extends StatelessWidget {
             ),
           );
         }),
+      ),
+    );
+  }
+}
+
+// Abstract month-day grid (1…31). Pick the calendar days of each month the
+// routine should repeat on. At least one day must stay selected. Days that
+// don't exist in a given month (e.g. 31 in April) are simply skipped.
+class _MonthdayPicker extends StatelessWidget {
+  const _MonthdayPicker({required this.selected, required this.onChanged});
+
+  final List<int> selected;
+  final void Function(List<int>) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = AppColors.accent;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Column(
+        children: [
+          for (int row = 0; row < 5; row++)
+            Padding(
+              padding: EdgeInsets.only(top: row == 0 ? 0 : 8),
+              child: Row(
+                children: [
+                  for (int col = 0; col < 7; col++)
+                    Expanded(
+                      child: _buildCell(context, row * 7 + col + 1, accent),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCell(BuildContext context, int day, Color accent) {
+    if (day > 31) return const SizedBox.shrink();
+    final isOn = selected.contains(day);
+    return GestureDetector(
+      onTap: () {
+        final next = List<int>.from(selected);
+        if (isOn) {
+          // Never let the user deselect the last remaining day.
+          if (next.length > 1) next.remove(day);
+        } else {
+          next.add(day);
+        }
+        onChanged(next);
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Center(
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: isOn
+                ? accent
+                : CupertinoColors.tertiarySystemFill.resolveFrom(context),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            '$day',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isOn
+                  ? CupertinoColors.white
+                  : CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        ),
       ),
     );
   }

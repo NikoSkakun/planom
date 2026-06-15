@@ -668,6 +668,11 @@ class S {
   String get freqSpecificDays => t('freqSpecificDays');
   String get freqInterval => t('freqInterval');
   String get freqDaysAfter => t('freqDaysAfter');
+  String get specificWeek => t('specificWeek');
+  String get specificMonth => t('specificMonth');
+  String get routineMonthDaysPrefix => t('routineMonthDaysPrefix');
+  String get continueAfterCompletion => t('continueAfterCompletion');
+  String get continueAfterCompletionInfo => t('continueAfterCompletionInfo');
   String get startDate => t('startDate');
   String get routineIntervalEvery => t('routineIntervalEvery');
   String routineIntervalDays(int n) =>
@@ -1315,6 +1320,9 @@ const Map<String, String> _en = {
   'newRoutine': 'New Routine', 'editRoutine': 'Edit Routine',
   'sectionFrequency': 'FREQUENCY',
   'freqDaily': 'Daily', 'freqSpecificDays': 'Specific Days', 'freqDaysAfter': 'X days after completion',
+  'specificWeek': 'Week', 'specificMonth': 'Month', 'routineMonthDaysPrefix': 'Days',
+  'continueAfterCompletion': 'Continue tracking after completion',
+  'continueAfterCompletionInfo': 'Keep recording progress after the goal is reached',
   'freqInterval': 'Interval', 'startDate': 'Start Date', 'routineIntervalEvery': 'Every', 'routineIntervalDays': '{n} days', 'waitForCompletion': 'Wait for completion', 'waitForCompletionInfo': 'Schedule the next occurrence after you complete this one. Missed days stay overdue.', 'addReminder': 'Add Reminder', 'reminderTypeTime': 'At a time', 'reminderTypeSpread': 'Spread through day', 'reminderTypeAfterEach': 'After each', 'reminderEveryLabel': 'every', 'reminderAfterEachLabel': 'after each', 'recordOnOriginalDate': 'Mark done on its original day', 'completeTodayShift': 'Complete today (shift next)', 'overdueRoutineTitle': 'Overdue routine', 'overdueRoutineBody': 'When did you do this?', 'overdueLabel': 'Overdue',
   'daysAfterCompletion': 'days after completion',
   'autoReset': 'Auto Reset', 'autoResetEveryDay': 'Every day',
@@ -1577,6 +1585,9 @@ const Map<String, String> _uk = {
   'newRoutine': 'Нова звичка', 'editRoutine': 'Редагувати звичку',
   'sectionFrequency': 'ЧАСТОТА',
   'freqDaily': 'Щодня', 'freqSpecificDays': 'Певні дні', 'freqDaysAfter': 'Через X днів після виконання',
+  'specificWeek': 'Тиждень', 'specificMonth': 'Місяць', 'routineMonthDaysPrefix': 'Дні',
+  'continueAfterCompletion': 'Продовжувати після виконання',
+  'continueAfterCompletionInfo': 'Записувати прогрес навіть після досягнення мети',
   'freqInterval': 'Інтервал', 'startDate': 'Дата початку', 'routineIntervalEvery': 'Кожні', 'routineIntervalDays': '{n} дн.', 'waitForCompletion': 'Чекати на виконання', 'waitForCompletionInfo': 'Наступне повторення планується після виконання поточного. Пропущені дні лишаються простроченими.', 'addReminder': 'Додати нагадування', 'reminderTypeTime': 'У певний час', 'reminderTypeSpread': 'Рівномірно за день', 'reminderTypeAfterEach': 'Після кожного', 'reminderEveryLabel': 'кожні', 'reminderAfterEachLabel': 'після кожного', 'recordOnOriginalDate': 'Позначити в початковий день', 'completeTodayShift': 'Виконати сьогодні (зсунути)', 'overdueRoutineTitle': 'Прострочена звичка', 'overdueRoutineBody': 'Коли ви це зробили?', 'overdueLabel': 'Прострочено',
   'daysAfterCompletion': 'днів після виконання',
   'autoReset': 'Автоскидання', 'autoResetEveryDay': 'Щодня',
@@ -2038,6 +2049,9 @@ const Map<String, String> _es = {
   'newRoutine': 'Nueva rutina', 'editRoutine': 'Editar rutina',
   'sectionFrequency': 'FRECUENCIA',
   'freqDaily': 'Diario', 'freqSpecificDays': 'Días específicos', 'freqDaysAfter': 'X días después de completar',
+  'specificWeek': 'Semana', 'specificMonth': 'Mes', 'routineMonthDaysPrefix': 'Días',
+  'continueAfterCompletion': 'Seguir registrando tras completar',
+  'continueAfterCompletionInfo': 'Sigue registrando el progreso después de alcanzar la meta',
   'freqInterval': 'Intervalo', 'startDate': 'Fecha de inicio', 'routineIntervalEvery': 'Cada', 'routineIntervalDays': '{n} días', 'waitForCompletion': 'Esperar a completar', 'waitForCompletionInfo': 'Programa la próxima vez tras completar esta. Los días perdidos quedan vencidos.', 'addReminder': 'Añadir recordatorio', 'reminderTypeTime': 'A una hora', 'reminderTypeSpread': 'Repartido en el día', 'reminderTypeAfterEach': 'Tras cada uno', 'reminderEveryLabel': 'cada', 'reminderAfterEachLabel': 'tras cada uno', 'recordOnOriginalDate': 'Marcar en su día original', 'completeTodayShift': 'Completar hoy (desplazar)', 'overdueRoutineTitle': 'Rutina vencida', 'overdueRoutineBody': '¿Cuándo lo hiciste?', 'overdueLabel': 'Vencido',
   'daysAfterCompletion': 'días después de completar',
   'autoReset': 'Reinicio automático', 'autoResetEveryDay': 'Cada día',
@@ -2499,6 +2513,9 @@ const Map<String, String> _fr = {
   'newRoutine': 'Nouvelle routine', 'editRoutine': 'Modifier la routine',
   'sectionFrequency': 'FRÉQUENCE',
   'freqDaily': 'Quotidien', 'freqSpecificDays': 'Jours précis', 'freqDaysAfter': 'X jours après l\'achèvement',
+  'specificWeek': 'Semaine', 'specificMonth': 'Mois', 'routineMonthDaysPrefix': 'Jours',
+  'continueAfterCompletion': 'Continuer le suivi après l\'achèvement',
+  'continueAfterCompletionInfo': 'Continuer à enregistrer la progression après avoir atteint l\'objectif',
   'freqInterval': 'Intervalle', 'startDate': 'Date de début', 'routineIntervalEvery': 'Tous les', 'routineIntervalDays': '{n} jours', 'waitForCompletion': 'Attendre la réalisation', 'waitForCompletionInfo': 'Planifie la prochaine fois après avoir terminé celle-ci. Les jours manqués restent en retard.', 'addReminder': 'Ajouter un rappel', 'reminderTypeTime': 'À une heure', 'reminderTypeSpread': 'Réparti sur la journée', 'reminderTypeAfterEach': 'Après chacun', 'reminderEveryLabel': 'toutes les', 'reminderAfterEachLabel': 'après chacun', 'recordOnOriginalDate': 'Marquer à sa date initiale', 'completeTodayShift': 'Terminer aujourd\'hui (décaler)', 'overdueRoutineTitle': 'Routine en retard', 'overdueRoutineBody': 'Quand l\'avez-vous fait ?', 'overdueLabel': 'En retard',
   'daysAfterCompletion': 'jours après l\'achèvement',
   'autoReset': 'Réinitialisation auto', 'autoResetEveryDay': 'Chaque jour',
@@ -2960,6 +2977,9 @@ const Map<String, String> _de = {
   'newRoutine': 'Neue Routine', 'editRoutine': 'Routine bearbeiten',
   'sectionFrequency': 'HÄUFIGKEIT',
   'freqDaily': 'Täglich', 'freqSpecificDays': 'Bestimmte Tage', 'freqDaysAfter': 'X Tage nach Abschluss',
+  'specificWeek': 'Woche', 'specificMonth': 'Monat', 'routineMonthDaysPrefix': 'Tage',
+  'continueAfterCompletion': 'Nach Abschluss weiter erfassen',
+  'continueAfterCompletionInfo': 'Fortschritt auch nach Erreichen des Ziels weiter erfassen',
   'freqInterval': 'Intervall', 'startDate': 'Startdatum', 'routineIntervalEvery': 'Alle', 'routineIntervalDays': '{n} Tage', 'waitForCompletion': 'Auf Abschluss warten', 'waitForCompletionInfo': 'Plant das nächste Mal nach Abschluss dieses. Verpasste Tage bleiben überfällig.', 'addReminder': 'Erinnerung hinzufügen', 'reminderTypeTime': 'Zu einer Zeit', 'reminderTypeSpread': 'Über den Tag verteilt', 'reminderTypeAfterEach': 'Nach jedem', 'reminderEveryLabel': 'alle', 'reminderAfterEachLabel': 'nach jedem', 'recordOnOriginalDate': 'Am ursprünglichen Tag erledigen', 'completeTodayShift': 'Heute erledigen (verschieben)', 'overdueRoutineTitle': 'Überfällige Routine', 'overdueRoutineBody': 'Wann hast du das gemacht?', 'overdueLabel': 'Überfällig',
   'daysAfterCompletion': 'Tage nach Abschluss',
   'autoReset': 'Automatisch zurücksetzen', 'autoResetEveryDay': 'Jeden Tag',
@@ -3421,6 +3441,9 @@ const Map<String, String> _it = {
   'newRoutine': 'Nuova abitudine', 'editRoutine': 'Modifica abitudine',
   'sectionFrequency': 'FREQUENZA',
   'freqDaily': 'Giornaliero', 'freqSpecificDays': 'Giorni specifici', 'freqDaysAfter': 'X giorni dopo completamento',
+  'specificWeek': 'Settimana', 'specificMonth': 'Mese', 'routineMonthDaysPrefix': 'Giorni',
+  'continueAfterCompletion': 'Continua a registrare dopo il completamento',
+  'continueAfterCompletionInfo': 'Continua a registrare i progressi dopo aver raggiunto l\'obiettivo',
   'freqInterval': 'Intervallo', 'startDate': 'Data di inizio', 'routineIntervalEvery': 'Ogni', 'routineIntervalDays': '{n} giorni', 'waitForCompletion': 'Attendi il completamento', 'waitForCompletionInfo': 'Pianifica la prossima dopo aver completato questa. I giorni saltati restano scaduti.', 'addReminder': 'Aggiungi promemoria', 'reminderTypeTime': 'A un orario', 'reminderTypeSpread': 'Distribuito nel giorno', 'reminderTypeAfterEach': 'Dopo ognuno', 'reminderEveryLabel': 'ogni', 'reminderAfterEachLabel': 'dopo ognuno', 'recordOnOriginalDate': 'Segna nel giorno originale', 'completeTodayShift': 'Completa oggi (sposta)', 'overdueRoutineTitle': 'Routine scaduta', 'overdueRoutineBody': 'Quando lo hai fatto?', 'overdueLabel': 'Scaduto',
   'daysAfterCompletion': 'giorni dopo completamento',
   'autoReset': 'Reset automatico', 'autoResetEveryDay': 'Ogni giorno',
@@ -3882,6 +3905,9 @@ const Map<String, String> _pt = {
   'newRoutine': 'Nova rotina', 'editRoutine': 'Editar rotina',
   'sectionFrequency': 'FREQUÊNCIA',
   'freqDaily': 'Diário', 'freqSpecificDays': 'Dias específicos', 'freqDaysAfter': 'X dias após concluir',
+  'specificWeek': 'Semana', 'specificMonth': 'Mês', 'routineMonthDaysPrefix': 'Dias',
+  'continueAfterCompletion': 'Continuar a registar após concluir',
+  'continueAfterCompletionInfo': 'Continue a registar o progresso depois de atingir a meta',
   'freqInterval': 'Intervalo', 'startDate': 'Data de início', 'routineIntervalEvery': 'A cada', 'routineIntervalDays': '{n} dias', 'waitForCompletion': 'Aguardar conclusão', 'waitForCompletionInfo': 'Agenda a próxima após concluir esta. Dias perdidos ficam atrasados.', 'addReminder': 'Adicionar lembrete', 'reminderTypeTime': 'A uma hora', 'reminderTypeSpread': 'Distribuído no dia', 'reminderTypeAfterEach': 'Após cada', 'reminderEveryLabel': 'a cada', 'reminderAfterEachLabel': 'após cada', 'recordOnOriginalDate': 'Marcar no dia original', 'completeTodayShift': 'Concluir hoje (deslocar)', 'overdueRoutineTitle': 'Rotina atrasada', 'overdueRoutineBody': 'Quando você fez isto?', 'overdueLabel': 'Atrasado',
   'daysAfterCompletion': 'dias após concluir',
   'autoReset': 'Reinício automático', 'autoResetEveryDay': 'Todo dia',
@@ -4343,6 +4369,9 @@ const Map<String, String> _ru = {
   'newRoutine': 'Новая привычка', 'editRoutine': 'Редактировать',
   'sectionFrequency': 'ЧАСТОТА',
   'freqDaily': 'Ежедневно', 'freqSpecificDays': 'Определённые дни', 'freqDaysAfter': 'Через X дней после выполнения',
+  'specificWeek': 'Неделя', 'specificMonth': 'Месяц', 'routineMonthDaysPrefix': 'Дни',
+  'continueAfterCompletion': 'Продолжать отслеживать после выполнения',
+  'continueAfterCompletionInfo': 'Записывать прогресс даже после достижения цели',
   'freqInterval': 'Интервал', 'startDate': 'Дата начала', 'routineIntervalEvery': 'Каждые', 'routineIntervalDays': '{n} дн.', 'waitForCompletion': 'Ждать выполнения', 'waitForCompletionInfo': 'Следующее повторение планируется после выполнения текущего. Пропущенные дни остаются просроченными.', 'addReminder': 'Добавить напоминание', 'reminderTypeTime': 'В заданное время', 'reminderTypeSpread': 'Равномерно за день', 'reminderTypeAfterEach': 'После каждого', 'reminderEveryLabel': 'каждые', 'reminderAfterEachLabel': 'после каждого', 'recordOnOriginalDate': 'Отметить в исходный день', 'completeTodayShift': 'Выполнить сегодня (сдвинуть)', 'overdueRoutineTitle': 'Просроченная привычка', 'overdueRoutineBody': 'Когда вы это сделали?', 'overdueLabel': 'Просрочено',
   'daysAfterCompletion': 'дней после выполнения',
   'autoReset': 'Автосброс', 'autoResetEveryDay': 'Каждый день',
@@ -4802,6 +4831,9 @@ const Map<String, String> _zh = {
   'newRoutine': '新习惯', 'editRoutine': '编辑习惯',
   'sectionFrequency': '频率',
   'freqDaily': '每天', 'freqSpecificDays': '指定日期', 'freqDaysAfter': '完成后 X 天',
+  'specificWeek': '按周', 'specificMonth': '按月', 'routineMonthDaysPrefix': '每月',
+  'continueAfterCompletion': '完成后继续记录',
+  'continueAfterCompletionInfo': '达成目标后仍可继续记录进度',
   'freqInterval': '间隔', 'startDate': '开始日期', 'routineIntervalEvery': '每', 'routineIntervalDays': '{n} 天', 'waitForCompletion': '等待完成', 'waitForCompletionInfo': '完成当前后再安排下一次。错过的日子会保持逾期。', 'addReminder': '添加提醒', 'reminderTypeTime': '在某时间', 'reminderTypeSpread': '全天分散', 'reminderTypeAfterEach': '每次之后', 'reminderEveryLabel': '每', 'reminderAfterEachLabel': '每次之后', 'recordOnOriginalDate': '标记在原始日期', 'completeTodayShift': '今天完成（顺延）', 'overdueRoutineTitle': '逾期的习惯', 'overdueRoutineBody': '你是什么时候做的？', 'overdueLabel': '逾期',
   'daysAfterCompletion': '完成后天数',
   'autoReset': '自动重置', 'autoResetEveryDay': '每天',
@@ -5261,6 +5293,9 @@ const Map<String, String> _ja = {
   'newRoutine': '新しい習慣', 'editRoutine': '習慣を編集',
   'sectionFrequency': '頻度',
   'freqDaily': '毎日', 'freqSpecificDays': '特定の曜日', 'freqDaysAfter': '完了から X 日後',
+  'specificWeek': '週', 'specificMonth': '月', 'routineMonthDaysPrefix': '日',
+  'continueAfterCompletion': '完了後も記録を続ける',
+  'continueAfterCompletionInfo': '目標を達成した後も進捗を記録し続けます',
   'freqInterval': '間隔', 'startDate': '開始日', 'routineIntervalEvery': '毎', 'routineIntervalDays': '{n} 日', 'waitForCompletion': '完了を待つ', 'waitForCompletionInfo': 'これを完了してから次回を予定します。逃した日は期限切れのまま残ります。', 'addReminder': 'リマインダーを追加', 'reminderTypeTime': '指定時刻', 'reminderTypeSpread': '一日に分散', 'reminderTypeAfterEach': '各回のあと', 'reminderEveryLabel': '毎', 'reminderAfterEachLabel': '各回のあと', 'recordOnOriginalDate': '元の日に記録', 'completeTodayShift': '今日完了（次回をずらす）', 'overdueRoutineTitle': '期限切れの習慣', 'overdueRoutineBody': 'いつ行いましたか？', 'overdueLabel': '期限切れ',
   'daysAfterCompletion': '完了からの日数',
   'autoReset': '自動リセット', 'autoResetEveryDay': '毎日',

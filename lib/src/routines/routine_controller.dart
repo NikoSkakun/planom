@@ -86,6 +86,11 @@ class RoutineController with ChangeNotifier {
     if (_epochDay(day) < _epochDay(startFloor(r))) return false;
     switch (r.frequencyType) {
       case 'specific_days':
+        // Month mode (selected days-of-month) takes precedence over weekly.
+        final monthdays = r.monthdays;
+        if (monthdays != null && monthdays.isNotEmpty) {
+          return monthdays.contains(day.day);
+        }
         return r.weekdays?.contains(day.weekday - 1) ?? false;
       case 'interval':
         return _intervalAppearsOn(r, day);
@@ -205,6 +210,12 @@ class RoutineController with ChangeNotifier {
 
   bool isTodayCompleted(Routine r) => isCompletedOnDate(r, DateTime.now());
 
+  /// A routine that has reached its goal but is configured to keep tracking
+  /// progress afterwards. Such routines sit in a "middle" state in the day
+  /// list — done, yet still interactive — rather than sinking to the bottom.
+  bool isContinuingOnDate(Routine r, DateTime date) =>
+      r.continueAfterCompletion && isCompletedOnDate(r, date);
+
   /// Records progress for [r] on [date].
   ///
   /// - achieve_all: toggles done/undone.
@@ -217,7 +228,11 @@ class RoutineController with ChangeNotifier {
     final current = existing?.amount ?? 0;
 
     final int next;
-    if (r.goalType == 'achieve_all') {
+    if (r.continueAfterCompletion) {
+      // Keep tracking beyond the goal — taps never auto-reset, so progress can
+      // accumulate past completion (the "continue tracking" middle state).
+      next = current + (r.goalType == 'achieve_all' ? 1 : (r.recordAmount ?? 1));
+    } else if (r.goalType == 'achieve_all') {
       next = current >= 1 ? 0 : 1;
     } else {
       final add = r.recordAmount ?? 1;

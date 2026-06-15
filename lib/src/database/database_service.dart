@@ -18,7 +18,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 35;
+  static const _dbVersion = 36;
 
   Database? _db;
 
@@ -173,6 +173,8 @@ class DatabaseService {
             recordAmount INTEGER,
             frequencyType TEXT NOT NULL DEFAULT 'daily',
             weekdays TEXT,
+            monthdays TEXT,
+            continueAfterCompletion INTEGER NOT NULL DEFAULT 0,
             startDate INTEGER,
             intervalDays INTEGER,
             waitForCompletion INTEGER NOT NULL DEFAULT 0,
@@ -681,6 +683,15 @@ class DatabaseService {
               'UPDATE events SET updatedAt = COALESCE(deletedDate, creationDate, 0)');
           await db.execute(
               'UPDATE list_sections SET updatedAt = COALESCE(creationDate, 0)');
+        }
+        if (oldVersion < 36) {
+          // `specific_days` routines gain a "Month" mode: monthdays stores the
+          // selected days-of-month (1…31) as a comma-joined string. Plus a
+          // "continue tracking after completion" flag that keeps a completed
+          // routine interactive in a middle state.
+          await db.execute('ALTER TABLE routines ADD COLUMN monthdays TEXT');
+          await db.execute(
+              'ALTER TABLE routines ADD COLUMN continueAfterCompletion INTEGER NOT NULL DEFAULT 0');
         }
       },
     );

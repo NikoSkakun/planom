@@ -228,13 +228,21 @@ class _DayContentState extends State<_DayContent> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final all = widget.controller.routinesForDate(_selected);
-    // Completed routines sink below the still-to-do ones (each group keeps its
-    // manual order).
+    // Three buckets (each keeps its manual order):
+    //  1. still-to-do routines (top),
+    //  2. "continue tracking" routines that reached their goal but stay
+    //     interactive — a middle state between to-do and fully done,
+    //  3. fully-completed routines, which sink into a collapsible section.
     final incomplete = all
         .where((r) => !widget.controller.isCompletedOnDate(r, _selected))
         .toList();
+    final continuing = all
+        .where((r) => widget.controller.isContinuingOnDate(r, _selected))
+        .toList();
     final completed = all
-        .where((r) => widget.controller.isCompletedOnDate(r, _selected))
+        .where((r) =>
+            widget.controller.isCompletedOnDate(r, _selected) &&
+            !r.continueAfterCompletion)
         .toList();
 
     final today = RoutineController.normalizeDate(DateTime.now());
@@ -264,7 +272,7 @@ class _DayContentState extends State<_DayContent> {
           resetSignal: widget.resetSignal,
         ),
         Expanded(
-          child: (incomplete.isEmpty && completed.isEmpty)
+          child: (incomplete.isEmpty && continuing.isEmpty && completed.isEmpty)
               ? _EmptyState(
                   message: s.noRoutinesToday,
                   hint: s.tapPlusFirstAdd,
@@ -272,6 +280,14 @@ class _DayContentState extends State<_DayContent> {
               : ListView(
                   children: [
                     for (final r in incomplete)
+                      _DayRoutineRow(
+                        routine: r,
+                        controller: widget.controller,
+                        date: _selected,
+                      ),
+                    // "Continue tracking" routines: done but still interactive,
+                    // shown in the middle (no collapsible section).
+                    for (final r in continuing)
                       _DayRoutineRow(
                         routine: r,
                         controller: widget.controller,
@@ -780,6 +796,10 @@ class _DayRoutineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCompleted = controller.isCompletedOnDate(routine, date);
+    // A "continue tracking" routine stays interactive after reaching its goal,
+    // so it isn't dimmed/struck like a fully-done one.
+    final continuing = isCompleted && routine.continueAfterCompletion;
+    final dimmed = isCompleted && !continuing;
     final progress = controller.progressForDate(routine.id, date);
     final achieveAll = routine.goalType == 'achieve_all';
     final overdue = !isCompleted && controller.isOverdueOn(routine, date);
@@ -831,7 +851,7 @@ class _DayRoutineRow extends StatelessWidget {
                     RoutineCircleIcon(
                       iconId: routine.iconId,
                       iconColor: routine.iconColor,
-                      dimmed: isCompleted,
+                      dimmed: dimmed,
                       showCheck: isCompleted && achieveAll,
                     ),
                     const SizedBox(width: 14),
@@ -844,7 +864,7 @@ class _DayRoutineRow extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
-                              color: isCompleted
+                              color: dimmed
                                   ? CupertinoColors.secondaryLabel
                                       .resolveFrom(context)
                                   : CupertinoColors.label.resolveFrom(context),
@@ -1076,16 +1096,20 @@ class _AllRoutineRow extends StatelessWidget {
     if (r.frequencyType == 'interval') {
       return '${s.routineIntervalEvery} ${s.routineIntervalDays(r.intervalDays ?? 1)}';
     }
-    final days = r.weekdays;
-    if (r.frequencyType != 'specific_days' ||
-        days == null ||
-        days.isEmpty ||
-        days.length == 7) {
-      return s.everyDayLabel;
+    if (r.frequencyType == 'specific_days') {
+      final monthdays = r.monthdays;
+      if (monthdays != null && monthdays.isNotEmpty) {
+        final sorted = [...monthdays]..sort();
+        return '${s.routineMonthDaysPrefix} ${sorted.join(', ')}';
+      }
+      final days = r.weekdays;
+      if (days != null && days.isNotEmpty && days.length != 7) {
+        final labels = weekdaysShort(context);
+        final sorted = [...days]..sort();
+        return sorted.map((d) => labels[d]).join(', ');
+      }
     }
-    final labels = weekdaysShort(context);
-    final sorted = [...days]..sort();
-    return sorted.map((d) => labels[d]).join(', ');
+    return s.everyDayLabel;
   }
 
   Future<bool> _confirmDelete(BuildContext context) {

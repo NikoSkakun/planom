@@ -26,8 +26,20 @@ class Routine extends AppItem {
 
   final String frequencyType; // 'daily' | 'specific_days' | 'interval'
 
-  /// Selected weekdays for `specific_days` (0 = Mon … 6 = Sun). Null otherwise.
+  /// Selected weekdays for `specific_days` in "Week" mode (0 = Mon … 6 = Sun).
+  /// Null when the routine isn't a weekly `specific_days` routine.
   final List<int>? weekdays;
+
+  /// Selected days-of-month for `specific_days` in "Month" mode (1 … 31). When
+  /// non-empty the routine repeats on those calendar days each month (days that
+  /// don't exist in a given month are simply skipped). Takes precedence over
+  /// [weekdays] for a `specific_days` routine. Null otherwise.
+  final List<int>? monthdays;
+
+  /// When true, a routine that has reached its goal stays interactive (in a
+  /// "middle" state between still-to-do and fully-done routines) so the user can
+  /// keep recording progress beyond the goal. Off by default.
+  final bool continueAfterCompletion;
 
   /// Day the routine starts being active (date-only). Defaults to the creation
   /// day when null.
@@ -63,6 +75,8 @@ class Routine extends AppItem {
     this.recordAmount,
     this.frequencyType = 'daily',
     this.weekdays,
+    this.monthdays,
+    this.continueAfterCompletion = false,
     this.startDate,
     this.intervalDays,
     this.waitForCompletion = false,
@@ -89,6 +103,9 @@ class Routine extends AppItem {
     String? frequencyType,
     List<int>? weekdays,
     bool clearWeekdays = false,
+    List<int>? monthdays,
+    bool clearMonthdays = false,
+    bool? continueAfterCompletion,
     DateTime? startDate,
     bool clearStartDate = false,
     int? intervalDays,
@@ -111,6 +128,9 @@ class Routine extends AppItem {
           clearRecordAmount ? null : (recordAmount ?? this.recordAmount),
       frequencyType: frequencyType ?? this.frequencyType,
       weekdays: clearWeekdays ? null : (weekdays ?? this.weekdays),
+      monthdays: clearMonthdays ? null : (monthdays ?? this.monthdays),
+      continueAfterCompletion:
+          continueAfterCompletion ?? this.continueAfterCompletion,
       startDate: clearStartDate ? null : (startDate ?? this.startDate),
       intervalDays:
           clearIntervalDays ? null : (intervalDays ?? this.intervalDays),
@@ -133,6 +153,8 @@ class Routine extends AppItem {
         'recordAmount': recordAmount,
         'frequencyType': frequencyType,
         'weekdays': weekdays?.join(','),
+        'monthdays': monthdays?.join(','),
+        'continueAfterCompletion': continueAfterCompletion ? 1 : 0,
         'startDate': startDate?.millisecondsSinceEpoch,
         'intervalDays': intervalDays,
         'waitForCompletion': waitForCompletion ? 1 : 0,
@@ -154,7 +176,10 @@ class Routine extends AppItem {
         recordAmount: map['recordAmount'] as int?,
         // Tolerate legacy rows / backups where newer fields are absent.
         frequencyType: (map['frequencyType'] as String?) ?? 'daily',
-        weekdays: _parseWeekdays(map['weekdays'] as String?),
+        weekdays: _parseIntList(map['weekdays'] as String?),
+        monthdays: _parseIntList(map['monthdays'] as String?),
+        continueAfterCompletion:
+            (map['continueAfterCompletion'] as int? ?? 0) == 1,
         startDate: map['startDate'] == null
             ? null
             : DateTime.fromMillisecondsSinceEpoch(map['startDate'] as int),
@@ -167,7 +192,7 @@ class Routine extends AppItem {
 
   // Empty strings round-trip as `null` so an empty list does not crash
   // `int.parse('')` on the next load.
-  static List<int>? _parseWeekdays(String? raw) {
+  static List<int>? _parseIntList(String? raw) {
     if (raw == null || raw.isEmpty) return null;
     return raw.split(',').map(int.parse).toList();
   }

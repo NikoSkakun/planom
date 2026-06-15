@@ -37,12 +37,19 @@ class _RoutinesTodaySectionState extends State<RoutinesTodaySection> {
       builder: (context, _) {
         final all = widget.controller.routinesForDate(widget.date);
         if (all.isEmpty) return const SizedBox.shrink();
-        // Completed routines sink to the bottom of the section.
+        // Completed routines sink to the bottom of the section; "continue
+        // tracking" routines that reached their goal stay in the middle (still
+        // interactive), between the to-do ones and the fully-done ones.
         final incomplete = all
             .where((r) => !widget.controller.isCompletedOnDate(r, widget.date))
             .toList();
+        final continuing = all
+            .where((r) => widget.controller.isContinuingOnDate(r, widget.date))
+            .toList();
         final completed = all
-            .where((r) => widget.controller.isCompletedOnDate(r, widget.date))
+            .where((r) =>
+                widget.controller.isCompletedOnDate(r, widget.date) &&
+                !r.continueAfterCompletion)
             .toList();
         final s = S.of(context);
         return Column(
@@ -50,17 +57,21 @@ class _RoutinesTodaySectionState extends State<RoutinesTodaySection> {
           children: [
             _Header(
               label: s.tabRoutines,
-              count: incomplete.length + completed.length,
+              count: incomplete.length + continuing.length + completed.length,
               expanded: _expanded,
               onToggle: () => setState(() => _expanded = !_expanded),
             ),
             if (_expanded) ...[
               for (final r in incomplete)
                 _Row(controller: widget.controller, routine: r, date: widget.date),
+              // "Continue tracking" routines stay at full opacity in the middle.
+              for (final r in continuing)
+                _Row(controller: widget.controller, routine: r, date: widget.date),
               // Completed routines are visually set apart — a light label divider
               // plus a dimmed row — so the done/to-do split reads at a glance.
               if (completed.isNotEmpty) ...[
-                if (incomplete.isNotEmpty) _CompletedDivider(label: s.completed),
+                if (incomplete.isNotEmpty || continuing.isNotEmpty)
+                  _CompletedDivider(label: s.completed),
                 for (final r in completed)
                   Opacity(
                     opacity: 0.55,
@@ -196,6 +207,10 @@ class _Row extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCompleted = controller.isCompletedOnDate(routine, date);
+    // "Continue tracking" routines stay interactive after reaching their goal,
+    // so they aren't dimmed like fully-done ones.
+    final continuing = isCompleted && routine.continueAfterCompletion;
+    final dimmed = isCompleted && !continuing;
     final achieveAll = routine.goalType == 'achieve_all';
     final progress = controller.progressForDate(routine.id, date);
     return GestureDetector(
@@ -220,7 +235,7 @@ class _Row extends StatelessWidget {
                   iconId: routine.iconId,
                   iconColor: routine.iconColor,
                   size: 20 * AppScale.factor,
-                  dimmed: isCompleted,
+                  dimmed: dimmed,
                   showCheck: isCompleted && achieveAll,
                 ),
                 const SizedBox(width: 12),
@@ -229,7 +244,7 @@ class _Row extends StatelessWidget {
                     routine.name,
                     style: TextStyle(
                       fontSize: 16,
-                      color: isCompleted
+                      color: dimmed
                           ? CupertinoColors.secondaryLabel.resolveFrom(context)
                           : CupertinoColors.label.resolveFrom(context),
                     ),
