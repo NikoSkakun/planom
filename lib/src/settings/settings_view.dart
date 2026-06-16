@@ -25,7 +25,7 @@ import 'security_view.dart';
 import 'settings_controller.dart';
 import 'spaces_view.dart';
 import 'split_screen_settings_view.dart';
-import 'sync_settings_view.dart';
+// import 'sync_settings_view.dart'; // Hidden until Sync feature is ready.
 import 'tab_bar_pages_view.dart';
 import 'tasks_settings_view.dart';
 
@@ -346,22 +346,24 @@ class _SettingsViewState extends State<SettingsView> {
 
             if (hasBackup) ...[
               // ── Sync ──────────────────────────────────────────────
-              const SizedBox(height: 18),
-              _SectionHeader(s.sync),
-              _NavRow(
-                label: s.sync,
-                icon: CupertinoIcons.arrow_2_circlepath,
-                onTap: () {
-                  final syncController =
-                      SpaceManagerProvider.of(context).syncController;
-                  Navigator.of(context).push(
-                    FastRoute<void>(
-                      builder: (_) =>
-                          SyncSettingsView(controller: syncController),
-                    ),
-                  );
-                },
-              ),
+              // Hidden until the Sync feature is ready. Restore this block
+              // (and the `sync_settings_view.dart` import) to re-enable it.
+              // const SizedBox(height: 18),
+              // _SectionHeader(s.sync),
+              // _NavRow(
+              //   label: s.sync,
+              //   icon: CupertinoIcons.arrow_2_circlepath,
+              //   onTap: () {
+              //     final syncController =
+              //         SpaceManagerProvider.of(context).syncController;
+              //     Navigator.of(context).push(
+              //       FastRoute<void>(
+              //         builder: (_) =>
+              //             SyncSettingsView(controller: syncController),
+              //       ),
+              //     );
+              //   },
+              // ),
 
               // ── Data ──────────────────────────────────────────────
               const SizedBox(height: 18),
