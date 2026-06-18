@@ -94,6 +94,8 @@ void main() async {
           routineController: spaceManager.routineController,
           eventController: spaceManager.eventController,
           contactController: spaceManager.contactController,
+          financeController: spaceManager.financeController,
+          goalController: spaceManager.goalController,
           backupService: spaceManager.backupService,
           securityService: securityService,
           googleCalendarController: googleCalendarController,

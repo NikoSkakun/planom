@@ -435,7 +435,7 @@ class SettingsController with ChangeNotifier {
         }
       } else if (key == 'last_tab') {
         final v = int.tryParse(value);
-        if (v != null && v >= 0 && v <= 4) _lastOpenedTab = v;
+        if (v != null && v >= 0 && v <= 6) _lastOpenedTab = v;
       } else if (key == 'first_day_of_week') {
         final v = int.tryParse(value);
         if (v != null && v >= 1 && v <= 7) _firstDayOfWeek = v;

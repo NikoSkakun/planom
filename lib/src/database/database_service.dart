@@ -5,8 +5,14 @@ import 'package:sqflite/sqflite.dart';
 import '../utils/platform_capabilities.dart';
 import '../models/app_folder.dart';
 import '../models/app_list.dart';
+import '../models/budget.dart';
 import '../models/contact.dart';
 import '../models/event.dart';
+import '../models/finance_account.dart';
+import '../models/finance_category.dart';
+import '../models/finance_transaction.dart';
+import '../models/goal.dart';
+import '../models/goal_milestone.dart';
 import '../models/list_section.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
@@ -18,7 +24,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 36;
+  static const _dbVersion = 37;
 
   Database? _db;
 
@@ -235,6 +241,7 @@ class DatabaseService {
             PRIMARY KEY (tbl, id)
           )
         ''');
+        await _createFinanceGoalsTables(db);
         await _createFtsTables(db);
         await _createIndexes(db);
       },
@@ -693,8 +700,114 @@ class DatabaseService {
           await db.execute(
               'ALTER TABLE routines ADD COLUMN continueAfterCompletion INTEGER NOT NULL DEFAULT 0');
         }
+        if (oldVersion < 37) {
+          // Finance mode (accounts / categories / transactions / budgets) and
+          // Goals mode (goals / milestones). All idempotent.
+          await _createFinanceGoalsTables(db);
+        }
       },
     );
+  }
+
+  /// Creates the Finance + Goals tables. Idempotent (`IF NOT EXISTS`) so it is
+  /// safe to call from both `onCreate` and the v37 upgrade branch.
+  Future<void> _createFinanceGoalsTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS finance_accounts (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        iconId TEXT NOT NULL DEFAULT 'wallet',
+        colorValue INTEGER NOT NULL DEFAULT 0,
+        type TEXT NOT NULL DEFAULT 'cash',
+        openingBalance INTEGER NOT NULL DEFAULT 0,
+        currencyCode TEXT NOT NULL DEFAULT 'USD',
+        isArchived INTEGER NOT NULL DEFAULT 0,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS finance_categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'expense',
+        iconId TEXT NOT NULL DEFAULT 'tag',
+        colorValue INTEGER NOT NULL DEFAULT 0,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS finance_transactions (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL DEFAULT 'expense',
+        amount INTEGER NOT NULL DEFAULT 0,
+        accountId TEXT NOT NULL,
+        toAccountId TEXT,
+        categoryId TEXT,
+        title TEXT NOT NULL DEFAULT '',
+        note TEXT,
+        date INTEGER NOT NULL,
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS budgets (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        categoryId TEXT,
+        amount INTEGER NOT NULL DEFAULT 0,
+        period TEXT NOT NULL DEFAULT 'monthly',
+        currencyCode TEXT NOT NULL DEFAULT 'USD',
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS goals (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        note TEXT,
+        iconId TEXT NOT NULL DEFAULT 'flag',
+        colorValue INTEGER NOT NULL DEFAULT 0,
+        type TEXT NOT NULL DEFAULT 'milestone',
+        targetAmount INTEGER,
+        currentAmount INTEGER NOT NULL DEFAULT 0,
+        unit TEXT,
+        startDate INTEGER NOT NULL,
+        targetDate INTEGER,
+        isCompleted INTEGER NOT NULL DEFAULT 0,
+        completionDate INTEGER,
+        isArchived INTEGER NOT NULL DEFAULT 0,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS goal_milestones (
+        id TEXT PRIMARY KEY,
+        goalId TEXT NOT NULL,
+        title TEXT NOT NULL,
+        isCompleted INTEGER NOT NULL DEFAULT 0,
+        completionDate INTEGER,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_fin_txn_account ON finance_transactions(accountId)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_fin_txn_date ON finance_transactions(date)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_fin_txn_category ON finance_transactions(categoryId)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_goal_milestones_goalId ON goal_milestones(goalId)');
   }
 
   /// Creates indexes on the columns the controllers repeatedly filter on
@@ -1535,10 +1648,238 @@ class DatabaseService {
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
+  Future<List<Map<String, dynamic>>> _exportTable(String table) async {
+    final db = await _database;
+    final rows = await db.query(table);
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> exportFinanceAccounts() =>
+      _exportTable('finance_accounts');
+  Future<List<Map<String, dynamic>>> exportFinanceCategories() =>
+      _exportTable('finance_categories');
+  Future<List<Map<String, dynamic>>> exportFinanceTransactions() =>
+      _exportTable('finance_transactions');
+  Future<List<Map<String, dynamic>>> exportBudgets() => _exportTable('budgets');
+  Future<List<Map<String, dynamic>>> exportGoals() => _exportTable('goals');
+  Future<List<Map<String, dynamic>>> exportGoalMilestones() =>
+      _exportTable('goal_milestones');
+
   Future<List<Map<String, dynamic>>> exportTombstones() async {
     final db = await _database;
     final rows = await db.query('tombstones');
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  // ── Finance: accounts ──────────────────────────────────────────────────────
+  Future<List<FinanceAccount>> getFinanceAccounts() async {
+    final db = await _database;
+    final rows = await db.query('finance_accounts',
+        orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(FinanceAccount.fromMap).toList();
+  }
+
+  Future<void> insertFinanceAccount(FinanceAccount account) async {
+    final db = await _database;
+    await _putRow(db, 'finance_accounts', account.toMap());
+  }
+
+  Future<void> updateFinanceAccount(FinanceAccount account) async {
+    final db = await _database;
+    await _patchRow(db, 'finance_accounts', account.toMap(),
+        where: 'id = ?', whereArgs: [account.id]);
+  }
+
+  Future<void> updateFinanceAccountSortOrders(
+      List<FinanceAccount> accounts) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final a in accounts) {
+      batch.update('finance_accounts', {'sortOrder': a.sortOrder},
+          where: 'id = ?', whereArgs: [a.id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Deletes an account and every transaction that touches it (as source or
+  /// transfer destination).
+  Future<void> deleteFinanceAccount(String id) async {
+    final db = await _database;
+    final txnIds = (await db.query('finance_transactions',
+            columns: ['id'],
+            where: 'accountId = ? OR toAccountId = ?',
+            whereArgs: [id, id]))
+        .map((r) => r['id'] as String)
+        .toList();
+    await db
+        .delete('finance_accounts', where: 'id = ?', whereArgs: [id]);
+    await db.delete('finance_transactions',
+        where: 'accountId = ? OR toAccountId = ?', whereArgs: [id, id]);
+    await _recordTombstone(db, 'finance_accounts', id);
+    for (final txnId in txnIds) {
+      await _recordTombstone(db, 'finance_transactions', txnId);
+    }
+  }
+
+  // ── Finance: categories ────────────────────────────────────────────────────
+  Future<List<FinanceCategory>> getFinanceCategories() async {
+    final db = await _database;
+    final rows = await db.query('finance_categories',
+        orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(FinanceCategory.fromMap).toList();
+  }
+
+  Future<void> insertFinanceCategory(FinanceCategory category) async {
+    final db = await _database;
+    await _putRow(db, 'finance_categories', category.toMap());
+  }
+
+  Future<void> updateFinanceCategory(FinanceCategory category) async {
+    final db = await _database;
+    await _patchRow(db, 'finance_categories', category.toMap(),
+        where: 'id = ?', whereArgs: [category.id]);
+  }
+
+  /// Deletes a category. Its transactions stay but become uncategorised.
+  Future<void> deleteFinanceCategory(String id) async {
+    final db = await _database;
+    await db
+        .delete('finance_categories', where: 'id = ?', whereArgs: [id]);
+    await db.update('finance_transactions', {'categoryId': null},
+        where: 'categoryId = ?', whereArgs: [id]);
+    await db.update('budgets', {'categoryId': null},
+        where: 'categoryId = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'finance_categories', id);
+  }
+
+  // ── Finance: transactions ──────────────────────────────────────────────────
+  Future<List<FinanceTransaction>> getFinanceTransactions() async {
+    final db = await _database;
+    final rows = await db.query('finance_transactions', orderBy: 'date DESC');
+    return rows.map(FinanceTransaction.fromMap).toList();
+  }
+
+  Future<void> insertFinanceTransaction(FinanceTransaction txn) async {
+    final db = await _database;
+    await _putRow(db, 'finance_transactions', txn.toMap());
+  }
+
+  Future<void> updateFinanceTransaction(FinanceTransaction txn) async {
+    final db = await _database;
+    await _patchRow(db, 'finance_transactions', txn.toMap(),
+        where: 'id = ?', whereArgs: [txn.id]);
+  }
+
+  Future<void> deleteFinanceTransaction(String id) async {
+    final db = await _database;
+    await db
+        .delete('finance_transactions', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'finance_transactions', id);
+  }
+
+  // ── Finance: budgets ───────────────────────────────────────────────────────
+  Future<List<Budget>> getBudgets() async {
+    final db = await _database;
+    final rows = await db.query('budgets',
+        orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(Budget.fromMap).toList();
+  }
+
+  Future<void> insertBudget(Budget budget) async {
+    final db = await _database;
+    await _putRow(db, 'budgets', budget.toMap());
+  }
+
+  Future<void> updateBudget(Budget budget) async {
+    final db = await _database;
+    await _patchRow(db, 'budgets', budget.toMap(),
+        where: 'id = ?', whereArgs: [budget.id]);
+  }
+
+  Future<void> deleteBudget(String id) async {
+    final db = await _database;
+    await db.delete('budgets', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'budgets', id);
+  }
+
+  // ── Goals ──────────────────────────────────────────────────────────────────
+  Future<List<Goal>> getGoals() async {
+    final db = await _database;
+    final rows =
+        await db.query('goals', orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(Goal.fromMap).toList();
+  }
+
+  Future<void> insertGoal(Goal goal) async {
+    final db = await _database;
+    await _putRow(db, 'goals', goal.toMap());
+  }
+
+  Future<void> updateGoal(Goal goal) async {
+    final db = await _database;
+    await _patchRow(db, 'goals', goal.toMap(),
+        where: 'id = ?', whereArgs: [goal.id]);
+  }
+
+  Future<void> updateGoalSortOrders(List<Goal> goals) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final g in goals) {
+      batch.update('goals', {'sortOrder': g.sortOrder},
+          where: 'id = ?', whereArgs: [g.id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> deleteGoal(String id) async {
+    final db = await _database;
+    final milestoneIds = (await db.query('goal_milestones',
+            columns: ['id'], where: 'goalId = ?', whereArgs: [id]))
+        .map((r) => r['id'] as String)
+        .toList();
+    await db.delete('goals', where: 'id = ?', whereArgs: [id]);
+    await db
+        .delete('goal_milestones', where: 'goalId = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'goals', id);
+    for (final mId in milestoneIds) {
+      await _recordTombstone(db, 'goal_milestones', mId);
+    }
+  }
+
+  Future<List<GoalMilestone>> getGoalMilestones() async {
+    final db = await _database;
+    final rows = await db.query('goal_milestones',
+        orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(GoalMilestone.fromMap).toList();
+  }
+
+  Future<void> insertGoalMilestone(GoalMilestone milestone) async {
+    final db = await _database;
+    await _putRow(db, 'goal_milestones', milestone.toMap());
+  }
+
+  Future<void> updateGoalMilestone(GoalMilestone milestone) async {
+    final db = await _database;
+    await _patchRow(db, 'goal_milestones', milestone.toMap(),
+        where: 'id = ?', whereArgs: [milestone.id]);
+  }
+
+  Future<void> updateGoalMilestoneSortOrders(
+      List<GoalMilestone> milestones) async {
+    final db = await _database;
+    final batch = db.batch();
+    for (final m in milestones) {
+      batch.update('goal_milestones', {'sortOrder': m.sortOrder},
+          where: 'id = ?', whereArgs: [m.id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> deleteGoalMilestone(String id) async {
+    final db = await _database;
+    await db
+        .delete('goal_milestones', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'goal_milestones', id);
   }
 
   static const _allTables = [
@@ -1555,6 +1896,12 @@ class DatabaseService {
     'folders',
     'tags',
     'tasks',
+    'finance_transactions',
+    'finance_accounts',
+    'finance_categories',
+    'budgets',
+    'goal_milestones',
+    'goals',
   ];
 
   /// Atomically replaces all data: clears every table and re-inserts the given
@@ -1593,6 +1940,12 @@ class DatabaseService {
     await db.delete('folders');
     await db.delete('tags');
     await db.delete('tasks');
+    await db.delete('finance_transactions');
+    await db.delete('finance_accounts');
+    await db.delete('finance_categories');
+    await db.delete('budgets');
+    await db.delete('goal_milestones');
+    await db.delete('goals');
     await db.delete('tombstones');
   }
 

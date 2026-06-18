@@ -6,8 +6,14 @@ import 'calendar/event_controller.dart';
 import 'calendar/event_creation_sheet.dart';
 import 'contacts/contact_controller.dart';
 import 'contacts/contact_creation_sheet.dart';
+import 'finance/finance_controller.dart';
+import 'finance/finance_view.dart';
+import 'finance/transaction_editor.dart';
 import 'folders/create_folder_list_sheet.dart';
 import 'folders/folder_controller.dart';
+import 'goals/goal_controller.dart';
+import 'goals/goal_editor.dart';
+import 'goals/goals_view.dart';
 import 'integrations/apple/device_calendar_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
 import 'models/list_type.dart';
@@ -52,6 +58,8 @@ class HomeShell extends StatefulWidget {
     required this.routineController,
     required this.eventController,
     required this.contactController,
+    required this.financeController,
+    required this.goalController,
     required this.backupService,
     this.securityService,
     required this.googleCalendarController,
@@ -86,6 +94,8 @@ class HomeShell extends StatefulWidget {
   final RoutineController routineController;
   final EventController eventController;
   final ContactController contactController;
+  final FinanceController financeController;
+  final GoalController goalController;
   final BackupService backupService;
   final SecurityService? securityService;
   final GoogleCalendarController googleCalendarController;
@@ -97,7 +107,8 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   // Logical indices: 0=Tasks 1=Notes 2=Calendar 3=Routines 4=Settings
-  final _navigatorKeys = List.generate(5, (_) => GlobalKey<NavigatorState>());
+  // 5=Finance 6=Goals
+  final _navigatorKeys = List.generate(7, (_) => GlobalKey<NavigatorState>());
   late final List<_DepthObserver> _depthObservers;
   final _activeListId = ValueNotifier<String?>(null);
   final _activeFolderId = ValueNotifier<String?>(null);
@@ -195,6 +206,10 @@ class _HomeShellState extends State<HomeShell> {
         return s.tabCalendar;
       case 3:
         return s.tabRoutines;
+      case 5:
+        return s.tabFinance;
+      case 6:
+        return s.tabGoals;
       default:
         return s.tabSettings;
     }
@@ -323,6 +338,19 @@ class _HomeShellState extends State<HomeShell> {
       _DepthObserver(
         onChanged: (depth, trackedCount) {
           if (_lastTabIndex == 4) _showPlusButton.value = false;
+        },
+      ),
+      // Finance tab: hide when navigated deeper (transaction editor opens on
+      // the root navigator, so the + stays at the Finance root).
+      _DepthObserver(
+        onChanged: (depth, trackedCount) {
+          if (_lastTabIndex == 5) _showPlusButton.value = depth <= 1;
+        },
+      ),
+      // Goals tab: hide when navigated deeper.
+      _DepthObserver(
+        onChanged: (depth, trackedCount) {
+          if (_lastTabIndex == 6) _showPlusButton.value = depth <= 1;
         },
       ),
     ];
@@ -646,6 +674,21 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ),
       );
+      return;
+    }
+
+    // Finance: + opens the transaction editor on the Finance tab navigator so
+    // it sits beneath the shell's UndoScope (delete shows an Undo banner).
+    if (_lastTabIndex == 5) {
+      final nav = _navigatorKeys[5].currentState;
+      if (nav != null) showTransactionEditor(nav.context, widget.financeController);
+      return;
+    }
+
+    // Goals: + opens the goal creation editor on the Goals tab navigator.
+    if (_lastTabIndex == 6) {
+      final nav = _navigatorKeys[6].currentState;
+      if (nav != null) showGoalEditor(nav.context, widget.goalController);
       return;
     }
 
@@ -1126,6 +1169,32 @@ class _HomeShellState extends State<HomeShell> {
           activeIcon: activeIcon('assets/icons/tab_bar/routines.png'),
           label: hideLabels ? null : s.tabRoutines,
         );
+      case 5:
+        return BottomNavigationBarItem(
+          icon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Icon(CupertinoIcons.chart_pie),
+          ),
+          activeIcon: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Icon(CupertinoIcons.chart_pie_fill,
+                color: deselectAll ? null : AppColors.accent),
+          ),
+          label: hideLabels ? null : s.tabFinance,
+        );
+      case 6:
+        return BottomNavigationBarItem(
+          icon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Icon(CupertinoIcons.flag),
+          ),
+          activeIcon: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Icon(CupertinoIcons.flag_fill,
+                color: deselectAll ? null : AppColors.accent),
+          ),
+          label: hideLabels ? null : s.tabGoals,
+        );
       default:
         return BottomNavigationBarItem(
           icon: const Padding(
@@ -1191,6 +1260,11 @@ class _HomeShellState extends State<HomeShell> {
           noteController: widget.noteController,
           eventController: widget.eventController,
         ),
+      5 => FinanceView(
+          controller: widget.financeController,
+          settingsController: widget.settingsController,
+        ),
+      6 => GoalsView(controller: widget.goalController),
       _ => SettingsView(
           controller: widget.settingsController,
           backupService: widget.backupService,

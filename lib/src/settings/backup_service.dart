@@ -10,8 +10,10 @@ import 'package:share_plus/share_plus.dart';
 import '../calendar/event_controller.dart';
 import '../contacts/contact_controller.dart';
 import '../database/database_service.dart';
+import '../finance/finance_controller.dart';
 import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
+import '../goals/goal_controller.dart';
 import '../integrations/apple/device_calendar_controller.dart';
 import '../integrations/google/google_calendar_controller.dart';
 import '../models/routine.dart';
@@ -33,6 +35,8 @@ class BackupService {
     required this.eventController,
     required this.contactController,
     required this.settingsController,
+    this.financeController,
+    this.goalController,
   });
 
   final DatabaseService db;
@@ -43,6 +47,8 @@ class BackupService {
   final EventController eventController;
   final ContactController contactController;
   final SettingsController settingsController;
+  final FinanceController? financeController;
+  final GoalController? goalController;
 
   /// Builds the active space's backup payload as a plain JSON string. Used
   /// both by [exportBackup] (writes to file + share sheet) and by the sync
@@ -54,6 +60,9 @@ class BackupService {
     var lists = await db.exportLists();
     var noteFolders = await db.exportNoteFolders();
     var routines = await db.exportRoutines();
+    var financeAccounts = await db.exportFinanceAccounts();
+    var financeCategories = await db.exportFinanceCategories();
+    var goals = await db.exportGoals();
 
     final customIcons = <String, String>{};
     folders = await _inlineIcons(folders, 'iconId', docsPath, customIcons);
@@ -61,6 +70,11 @@ class BackupService {
     noteFolders =
         await _inlineIcons(noteFolders, 'iconId', docsPath, customIcons);
     routines = await _inlineIcons(routines, 'iconId', docsPath, customIcons);
+    financeAccounts =
+        await _inlineIcons(financeAccounts, 'iconId', docsPath, customIcons);
+    financeCategories =
+        await _inlineIcons(financeCategories, 'iconId', docsPath, customIcons);
+    goals = await _inlineIcons(goals, 'iconId', docsPath, customIcons);
 
     final payload = <String, dynamic>{
       'version': 1,
@@ -77,6 +91,12 @@ class BackupService {
       'events': await db.exportEvents(),
       'list_sections': await db.exportListSections(),
       'contacts': await db.exportContacts(),
+      'finance_accounts': financeAccounts,
+      'finance_categories': financeCategories,
+      'finance_transactions': await db.exportFinanceTransactions(),
+      'budgets': await db.exportBudgets(),
+      'goals': goals,
+      'goal_milestones': await db.exportGoalMilestones(),
       'tombstones': await db.exportTombstones(),
       'app_settings': (await db.exportAppSettings())
           .where((r) =>
@@ -242,6 +262,12 @@ class BackupService {
         'events': asMaps(data['events']),
         'list_sections': asMaps(data['list_sections']),
         'contacts': asMaps(data['contacts']),
+        'finance_accounts': asMaps(data['finance_accounts']),
+        'finance_categories': asMaps(data['finance_categories']),
+        'finance_transactions': asMaps(data['finance_transactions']),
+        'budgets': asMaps(data['budgets']),
+        'goals': asMaps(data['goals']),
+        'goal_milestones': asMaps(data['goal_milestones']),
         'tombstones': asMaps(data['tombstones']),
         'app_settings': [
           ...asMaps(data['app_settings']).where((r) =>
@@ -284,6 +310,8 @@ class BackupService {
     await routineController.load();
     await eventController.load();
     await contactController.load();
+    await financeController?.load();
+    await goalController?.load();
     await settingsController.loadSettings();
 
     return true;
@@ -297,6 +325,8 @@ class BackupService {
     await routineController.load();
     await eventController.load();
     await contactController.load();
+    await financeController?.load();
+    await goalController?.load();
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────

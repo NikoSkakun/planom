@@ -258,8 +258,9 @@ Migration history:
 | v34 | Persisted per-list / per-folder view mode (`folders`/`app_lists`: `viewMode`, `kanbanScrollMode`) |
 | v35 | Per-record `updatedAt` (merge-sync foundation) on every user table + a `tombstones` table recording permanent deletions; `updatedAt` backfilled from the best existing timestamp |
 | v36 | `routines.monthdays TEXT` (specific_days "Month" mode: comma-joined days-of-month 1…31) + `routines.continueAfterCompletion INTEGER NOT NULL DEFAULT 0` (keep tracking past the goal) |
+| v37 | Finance + Goals modes: `finance_accounts`, `finance_categories`, `finance_transactions`, `budgets`, `goals`, `goal_milestones` tables — all created via the idempotent `_createFinanceGoalsTables` helper shared by `onCreate` and the upgrade branch. Money is stored as **integer minor units** (cents) in each account's own `currencyCode`; aggregates are grouped per-currency (no exchange rates). All six tables are in `_allTables` / `resetUserData` / the backup payload |
 
-When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch. Current version: **36**.
+When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch. Current version: **37**.
 
 **Full-text search (FTS5)** — `DatabaseService.searchAll(query, {limit = 50}) → SearchResults` returns id sets keyed by source table. Each token is wrapped in `"…"*` (with internal quotes doubled), so the user gets implicit AND prefix matching without exposed FTS5 syntax. Triggers keep `tasks_fts` / `notes_fts` / `events_fts` in sync; `_backfillFts` populates pre-existing rows during the v21 upgrade.
 
@@ -546,6 +547,30 @@ Key state:
 **Row layout**: 40 px circle icon (`RoutineCircleIcon`; dimmed + check overlay when `achieve_all` complete) · name (no strikethrough when complete) · right-aligned `_ProgressBadge` for `certain_amount`, with an animated `RoutineProgressFill` background. Completed routines sort below uncompleted. Row vertical padding is tightened to `8`.
 
 **Unit picker**: `_UnitPickerSheet` offers presets (`ml`, `L`, `oz`, `count`, `minute`, `hour`, `km`, `mi`, `page`, `cup`, `lap`, `step`) plus a free-text "Custom…" option.
+
+### Finance feature (`lib/src/finance/`) — built-in tab 5
+
+Full income/expense/transfer ledger with accounts, categories and budgets. **Hidden by default** — the user enables it from Settings → Tab Bar (the built-in picker lists it). Per-space, like Tasks.
+
+- **Money** (`money.dart`): stored as **integer minor units** (cents). `Currency` knows its decimal places (USD 2, JPY/KRW 0) and does locale-tolerant `parse` / `format`. `Currencies` is a ~33-entry catalogue; `Currencies.defaultForLanguage(code)` seeds a sensible default for new accounts.
+- **Per-account currency**: each `FinanceAccount` has its own `currencyCode`. Balances are **derived** (`openingBalance` + every transaction's `signedFor(account)`), never stored. Aggregates that could mix currencies (net worth, monthly income/expense, top spending) are computed **per currency** — no exchange rates, so every figure is exact.
+- **Models** (`lib/src/models/`): `FinanceAccount` (type/icon/color/currency/openingBalance/archived), `FinanceCategory` (`kind` income|expense), `FinanceTransaction` (`type` income|expense|transfer; `amount` always positive, sign implied by type; transfers carry `toAccountId`, no category), `Budget` (per-category-or-all limit over weekly|monthly|yearly, in a `currencyCode`).
+- **`FinanceController`** (`finance_controller.dart`): owns the four lists; `balanceOf`, `netWorthByCurrency`, `periodIncome/Expense`, `categorySpending`, `spentForBudget`, `periodWindow`. Seeds a default category set once per space (guarded by the `finance_seeded` app_setting). `setDefaultCurrency` persists the last-picked currency in `finance_default_currency`.
+- **Views**: `finance_view.dart` (tab root — Overview / Transactions / Budgets segments + `AccountDetailView` + reusable `TransactionRow` + `LinearProgressBar`), `transaction_editor.dart` (expense/income/transfer; delete uses the shell `UndoScope` so it must be pushed on a **tab** navigator, never root), `account_editor.dart`, `budget_editor.dart`, `category_manager.dart`. `finance_icons.dart` (`financeIconData` + `FinanceCircleIcon` + presets), `finance_pickers.dart` (`showCurrencyPicker`).
+- The floating **+** creates a transaction (routed in `HomeShell._onPlusPressed`, pushed on `_navigatorKeys[5]`).
+
+### Goals feature (`lib/src/goals/`) — built-in tab 6
+
+Long-term objective tracking. **Hidden by default**, enabled via Settings → Tab Bar. Per-space.
+
+- **Models**: `Goal` (`type` numeric|milestone; numeric tracks `currentAmount`/`targetAmount`/`unit`; milestone goals derive completion from their `GoalMilestone` children, or from `isCompleted` when they have none), `GoalMilestone`.
+- **`GoalController`** (`goal_controller.dart`): `progress(goal)` (0..1), `addProgress` (auto-completes a numeric goal at target, re-opens below it), `toggleMilestone` (`_syncGoalCompletionFromMilestones` flips the goal's completion when all/▸not-all milestones are done), `restoreGoal` for Undo.
+- **Views**: `goals_view.dart` (tab root — active goals with `GoalProgressRing`, collapsible Completed section), `goal_detail_view.dart` (hero ring, numeric +/−/set controls or milestone checklist with swipe-to-delete; ⋯ → edit/archive/delete with Undo), `goal_editor.dart`. `goal_icons.dart` (`goalIconData` + `GoalCircleIcon`), `goal_ring.dart` (`GoalProgressRing` CustomPaint).
+- The floating **+** creates a goal (pushed on `_navigatorKeys[6]`).
+
+**Shared editor widgets** (`lib/src/utils/editor_widgets.dart`): `EditorField` / `EditorLabel` / `EditorRowButton` / `EditorIconGrid` / `EditorColorRow` / `EditorPrimaryButton` + `kEditorColors`, reused by every Finance & Goals editor. Plain date-only picker in `lib/src/utils/simple_date_picker.dart` (`showSimpleDatePicker`, `formatShortDate`).
+
+> **Tab system note**: built-in tabs are now `0..6` (added Finance=5, Goals=6). `home_shell.dart` keeps 7 `_navigatorKeys` / `_depthObservers`; `tab_bar_config.dart` accepts `builtinIndex` 0..6; `TabBarConfig.defaultLayout()` still ships only the original 5, so the two new modes stay off the bar until added.
 
 ### Calendar feature (`lib/src/calendar/`)
 

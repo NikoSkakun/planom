@@ -426,6 +426,8 @@ String _tabLabel(S s, int tabIndex) {
     case 2: return s.tabCalendar;
     case 3: return s.tabRoutines;
     case 4: return s.tabSettings;
+    case 5: return s.tabFinance;
+    case 6: return s.tabGoals;
     default: return '';
   }
 }
@@ -443,8 +445,13 @@ String defaultTabLabel(S s, SettingsController controller) {
 Future<void> showDefaultTabPicker(
     BuildContext context, SettingsController controller) async {
   final s = S.of(context);
-  final visible =
-      controller.tabOrder.where(controller.isTabVisible).toList();
+  // Visible built-in tabs in display order (deduped) — derived from the tab-bar
+  // config so newer modes (Finance/Goals) appear here once enabled.
+  final visible = <int>[];
+  for (final item in controller.tabBarConfig.active.flattened) {
+    final idx = item.builtinIndex;
+    if (idx != null && !visible.contains(idx)) visible.add(idx);
+  }
   final selected = await showSelectionMenu<String>(
     context: context,
     title: s.defaultTab,
