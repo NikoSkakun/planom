@@ -2,8 +2,8 @@ import 'dart:convert';
 
 /// What a single tab on the tab bar represents.
 ///
-/// - [builtin] — one of the built-in modes (Tasks/Notes/Calendar/Routines/
-///   Settings/Finance/Goals) identified by [builtinIndex] 0..6.
+/// - [builtin] — one of the 5 historical tabs (Tasks/Notes/Calendar/Routines/
+///   Settings) identified by [builtinIndex] 0..4.
 /// - [shortcut] — direct navigation target chosen by the user (a list,
 ///   folder, smart list, or note folder) identified by [shortcutTarget] +
 ///   [shortcutId].
@@ -78,7 +78,7 @@ class TabItem {
     final enabled = map['enabled'] != false; // default true
     if (kindStr == 'builtin') {
       final idx = map['builtinIndex'] as int?;
-      if (idx == null || idx < 0 || idx > 6) return null;
+      if (idx == null || idx < 0 || idx > 4) return null;
       return TabItem.builtin(idx, enabled: enabled);
     }
     if (kindStr == 'shortcut') {
