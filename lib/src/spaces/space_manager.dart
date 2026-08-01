@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../calendar/event_controller.dart';
 import '../contacts/contact_controller.dart';
 import '../database/database_service.dart';
+import '../finance/finance_controller.dart';
 import '../folders/folder_controller.dart';
 import '../notes/note_controller.dart';
 import '../routines/routine_controller.dart';
@@ -41,6 +42,7 @@ class SpaceManager with ChangeNotifier {
   late RoutineController _routineController;
   late EventController _eventController;
   late ContactController _contactController;
+  late FinanceController _financeController;
   late BackupService _backupService;
   late SyncController _syncController;
 
@@ -57,6 +59,7 @@ class SpaceManager with ChangeNotifier {
   RoutineController get routineController => _routineController;
   EventController get eventController => _eventController;
   ContactController get contactController => _contactController;
+  FinanceController get financeController => _financeController;
   BackupService get backupService => _backupService;
   SyncController get syncController => _syncController;
   // Exposed for features (e.g. search) that need to query the active space's
@@ -143,7 +146,7 @@ class SpaceManager with ChangeNotifier {
         ? globalDb
         : DatabaseService(dbName: 'planom_$spaceId.db');
 
-    // The six controller loads are mutually independent (each reads its own
+    // The controller loads are mutually independent (each reads its own
     // tables; the badge wiring below runs only after all have loaded), so kick
     // them off together. They share one DB connection so queries still
     // serialise at the SQLite layer, but this removes the per-controller await
@@ -154,6 +157,7 @@ class SpaceManager with ChangeNotifier {
     _routineController = RoutineController(_db);
     _eventController = EventController(_db);
     _contactController = ContactController(_db);
+    _financeController = FinanceController(_db);
     await Future.wait([
       _taskController.load(),
       _folderController.load(),
@@ -161,6 +165,7 @@ class SpaceManager with ChangeNotifier {
       _routineController.load(),
       _eventController.load(),
       _contactController.load(),
+      _financeController.load(),
     ]);
 
     // Wire the badge to the global settings + current space's events.
@@ -198,6 +203,7 @@ class SpaceManager with ChangeNotifier {
       routineController: _routineController,
       eventController: _eventController,
       contactController: _contactController,
+      financeController: _financeController,
       settingsController: settingsController,
     );
 

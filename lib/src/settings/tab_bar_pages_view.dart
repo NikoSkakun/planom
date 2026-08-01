@@ -66,7 +66,7 @@ class TabBarPagesEditor extends StatelessWidget {
   Future<void> _addBuiltinItem(BuildContext context, int pageIdx) async {
     final s = S.of(context);
     final cfg = controller.tabBarConfig;
-    // Show all 5 builtins — duplicates across pages are allowed (e.g. user
+    // Show every builtin — duplicates across pages are allowed (e.g. user
     // may want Tasks accessible from every page).
     final picked = await showSelectionMenu<int>(
       context: context,
@@ -76,6 +76,7 @@ class TabBarPagesEditor extends StatelessWidget {
         SelectionMenuOption(value: 1, label: s.tabNotes),
         SelectionMenuOption(value: 2, label: s.tabCalendar),
         SelectionMenuOption(value: 3, label: s.tabRoutines),
+        SelectionMenuOption(value: 5, label: s.tabFinance),
         SelectionMenuOption(value: 4, label: s.tabSettings),
       ],
     );
@@ -209,6 +210,8 @@ class TabBarPagesEditor extends StatelessWidget {
           return s.tabCalendar;
         case 3:
           return s.tabRoutines;
+        case 5:
+          return s.tabFinance;
         default:
           return s.tabSettings;
       }
@@ -255,6 +258,8 @@ class TabBarPagesEditor extends StatelessWidget {
         case 3:
           return const ImageIcon(
               AssetImage('assets/icons/tab_bar/routines.png'), size: 20);
+        case 5:
+          return const Icon(CupertinoIcons.money_dollar_circle, size: 20);
         default:
           return const ImageIcon(
               AssetImage('assets/icons/tab_bar/settings.png'), size: 20);

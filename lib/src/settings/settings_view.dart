@@ -15,6 +15,7 @@ import 'about_legal_view.dart';
 import 'appearance_view.dart';
 import 'backup_service.dart';
 import 'data_view.dart';
+import 'finance_settings_view.dart';
 import '../utils/platform_capabilities.dart';
 import 'device_calendar_settings_view.dart';
 import 'google_calendar_settings_view.dart';
@@ -212,6 +213,18 @@ class _SettingsViewState extends State<SettingsView> {
               onTap: () => Navigator.of(context).push(
                 FastRoute<void>(
                   builder: (_) => RoutinesSettingsView(
+                    controller: widget.controller,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 1),
+            _NavRow(
+              label: s.tabFinance,
+              icon: CupertinoIcons.money_dollar_circle,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => FinanceSettingsView(
                     controller: widget.controller,
                   ),
                 ),
@@ -426,6 +439,7 @@ String _tabLabel(S s, int tabIndex) {
     case 2: return s.tabCalendar;
     case 3: return s.tabRoutines;
     case 4: return s.tabSettings;
+    case 5: return s.tabFinance;
     default: return '';
   }
 }

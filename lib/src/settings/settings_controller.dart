@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:google_fonts/google_fonts.dart';
 
 import '../database/database_service.dart';
+import '../finance/finance_format.dart';
 import '../localization/strings.dart';
 import '../notifications/notification_service.dart';
 import '../tasks/task_field_prefs.dart';
@@ -218,6 +219,15 @@ class SettingsController with ChangeNotifier {
   bool _countEventsInToday = false;
   bool get countEventsInToday => _countEventsInToday;
 
+  // Finance display prefs. The symbol is prefixed to every amount; turning
+  // decimals off suits currencies used in whole units (¥, ₩, …). Both are
+  // mirrored to [FinanceCurrency] so formatting call sites don't need the
+  // controller. Global (not per-space) like the other display settings.
+  String _financeCurrencySymbol = r'$';
+  String get financeCurrencySymbol => _financeCurrencySymbol;
+  bool _financeShowDecimals = true;
+  bool get financeShowDecimals => _financeShowDecimals;
+
   // Time-of-day display style. false = 12-hour AM/PM (default), true = 24-hour.
   // Mirrored to [TimeFormatPref.use24h] so formatters can read it globally.
   bool _use24hTime = false;
@@ -240,7 +250,7 @@ class SettingsController with ChangeNotifier {
   String get lastOverdueCheckDay => _lastOverdueCheckDay;
 
   // Floating + button placement. Global default plus optional per-tab overrides
-  // (Tasks 0 / Notes 1 / Calendar 2 / Routines 3). A null override inherits the
+  // (Tasks 0 / Notes 1 / Calendar 2 / Routines 3 / Finance 5). A null override inherits the
   // global side. Size is a multiplier on the stock 52 px button (1.0 = stock).
   PlusButtonSide _plusButtonSide = PlusButtonSide.right;
   PlusButtonSide get plusButtonSide => _plusButtonSide;
@@ -249,6 +259,7 @@ class SettingsController with ChangeNotifier {
     1: null,
     2: null,
     3: null,
+    5: null,
   };
   PlusButtonSide? plusButtonSideOverride(int tab) =>
       _plusButtonSideOverrides[tab];
@@ -357,8 +368,9 @@ class SettingsController with ChangeNotifier {
     2: true,
     3: true,
     4: true,
+    5: true,
   };
-  /// Whether the built-in tab [index] (0–4) appears anywhere in the live
+  /// Whether the built-in tab [index] (0–5) appears anywhere in the live
   /// [tabBarConfig]. Derived from the config — the source of truth for the
   /// rendered tab bar — so callers (e.g. the Settings ⋯ fallback) stay in
   /// sync with what the user actually sees. The legacy `_tabVisibility` map
@@ -366,16 +378,17 @@ class SettingsController with ChangeNotifier {
   bool isTabVisible(int index) => _tabBarConfig.flattened.any((it) =>
       it.enabled && it.kind == TabKind.builtin && it.builtinIndex == index);
 
-  /// Returns the count of built-in tabs (0–4) present in the live config.
+  /// Returns the count of built-in tabs (0–5) present in the live config.
   int get visibleOptionalTabCount =>
-      [0, 1, 2, 3, 4].where(isTabVisible).length;
+      [0, 1, 2, 3, 4, 5].where(isTabVisible).length;
 
-  List<int> _tabOrder = [0, 1, 2, 3, 4];
+  // Settings (4) sits last by convention; Finance (5) slots in before it.
+  List<int> _tabOrder = [0, 1, 2, 3, 5, 4];
 
-  /// The user-defined display order of the five logical tab indices.
+  /// The user-defined display order of the logical tab indices.
   List<int> get tabOrder => List.unmodifiable(_tabOrder);
 
-  // Which tab to select on launch: a logical index ('0'–'4') or [kLastOpenedTab].
+  // Which tab to select on launch: a logical index ('0'–'5') or [kLastOpenedTab].
   String _defaultTab = '0';
   String get defaultTab => _defaultTab;
 
@@ -383,7 +396,7 @@ class SettingsController with ChangeNotifier {
   int _lastOpenedTab = 0;
   int get lastOpenedTab => _lastOpenedTab;
 
-  /// The logical tab (0–4) to show on launch, resolved against the tabs that
+  /// The logical tab (0–5) to show on launch, resolved against the tabs that
   /// are currently visible. Falls back to the first visible tab when the
   /// configured choice is hidden or invalid.
   int resolveInitialTab(List<int> visibleLogicalTabs) {
@@ -425,8 +438,26 @@ class SettingsController with ChangeNotifier {
             .map((s) => int.tryParse(s))
             .whereType<int>()
             .toList();
-        if (parts.length == 5 && parts.toSet().containsAll([0, 1, 2, 3, 4])) {
-          _tabOrder = parts;
+        // Historical rows only list the original five tabs. Keep the stored
+        // order and append any tab added since (Finance) so an older row
+        // still resolves to a complete, duplicate-free ordering.
+        if (parts.toSet().containsAll([0, 1, 2, 3, 4])) {
+          final seen = <int>{};
+          final order = [
+            for (final p in parts)
+              if (p >= 0 && p <= 5 && seen.add(p)) p,
+          ];
+          for (final i in [0, 1, 2, 3, 4, 5]) {
+            if (!seen.add(i)) continue;
+            // New tabs go in front of Settings, which sits last by convention.
+            final settingsIdx = order.indexOf(4);
+            if (i != 4 && settingsIdx >= 0) {
+              order.insert(settingsIdx, i);
+            } else {
+              order.add(i);
+            }
+          }
+          _tabOrder = order;
         }
       } else if (key == 'default_tab') {
         if (value == kLastOpenedTab ||
@@ -435,7 +466,11 @@ class SettingsController with ChangeNotifier {
         }
       } else if (key == 'last_tab') {
         final v = int.tryParse(value);
-        if (v != null && v >= 0 && v <= 4) _lastOpenedTab = v;
+        if (v != null && v >= 0 && v <= 5) _lastOpenedTab = v;
+      } else if (key == 'finance_currency') {
+        if (value.isNotEmpty) _financeCurrencySymbol = value;
+      } else if (key == 'finance_show_decimals') {
+        _financeShowDecimals = value != 'false';
       } else if (key == 'first_day_of_week') {
         final v = int.tryParse(value);
         if (v != null && v >= 1 && v <= 7) _firstDayOfWeek = v;
@@ -543,6 +578,8 @@ class SettingsController with ChangeNotifier {
     AppScale.factor = _useSystemTextScale ? 1.0 : _textScale;
     DayBoundary.hour = _dayBoundaryHour;
     TimeFormatPref.use24h = _use24hTime;
+    FinanceCurrency.symbol = _financeCurrencySymbol;
+    FinanceCurrency.showDecimals = _financeShowDecimals;
     NotificationService.instance.customSoundName =
         _soundFileNameFromPath(_customNotificationSoundPath);
     S.useHabitNaming = _useHabitNaming;
@@ -620,7 +657,7 @@ class SettingsController with ChangeNotifier {
   }
 
   Future<void> updateTabOrder(List<int> order) async {
-    if (order.length != 5 || order.toSet().length != 5) return;
+    if (order.length != 6 || order.toSet().length != 6) return;
     _tabOrder = List.of(order);
     notifyListeners();
     await _db.setAppSetting('tab_order', order.join(','));
@@ -763,6 +800,23 @@ class SettingsController with ChangeNotifier {
     TimeFormatPref.use24h = value;
     notifyListeners();
     await _db.setAppSetting('use_24h_time', value.toString());
+  }
+
+  Future<void> updateFinanceCurrencySymbol(String symbol) async {
+    final trimmed = symbol.trim();
+    if (trimmed.isEmpty || trimmed == _financeCurrencySymbol) return;
+    _financeCurrencySymbol = trimmed;
+    FinanceCurrency.symbol = trimmed;
+    notifyListeners();
+    await _db.setAppSetting('finance_currency', trimmed);
+  }
+
+  Future<void> updateFinanceShowDecimals(bool value) async {
+    if (value == _financeShowDecimals) return;
+    _financeShowDecimals = value;
+    FinanceCurrency.showDecimals = value;
+    notifyListeners();
+    await _db.setAppSetting('finance_show_decimals', value.toString());
   }
 
   Future<void> updateAutoPostponeOverdue(bool value) async {

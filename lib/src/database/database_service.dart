@@ -7,6 +7,9 @@ import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import '../models/contact.dart';
 import '../models/event.dart';
+import '../models/finance_budget.dart';
+import '../models/finance_category.dart';
+import '../models/finance_transaction.dart';
 import '../models/list_section.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
@@ -18,7 +21,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 36;
+  static const _dbVersion = 37;
 
   Database? _db;
 
@@ -235,6 +238,7 @@ class DatabaseService {
             PRIMARY KEY (tbl, id)
           )
         ''');
+        await _createFinanceTables(db);
         await _createFtsTables(db);
         await _createIndexes(db);
       },
@@ -693,8 +697,62 @@ class DatabaseService {
           await db.execute(
               'ALTER TABLE routines ADD COLUMN continueAfterCompletion INTEGER NOT NULL DEFAULT 0');
         }
+        if (oldVersion < 37) {
+          // Finance feature: expenses/income entries, their categories, and
+          // per-category (or overall) spending budgets. Purely additive — no
+          // existing table is touched.
+          await _createFinanceTables(db);
+        }
       },
     );
+  }
+
+  /// Creates the Finance feature's tables + indexes. Idempotent
+  /// (`IF NOT EXISTS`) so `onCreate` and the v37 upgrade branch can share it.
+  static Future<void> _createFinanceTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS finance_categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        iconId TEXT NOT NULL,
+        color INTEGER NOT NULL,
+        type TEXT NOT NULL DEFAULT 'expense',
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS finance_transactions (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        amount INTEGER NOT NULL DEFAULT 0,
+        type TEXT NOT NULL DEFAULT 'expense',
+        categoryId TEXT,
+        date INTEGER NOT NULL,
+        note TEXT,
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS finance_budgets (
+        id TEXT PRIMARY KEY,
+        categoryId TEXT,
+        amount INTEGER NOT NULL DEFAULT 0,
+        period TEXT NOT NULL DEFAULT 'monthly',
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    const indexes = [
+      'CREATE INDEX IF NOT EXISTS idx_finance_transactions_date ON finance_transactions(date)',
+      'CREATE INDEX IF NOT EXISTS idx_finance_transactions_categoryId ON finance_transactions(categoryId)',
+      'CREATE INDEX IF NOT EXISTS idx_finance_budgets_categoryId ON finance_budgets(categoryId)',
+    ];
+    for (final stmt in indexes) {
+      await db.execute(stmt);
+    }
   }
 
   /// Creates indexes on the columns the controllers repeatedly filter on
@@ -1248,6 +1306,133 @@ class DatabaseService {
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
+  // ── Finance ───────────────────────────────────────────────────────────────
+  // Transactions, their categories and the spending budgets. Deletes are
+  // permanent (there's no Finance trash) but still tombstoned so they can
+  // propagate on merge, mirroring how events are handled.
+
+  Future<List<FinanceCategory>> getFinanceCategories() async {
+    final db = await _database;
+    final rows = await db.query('finance_categories',
+        orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(FinanceCategory.fromMap).toList();
+  }
+
+  Future<void> insertFinanceCategory(FinanceCategory category) async {
+    final db = await _database;
+    await _putRow(db, 'finance_categories', category.toMap());
+  }
+
+  /// Bulk insert used to seed the default category set on first use.
+  Future<void> insertFinanceCategories(
+      List<FinanceCategory> categories) async {
+    if (categories.isEmpty) return;
+    final db = await _database;
+    await db.transaction((txn) async {
+      for (final c in categories) {
+        await _putRow(txn, 'finance_categories', c.toMap());
+      }
+    });
+  }
+
+  Future<void> updateFinanceCategory(FinanceCategory category) async {
+    final db = await _database;
+    await _patchRow(db, 'finance_categories', category.toMap(),
+        where: 'id = ?', whereArgs: [category.id]);
+  }
+
+  /// Deletes a category and detaches it from any transaction / budget that
+  /// referenced it (transactions fall back to "Uncategorized"), all in one
+  /// transaction so a partial delete can't strand rows.
+  Future<void> deleteFinanceCategory(String id) async {
+    final db = await _database;
+    await db.transaction((txn) async {
+      await txn.delete('finance_categories', where: 'id = ?', whereArgs: [id]);
+      await _patchRow(txn, 'finance_transactions', {'categoryId': null},
+          where: 'categoryId = ?', whereArgs: [id]);
+      await txn
+          .delete('finance_budgets', where: 'categoryId = ?', whereArgs: [id]);
+      await _recordTombstone(txn, 'finance_categories', id);
+    });
+  }
+
+  Future<void> updateFinanceCategorySortOrders(
+      List<FinanceCategory> categories) async {
+    if (categories.isEmpty) return;
+    final db = await _database;
+    await db.transaction((txn) async {
+      for (final c in categories) {
+        await _patchRow(txn, 'finance_categories', {'sortOrder': c.sortOrder},
+            where: 'id = ?', whereArgs: [c.id]);
+      }
+    });
+  }
+
+  Future<List<FinanceTransaction>> getFinanceTransactions() async {
+    final db = await _database;
+    final rows = await db.query('finance_transactions',
+        orderBy: 'date DESC, creationDate DESC');
+    return rows.map(FinanceTransaction.fromMap).toList();
+  }
+
+  Future<void> insertFinanceTransaction(FinanceTransaction tx) async {
+    final db = await _database;
+    await _putRow(db, 'finance_transactions', tx.toMap());
+  }
+
+  Future<void> updateFinanceTransaction(FinanceTransaction tx) async {
+    final db = await _database;
+    await _patchRow(db, 'finance_transactions', tx.toMap(),
+        where: 'id = ?', whereArgs: [tx.id]);
+  }
+
+  Future<void> deleteFinanceTransaction(String id) async {
+    final db = await _database;
+    await db.delete('finance_transactions', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'finance_transactions', id);
+  }
+
+  Future<List<FinanceBudget>> getFinanceBudgets() async {
+    final db = await _database;
+    final rows = await db.query('finance_budgets', orderBy: 'creationDate ASC');
+    return rows.map(FinanceBudget.fromMap).toList();
+  }
+
+  Future<void> insertFinanceBudget(FinanceBudget budget) async {
+    final db = await _database;
+    await _putRow(db, 'finance_budgets', budget.toMap());
+  }
+
+  Future<void> updateFinanceBudget(FinanceBudget budget) async {
+    final db = await _database;
+    await _patchRow(db, 'finance_budgets', budget.toMap(),
+        where: 'id = ?', whereArgs: [budget.id]);
+  }
+
+  Future<void> deleteFinanceBudget(String id) async {
+    final db = await _database;
+    await db.delete('finance_budgets', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'finance_budgets', id);
+  }
+
+  Future<List<Map<String, dynamic>>> exportFinanceCategories() async {
+    final db = await _database;
+    final rows = await db.query('finance_categories');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> exportFinanceTransactions() async {
+    final db = await _database;
+    final rows = await db.query('finance_transactions');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> exportFinanceBudgets() async {
+    final db = await _database;
+    final rows = await db.query('finance_budgets');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
   // List sections — user-defined groups of tasks within a list
   Future<List<ListSection>> getListSections() async {
     final db = await _database;
@@ -1545,6 +1730,9 @@ class DatabaseService {
     'tombstones',
     'contacts',
     'events',
+    'finance_budgets',
+    'finance_transactions',
+    'finance_categories',
     'list_sections',
     'app_settings',
     'routine_entries',
@@ -1584,6 +1772,9 @@ class DatabaseService {
     final db = await _database;
     await db.delete('contacts');
     await db.delete('events');
+    await db.delete('finance_budgets');
+    await db.delete('finance_transactions');
+    await db.delete('finance_categories');
     await db.delete('list_sections');
     await db.delete('routine_entries');
     await db.delete('routines');

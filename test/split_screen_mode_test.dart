@@ -8,6 +8,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'package:planom/src/calendar/event_controller.dart';
 import 'package:planom/src/contacts/contact_controller.dart';
+import 'package:planom/src/finance/finance_controller.dart';
 import 'package:planom/src/folders/folder_controller.dart';
 import 'package:planom/src/home_shell.dart';
 import 'package:planom/src/integrations/apple/device_calendar_controller.dart';
@@ -61,6 +62,7 @@ void main() {
     final routine = RoutineController(db);
     final event = EventController(db);
     final contact = ContactController(db);
+    final finance = FinanceController(db);
     final settings = SettingsController(SettingsService(), db);
     final backup = BackupService(
       db: db,
@@ -70,6 +72,7 @@ void main() {
       routineController: routine,
       eventController: event,
       contactController: contact,
+      financeController: finance,
       settingsController: settings,
     );
     final sm = SpaceManager(settingsController: settings, globalDb: db);
@@ -81,6 +84,7 @@ void main() {
       await routine.load();
       await event.load();
       await contact.load();
+      await finance.load();
       await settings.loadSettings();
       await sm.load();
     });
@@ -103,6 +107,7 @@ void main() {
           routineController: routine,
           eventController: event,
           contactController: contact,
+          financeController: finance,
           backupService: backup,
           securityService: SecurityService(db),
           googleCalendarController: GoogleCalendarController(db: db),

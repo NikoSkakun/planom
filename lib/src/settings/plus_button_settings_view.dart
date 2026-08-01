@@ -5,6 +5,7 @@ import '../localization/strings.dart';
 import '../theme/app_theme.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
+import 'finance_settings_view.dart';
 import 'module_settings_views.dart';
 import 'settings_controller.dart';
 import 'settings_widgets.dart';
@@ -12,7 +13,7 @@ import 'tasks_settings_view.dart';
 
 /// Logical tab indices that can carry a per-tab + button override. (Notes only
 /// uses the global side in practice, but it's still configurable for symmetry.)
-const List<int> _plusOverrideTabs = [0, 1, 2, 3];
+const List<int> _plusOverrideTabs = [0, 1, 2, 3, 5];
 
 String _tabName(S s, int tab) {
   switch (tab) {
@@ -24,6 +25,8 @@ String _tabName(S s, int tab) {
       return s.tabCalendar;
     case 3:
       return s.tabRoutines;
+    case 5:
+      return s.tabFinance;
     default:
       return '';
   }
@@ -70,6 +73,8 @@ class PlusButtonSettingsView extends StatelessWidget {
         );
       case 3:
         page = RoutinesSettingsView(controller: controller);
+      case 5:
+        page = FinanceSettingsView(controller: controller);
       case 0:
       default:
         page = TasksSettingsView(controller: controller);

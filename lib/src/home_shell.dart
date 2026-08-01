@@ -6,6 +6,9 @@ import 'calendar/event_controller.dart';
 import 'calendar/event_creation_sheet.dart';
 import 'contacts/contact_controller.dart';
 import 'contacts/contact_creation_sheet.dart';
+import 'finance/finance_controller.dart';
+import 'finance/finance_view.dart';
+import 'finance/transaction_sheet.dart';
 import 'folders/create_folder_list_sheet.dart';
 import 'folders/folder_controller.dart';
 import 'integrations/apple/device_calendar_controller.dart';
@@ -52,6 +55,7 @@ class HomeShell extends StatefulWidget {
     required this.routineController,
     required this.eventController,
     required this.contactController,
+    required this.financeController,
     required this.backupService,
     this.securityService,
     required this.googleCalendarController,
@@ -86,6 +90,7 @@ class HomeShell extends StatefulWidget {
   final RoutineController routineController;
   final EventController eventController;
   final ContactController contactController;
+  final FinanceController financeController;
   final BackupService backupService;
   final SecurityService? securityService;
   final GoogleCalendarController googleCalendarController;
@@ -96,8 +101,8 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  // Logical indices: 0=Tasks 1=Notes 2=Calendar 3=Routines 4=Settings
-  final _navigatorKeys = List.generate(5, (_) => GlobalKey<NavigatorState>());
+  // Logical indices: 0=Tasks 1=Notes 2=Calendar 3=Routines 4=Settings 5=Finance
+  final _navigatorKeys = List.generate(6, (_) => GlobalKey<NavigatorState>());
   late final List<_DepthObserver> _depthObservers;
   final _activeListId = ValueNotifier<String?>(null);
   final _activeFolderId = ValueNotifier<String?>(null);
@@ -112,6 +117,10 @@ class _HomeShellState extends State<HomeShell> {
   final _notesCollapseSignal = ValueNotifier<int>(0);
   final _calendarResetSignal = ValueNotifier<int>(0);
   final _routinesResetSignal = ValueNotifier<int>(0);
+  final _financeResetSignal = ValueNotifier<int>(0);
+  // Month currently shown on the Finance tab (null = the present month), so a
+  // + tap creates the entry inside the month the user is looking at.
+  final _activeFinanceMonth = ValueNotifier<DateTime?>(null);
   final _showPlusButton = ValueNotifier<bool>(true);
   final _plusButtonInset = ValueNotifier<double>(0);
   final _undoController = UndoController();
@@ -195,6 +204,8 @@ class _HomeShellState extends State<HomeShell> {
         return s.tabCalendar;
       case 3:
         return s.tabRoutines;
+      case 5:
+        return s.tabFinance;
       default:
         return s.tabSettings;
     }
@@ -323,6 +334,12 @@ class _HomeShellState extends State<HomeShell> {
       _DepthObserver(
         onChanged: (depth, trackedCount) {
           if (_lastTabIndex == 4) _showPlusButton.value = false;
+        },
+      ),
+      // Finance tab: hide when navigated deeper (categories / budgets).
+      _DepthObserver(
+        onChanged: (depth, trackedCount) {
+          if (_lastTabIndex == 5) _showPlusButton.value = depth <= 1;
         },
       ),
     ];
@@ -571,6 +588,8 @@ class _HomeShellState extends State<HomeShell> {
     _notesCollapseSignal.dispose();
     _calendarResetSignal.dispose();
     _routinesResetSignal.dispose();
+    _financeResetSignal.dispose();
+    _activeFinanceMonth.dispose();
     _showPlusButton.dispose();
     _plusButtonInset.dispose();
     _globalSettingsOpen.dispose();
@@ -637,6 +656,15 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _onPlusPressed() {
+    if (_lastTabIndex == 5) {
+      showTransactionSheet(
+        context,
+        widget.financeController,
+        initialDate: _activeFinanceMonth.value,
+      );
+      return;
+    }
+
     if (_lastTabIndex == 3) {
       _navigatorKeys[3].currentState?.push(
         FastRoute<void>(
@@ -844,6 +872,7 @@ class _HomeShellState extends State<HomeShell> {
       if (tappedIndex == 1) _notesCollapseSignal.value++;
       if (tappedIndex == 2) _calendarResetSignal.value++;
       if (tappedIndex == 3) _routinesResetSignal.value++;
+      if (tappedIndex == 5) _financeResetSignal.value++;
     }
     _refreshPlusForTab(tappedIndex);
     final changed = tappedIndex != _lastTabIndex;
@@ -1126,6 +1155,23 @@ class _HomeShellState extends State<HomeShell> {
           activeIcon: activeIcon('assets/icons/tab_bar/routines.png'),
           label: hideLabels ? null : s.tabRoutines,
         );
+      case 5:
+        // No bespoke PNG for Finance yet — the Cupertino glyph matches the
+        // outline weight of the other tab icons closely enough.
+        return BottomNavigationBarItem(
+          icon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Icon(CupertinoIcons.money_dollar_circle),
+          ),
+          activeIcon: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Icon(
+              CupertinoIcons.money_dollar_circle_fill,
+              color: deselectAll ? null : AppColors.accent,
+            ),
+          ),
+          label: hideLabels ? null : s.tabFinance,
+        );
       default:
         return BottomNavigationBarItem(
           icon: const Padding(
@@ -1190,6 +1236,12 @@ class _HomeShellState extends State<HomeShell> {
           folderController: widget.folderController,
           noteController: widget.noteController,
           eventController: widget.eventController,
+        ),
+      5 => FinanceView(
+          controller: widget.financeController,
+          settingsController: widget.settingsController,
+          resetSignal: _financeResetSignal,
+          activeMonth: _activeFinanceMonth,
         ),
       _ => SettingsView(
           controller: widget.settingsController,

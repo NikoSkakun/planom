@@ -8,6 +8,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'package:planom/src/calendar/event_controller.dart';
 import 'package:planom/src/contacts/contact_controller.dart';
+import 'package:planom/src/finance/finance_controller.dart';
 import 'package:planom/src/folders/folder_controller.dart';
 import 'package:planom/src/home_shell.dart';
 import 'package:planom/src/integrations/apple/device_calendar_controller.dart';
@@ -19,6 +20,7 @@ import 'package:planom/src/security/security_service.dart';
 import 'package:planom/src/settings/backup_service.dart';
 import 'package:planom/src/settings/settings_controller.dart';
 import 'package:planom/src/settings/settings_service.dart';
+import 'package:planom/src/settings/tab_bar_config.dart';
 import 'package:planom/src/settings/settings_view.dart';
 import 'package:planom/src/spaces/space_manager.dart';
 import 'package:planom/src/tasks/task_controller.dart';
@@ -38,6 +40,13 @@ class _FakePathProvider extends PathProviderPlatform
   @override
   Future<String?> getLibraryPath() async => dir;
 }
+
+/// Position of the built-in Settings tab on the first tab-bar page. Looked up
+/// rather than hard-coded so adding a built-in tab ahead of it (Finance) can't
+/// silently point these tests at the wrong item.
+int _settingsItemIndex(SettingsController controller) =>
+    controller.tabBarConfig.pages[0].indexWhere(
+        (it) => it.kind == TabKind.builtin && it.builtinIndex == 4);
 
 /// Regression coverage for hiding the Settings tab while the user is inside
 /// Settings. The Settings content must stay put (no full-screen transition
@@ -67,6 +76,7 @@ void main() {
     final routine = RoutineController(db);
     final event = EventController(db);
     final contact = ContactController(db);
+    final finance = FinanceController(db);
     final settings = SettingsController(SettingsService(), db);
     final backup = BackupService(
       db: db,
@@ -76,6 +86,7 @@ void main() {
       routineController: routine,
       eventController: event,
       contactController: contact,
+      financeController: finance,
       settingsController: settings,
     );
     final sm = SpaceManager(settingsController: settings, globalDb: db);
@@ -87,6 +98,7 @@ void main() {
       await routine.load();
       await event.load();
       await contact.load();
+      await finance.load();
       await settings.loadSettings();
       await sm.load();
     });
@@ -109,6 +121,7 @@ void main() {
           routineController: routine,
           eventController: event,
           contactController: contact,
+          financeController: finance,
           backupService: backup,
           securityService: SecurityService(db),
           googleCalendarController: GoogleCalendarController(db: db),
@@ -134,10 +147,10 @@ void main() {
     // "Settings" now appears twice: the sidebar tile + the page title.
     expect(find.text('Settings'), findsNWidgets(2));
 
-    // Now hide the Settings tab from within Settings (Settings is item 4 on
-    // page 0 of the default layout).
-    await tester.runAsync(() => settings.updateTabBarConfig(
-        settings.tabBarConfig.setItemEnabled(0, 4, false)));
+    // Now hide the Settings tab from within Settings.
+    await tester.runAsync(() => settings.updateTabBarConfig(settings
+        .tabBarConfig
+        .setItemEnabled(0, _settingsItemIndex(settings), false)));
     await beat();
 
     // Settings content stays on screen — exactly one SettingsView (no
@@ -176,6 +189,7 @@ void main() {
     final routine = RoutineController(db);
     final event = EventController(db);
     final contact = ContactController(db);
+    final finance = FinanceController(db);
     final settings = SettingsController(SettingsService(), db);
     final backup = BackupService(
       db: db,
@@ -185,6 +199,7 @@ void main() {
       routineController: routine,
       eventController: event,
       contactController: contact,
+      financeController: finance,
       settingsController: settings,
     );
     final sm = SpaceManager(settingsController: settings, globalDb: db);
@@ -196,10 +211,11 @@ void main() {
       await routine.load();
       await event.load();
       await contact.load();
+      await finance.load();
       await settings.loadSettings();
       // Hide the Settings tab up front so it's reached only via the overlay.
-      await settings.updateTabBarConfig(
-          settings.tabBarConfig.setItemEnabled(0, 4, false));
+      await settings.updateTabBarConfig(settings.tabBarConfig
+          .setItemEnabled(0, _settingsItemIndex(settings), false));
       await sm.load();
     });
 
@@ -221,6 +237,7 @@ void main() {
           routineController: routine,
           eventController: event,
           contactController: contact,
+          financeController: finance,
           backupService: backup,
           securityService: SecurityService(db),
           googleCalendarController: GoogleCalendarController(db: db),

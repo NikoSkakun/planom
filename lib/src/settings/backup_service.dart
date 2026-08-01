@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../calendar/event_controller.dart';
 import '../contacts/contact_controller.dart';
 import '../database/database_service.dart';
+import '../finance/finance_controller.dart';
 import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
 import '../integrations/apple/device_calendar_controller.dart';
@@ -32,6 +33,7 @@ class BackupService {
     required this.routineController,
     required this.eventController,
     required this.contactController,
+    required this.financeController,
     required this.settingsController,
   });
 
@@ -42,6 +44,7 @@ class BackupService {
   final RoutineController routineController;
   final EventController eventController;
   final ContactController contactController;
+  final FinanceController financeController;
   final SettingsController settingsController;
 
   /// Builds the active space's backup payload as a plain JSON string. Used
@@ -77,6 +80,9 @@ class BackupService {
       'events': await db.exportEvents(),
       'list_sections': await db.exportListSections(),
       'contacts': await db.exportContacts(),
+      'finance_categories': await db.exportFinanceCategories(),
+      'finance_transactions': await db.exportFinanceTransactions(),
+      'finance_budgets': await db.exportFinanceBudgets(),
       'tombstones': await db.exportTombstones(),
       'app_settings': (await db.exportAppSettings())
           .where((r) =>
@@ -242,6 +248,11 @@ class BackupService {
         'events': asMaps(data['events']),
         'list_sections': asMaps(data['list_sections']),
         'contacts': asMaps(data['contacts']),
+        // Absent in backups taken before the Finance feature shipped — asMaps
+        // maps a missing key to an empty list, so those import unchanged.
+        'finance_categories': asMaps(data['finance_categories']),
+        'finance_transactions': asMaps(data['finance_transactions']),
+        'finance_budgets': asMaps(data['finance_budgets']),
         'tombstones': asMaps(data['tombstones']),
         'app_settings': [
           ...asMaps(data['app_settings']).where((r) =>
@@ -284,6 +295,7 @@ class BackupService {
     await routineController.load();
     await eventController.load();
     await contactController.load();
+    await financeController.load();
     await settingsController.loadSettings();
 
     return true;
@@ -297,6 +309,7 @@ class BackupService {
     await routineController.load();
     await eventController.load();
     await contactController.load();
+    await financeController.load();
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────

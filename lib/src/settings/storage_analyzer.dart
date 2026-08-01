@@ -53,6 +53,19 @@ class StorageAnalyzer {
       routines.length,
     );
     final tags = await bucketSingle('tags', 'tags', svc.exportTags);
+    // Finance: entries + their categories and budgets in one bucket. The count
+    // reports entries only — categories/budgets are configuration, not data
+    // the user thinks of as "stored items".
+    final financeEntries = await svc.exportFinanceTransactions();
+    final financeCategories = await svc.exportFinanceCategories();
+    final financeBudgets = await svc.exportFinanceBudgets();
+    final financeBucket = DbBuckets(
+      'finance',
+      _estimateRowsBytes(financeEntries) +
+          _estimateRowsBytes(financeCategories) +
+          _estimateRowsBytes(financeBudgets),
+      financeEntries.length,
+    );
     // Folders + lists + note folders + sections together.
     final folders = await svc.exportFolders();
     final lists = await svc.exportLists();
@@ -73,6 +86,7 @@ class StorageAnalyzer {
       notes,
       events,
       routineBucket,
+      financeBucket,
       tags,
       containerBucket,
     ];
@@ -242,6 +256,7 @@ class StorageAnalyzer {
       notes: pick('notes'),
       events: pick('events'),
       routines: pick('routines'),
+      finance: pick('finance'),
       tags: pick('tags'),
       containers: pick('containers'),
       dbFileBytes: await spaceDbFileBytes(dbName),
@@ -292,6 +307,7 @@ class SpaceStorageReport {
     required this.notes,
     required this.events,
     required this.routines,
+    required this.finance,
     required this.tags,
     required this.containers,
     required this.dbFileBytes,
@@ -304,6 +320,7 @@ class SpaceStorageReport {
   final DbBuckets notes;
   final DbBuckets events;
   final DbBuckets routines;
+  final DbBuckets finance;
   final DbBuckets tags;
   final DbBuckets containers;
   final int dbFileBytes;
@@ -314,6 +331,7 @@ class SpaceStorageReport {
       notes.bytes +
       events.bytes +
       routines.bytes +
+      finance.bytes +
       tags.bytes +
       containers.bytes;
 
@@ -323,11 +341,12 @@ class SpaceStorageReport {
       notes.count +
       events.count +
       routines.count +
+      finance.count +
       tags.count +
       containers.count;
 
   List<DbBuckets> get categories =>
-      [tasks, contacts, notes, events, routines, tags, containers];
+      [tasks, contacts, notes, events, routines, finance, tags, containers];
 }
 
 /// Formats a byte count as a human-readable size like "1.2 MB".

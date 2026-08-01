@@ -2,8 +2,8 @@ import 'dart:convert';
 
 /// What a single tab on the tab bar represents.
 ///
-/// - [builtin] — one of the 5 historical tabs (Tasks/Notes/Calendar/Routines/
-///   Settings) identified by [builtinIndex] 0..4.
+/// - [builtin] — one of the app's own tabs (Tasks/Notes/Calendar/Routines/
+///   Settings/Finance) identified by [builtinIndex] 0..5.
 /// - [shortcut] — direct navigation target chosen by the user (a list,
 ///   folder, smart list, or note folder) identified by [shortcutTarget] +
 ///   [shortcutId].
@@ -40,7 +40,7 @@ class TabItem {
         builtinIndex = null;
 
   final TabKind kind;
-  final int? builtinIndex; // 0..4 when kind == builtin
+  final int? builtinIndex; // 0..5 when kind == builtin
   final ShortcutTarget? shortcutTarget; // non-null when kind == shortcut
   final String? shortcutId; // list/folder/note-folder id; null for smart lists
   final String? customLabel;
@@ -78,7 +78,7 @@ class TabItem {
     final enabled = map['enabled'] != false; // default true
     if (kindStr == 'builtin') {
       final idx = map['builtinIndex'] as int?;
-      if (idx == null || idx < 0 || idx > 4) return null;
+      if (idx == null || idx < 0 || idx > 5) return null;
       return TabItem.builtin(idx, enabled: enabled);
     }
     if (kindStr == 'shortcut') {
@@ -103,24 +103,38 @@ class TabBarConfig {
 
   static const int maxItemsPerPage = 7;
 
-  /// Default config = single page mirroring the historical 5 built-in tabs.
+  /// Default config = single page holding every built-in tab.
   factory TabBarConfig.defaultLayout() => TabBarConfig(pages: [
         [
           TabItem.builtin(0),
           TabItem.builtin(1),
           TabItem.builtin(2),
           TabItem.builtin(3),
+          TabItem.builtin(5),
           TabItem.builtin(4),
         ],
       ]);
 
   /// Migration helper: builds a single-page config from the legacy
-  /// `tabVisibility` + `tabOrder` settings.
+  /// `tabVisibility` + `tabOrder` settings. Tabs added after that scheme was
+  /// retired (Finance) are appended when the legacy order predates them, so
+  /// upgrading users see the new tab instead of having to add it by hand.
   factory TabBarConfig.fromLegacy({
     required Map<int, bool> tabVisibility,
     required List<int> tabOrder,
   }) {
-    final visible = tabOrder.where((i) => tabVisibility[i] ?? true).toList();
+    final order = [...tabOrder];
+    for (final added in const [5]) {
+      if (order.contains(added)) continue;
+      // Settings conventionally sits last, so slot new tabs in front of it.
+      final settingsIdx = order.indexOf(4);
+      if (settingsIdx >= 0) {
+        order.insert(settingsIdx, added);
+      } else {
+        order.add(added);
+      }
+    }
+    final visible = order.where((i) => tabVisibility[i] ?? true).toList();
     if (visible.isEmpty) return TabBarConfig.defaultLayout();
     return TabBarConfig(pages: [
       [for (final i in visible) TabItem.builtin(i)],

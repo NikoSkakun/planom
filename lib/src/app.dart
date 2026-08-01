@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'calendar/event_controller.dart';
 import 'contacts/contact_controller.dart';
+import 'finance/finance_controller.dart';
 import 'folders/folder_controller.dart';
 import 'integrations/apple/device_calendar_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
@@ -35,6 +36,7 @@ class MyApp extends StatefulWidget {
     required this.routineController,
     required this.eventController,
     required this.contactController,
+    required this.financeController,
     required this.backupService,
     this.securityService,
     required this.googleCalendarController,
@@ -48,6 +50,7 @@ class MyApp extends StatefulWidget {
   final RoutineController routineController;
   final EventController eventController;
   final ContactController contactController;
+  final FinanceController financeController;
   final BackupService backupService;
   final SecurityService? securityService;
   final GoogleCalendarController googleCalendarController;
@@ -208,6 +211,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                         routineController: widget.routineController,
                         eventController: widget.eventController,
                         contactController: widget.contactController,
+                        financeController: widget.financeController,
                         backupService: widget.backupService,
                         securityService: widget.securityService,
                         googleCalendarController: widget.googleCalendarController,

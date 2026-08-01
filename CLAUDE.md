@@ -177,6 +177,20 @@ Recurrence (lib/src/models/recurrence.dart)
 RoutineEntry (lib/src/models/routine_entry.dart) ← per-day progress
   id, routineId, date (midnight), amount (cumulative for the day)
 
+FinanceTransaction (lib/src/models/finance_transaction.dart)  ← one money movement
+  id, title, amount (minor units / cents, always >= 0), type (expense|income)
+  categoryId?                        ← null = Uncategorized
+  date (midnight), note?, creationDate
+  signedAmount                       ← negative for expenses, positive for income
+
+FinanceCategory (lib/src/models/finance_category.dart)
+  id, name, iconId (key into kFinanceCategoryIcons), color (ARGB),
+  type (expense|income), sortOrder, creationDate
+
+FinanceBudget (lib/src/models/finance_budget.dart)
+  id, categoryId?                    ← null = overall spending budget
+  amount (minor units), period ('monthly'|'weekly'), creationDate
+
 RemoteEvent (lib/src/integrations/google/remote_event.dart) ← in-memory only,
   never persisted; mirrors Event + Google fields (googleEventId, calendarId,
   calendarColor, htmlLink, etag, isReadOnly, recurringEventId)
@@ -258,15 +272,16 @@ Migration history:
 | v34 | Persisted per-list / per-folder view mode (`folders`/`app_lists`: `viewMode`, `kanbanScrollMode`) |
 | v35 | Per-record `updatedAt` (merge-sync foundation) on every user table + a `tombstones` table recording permanent deletions; `updatedAt` backfilled from the best existing timestamp |
 | v36 | `routines.monthdays TEXT` (specific_days "Month" mode: comma-joined days-of-month 1…31) + `routines.continueAfterCompletion INTEGER NOT NULL DEFAULT 0` (keep tracking past the goal) |
+| v37 | Finance feature: `finance_transactions`, `finance_categories`, `finance_budgets` (+ their indexes), created by the shared idempotent `_createFinanceTables`. Purely additive — no existing table is touched |
 
-When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch. Current version: **36**.
+When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch. Current version: **37**.
 
 **Full-text search (FTS5)** — `DatabaseService.searchAll(query, {limit = 50}) → SearchResults` returns id sets keyed by source table. Each token is wrapped in `"…"*` (with internal quotes doubled), so the user gets implicit AND prefix matching without exposed FTS5 syntax. Triggers keep `tasks_fts` / `notes_fts` / `events_fts` in sync; `_backfillFts` populates pre-existing rows during the v21 upgrade.
 
 **`app_settings` keys** (all stored as strings):
-- `tab_<i>_visible` (i = 0..4) — per-tab visibility booleans
+- `tab_<i>_visible` (i = 0..5) — legacy per-tab visibility booleans (superseded by `tab_bar_config`; still read to migrate old layouts)
 - `tab_order` — comma-separated ordered list of logical tab indices
-- `default_tab` — logical index `'0'..'4'` or sentinel `'last'` (`kLastOpenedTab`) to restore the last-used tab on launch
+- `default_tab` — logical index `'0'..'5'` or sentinel `'last'` (`kLastOpenedTab`) to restore the last-used tab on launch
 - `last_tab` — last logical tab opened (persisted for `default_tab = last`)
 - `accent_color`, `completion_color` — ARGB int as decimal string
 - `font` — Google Fonts camelCase key or `'__system__'`
@@ -278,6 +293,7 @@ When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 - `count_routines_in_today`, `show_events_in_today`, `count_events_in_today` — fold today's routines into the Today count badge; show today's events as a Today section + optionally fold them into the Today count
 - `auth_type`, `auth_hash`, `auth_salt`, `auth_biometric` — passcode + biometric flag (owned by `SecurityService.authSettingKeys`; **excluded from backup export and never overwritten on import**)
 - `gcal_email`, `gcal_selected_calendar_ids` (JSON list), `gcal_default_calendar_id`, `gcal_last_sync_at`, `gcal_synctoken_<calendarId>` — Google Calendar state (owned by `GoogleCalendarController`; **excluded from backups** via `isReservedKey`)
+- `finance_currency`, `finance_show_decimals` — currency symbol prefixed to every amount + whether minor units are rendered (mirrored to `FinanceCurrency`; global, not per-space)
 - `sync_backend` — selected `SyncBackend` (owned by `SyncController`)
 
 **Backup import is atomic**: `BackupService` parses/validates the whole payload first, then `DatabaseService.replaceAllData` clears + re-inserts every table inside one transaction (rolls back on any error, so a corrupt or partial backup can't destroy existing data). Backups currently cover only the **active** space (multi-space backup is a known follow-up).
@@ -339,6 +355,13 @@ Every controller is a `ChangeNotifier`. They're constructed in `main.dart` (glob
 **`EventController`** (`lib/src/calendar/event_controller.dart`)
 - Owns local `_events`; mirrors `TaskController` shape but without subtasks/tags.
 - `eventsForDate(date)`, `addEvent`, `updateEvent`, `deleteEvent` (immediate hard-delete from DB but `UndoController` lets the user revert by re-inserting).
+
+**`FinanceController`** (`lib/src/finance/finance_controller.dart`)
+- Owns the space's `_transactions`, `_categories`, `_budgets`. Deletes are permanent (no Finance trash) but tombstoned; the UI pairs each with an Undo banner that re-inserts the row, like event delete.
+- Seeds a default category set on `load()` **only** when the space has neither categories nor transactions, so deleting them all doesn't resurrect them. Seed names are English data rows, not UI strings.
+- Queries: `transactionsInRange(from, to)` (upper bound exclusive) / `transactionsForMonth`, `summaryInRange` / `summaryForMonth` → `FinanceSummary(income, expenses, balance)`, `spendByCategory` → `CategorySpend` list (expenses only, biggest first, uncategorized under a null id), `budgetProgress(reference)` → `BudgetProgress(spent, remaining, isOver, fraction)`, `budgetFor(categoryId)`, `monthsWithData()`.
+- Mutations: `addTransaction` / `updateTransaction` / `deleteTransaction`, `addCategory` / `updateCategory` / `deleteCategory` (entries survive and become uncategorized; the category's budget goes with it) / `reorderCategories(type, old, new)`, `setBudget(categoryId, amount, period)` (replaces rather than duplicating; a non-positive amount clears) / `clearBudget`.
+- Period helpers `monthStart` / `nextMonthStart` / `weekStart` live alongside it.
 
 **`SettingsController`** (`lib/src/settings/settings_controller.dart`)
 - Loads state from `app_settings` rows + `SettingsService` (`SharedPreferences` for `ThemeMode`) + `SmartListPrefs.load()` (separate JSON file in docs dir).
@@ -434,7 +457,7 @@ Tools cover: tasks (list / create / update / complete / delete / restore with sc
 
 ### App shell (`lib/src/home_shell.dart`)
 
-`HomeShell` is a `StatefulWidget` managing up to **5 logical tabs**: Tasks(0) always-on, then Notes(1) / Calendar(2) / Routines(3) / Settings(4) — each toggleable in Settings → Tab Bar. Layout adapts:
+`HomeShell` is a `StatefulWidget` managing up to **6 logical tabs**: Tasks(0) always-on, then Notes(1) / Calendar(2) / Routines(3) / Settings(4) / Finance(5) — each toggleable in Settings → Tab Bar. Finance was added last, so it takes index 5 rather than renumbering the persisted `tab_bar_config` / `default_tab` / `last_tab` values. Layout adapts:
 
 - **Wide layout** (`PlatformCapabilities.isDesktop` OR window width ≥ 700 px) → `_WideLayout` with a persistent left sidebar.
 - **Single visible tab** → no tab bar at all; just `CupertinoTabView`.
@@ -610,6 +633,23 @@ Lists with `listType = ListType.birthdays` render contacts instead of tasks. Con
 | `contact_row.dart` | Row with pink gift icon (or gray checkbox if `isCompletable` + completed), name, celebration date, age, optional note snippet. |
 
 Plus-button drop on a Birthdays-type list opens `showContactCreationSheet` instead of the task sheet (handled in `HomeShell._handleDropOnList`). Birthday chips appear on the relevant day in `CalendarView` via `ContactController.contactsForDate(date)`.
+
+### Finance feature (`lib/src/finance/`) — new
+
+Simple money tracking: expenses / income, categories and spending budgets. Amounts are stored as **minor units (cents) in an `int`** — never a double — with the direction carried by `FinanceEntryType`, not the sign, so sums stay exact.
+
+| File | Purpose |
+|------|---------|
+| `finance_controller.dart` | (see Controllers above) |
+| `finance_view.dart` | Tab root (logical tab 5): month navigator (‹ March 2026 ›), summary card (Spent / Income / Balance), budget progress bars, per-category breakdown, then the month's entries grouped by day with the day's net total. Swipe an entry to delete (Undo banner), tap to edit, long-press for edit/delete. ⋯ menu → Categories / Budgets / Settings. Publishes the viewed month so the shell's + button dates new entries inside it. |
+| `transaction_sheet.dart` | `showTransactionSheet(...)` — one modal sheet for both create and edit: Expense/Income segment, amount (the only required field), description, category, date, note. An empty description falls back to the category name. |
+| `finance_categories_view.dart` | Categories per ledger side (segmented), long-press drag-reorder, swipe delete, tap to edit; `showCategoryEditor` is the name + colour + icon page. |
+| `finance_budgets_view.dart` | Overall budget + one per expense category, plus the shared monthly/weekly period. Amounts entered through `money_amount_dialog.dart` (clearing removes the budget). |
+| `finance_format.dart` | `FinanceCurrency` global mirror (symbol + show-decimals, kept in sync by `SettingsController`), `formatMoney`, `parseAmountToCents` (accepts `12`, `12.5`, `12,50`, `1 234.56`), month / day header formatting. |
+| `finance_icons.dart` | `kFinanceCategoryIcons` + `financeCategoryIcon(key)`, the colour swatches, and the round `FinanceCategoryIcon` badge. |
+| `lib/src/settings/finance_settings_view.dart` | Settings → Modules → Finance: currency symbol (shortlist + custom), show-decimals toggle, links to Categories / Budgets, + button placement. |
+
+Finance data is **per space** (it lives in the space's DB file); the currency prefs are global. Backups carry `finance_categories` / `finance_transactions` / `finance_budgets`; payloads written before the feature shipped import unchanged (a missing key reads as an empty table). Transactions are **not** FTS-indexed and are not exposed over MCP yet.
 
 ### Search feature (`lib/src/search/`) — new
 
