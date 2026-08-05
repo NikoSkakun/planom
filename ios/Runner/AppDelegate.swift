@@ -3,29 +3,38 @@ import Flutter
 import UserNotifications
 import EventKit
 
+/// Adopts the `UIScene` life cycle, which Apple requires of UIKit apps built
+/// against the SDK after iOS 26 — without it such an app does not launch, which
+/// on a device looks like a permanently white screen.
+///
+/// This mirrors the AppDelegate that `flutter build ios` generates when it
+/// migrates a project automatically. It cannot migrate this one: the tool only
+/// rewrites an AppDelegate that matches its stock template byte for byte, and
+/// this one registers a notification delegate and the EventKit bridge. The
+/// shape is the same though — nothing happens at `didFinishLaunching` that
+/// needs the engine, and everything engine-bound moves into
+/// `didInitializeImplicitFlutterEngine`, which fires under either life cycle
+/// once the implicit engine exists.
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var eventKitBridge: EventKitBridge?
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
     UNUserNotificationCenter.current().delegate = self
-
-    // The messenger comes from a plugin registrar rather than from
-    // `window?.rootViewController`. FlutterAppDelegate is itself a
-    // FlutterPluginRegistry, so this resolves the same implicit engine without
-    // depending on the window already holding a FlutterViewController — which
-    // it does not under the UIScene life cycle, where the window belongs to the
-    // scene. Silently skipping the bridge there would leave the device-calendar
-    // channel unanswered with nothing to show for it.
-    if let registrar = registrar(forPlugin: "EventKitBridge") {
-      eventKitBridge = EventKitBridge(messenger: registrar.messenger())
-    }
-
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // The application registrar's messenger belongs to the engine itself. The
+    // bridge used to be built from `window?.rootViewController`, which is nil
+    // under the scene life cycle because the window belongs to the scene — the
+    // device-calendar channel would have gone unanswered with nothing to show
+    // for it.
+    eventKitBridge = EventKitBridge(messenger: engineBridge.applicationRegistrar.messenger())
   }
 }
 
