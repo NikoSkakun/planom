@@ -238,16 +238,20 @@ class Goal {
         'creationDate': creationDate.millisecondsSinceEpoch,
       };
 
+  // Every field reads defensively. A row written by a schema this build does
+  // not know about — the reverted Goals feature used `title`, not `name` —
+  // must come back as a dull goal, not as a cast that throws. This runs while
+  // the space is loading, so throwing here means the app never draws at all.
   factory Goal.fromMap(Map<String, dynamic> map) => Goal(
-        id: map['id'] as String,
-        name: map['name'] as String,
+        id: map['id'] as String? ?? const Uuid().v4(),
+        name: map['name'] as String? ?? map['title'] as String? ?? '',
         description: map['description'] as String?,
         iconId: map['iconId'] as String? ?? 'flag',
         color: map['color'] as int? ?? 0xFFFF4D00,
         sources: _parseSources(map['sources'] as String?),
         sortOrder: map['sortOrder'] as int? ?? 0,
-        creationDate:
-            DateTime.fromMillisecondsSinceEpoch(map['creationDate'] as int),
+        creationDate: DateTime.fromMillisecondsSinceEpoch(
+            map['creationDate'] as int? ?? 0),
       );
 
   /// Tolerant parse — a malformed `sources` blob yields a goal with no

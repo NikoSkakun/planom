@@ -23,7 +23,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 38;
+  static const _dbVersion = 39;
 
   Database? _db;
 
@@ -726,8 +726,130 @@ class DatabaseService {
               'CREATE INDEX IF NOT EXISTS idx_finance_transactions_accountId '
               'ON finance_transactions(accountId)');
         }
+        if (oldVersion < 39) {
+          await _repairRevertedFeatureTables(db);
+        }
       },
     );
+  }
+
+  /// Rebuilds `goals`, `finance_categories` and `finance_accounts` when they
+  /// are left over from the Goals/Finance build that shipped once and was
+  /// reverted before release (commit 6745e0e).
+  ///
+  /// That build created the same table names with different columns —
+  /// `goals.title`, `finance_categories.kind`, `finance_accounts.colorValue`
+  /// and `openingBalance`. Every `CREATE TABLE` here is `IF NOT EXISTS`, so on
+  /// a device that ran it the current schema was never applied, and the app
+  /// read columns that do not exist. `goals.name` came back null, the cast to
+  /// String threw while the space was loading, and the app never drew a frame —
+  /// a white screen with nothing to report. The finance tables failed more
+  /// quietly: every category read back as an expense and every account balance
+  /// as zero, because `type`, `color` and `initialBalance` were all missing.
+  ///
+  /// Data carries across wherever it still means the same thing. Goals cannot
+  /// bring their membership — the reverted feature tracked an amount, not a set
+  /// of tasks — so they arrive with no sources and the user can point them at
+  /// something; their names, notes, icons and colours survive.
+  static Future<void> _repairRevertedFeatureTables(Database db) async {
+    await _rebuildIfLegacy(
+      db,
+      table: 'goals',
+      currentColumn: 'name',
+      create: _createGoalsTable,
+      columns: {
+        'id': 'id',
+        'name': "COALESCE(title, '')",
+        'description': 'note',
+        'iconId': "COALESCE(iconId, 'flag')",
+        'color': 'CASE WHEN COALESCE(colorValue, 0) = 0 '
+            'THEN 4294725888 ELSE colorValue END',
+        'sources': "'[]'",
+        'sortOrder': 'COALESCE(sortOrder, 0)',
+        'creationDate': 'creationDate',
+      },
+      requires: {'title', 'note', 'iconId', 'colorValue', 'sortOrder'},
+    );
+
+    await _rebuildIfLegacy(
+      db,
+      table: 'finance_categories',
+      currentColumn: 'type',
+      create: (db) async => _createFinanceTables(db),
+      columns: {
+        'id': 'id',
+        'name': 'name',
+        'type': "COALESCE(kind, 'expense')",
+        'iconId': "COALESCE(iconId, 'tag')",
+        'color': 'CASE WHEN COALESCE(colorValue, 0) = 0 '
+            'THEN 4278221567 ELSE colorValue END',
+        'sortOrder': 'COALESCE(sortOrder, 0)',
+        'creationDate': 'creationDate',
+      },
+      requires: {'kind', 'iconId', 'colorValue', 'sortOrder'},
+    );
+
+    await _rebuildIfLegacy(
+      db,
+      table: 'finance_accounts',
+      currentColumn: 'initialBalance',
+      create: _createFinanceAccountsTable,
+      columns: {
+        'id': 'id',
+        'name': 'name',
+        'type': "COALESCE(type, 'cash')",
+        'currencyCode': "COALESCE(currencyCode, 'USD')",
+        'initialBalance': 'COALESCE(openingBalance, 0)',
+        'color': 'CASE WHEN COALESCE(colorValue, 0) = 0 '
+            'THEN 4278221567 ELSE colorValue END',
+        'iconId': "COALESCE(iconId, 'creditcard')",
+        'sortOrder': 'COALESCE(sortOrder, 0)',
+        'isArchived': 'COALESCE(isArchived, 0)',
+        'creationDate': 'creationDate',
+      },
+      requires: {'openingBalance', 'colorValue', 'type', 'currencyCode'},
+    );
+  }
+
+  /// Rebuilds [table] in today's shape when it exists but predates it.
+  ///
+  /// [currentColumn] is a column only today's schema has — its absence is what
+  /// identifies an old table. [columns] maps each target column to an SQL
+  /// expression over the old row. The rebuild is skipped when the old table is
+  /// missing any of [requires], because then it is some third shape this code
+  /// has never seen and guessing at it would lose more than it saved; the
+  /// tolerant `fromMap` defaults handle that case instead.
+  static Future<void> _rebuildIfLegacy(
+    Database db, {
+    required String table,
+    required String currentColumn,
+    required Future<void> Function(Database) create,
+    required Map<String, String> columns,
+    required Set<String> requires,
+  }) async {
+    final existing = await _columnsOf(db, table);
+    if (existing.isEmpty) {
+      // No table at all — just create today's.
+      await create(db);
+      return;
+    }
+    if (existing.contains(currentColumn)) return; // already current
+    if (!requires.every(existing.contains)) return;
+
+    final legacy = '${table}_legacy';
+    await db.execute('DROP TABLE IF EXISTS $legacy');
+    await db.execute('ALTER TABLE $table RENAME TO $legacy');
+    await create(db);
+    final targets = columns.keys.join(', ');
+    final values = columns.values.join(', ');
+    await db.execute('INSERT INTO $table ($targets) SELECT $values FROM $legacy');
+    await db.execute('DROP TABLE $legacy');
+  }
+
+  /// Column names of [table]; empty when the table does not exist.
+  static Future<List<String>> _columnsOf(Database db, String table) async {
+    final info = await db.rawQuery('PRAGMA table_info($table)');
+    return [for (final row in info) row['name'] as String];
   }
 
   /// Creates the Finance feature's tables + indexes. Idempotent

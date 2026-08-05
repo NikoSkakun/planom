@@ -80,11 +80,13 @@ class FinanceCategory {
       };
 
   factory FinanceCategory.fromMap(Map<String, dynamic> map) => FinanceCategory(
-        id: map['id'] as String,
-        name: map['name'] as String,
+        id: map['id'] as String? ?? const Uuid().v4(),
+        name: map['name'] as String? ?? '',
         iconId: map['iconId'] as String? ?? 'tag',
         color: map['color'] as int? ?? 0xFF8E8E93,
-        type: decodeFinanceEntryType(map['type'] as String?),
+        // `kind` is what the reverted Finance build called this column.
+        type: decodeFinanceEntryType(
+            map['type'] as String? ?? map['kind'] as String?),
         sortOrder: map['sortOrder'] as int? ?? 0,
         creationDate:
             DateTime.fromMillisecondsSinceEpoch(map['creationDate'] as int),

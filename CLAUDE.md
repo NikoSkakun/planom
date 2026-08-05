@@ -308,7 +308,9 @@ Migration history:
 | v37 | Finance feature: `finance_transactions`, `finance_categories`, `finance_budgets` (+ their indexes), created by the shared idempotent `_createFinanceTables`. Purely additive — no existing table is touched |
 | v38 | `goals` table (a goal's task set is JSON-encoded sources, resolved at read time) + `finance_accounts` + `finance_transactions.accountId / toAccountId / toAmount` (accounts, per-account currency, transfers). The two `CREATE TABLE IF NOT EXISTS` helpers (`_createGoalsTable`, `_createFinanceAccountsTable`) are shared with `onCreate`; the `ALTER`s live only in the v38 branch because `_createFinanceTables` already emits the full column set for fresh DBs |
 
-When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch. Current version: **38**.
+| v39 | Repairs tables left over from the Goals/Finance build that shipped once and was reverted (commit 6745e0e). It created `goals`, `finance_categories` and `finance_accounts` under the same names with different columns (`title`, `kind`, `colorValue`, `openingBalance`), and since every `CREATE TABLE` here is `IF NOT EXISTS`, the current schema was never applied on a device that ran it — `goals.name` read back null and the cast threw during space load, so the app never drew a frame. `_repairRevertedFeatureTables` rebuilds each table in today's shape, carrying across what still means the same thing; goals lose only their membership, which the old feature never had |
+
+When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch. Current version: **39**.
 
 **Full-text search (FTS5)** — `DatabaseService.searchAll(query, {limit = 50}) → SearchResults` returns id sets keyed by source table. Each token is wrapped in `"…"*` (with internal quotes doubled), so the user gets implicit AND prefix matching without exposed FTS5 syntax. Triggers keep `tasks_fts` / `notes_fts` / `events_fts` in sync; `_backfillFts` populates pre-existing rows during the v21 upgrade.
 

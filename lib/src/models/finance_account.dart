@@ -87,17 +87,21 @@ class FinanceAccount {
         'creationDate': creationDate.millisecondsSinceEpoch,
       };
 
+  // Reads defensively for the same reason as [Goal.fromMap]: a row from the
+  // reverted Finance build stores `colorValue` / `openingBalance`, and this
+  // runs while the space is loading, where a throw costs the whole launch.
   factory FinanceAccount.fromMap(Map<String, dynamic> map) => FinanceAccount(
-        id: map['id'] as String,
-        name: map['name'] as String,
+        id: map['id'] as String? ?? const Uuid().v4(),
+        name: map['name'] as String? ?? '',
         type: decodeAccountType(map['type'] as String?),
         currencyCode: map['currencyCode'] as String? ?? 'USD',
-        initialBalance: map['initialBalance'] as int? ?? 0,
-        color: map['color'] as int? ?? 0xFF007AFF,
+        initialBalance:
+            map['initialBalance'] as int? ?? map['openingBalance'] as int? ?? 0,
+        color: map['color'] as int? ?? map['colorValue'] as int? ?? 0xFF007AFF,
         iconId: map['iconId'] as String? ?? 'creditcard',
         sortOrder: map['sortOrder'] as int? ?? 0,
         isArchived: (map['isArchived'] as int? ?? 0) == 1,
-        creationDate:
-            DateTime.fromMillisecondsSinceEpoch(map['creationDate'] as int),
+        creationDate: DateTime.fromMillisecondsSinceEpoch(
+            map['creationDate'] as int? ?? 0),
       );
 }
