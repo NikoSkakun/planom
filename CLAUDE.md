@@ -41,7 +41,7 @@ The Android Gradle toolchain was upgraded for Flutter 3.44.1 / JDK 21 (Flutter r
 - **Icons**: `cupertino_icons`; custom PNG tab-bar icons in `assets/icons/tab_bar/` (Tasks/Notes/Calendar/Routines use PNGs; Settings uses `CupertinoIcons.gear_alt` / `gear_alt_fill`); list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`.
 - **App badge**: `flutter_app_badger ^1.5.0` (discontinued but functional) — set by `TaskController._updateBadge()` per the selected `BadgeMode`; when `SettingsController.badgeIncludeRoutines` is on, today's uncompleted routines are added (via an injected count getter). Gated to mobile via `PlatformCapabilities.supportsAppBadge`.
 - **Backup / share**: `share_plus` (iOS/Android/macOS share sheet) for `.planom` files; `file_picker` for document picker import. `pdf` for note PDF export. `image_picker` (mobile) + `file_picker` (desktop) for custom-icon photo selection.
-- **Markdown**: `flutter_markdown` for note rendering; custom inline-markdown stripper used in note-row previews.
+- **Markdown**: notes are **always** markdown — `flutter_markdown` with the full `md.ExtensionSet.gitHubWeb` (tables, task lists, strikethrough, footnotes, autolinks, heading ids, alerts, `:emoji:`) plus LaTeX through `flutter_math_fork` (see Notes). A custom inline-markdown stripper is still used for note-row previews. `flutter_math_fork` is **pinned to 0.7.3**: 0.7.4 needs `RenderObjectWithLayoutCallbackMixin`, which the Flutter SDK used here (3.24.5) doesn't have.
 - **Fonts**: `google_fonts` — full ~1500-font catalogue exposed via the in-app Font Picker; cached at `<appSupport>/google_fonts/` automatically.
 - **Google Calendar**: `google_sign_in` + `googleapis` + `extension_google_sign_in_as_googleapis_auth` (see Google Calendar integration). Optional — disabled until client IDs are configured.
 
@@ -178,10 +178,38 @@ RoutineEntry (lib/src/models/routine_entry.dart) ← per-day progress
   id, routineId, date (midnight), amount (cumulative for the day)
 
 FinanceTransaction (lib/src/models/finance_transaction.dart)  ← one money movement
-  id, title, amount (minor units / cents, always >= 0), type (expense|income)
-  categoryId?                        ← null = Uncategorized
+  id, title, amount (minor units / cents, always >= 0)
+  type (expense|income|transfer)
+  categoryId?                        ← null = Uncategorized; always null for transfers
+  accountId?                         ← account the money left / landed in; null =
+                                       counted in the space's default currency
+  toAccountId?                       ← transfers only: destination account
+  toAmount?                          ← transfers only: the amount credited to
+                                       toAccountId, for cross-currency moves
+                                       (null = same as `amount`). The app holds
+                                       no exchange rates, so both legs are stored
   date (midnight), note?, creationDate
-  signedAmount                       ← negative for expenses, positive for income
+  signedAmount                       ← negative for expenses, positive for income,
+                                       0 for transfers (they move, not change, money)
+
+FinanceAccount (lib/src/models/finance_account.dart)  ← wallet / card / bank
+  id, name, type (cash|card|bank|savings|other), currencyCode (ISO),
+  initialBalance (minor units, may be negative), color (ARGB), iconId,
+  sortOrder, isArchived, creationDate
+
+Goal (lib/src/models/goal.dart)                  ← a tracked collection of tasks
+  id, name, description?, iconId (key into kGoalIcons), color (ARGB),
+  sources: List<GoalSource>          ← JSON-encoded; the task set is never
+                                       denormalised, so rules keep picking up
+                                       tasks created later
+  sortOrder, creationDate
+
+GoalSource (lib/src/models/goal.dart)            ← NOT a table of its own
+  kind ('manual' | 'rule')
+  taskIds                            ← manual: the hand-picked tasks
+  scopeType ('all'|'folders'|'lists'|'sections') + scopeIds   ← rule: where to look
+  tagIds, priorities, dateFilter, from?, to?                  ← rule: narrowing
+  (empty filter lists mean "don't filter on this")
 
 FinanceCategory (lib/src/models/finance_category.dart)
   id, name, iconId (key into kFinanceCategoryIcons), color (ARGB),
@@ -273,8 +301,9 @@ Migration history:
 | v35 | Per-record `updatedAt` (merge-sync foundation) on every user table + a `tombstones` table recording permanent deletions; `updatedAt` backfilled from the best existing timestamp |
 | v36 | `routines.monthdays TEXT` (specific_days "Month" mode: comma-joined days-of-month 1…31) + `routines.continueAfterCompletion INTEGER NOT NULL DEFAULT 0` (keep tracking past the goal) |
 | v37 | Finance feature: `finance_transactions`, `finance_categories`, `finance_budgets` (+ their indexes), created by the shared idempotent `_createFinanceTables`. Purely additive — no existing table is touched |
+| v38 | `goals` table (a goal's task set is JSON-encoded sources, resolved at read time) + `finance_accounts` + `finance_transactions.accountId / toAccountId / toAmount` (accounts, per-account currency, transfers). The two `CREATE TABLE IF NOT EXISTS` helpers (`_createGoalsTable`, `_createFinanceAccountsTable`) are shared with `onCreate`; the `ALTER`s live only in the v38 branch because `_createFinanceTables` already emits the full column set for fresh DBs |
 
-When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch. Current version: **37**.
+When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch. Current version: **38**.
 
 **Full-text search (FTS5)** — `DatabaseService.searchAll(query, {limit = 50}) → SearchResults` returns id sets keyed by source table. Each token is wrapped in `"…"*` (with internal quotes doubled), so the user gets implicit AND prefix matching without exposed FTS5 syntax. Triggers keep `tasks_fts` / `notes_fts` / `events_fts` in sync; `_backfillFts` populates pre-existing rows during the v21 upgrade.
 
@@ -293,7 +322,9 @@ When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch.
 - `count_routines_in_today`, `show_events_in_today`, `count_events_in_today` — fold today's routines into the Today count badge; show today's events as a Today section + optionally fold them into the Today count
 - `auth_type`, `auth_hash`, `auth_salt`, `auth_biometric` — passcode + biometric flag (owned by `SecurityService.authSettingKeys`; **excluded from backup export and never overwritten on import**)
 - `gcal_email`, `gcal_selected_calendar_ids` (JSON list), `gcal_default_calendar_id`, `gcal_last_sync_at`, `gcal_synctoken_<calendarId>` — Google Calendar state (owned by `GoogleCalendarController`; **excluded from backups** via `isReservedKey`)
-- `finance_currency`, `finance_show_decimals` — currency symbol prefixed to every amount + whether minor units are rendered (mirrored to `FinanceCurrency`; global, not per-space)
+- `finance_currency_code`, `finance_currency`, `finance_show_decimals` — the space default currency (ISO code), its symbol (follows the code unless the user typed a custom glyph) + whether minor units are rendered. All three mirror into `FinanceCurrency`; global, not per-space
+- `tab_bar_swipe_mode` — `pages` (default) or `spaces`: what a horizontal swipe across the tab bar moves between (see Tab bar)
+- `tab_bar_known_builtins` — comma-joined built-in tab indices this user's layout has already been offered. On load, any built-in missing from the set is inserted into their saved layout (in front of Settings) exactly once and the set is updated, so a tab that ships later still appears for someone who had customised their bar — while a tab they removed themselves is never resurrected. Seeded from `TabBarConfig.legacyBuiltins` + whatever their layout holds the first time it runs
 - `sync_backend` — selected `SyncBackend` (owned by `SyncController`)
 
 **Backup import is atomic**: `BackupService` parses/validates the whole payload first, then `DatabaseService.replaceAllData` clears + re-inserts every table inside one transaction (rolls back on any error, so a corrupt or partial backup can't destroy existing data). Backups currently cover only the **active** space (multi-space backup is a known follow-up).
@@ -359,9 +390,17 @@ Every controller is a `ChangeNotifier`. They're constructed in `main.dart` (glob
 **`FinanceController`** (`lib/src/finance/finance_controller.dart`)
 - Owns the space's `_transactions`, `_categories`, `_budgets`. Deletes are permanent (no Finance trash) but tombstoned; the UI pairs each with an Undo banner that re-inserts the row, like event delete.
 - Seeds a default category set on `load()` **only** when the space has neither categories nor transactions, so deleting them all doesn't resurrect them. Seed names are English data rows, not UI strings.
-- Queries: `transactionsInRange(from, to)` (upper bound exclusive) / `transactionsForMonth`, `summaryInRange` / `summaryForMonth` → `FinanceSummary(income, expenses, balance)`, `spendByCategory` → `CategorySpend` list (expenses only, biggest first, uncategorized under a null id), `budgetProgress(reference)` → `BudgetProgress(spent, remaining, isOver, fraction)`, `budgetFor(categoryId)`, `monthsWithData()`.
-- Mutations: `addTransaction` / `updateTransaction` / `deleteTransaction`, `addCategory` / `updateCategory` / `deleteCategory` (entries survive and become uncategorized; the category's budget goes with it) / `reorderCategories(type, old, new)`, `setBudget(categoryId, amount, period)` (replaces rather than duplicating; a non-positive amount clears) / `clearBudget`.
+- Also owns `_accounts` and seeds a single `Cash` account (in the default currency) into an untouched space, under the same "only when nothing exists yet" rule as the categories.
+- Queries take optional `accountId` / `currency` filters: `transactionsInRange(from, to)` (upper bound exclusive) / `transactionsForMonth`, `summaryInRange` / `summaryForMonth` → `FinanceSummary(income, expenses, balance)`, `spendByCategory` → `CategorySpend` list (expenses only, biggest first, uncategorized under a null id), `budgetProgress(reference)` → `BudgetProgress(spent, remaining, isOver, fraction)`, `budgetFor(categoryId)`, `monthsWithData()`. **Transfers are excluded from income / expense totals and from budgets** — moving your own money isn't spending it — and an `accountId` filter matches *either* leg of a transfer.
+- Accounts: `accounts` / `activeAccounts` / `accountById`, `balanceOf(account)` (opening balance ± every entry that touched it), `accountBalances`, `totalsByCurrency()` (never summed across currencies — the app holds no exchange rates), `currencyOf(tx)`, `currenciesInUse`.
+- Mutations: `addTransaction` / `updateTransaction` / `deleteTransaction`, `addAccount` / `updateAccount` / `deleteAccount` (entries survive and lose their account) / `setAccountArchived` / `reorderAccounts`, `addCategory` / `updateCategory` / `deleteCategory` (entries survive and become uncategorized; the category's budget goes with it) / `reorderCategories(type, old, new)`, `setBudget(categoryId, amount, period)` (replaces rather than duplicating; a non-positive amount clears) / `clearBudget`.
 - Period helpers `monthStart` / `nextMonthStart` / `weekStart` live alongside it.
+
+**`GoalController`** (`lib/src/goals/goal_controller.dart`)
+- Owns the space's `_goals`; built with the space's `TaskController` + `FolderController` because a goal's membership is **resolved on demand**, never stored.
+- `tasksForGoal(goal)` unions every source (de-duplicated, uncompleted first), `tasksForSource(source)` powers the editor's live "matches N tasks" preview, `progressFor(goal)` → `GoalProgress(total, completed, fraction, percent)`.
+- Rule matching: scope (all / folders recursively / lists / sections) ∧ tags (any-of) ∧ priorities (any-of) ∧ due-date filter (`any|noDate|overdue|today|tomorrow|thisWeek|thisMonth|range`, evaluated against `DayBoundary.today()` / `DayBoundary.startOfWeek`). Subtasks are excluded — the candidate pool is `TaskController.allTasks`. The date filters are pure **date** predicates, completion-agnostic — that's why `overdue` is labelled "Due before today": a filter that dropped tasks as they were completed could never let the progress bar fill. A section whose row has since been deleted stops matching, so ghost `sectionId`s don't keep counting.
+- Mutations: `addGoal` / `updateGoal` / `deleteGoal` (permanent + tombstoned) / `restoreGoal` (the Undo path — keeps the stored `sortOrder`, which `addGoal` would treat as unset for the first goal) / `reorderGoals`.
 
 **`SettingsController`** (`lib/src/settings/settings_controller.dart`)
 - Loads state from `app_settings` rows + `SettingsService` (`SharedPreferences` for `ThemeMode`) + `SmartListPrefs.load()` (separate JSON file in docs dir).
@@ -457,13 +496,15 @@ Tools cover: tasks (list / create / update / complete / delete / restore with sc
 
 ### App shell (`lib/src/home_shell.dart`)
 
-`HomeShell` is a `StatefulWidget` managing up to **6 logical tabs**: Tasks(0) always-on, then Notes(1) / Calendar(2) / Routines(3) / Settings(4) / Finance(5) — each toggleable in Settings → Tab Bar. Finance was added last, so it takes index 5 rather than renumbering the persisted `tab_bar_config` / `default_tab` / `last_tab` values. Layout adapts:
+`HomeShell` is a `StatefulWidget` managing up to **7 logical tabs**: Tasks(0) always-on, then Notes(1) / Calendar(2) / Routines(3) / Settings(4) / Finance(5) / Goals(6) — each toggleable in Settings → Tab Bar. New tabs take the next free index rather than renumbering the persisted `tab_bar_config` / `default_tab` / `last_tab` values, which is why Settings sits at 4 in the middle of the range (it is still rendered last by convention). Layout adapts:
 
 - **Wide layout** (`PlatformCapabilities.isDesktop` OR window width ≥ 700 px) → `_WideLayout` with a persistent left sidebar.
 - **Single visible tab** → no tab bar at all; just `CupertinoTabView`.
 - **Otherwise** → `CupertinoTabScaffold` + `CupertinoTabBar` at the bottom.
 
-The sidebar/tab-bar **order** is user-configurable in Settings → Tab Bar (`SettingsController.tabOrder`); visibility is independent. A "Default tab on launch" preference (`SettingsController.defaultTab`) selects one of `'0'..'4'` or `'last'` (`kLastOpenedTab` — restore the last opened tab).
+The sidebar/tab-bar **order** is user-configurable in Settings → Tab Bar (`SettingsController.tabOrder`); visibility is independent. A "Default tab on launch" preference (`SettingsController.defaultTab`) selects one of `'0'..'6'` or `'last'` (`kLastOpenedTab` — restore the last opened tab).
+
+**Tab bar swipe mode** (`SettingsController.tabBarSwipeMode`, `tab_bar_swipe_mode`): a horizontal swipe across the bar either pages through the multi-page tab layout (`TabBarSwipeMode.pages`, the default) **or** switches Space (`TabBarSwipeMode.spaces`). The two are alternatives so one gesture never means two things: in spaces mode the bar always renders the first non-empty page (`_pageItems` pins it) and the indicator dots count the user's spaces with the active one filled. `_switchSpace` guards against re-entrancy — `SpaceManager.switchSpace` rebuilds every per-space controller and `main.dart` re-keys `MyApp` on the active space id, so the whole shell is replaced mid-gesture.
 
 Key state:
 - `_navigatorKeys`: per-tab `GlobalKey<NavigatorState>` — used to pop-to-root on same-tab re-tap.
@@ -546,11 +587,12 @@ Key state:
 |------|---------|
 | `notes_view.dart` | Tab root; folder tree + flat notes at root + Trash row (visibility per `SmartListPrefs.notesTrash`). Plus drop targets on every folder row and on the empty root. Multi-select (`SelectableNoteListShell`-style) for batch delete / move. Long-press a note row to drag it between folders (drop targets highlight). |
 | `note_folder_view.dart` | Inside-folder browser; same affordances as the root. |
-| `note_detail_view.dart` | Full editor; markdown preview ↔ edit toggle (driven by `SmartListPrefs.notesUseMarkdown`). Autosave (3 s debounce + on blur / disposal). `MarkdownToolbar` shown above keyboard while editing. ⋯ menu → Move, Share, Info, Delete. `routeName = NoteDetailView.routeName`. |
-| `markdown_view.dart` | Read-only markdown renderer using `flutter_markdown`; intercepts `http`, `mailto`, `tel`, and custom schemes via `url_launcher`. |
-| `markdown_toolbar.dart` | Keyboard accessory with **bold**, *italic*, ~~strike~~, `code`, [link](url) buttons — wraps selection or inserts at cursor. |
+| `note_detail_view.dart` | Full editor; the body is **always** rendered as markdown when not being edited (the old plain-text mode and its `notesUseMarkdown` preference are gone). Autosave (3 s debounce + on blur / disposal). `MarkdownToolbar` shown above keyboard while editing. ⋯ menu → Move, Share, Info, Delete. `routeName = NoteDetailView.routeName`. |
+| `markdown_view.dart` | Read-only markdown renderer using `flutter_markdown` with `md.ExtensionSet.gitHubWeb` (tables, task lists, strikethrough, footnotes, autolinks, heading ids, alerts, `:emoji:`), a Cupertino `checkboxBuilder` for GFM task lists, a full style sheet (h1–h6, tables, rules, code blocks) and the LaTeX syntaxes from `markdown_math.dart`. Intercepts `http`, `mailto`, `tel`, and custom schemes via `url_launcher`. `preserveMarkdownBlankLines` (top-level, unit-tested) keeps deliberate vertical gaps and skips fenced code **and** `$$` / `\[ … \]` math blocks so it can't corrupt either. |
+| `markdown_math.dart` | LaTeX: `$…$` / `\(…\)` inline and `$$…$$` / `\[…\]` display, rendered with `flutter_math_fork`. Both are **inline** syntaxes on purpose — flutter_markdown appends block-builder tags to a package-global list on every build and never removes them, so a block builder would grow that list for the process's lifetime. The builder returns `Text.rich` with a `WidgetSpan` (the package only merges Text/RichText back into a paragraph), and malformed TeX degrades to the author's own source in red instead of throwing. The `$` form requires non-space just inside both delimiters, so "it cost $5 and $7" stays prose. |
+| `markdown_toolbar.dart` | Keyboard accessory: H1–H3, **bold**, *italic*, ~~strike~~, list, numbered list, quote, `code`, fenced code, [link](url), task list, table, horizontal rule, `$x$` and `$$` — wraps the selection or inserts at the cursor. |
 | `note_widgets.dart` | Shared row widgets: `NoteFolderRow`, `NoteRow` (first-line preview with lightweight inline-markdown stripping). |
-| `note_share.dart` | `showNoteShareMenu` — exports current note as plain text, PDF (via `pdf` package), or PNG image (renders markdown to canvas), shares via `share_plus`. |
+| `note_share.dart` | `showNoteShareMenu` — exports the current note as plain text, PDF or PNG, shared via `share_plus`. PDF and PNG both go through one off-screen render of the real `MarkdownView` (`_renderNoteToImage`); the PDF slices that bitmap into A4 pages (capped at 60). Rendering rather than emitting `pw.Text` is what makes headings, tables, task lists, LaTeX, emoji and non-Latin scripts survive — the pdf package's built-in Type-1 fonts cover only Latin-1. |
 | `note_trash_view.dart` | Trashed notes + folders; same swipe-right / swipe-left pattern as task Trash. |
 | `create_note_folder_sheet.dart` | Icon + name sheet for new note folders. |
 | `note_controller.dart` | (see Controllers above) |
@@ -634,22 +676,44 @@ Lists with `listType = ListType.birthdays` render contacts instead of tasks. Con
 
 Plus-button drop on a Birthdays-type list opens `showContactCreationSheet` instead of the task sheet (handled in `HomeShell._handleDropOnList`). Birthday chips appear on the relevant day in `CalendarView` via `ContactController.contactsForDate(date)`.
 
+### Goals feature (`lib/src/goals/`) — new
+
+A goal is a **named collection of tasks with a progress bar**. What it contains is described by `GoalSource`s and resolved live, so the goal keeps up with tasks created after it was made.
+
+| File | Purpose |
+|------|---------|
+| `goal_controller.dart` | (see Controllers above) |
+| `goals_view.dart` | Tab root (logical tab 6): one card per goal — icon, name, description, `%`, gradient progress bar and `x of y done`. Long-press to drag-reorder or open edit/delete; swipe to delete (Undo banner); tap to open. The shell's + button opens the goal editor. |
+| `goal_detail_view.dart` | A goal's contents: header + progress, a plain-language list of the rules it's built from, then the live task list rendered with the shared `TaskRow` (checkable in place via `toggleTaskCompletedWithUndo`, tap-through to `TaskDetailView`). |
+| `goal_editor_view.dart` | Name, description, colour, icon, and the list of sources (each row summarises what it matches and how many tasks that is right now). |
+| `goal_source_editor.dart` | One source: **Picked tasks** (hand-picked ids) or **Rule** (scope = all / folders / lists / sections, then optional tag, priority and due-date filters). Shows a live "matches N tasks" preview using the same resolution the goal will use. |
+| `goal_scope_picker.dart` / `goal_task_picker.dart` | Multi-select sheets for the rule's containers and for hand-picked tasks (with search). |
+| `goal_source_labels.dart` | Shared human-readable summaries of a source (`Work, Personal · #launch · High · This week`). |
+| `goal_progress_bar.dart` | The red → amber → green gradient bar. The gradient is sampled across the full width and clipped to the current fraction, so the leading edge's colour tracks progress instead of every bar ending on the same hue. |
+| `goal_icons.dart` | `kGoalIcons` / `kGoalColors` / `GoalCircleIcon`. |
+
+Goals are **per space**. Deletes are permanent (no Goals trash) but tombstoned, with an Undo banner that re-inserts. Goals are not FTS-indexed and are not exposed over MCP yet.
+
 ### Finance feature (`lib/src/finance/`) — new
 
-Simple money tracking: expenses / income, categories and spending budgets. Amounts are stored as **minor units (cents) in an `int`** — never a double — with the direction carried by `FinanceEntryType`, not the sign, so sums stay exact.
+Money tracking: accounts/cards with their own currencies, expenses / income / transfers, categories and spending budgets. Amounts are stored as **minor units (cents) in an `int`** — never a double — with the direction carried by `FinanceEntryType`, not the sign, so sums stay exact.
+
+**Currencies are never converted.** Each account carries its own `currencyCode`; totals are grouped per currency, a cross-currency transfer stores both legs (`amount` out, `toAmount` in), and budgets count only entries in the space's default currency — the budget section is hidden entirely while the tab is filtered to an account in another currency, rather than comparing amounts that aren't comparable. A day header shows a net total only when everything on that day shares one currency. There are no exchange rates anywhere in the app.
 
 | File | Purpose |
 |------|---------|
 | `finance_controller.dart` | (see Controllers above) |
-| `finance_view.dart` | Tab root (logical tab 5): month navigator (‹ March 2026 ›), summary card (Spent / Income / Balance), budget progress bars, per-category breakdown, then the month's entries grouped by day with the day's net total. Swipe an entry to delete (Undo banner), tap to edit, long-press for edit/delete. ⋯ menu → Categories / Budgets / Settings. Publishes the viewed month so the shell's + button dates new entries inside it. |
-| `transaction_sheet.dart` | `showTransactionSheet(...)` — one modal sheet for both create and edit: Expense/Income segment, amount (the only required field), description, category, date, note. An empty description falls back to the category name. |
+| `finance_view.dart` | Tab root (logical tab 5): month navigator (‹ March 2026 ›), an account chip strip (All + one chip per account with its balance), summary card(s) — one per currency when showing every account — budget progress bars, per-category breakdown, then the month's entries grouped by day with the day's net total. Swipe an entry to delete (Undo banner), tap to edit, long-press for edit/delete. ⋯ menu → Accounts / Categories / Budgets / Settings. Publishes the viewed month so the shell's + button dates new entries inside it. |
+| `transaction_sheet.dart` | `showTransactionSheet(...)` — one modal sheet for create and edit: Expense/Income/**Transfer** segment, amount (in the chosen account's currency), account (and destination + a second amount for a cross-currency transfer), description, category, date, note. An empty description falls back to the category — or, for a transfer, the destination account. |
+| `finance_accounts_view.dart` | Accounts and cards: per-currency totals, balances, drag-reorder, archive, swipe delete; `showAccountEditor` is the name + type + currency + starting balance + colour + icon page. |
+| `currency.dart` | `kCurrencies` catalogue (code, symbol, decimals), `currencySymbol`, `currencyDecimals`. A code outside the catalogue still works — it renders as the code. |
 | `finance_categories_view.dart` | Categories per ledger side (segmented), long-press drag-reorder, swipe delete, tap to edit; `showCategoryEditor` is the name + colour + icon page. |
 | `finance_budgets_view.dart` | Overall budget + one per expense category, plus the shared monthly/weekly period. Amounts entered through `money_amount_dialog.dart` (clearing removes the budget). |
 | `finance_format.dart` | `FinanceCurrency` global mirror (symbol + show-decimals, kept in sync by `SettingsController`), `formatMoney`, `parseAmountToCents` (accepts `12`, `12.5`, `12,50`, `1 234.56`), month / day header formatting. |
 | `finance_icons.dart` | `kFinanceCategoryIcons` + `financeCategoryIcon(key)`, the colour swatches, and the round `FinanceCategoryIcon` badge. |
-| `lib/src/settings/finance_settings_view.dart` | Settings → Modules → Finance: currency symbol (shortlist + custom), show-decimals toggle, links to Categories / Budgets, + button placement. |
+| `lib/src/settings/finance_settings_view.dart` | Settings → Modules → Finance: default currency (catalogue + custom glyph), show-decimals toggle, links to Accounts / Categories / Budgets, + button placement. |
 
-Finance data is **per space** (it lives in the space's DB file); the currency prefs are global. Backups carry `finance_categories` / `finance_transactions` / `finance_budgets`; payloads written before the feature shipped import unchanged (a missing key reads as an empty table). Transactions are **not** FTS-indexed and are not exposed over MCP yet.
+Finance data is **per space** (it lives in the space's DB file); the currency prefs are global. Backups carry `finance_accounts` / `finance_categories` / `finance_transactions` / `finance_budgets`; payloads written before a table existed import unchanged (a missing key reads as an empty table). Transactions are **not** FTS-indexed and are not exposed over MCP yet.
 
 ### Search feature (`lib/src/search/`) — new
 
@@ -673,7 +737,7 @@ Contacts are intentionally **not** indexed for search yet.
 | `appearance_view.dart` | Theme (Light/System/Dark), 12-swatch accent, 7-swatch completion color. |
 | `font_picker_view.dart` | Browses all ~1500 Google Fonts. `CupertinoSearchTextField` filters. Connectivity check (`InternetAddress.lookup('fonts.gstatic.com')`); offline + uncached fonts grayed out. ⋯ → "Edit Preview Text". |
 | `font_cache.dart` | `FontCache` singleton; persists `Set<String>` of seen keys + custom preview text to `<docsDir>/font_cache.json`. |
-| `module_settings_views.dart` | Per-module setting screens (Notes, Calendar, Routines). Calendar + Routines pages host the `showRoutinesInCalendar` / `showRoutinesInToday` toggles (mirrored across pages since they read/write the same `SettingsController` fields). |
+| `module_settings_views.dart` | Per-module setting screens (Notes, Calendar, Routines, Goals). Calendar + Routines pages host the `showRoutinesInCalendar` / `showRoutinesInToday` toggles (mirrored across pages since they read/write the same `SettingsController` fields). |
 | `tasks_settings_view.dart` | Tasks-module screen — toggles for individual `TaskFieldPrefs` fields, folder-count mode, hide-tab-labels, show-add-folder-button, and a **Today** section: show routines / events in Today, each with an "include in Today's count" sub-toggle (`showRoutinesInToday` + `countRoutinesInToday`, `showEventsInToday` + `countEventsInToday`). |
 | `notifications_view.dart` | Permission gate + per-feature toggles (badge mode, `badgeIncludeRoutines`, reminders). |
 | `security_view.dart` | PIN/password setup, biometric toggle (gated by `supportsBiometricAuth`), change-password flow. |
@@ -684,7 +748,7 @@ Contacts are intentionally **not** indexed for search yet.
 | `data_view.dart` | Export Backup, Import Backup, Reset User Data (confirms hard, then `BackupService.hardReset`). |
 | `backup_service.dart` | (see Controllers above) |
 | `backup_crypto.dart` | AES-256-GCM + PBKDF2 envelope encryption (see Sync). |
-| `smart_list_prefs.dart` | `SmartListPrefs` — `today` / `tomorrow` / `upcoming` / `allTasks` / `completed` / `trash` / `notesTrash` visibility (`show` / `showIfNotEmpty` / `hidden`), `hideTabLabels`, `showAddFolderButton`, `showNotesAddFolderButton`, `notesUseMarkdown`. Stored as `<docsDir>/smart_list_prefs.json`; included in backup payloads. |
+| `smart_list_prefs.dart` | `SmartListPrefs` — `today` / `tomorrow` / `upcoming` / `allTasks` / `completed` / `trash` / `notesTrash` visibility (`show` / `showIfNotEmpty` / `hidden`), `hideTabLabels`, `showAddFolderButton`, `showNotesAddFolderButton`. Stored as `<docsDir>/smart_list_prefs.json`; included in backup payloads. |
 | `google_calendar_settings_view.dart` | (see Google Calendar) |
 
 **Appearance color presets:**
@@ -720,6 +784,7 @@ Use the statics — never hard-code these values at call sites.
 ### Shared utilities (`lib/src/utils/`)
 
 - `fast_route.dart` — `FastRoute<T> extends CupertinoPageRoute<T>` with 180 ms transition. **Always use FastRoute, never bare `CupertinoPageRoute`.**
+- `day_boundary.dart` — `DayBoundary.hour` / `today()` / `tomorrow()` (user-configurable day rollover) plus `DayBoundary.firstWeekday` / `startOfWeek(date)`, mirrored from `SettingsController` so plain controllers can do week arithmetic without a Settings dependency. `startOfWeek` uses calendar arithmetic, not `Duration` subtraction, so a DST change inside the week can't shift the result.
 - `platform_capabilities.dart` — `PlatformCapabilities` predicates (see Platforms).
 - `dropdown_overlay.dart` — `DropdownOverlayMixin` on `State<T>`: provides `showDropdown(context, builder)` that inserts an `OverlayEntry`, exposes a `dismiss()` callback, and auto-removes the entry in `dispose()` so the overlay can't leak when the host route is popped.
 - `dropdown_row.dart` — `DropdownRow` widget (leading icon + label + optional destructive color); used inside dropdown overlays and ⋯ menus.

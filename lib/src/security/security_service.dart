@@ -47,7 +47,25 @@ class SecurityService {
 
   PasswordType _type = PasswordType.none;
   PasswordType get type => _type;
+
+  /// Whether a passcode is configured at all.
   bool get isLocked => _type != PasswordType.none;
+
+  /// Whether the user has already unlocked during this app run. The lock gate
+  /// lives inside the widget tree that is rebuilt from scratch on every Space
+  /// switch, so without this the app would demand the passcode again every
+  /// time the user changed Space — which the tab-bar swipe makes constant.
+  /// Backgrounding the app clears it (see [lock]).
+  bool _unlockedThisRun = false;
+
+  /// True when the lock screen should be shown right now.
+  bool get shouldPrompt => isLocked && !_unlockedThisRun;
+
+  /// Records a successful unlock for the rest of this app run.
+  void markUnlocked() => _unlockedThisRun = true;
+
+  /// Drops the unlocked state — called when the app leaves the foreground.
+  void lock() => _unlockedThisRun = false;
 
   bool _biometricEnabled = false;
   bool get biometricEnabled => _biometricEnabled;

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../home_shell.dart';
 import '../localization/strings.dart';
+import '../models/finance_account.dart';
 import '../models/finance_budget.dart';
 import '../models/finance_category.dart';
 import '../models/finance_transaction.dart';
@@ -13,6 +14,7 @@ import '../utils/dropdown_row.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
 import '../utils/undo_controller.dart';
+import 'finance_accounts_view.dart';
 import 'finance_budgets_view.dart';
 import 'finance_categories_view.dart';
 import 'finance_controller.dart';
@@ -31,6 +33,7 @@ class FinanceView extends StatefulWidget {
     this.settingsController,
     this.resetSignal,
     this.activeMonth,
+    this.activeAccount,
   });
 
   final FinanceController controller;
@@ -44,12 +47,21 @@ class FinanceView extends StatefulWidget {
   /// entry inside it instead of always using today.
   final ValueNotifier<DateTime?>? activeMonth;
 
+  /// Publishes the account the tab is filtered to (null = all), so a new
+  /// entry starts on the account the user is looking at.
+
+  final ValueNotifier<String?>? activeAccount;
+
   @override
   State<FinanceView> createState() => _FinanceViewState();
 }
 
 class _FinanceViewState extends State<FinanceView> with DropdownOverlayMixin {
   late DateTime _month;
+
+  /// null = every account. Narrowing to one account also scopes the summary,
+  /// breakdown and budgets to that account's currency.
+  String? _accountId;
 
   @override
   void initState() {
@@ -122,6 +134,14 @@ class _FinanceViewState extends State<FinanceView> with DropdownOverlayMixin {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   DropdownRow(
+                    label: s.accounts,
+                    icon: CupertinoIcons.creditcard,
+                    onTap: () {
+                      dismiss();
+                      _openAccounts();
+                    },
+                  ),
+                  DropdownRow(
                     label: s.categories,
                     icon: CupertinoIcons.tag,
                     onTap: () {
@@ -170,6 +190,27 @@ class _FinanceViewState extends State<FinanceView> with DropdownOverlayMixin {
       ),
     );
   }
+
+  void _openAccounts() {
+    Navigator.of(context).push(
+      FastRoute<void>(
+        builder: (_) => FinanceAccountsView(controller: widget.controller),
+      ),
+    );
+  }
+
+  /// The account currently filtered to, if any. Resolved through the
+  /// controller every time, so a filter pointing at an account the user has
+  /// since deleted quietly falls back to "all accounts" instead of showing an
+  /// empty month with no chip selected.
+  FinanceAccount? get _account => widget.controller.accountById(_accountId);
+
+  /// The filter actually in force — null once the selected account is gone.
+  String? get _effectiveAccountId => _account?.id;
+
+  /// Currency the month's figures are denominated in: the selected account's,
+  /// or the space default when showing every account.
+  String get _currency => _account?.currencyCode ?? FinanceCurrency.code;
 
   Future<void> _deleteTransaction(FinanceTransaction tx) async {
     await widget.controller.deleteTransaction(tx.id);
@@ -243,10 +284,19 @@ class _FinanceViewState extends State<FinanceView> with DropdownOverlayMixin {
   Widget _buildBody(BuildContext context) {
     final s = S.of(context);
     final controller = widget.controller;
-    final summary = controller.summaryForMonth(_month);
-    final transactions = controller.transactionsForMonth(_month);
-    final progress = controller.budgetProgress(_month);
-    final breakdown = controller.spendByCategoryForMonth(_month);
+    final transactions =
+        controller.transactionsForMonth(_month, accountId: _effectiveAccountId);
+    final progress = controller.budgetProgress(_month,
+        currency: _currency, accountId: _effectiveAccountId);
+    final breakdown = controller.spendByCategoryForMonth(_month,
+        accountId: _effectiveAccountId, currency: _currency);
+    // With one account selected there's a single currency to report. Showing
+    // every account, each currency gets its own card — the app never sums
+    // across currencies because it holds no exchange rates.
+    final currencies = _effectiveAccountId != null
+        ? [_currency]
+        : controller.currenciesInUse;
+    final accounts = controller.activeAccounts;
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 120),
@@ -256,11 +306,32 @@ class _FinanceViewState extends State<FinanceView> with DropdownOverlayMixin {
           onPrevious: () => _shiftMonth(-1),
           onNext: () => _shiftMonth(1),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-          child: _SummaryCard(summary: summary),
-        ),
-        if (progress.isNotEmpty) ...[
+        if (accounts.isNotEmpty)
+          _AccountStrip(
+            accounts: accounts,
+            selectedId: _effectiveAccountId,
+            balanceOf: controller.balanceOf,
+            onSelect: (id) {
+              setState(() => _accountId = id);
+              widget.activeAccount?.value = id;
+            },
+            onManage: _openAccounts,
+          ),
+        for (final currency in currencies)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: _SummaryCard(
+              summary: controller.summaryForMonth(_month,
+                  accountId: _effectiveAccountId, currency: currency),
+              currencyCode: currency,
+              showCurrencyLabel: currencies.length > 1,
+            ),
+          ),
+        // Budgets are denominated in the space's default currency, so they
+        // are only shown while that's the currency on screen — comparing a
+        // EUR month against a USD budget would be a lie, and the app has no
+        // exchange rates to convert with.
+        if (progress.isNotEmpty && _currency == FinanceCurrency.code) ...[
           _SectionHeader(
             label: s.budgets,
             actionLabel: s.edit,
@@ -270,6 +341,7 @@ class _FinanceViewState extends State<FinanceView> with DropdownOverlayMixin {
             _BudgetRow(
               progress: p,
               category: controller.categoryById(p.budget.categoryId),
+              currencyCode: _currency,
             ),
         ],
         if (breakdown.isNotEmpty) ...[
@@ -278,7 +350,11 @@ class _FinanceViewState extends State<FinanceView> with DropdownOverlayMixin {
             _BreakdownRow(
               spend: entry,
               category: controller.categoryById(entry.categoryId),
-              total: summary.expenses,
+              total: controller
+                  .summaryForMonth(_month,
+                      accountId: _effectiveAccountId, currency: _currency)
+                  .expenses,
+              currencyCode: _currency,
             ),
         ],
         _SectionHeader(label: s.transactions),
@@ -332,20 +408,30 @@ class _FinanceViewState extends State<FinanceView> with DropdownOverlayMixin {
       final day = DateTime(tx.date.year, tx.date.month, tx.date.day);
       if (currentDay == null || day != currentDay) {
         currentDay = day;
-        final dayTotal = transactions
-            .where((t) =>
-                t.date.year == day.year &&
-                t.date.month == day.month &&
-                t.date.day == day.day)
-            .fold<int>(0, (sum, t) => sum + t.signedAmount);
+        final ofDay = transactions.where((t) =>
+            t.date.year == day.year &&
+            t.date.month == day.month &&
+            t.date.day == day.day);
+        // A day's net total only means something when everything on it is in
+        // one currency — the app never converts, so a mixed day shows no
+        // total rather than a nonsense sum.
+        final dayCurrencies =
+            ofDay.map(widget.controller.currencyOf).toSet();
+        final dayTotal =
+            ofDay.fold<int>(0, (sum, t) => sum + t.signedAmount);
         widgets.add(_DayHeader(
           label: formatTransactionDay(context, day, now),
-          total: dayTotal,
+          total: dayCurrencies.length == 1 ? dayTotal : null,
+          currencyCode:
+              dayCurrencies.length == 1 ? dayCurrencies.first : null,
         ));
       }
       widgets.add(_TransactionRow(
         transaction: tx,
         category: widget.controller.categoryById(tx.categoryId),
+        account: widget.controller.accountById(tx.accountId),
+        toAccount: widget.controller.accountById(tx.toAccountId),
+        currencyCode: widget.controller.currencyOf(tx),
         onTap: () =>
             showTransactionSheet(context, widget.controller, existing: tx),
         onLongPress: () => _showTransactionMenu(tx),
@@ -358,6 +444,122 @@ class _FinanceViewState extends State<FinanceView> with DropdownOverlayMixin {
 }
 
 // ── Pieces ───────────────────────────────────────────────────────────────────
+
+/// Horizontal strip of account chips above the month's figures: "All" plus
+/// one chip per active account showing its balance in its own currency.
+/// Selecting one scopes everything below to that account.
+class _AccountStrip extends StatelessWidget {
+  const _AccountStrip({
+    required this.accounts,
+    required this.selectedId,
+    required this.balanceOf,
+    required this.onSelect,
+    required this.onManage,
+  });
+
+  final List<FinanceAccount> accounts;
+  final String? selectedId;
+  final int Function(FinanceAccount) balanceOf;
+  final ValueChanged<String?> onSelect;
+  final VoidCallback onManage;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return SizedBox(
+      height: 62,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        children: [
+          _AccountChip(
+            label: s.allAccounts,
+            detail: null,
+            color: AppColors.accent.value,
+            selected: selectedId == null,
+            onTap: () => onSelect(null),
+          ),
+          for (final account in accounts)
+            _AccountChip(
+              label: account.name,
+              detail: formatMoney(balanceOf(account),
+                  currencyCode: account.currencyCode),
+              color: account.color,
+              selected: selectedId == account.id,
+              onTap: () => onSelect(account.id),
+            ),
+          _AccountChip(
+            label: s.manage,
+            detail: null,
+            color: 0xFF8E8E93,
+            selected: false,
+            onTap: onManage,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountChip extends StatelessWidget {
+  const _AccountChip({
+    required this.label,
+    required this.detail,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String? detail;
+  final int color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = Color(color);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? tint.withOpacity(0.16)
+              : CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          borderRadius: BorderRadius.circular(10),
+          border: selected ? Border.all(color: tint, width: 1) : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                color: selected
+                    ? tint
+                    : CupertinoColors.label.resolveFrom(context),
+              ),
+            ),
+            if (detail != null)
+              Text(
+                detail!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _MonthNavigator extends StatelessWidget {
   const _MonthNavigator({
@@ -415,9 +617,18 @@ class _MonthNavigator extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.summary});
+  const _SummaryCard({
+    required this.summary,
+    required this.currencyCode,
+    this.showCurrencyLabel = false,
+  });
 
   final FinanceSummary summary;
+  final String currencyCode;
+
+  /// Shown when several currencies are on screen, so each card says which
+  /// money it is reporting.
+  final bool showCurrencyLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -431,12 +642,30 @@ class _SummaryCard extends StatelessWidget {
       ),
       child: Column(
         children: [
+          if (showCurrencyLabel)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Text(
+                    currencyCode,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          CupertinoColors.secondaryLabel.resolveFrom(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Row(
             children: [
               Expanded(
                 child: _SummaryCell(
                   label: s.spent,
-                  amount: formatMoney(summary.expenses),
+                  amount:
+                      formatMoney(summary.expenses, currencyCode: currencyCode),
                   color: CupertinoColors.label.resolveFrom(context),
                 ),
               ),
@@ -448,7 +677,8 @@ class _SummaryCard extends StatelessWidget {
               Expanded(
                 child: _SummaryCell(
                   label: s.income,
-                  amount: formatMoney(summary.income),
+                  amount:
+                      formatMoney(summary.income, currencyCode: currencyCode),
                   color: AppColors.systemGreen,
                 ),
               ),
@@ -471,7 +701,8 @@ class _SummaryCard extends StatelessWidget {
                 ),
               ),
               Text(
-                formatMoney(balance, signed: balance != 0),
+                formatMoney(balance,
+                    signed: balance != 0, currencyCode: currencyCode),
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w600,
@@ -570,10 +801,15 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _BudgetRow extends StatelessWidget {
-  const _BudgetRow({required this.progress, required this.category});
+  const _BudgetRow({
+    required this.progress,
+    required this.category,
+    required this.currencyCode,
+  });
 
   final BudgetProgress progress;
   final FinanceCategory? category;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -604,7 +840,8 @@ class _BudgetRow extends StatelessWidget {
                 ),
               ),
               Text(
-                '${formatMoney(progress.spent)} / ${formatMoney(budget.amount)}',
+                '${formatMoney(progress.spent, currencyCode: currencyCode)}'
+                ' / ${formatMoney(budget.amount, currencyCode: currencyCode)}',
                 style: TextStyle(
                   fontSize: 13,
                   color: progress.isOver
@@ -636,8 +873,10 @@ class _BudgetRow extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             progress.isOver
-                ? s.overBudgetBy(formatMoney(-progress.remaining))
-                : s.leftToSpend(formatMoney(progress.remaining)),
+                ? s.overBudgetBy(formatMoney(-progress.remaining,
+                    currencyCode: currencyCode))
+                : s.leftToSpend(formatMoney(progress.remaining,
+                    currencyCode: currencyCode)),
             style: TextStyle(
               fontSize: 12,
               color: progress.isOver
@@ -656,11 +895,13 @@ class _BreakdownRow extends StatelessWidget {
     required this.spend,
     required this.category,
     required this.total,
+    required this.currencyCode,
   });
 
   final CategorySpend spend;
   final FinanceCategory? category;
   final int total;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -714,7 +955,7 @@ class _BreakdownRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                formatMoney(spend.amount),
+                formatMoney(spend.amount, currencyCode: currencyCode),
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
               ),
               Text(
@@ -733,13 +974,21 @@ class _BreakdownRow extends StatelessWidget {
 }
 
 class _DayHeader extends StatelessWidget {
-  const _DayHeader({required this.label, required this.total});
+  const _DayHeader({
+    required this.label,
+    required this.total,
+    required this.currencyCode,
+  });
 
   final String label;
-  final int total;
+
+  /// null when the day mixes currencies — see the caller.
+  final int? total;
+  final String? currencyCode;
 
   @override
   Widget build(BuildContext context) {
+    final value = total;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
@@ -754,13 +1003,15 @@ class _DayHeader extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            formatMoney(total, signed: total != 0),
-            style: TextStyle(
-              fontSize: 13,
-              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+          if (value != null)
+            Text(
+              formatMoney(value,
+                  signed: value != 0, currencyCode: currencyCode),
+              style: TextStyle(
+                fontSize: 13,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -771,6 +1022,9 @@ class _TransactionRow extends StatelessWidget {
   const _TransactionRow({
     required this.transaction,
     required this.category,
+    required this.account,
+    required this.toAccount,
+    required this.currencyCode,
     required this.onTap,
     required this.onLongPress,
     required this.onDismissed,
@@ -778,14 +1032,26 @@ class _TransactionRow extends StatelessWidget {
 
   final FinanceTransaction transaction;
   final FinanceCategory? category;
+  final FinanceAccount? account;
+  final FinanceAccount? toAccount;
+  final String currencyCode;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback onDismissed;
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final isIncome = transaction.type == FinanceEntryType.income;
-    final subtitle = category?.name ?? S.of(context).uncategorized;
+    final isTransfer = transaction.isTransfer;
+    // Transfers name both ends; everything else names its category, then its
+    // account when one is set.
+    final subtitle = isTransfer
+        ? '${account?.name ?? s.noAccount} → ${toAccount?.name ?? s.noAccount}'
+        : [
+            category?.name ?? s.uncategorized,
+            if (account != null) account!.name,
+          ].join(' · ');
     return Dismissible(
       key: ValueKey(transaction.id),
       direction: DismissDirection.endToStart,
@@ -806,8 +1072,12 @@ class _TransactionRow extends StatelessWidget {
           child: Row(
             children: [
               FinanceCategoryIcon(
-                iconId: category?.iconId,
-                color: category?.color ?? 0xFF8E8E93,
+                iconId: isTransfer
+                    ? 'creditcard'
+                    : (category?.iconId ?? account?.iconId),
+                color: isTransfer
+                    ? (account?.color ?? 0xFF8E8E93)
+                    : (category?.color ?? 0xFF8E8E93),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -838,13 +1108,19 @@ class _TransactionRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                formatMoney(transaction.signedAmount, signed: true),
+                isTransfer
+                    ? formatMoney(transaction.amount,
+                        currencyCode: currencyCode)
+                    : formatMoney(transaction.signedAmount,
+                        signed: true, currencyCode: currencyCode),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: isIncome
-                      ? AppColors.systemGreen
-                      : CupertinoColors.label.resolveFrom(context),
+                  color: isTransfer
+                      ? CupertinoColors.secondaryLabel.resolveFrom(context)
+                      : isIncome
+                          ? AppColors.systemGreen
+                          : CupertinoColors.label.resolveFrom(context),
                 ),
               ),
             ],

@@ -9,6 +9,7 @@ import 'calendar/event_controller.dart';
 import 'contacts/contact_controller.dart';
 import 'finance/finance_controller.dart';
 import 'folders/folder_controller.dart';
+import 'goals/goal_controller.dart';
 import 'integrations/apple/device_calendar_controller.dart';
 import 'integrations/google/google_calendar_controller.dart';
 import 'localization/app_localizations.dart';
@@ -37,6 +38,7 @@ class MyApp extends StatefulWidget {
     required this.eventController,
     required this.contactController,
     required this.financeController,
+    required this.goalController,
     required this.backupService,
     this.securityService,
     required this.googleCalendarController,
@@ -51,6 +53,7 @@ class MyApp extends StatefulWidget {
   final EventController eventController;
   final ContactController contactController;
   final FinanceController financeController;
+  final GoalController goalController;
   final BackupService backupService;
   final SecurityService? securityService;
   final GoogleCalendarController googleCalendarController;
@@ -212,6 +215,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                         eventController: widget.eventController,
                         contactController: widget.contactController,
                         financeController: widget.financeController,
+                        goalController: widget.goalController,
                         backupService: widget.backupService,
                         securityService: widget.securityService,
                         googleCalendarController: widget.googleCalendarController,
@@ -307,7 +311,9 @@ class _SecurityGateState extends State<_SecurityGate>
   @override
   void initState() {
     super.initState();
-    _locked = widget.securityService?.isLocked ?? false;
+    // `shouldPrompt`, not `isLocked`: a Space switch rebuilds this gate from
+    // scratch, and an already-unlocked run must not be challenged again.
+    _locked = widget.securityService?.shouldPrompt ?? false;
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -321,7 +327,9 @@ class _SecurityGateState extends State<_SecurityGate>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      if (widget.securityService?.isLocked ?? false) {
+      final service = widget.securityService;
+      if (service?.isLocked ?? false) {
+        service!.lock();
         setState(() => _locked = true);
       }
     }
@@ -332,7 +340,10 @@ class _SecurityGateState extends State<_SecurityGate>
     if (_locked && widget.securityService != null) {
       return LockScreen(
         securityService: widget.securityService!,
-        onUnlocked: () => setState(() => _locked = false),
+        onUnlocked: () {
+          widget.securityService!.markUnlocked();
+          setState(() => _locked = false);
+        },
       );
     }
     return widget.child;

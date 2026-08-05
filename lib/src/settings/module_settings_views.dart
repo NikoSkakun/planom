@@ -73,16 +73,10 @@ class NotesSettingsView extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   SettingsSectionHeader(s.sectionBody),
-                  SettingsToggleRow(
-                    label: s.useMarkdown,
-                    value: prefs.notesUseMarkdown,
-                    onChanged: controller.updateNotesUseMarkdown,
-                  ),
-                  const SizedBox(height: 6),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
-                      s.useMarkdownHint,
+                      s.notesMarkdownAlwaysHint,
                       style: TextStyle(
                         fontSize: 13,
                         color: CupertinoColors.secondaryLabel
@@ -287,6 +281,56 @@ class CalendarSettingsView extends StatelessWidget {
 
 /// Sentinel value for "Planom (Local)" in the default-container picker.
 const String _localContainerKey = '__planom_local__';
+
+/// Settings → Modules → Goals. Goals have no data preferences of their own —
+/// what a goal tracks lives on the goal — so this page carries the module's
+/// UI options and explains what the tab does.
+class GoalsSettingsView extends StatelessWidget {
+  const GoalsSettingsView({super.key, required this.controller});
+
+  final SettingsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        border: null,
+        middle: Text(s.tabGoals),
+      ),
+      child: SafeArea(
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) {
+            return SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      s.goalsModuleHint,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color:
+                            CupertinoColors.secondaryLabel.resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SettingsSectionHeader(s.plusButton),
+                  PlusButtonOverrideRow(controller: controller, tab: 6),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
 
 class RoutinesSettingsView extends StatelessWidget {
   const RoutinesSettingsView({super.key, required this.controller});

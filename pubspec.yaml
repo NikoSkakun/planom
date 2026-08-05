@@ -46,6 +46,7 @@ dependencies:
   googleapis: ^13.2.0
   http: ^1.2.0
   pdf: ^3.11.3
+  flutter_math_fork: 0.7.3
 
 dev_dependencies:
   flutter_test:

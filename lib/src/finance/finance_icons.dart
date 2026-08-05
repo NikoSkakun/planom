@@ -34,6 +34,23 @@ const List<String> kFinanceCategoryIcons = [
   'plus_circle',
 ];
 
+/// Icon keys offered for an account or card. Shares [financeCategoryIcon]'s
+/// resolution so account and category badges can use the same widget.
+const List<String> kFinanceAccountIcons = [
+  'creditcard',
+  'banknote',
+  'wallet',
+  'building',
+  'piggy',
+  'money_dollar',
+  'chart_bar',
+  'phone',
+  'globe',
+  'star',
+  'bag',
+  'tag',
+];
+
 /// Resolves a stored category icon key to its Cupertino glyph. Unknown keys
 /// (e.g. from a newer build's backup) fall back to a neutral tag.
 IconData financeCategoryIcon(String? key) {
@@ -80,6 +97,14 @@ IconData financeCategoryIcon(String? key) {
       return CupertinoIcons.creditcard;
     case 'money_dollar':
       return CupertinoIcons.money_dollar;
+    case 'banknote':
+      return CupertinoIcons.money_dollar_circle;
+    case 'wallet':
+      return CupertinoIcons.briefcase_fill;
+    case 'building':
+      return CupertinoIcons.building_2_fill;
+    case 'piggy':
+      return CupertinoIcons.arrow_down_circle;
     case 'chart_bar':
       return CupertinoIcons.chart_bar;
     case 'paw':

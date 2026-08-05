@@ -13,7 +13,7 @@ import 'tasks_settings_view.dart';
 
 /// Logical tab indices that can carry a per-tab + button override. (Notes only
 /// uses the global side in practice, but it's still configurable for symmetry.)
-const List<int> _plusOverrideTabs = [0, 1, 2, 3, 5];
+const List<int> _plusOverrideTabs = [0, 1, 2, 3, 5, 6];
 
 String _tabName(S s, int tab) {
   switch (tab) {
@@ -27,6 +27,8 @@ String _tabName(S s, int tab) {
       return s.tabRoutines;
     case 5:
       return s.tabFinance;
+    case 6:
+      return s.tabGoals;
     default:
       return '';
   }
@@ -75,6 +77,8 @@ class PlusButtonSettingsView extends StatelessWidget {
         page = RoutinesSettingsView(controller: controller);
       case 5:
         page = FinanceSettingsView(controller: controller);
+      case 6:
+        page = GoalsSettingsView(controller: controller);
       case 0:
       default:
         page = TasksSettingsView(controller: controller);

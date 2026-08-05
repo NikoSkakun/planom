@@ -1,5 +1,7 @@
-import '../localization/strings.dart';
 import 'package:flutter/widgets.dart';
+
+import '../localization/strings.dart';
+import 'currency.dart';
 
 /// Global mirror of the user's currency preferences, kept in sync by
 /// [SettingsController]. Money is formatted in dozens of places (rows, chips,
@@ -7,47 +9,46 @@ import 'package:flutter/widgets.dart';
 /// sites don't each have to be handed the settings controller — the same
 /// approach `TimeFormatPref` uses for the 12/24-hour clock.
 class FinanceCurrency {
-  /// Symbol placed before the amount, e.g. `$`, `€`, `₴`.
+  /// The space's default currency code — used by entries with no account and
+  /// as the currency of a newly created account.
+  static String code = 'USD';
+
+  /// Symbol placed before the amount, e.g. `$`, `€`, `₴`. Derived from [code]
+  /// but overridable, so a user can keep a custom glyph.
   static String symbol = r'$';
 
   /// Whether amounts render their minor units (cents). Off suits currencies
-  /// that are used in whole units (¥, ₩, …).
+  /// that are used in whole units (¥, ₩, …); a zero-decimal currency hides
+  /// them regardless of this flag.
   static bool showDecimals = true;
 }
-
-/// Currency symbols offered in Settings → Finance. The user can also type a
-/// custom one, so this is a shortcut list rather than an exhaustive set.
-const List<String> kCurrencySymbols = [
-  r'$',
-  '€',
-  '£',
-  '₴',
-  '₽',
-  '¥',
-  '₹',
-  '₺',
-  '₪',
-  'zł',
-  'Kč',
-  'kr',
-  'CHF',
-  'R\$',
-  'C\$',
-  'A\$',
-];
 
 /// Formats [cents] (minor units) as a currency string, e.g. `$1,234.56`.
 ///
 /// [signed] prefixes an explicit `+` / `−` (used by transaction rows to show
 /// direction); otherwise the value is rendered as an absolute amount.
+/// [currencyCode] renders the amount in that currency (an account's own
+/// currency) instead of the space default; [symbol] overrides the glyph
+/// outright.
 String formatMoney(
   int cents, {
   bool signed = false,
+  String? currencyCode,
   String? symbol,
   bool? showDecimals,
 }) {
-  final sym = symbol ?? FinanceCurrency.symbol;
-  final decimals = showDecimals ?? FinanceCurrency.showDecimals;
+  // The space's default currency uses the user's own glyph — they may have
+  // typed a custom one the catalogue doesn't carry.
+  final sym = symbol ??
+      (currencyCode == null || currencyCode == FinanceCurrency.code
+          ? FinanceCurrency.symbol
+          : currencySymbol(currencyCode));
+  // A zero-decimal currency (¥, ₩, …) never shows a fractional part, whatever
+  // the global preference says.
+  final currencyHasDecimals =
+      currencyCode == null || currencyDecimals(currencyCode) > 0;
+  final decimals =
+      showDecimals ?? (FinanceCurrency.showDecimals && currencyHasDecimals);
   final negative = cents < 0;
   final abs = cents.abs();
 

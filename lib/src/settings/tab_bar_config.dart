@@ -3,7 +3,7 @@ import 'dart:convert';
 /// What a single tab on the tab bar represents.
 ///
 /// - [builtin] — one of the app's own tabs (Tasks/Notes/Calendar/Routines/
-///   Settings/Finance) identified by [builtinIndex] 0..5.
+///   Settings/Finance/Goals) identified by [builtinIndex] 0..6.
 /// - [shortcut] — direct navigation target chosen by the user (a list,
 ///   folder, smart list, or note folder) identified by [shortcutTarget] +
 ///   [shortcutId].
@@ -40,7 +40,7 @@ class TabItem {
         builtinIndex = null;
 
   final TabKind kind;
-  final int? builtinIndex; // 0..5 when kind == builtin
+  final int? builtinIndex; // 0..6 when kind == builtin
   final ShortcutTarget? shortcutTarget; // non-null when kind == shortcut
   final String? shortcutId; // list/folder/note-folder id; null for smart lists
   final String? customLabel;
@@ -78,7 +78,7 @@ class TabItem {
     final enabled = map['enabled'] != false; // default true
     if (kindStr == 'builtin') {
       final idx = map['builtinIndex'] as int?;
-      if (idx == null || idx < 0 || idx > 5) return null;
+      if (idx == null || idx < 0 || idx > 6) return null;
       return TabItem.builtin(idx, enabled: enabled);
     }
     if (kindStr == 'shortcut') {
@@ -111,20 +111,57 @@ class TabBarConfig {
           TabItem.builtin(2),
           TabItem.builtin(3),
           TabItem.builtin(5),
+          TabItem.builtin(6),
           TabItem.builtin(4),
         ],
       ]);
 
+  /// Every built-in tab the app ships today, in the order they should appear.
+  /// Settings (4) is last by convention even though newer tabs have higher
+  /// indices — indices are never renumbered because they are persisted.
+  static const List<int> allBuiltins = [0, 1, 2, 3, 5, 6, 4];
+
+  /// The built-ins that existed before [allBuiltins] started growing. Used to
+  /// seed the "already offered to this user" set the first time a layout saved
+  /// by an older build is opened, so tabs the user deliberately removed stay
+  /// removed while genuinely new ones get surfaced once.
+  static const List<int> legacyBuiltins = [0, 1, 2, 3, 4];
+
+  /// Returns this config with [index] added to the first page, in front of the
+  /// Settings tab when it's there. Used to surface a newly-shipped built-in
+  /// tab in a layout the user saved before it existed. A no-op when the tab is
+  /// already somewhere in the config or every page is full.
+  TabBarConfig withBuiltinSurfaced(int index) {
+    if (flattened.any(
+        (it) => it.kind == TabKind.builtin && it.builtinIndex == index)) {
+      return this;
+    }
+    for (var page = 0; page < pages.length; page++) {
+      if (pages[page].length >= maxItemsPerPage) continue;
+      final items = [...pages[page]];
+      final settingsAt = items.indexWhere(
+          (it) => it.kind == TabKind.builtin && it.builtinIndex == 4);
+      items.insert(
+          settingsAt >= 0 ? settingsAt : items.length, TabItem.builtin(index));
+      return setPage(page, items);
+    }
+    // Every page is full — give the new tab a page of its own rather than
+    // dropping it silently.
+    return addPage().let((cfg) =>
+        cfg.setPage(cfg.pages.length - 1, [TabItem.builtin(index)]));
+  }
+
   /// Migration helper: builds a single-page config from the legacy
   /// `tabVisibility` + `tabOrder` settings. Tabs added after that scheme was
-  /// retired (Finance) are appended when the legacy order predates them, so
-  /// upgrading users see the new tab instead of having to add it by hand.
+  /// retired (Finance, Goals) are appended when the legacy order predates
+  /// them, so upgrading users see the new tabs instead of having to add them
+  /// by hand.
   factory TabBarConfig.fromLegacy({
     required Map<int, bool> tabVisibility,
     required List<int> tabOrder,
   }) {
     final order = [...tabOrder];
-    for (final added in const [5]) {
+    for (final added in const [5, 6]) {
       if (order.contains(added)) continue;
       // Settings conventionally sits last, so slot new tabs in front of it.
       final settingsIdx = order.indexOf(4);
@@ -240,4 +277,8 @@ class TabBarConfig {
     page.insert(insertAt, item);
     return setPage(pageIndex, page);
   }
+}
+
+extension _Let<T> on T {
+  R let<R>(R Function(T) fn) => fn(this);
 }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -83,99 +84,175 @@ Future<void> _shareAsPdf(
   _showProgress(rootContext,
       progress: progress, label: S.of(rootContext).preparingPdf);
 
-  Future<void> run() async {
-    try {
-      if (progress.isCanceled) return;
+  try {
+    // Render the note through the very same MarkdownView the app displays,
+    // then slice the resulting bitmap into A4 pages. Going through a bitmap
+    // (rather than emitting pw.Text) is what makes the PDF match what the
+    // user sees: headings, tables, task lists, LaTeX, emoji and non-Latin
+    // scripts all survive — none of which the pdf package's built-in Type-1
+    // fonts can represent.
+    final rendered = await _renderNoteToImage(
+      rootContext,
+      title: title,
+      content: content,
+      progress: progress,
+    );
+    if (rendered == null || progress.isCanceled) {
+      rendered?.dispose();
+      progress.close();
+      // A render that failed (rather than one the user cancelled) should say
+      // so instead of just closing the sheet.
+      if (rendered == null && !progress.isCanceled && rootContext.mounted) {
+        _showError(rootContext, message: S.of(rootContext).exportFailed);
+      }
+      return;
+    }
 
-      // Use the built-in Type 1 Helvetica fonts. They're embedded in the
-      // pdf package itself, so generation never has to wait on disk or
-      // network. They only cover WinAnsi (basic Latin-1), so non-Latin
-      // characters and emoji get replaced with placeholder glyphs — the
-      // tradeoff is "PDF always generates" over "every glyph survives".
-      final regular = pw.Font.helvetica();
-      final bold = pw.Font.helveticaBold();
-
-      final doc = pw.Document(
-        title: _safeForPdf(title),
-        theme: pw.ThemeData.withFont(base: regular, bold: bold),
-      );
+    final doc = pw.Document(title: title);
+    // Slice height must match the shape of the box the image is actually
+    // drawn into — the A4 page minus OUR margin, not the format's own default
+    // margin. Get that wrong and `fitWidth` scales each slice past the
+    // content height, cropping a band off every page.
+    const margin = 24.0;
+    final contentWidth = PdfPageFormat.a4.width - margin * 2;
+    final contentHeight = PdfPageFormat.a4.height - margin * 2;
+    final sliceHeight = (rendered.width * (contentHeight / contentWidth))
+        .floor()
+        .clamp(1, 1 << 20);
+    const maxPages = 60; // hard stop so a pathological note can't hang here
+    var top = 0;
+    var pages = 0;
+    while (top < rendered.height && pages < maxPages) {
+      if (progress.isCanceled) {
+        rendered.dispose();
+        progress.close();
+        return;
+      }
+      final height = (top + sliceHeight > rendered.height)
+          ? rendered.height - top
+          : sliceHeight;
+      final slice = await _cropImage(rendered, top, height);
+      final image = pw.MemoryImage(slice);
       doc.addPage(
-        pw.MultiPage(
+        pw.Page(
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(36),
-          build: (context) => [
-            pw.Text(
-              _safeForPdf(title),
-              style: pw.TextStyle(
-                font: bold,
-                fontSize: 20,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-            pw.SizedBox(height: 14),
-            // overflow: span lets long content split across pages instead
-            // of bumping itself onto the next blank page (which left the
-            // title sitting alone on page 1).
-            pw.Text(
-              _safeForPdf(content),
-              overflow: pw.TextOverflow.span,
-              style: pw.TextStyle(
-                font: regular,
-                fontSize: 12,
-                lineSpacing: 4,
-              ),
-            ),
-          ],
+          margin: const pw.EdgeInsets.all(margin),
+          build: (context) => pw.Align(
+            alignment: pw.Alignment.topCenter,
+            child: pw.Image(image, fit: pw.BoxFit.fitWidth),
+          ),
         ),
       );
-      final bytes = await doc.save();
-      if (progress.isCanceled) return;
+      top += height;
+      pages++;
+    }
+    rendered.dispose();
 
-      // Persist to a temp file. `flush: true` fsyncs the bytes before
-      // handing the path to the share sheet.
-      final dir = await getTemporaryDirectory();
-      final fileName = '${_sanitizeFileName(title)}.pdf';
-      final file = File('${dir.path}/$fileName');
-      await file.writeAsBytes(bytes, flush: true);
-      if (progress.isCanceled) return;
-
-      // Hide the progress dialog before opening the share sheet so the
-      // user sees the system share UI immediately.
+    final bytes = await doc.save();
+    if (progress.isCanceled) {
       progress.close();
+      return;
+    }
 
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'application/pdf', name: fileName)],
-        subject: title,
-      );
-    } catch (e, st) {
-      // ignore: avoid_print
-      print('Note PDF export failed: $e\n$st');
+    // Persist to a temp file. `flush: true` fsyncs the bytes before
+    // handing the path to the share sheet.
+    final dir = await getTemporaryDirectory();
+    final fileName = '${_sanitizeFileName(title)}.pdf';
+    final file = File('${dir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+    if (progress.isCanceled) {
       progress.close();
-      if (rootContext.mounted) {
-        _showError(rootContext, message: '$e');
-      }
+      return;
+    }
+
+    // Hide the progress dialog before opening the share sheet so the
+    // user sees the system share UI immediately.
+    progress.close();
+
+    await Share.shareXFiles(
+      [XFile(file.path, mimeType: 'application/pdf', name: fileName)],
+      subject: title,
+    );
+  } catch (e, st) {
+    debugPrint('Note PDF export failed: $e\n$st');
+    progress.close();
+    if (rootContext.mounted) {
+      _showError(rootContext, message: '$e');
     }
   }
-
-  // Kick the work off but don't await it here — the progress dialog is
-  // already on screen and its cancel button will short-circuit run() by
-  // flipping progress.isCanceled.
-  unawaited(run());
 }
 
-/// Replaces every code point outside the WinAnsi range (which is all
-/// Type-1 Helvetica supports) with '?', so the pdf package's text
-/// encoder never throws on a Cyrillic/CJK/emoji character.
-String _safeForPdf(String input) {
-  final buffer = StringBuffer();
-  for (final rune in input.runes) {
-    if (rune <= 0xFF) {
-      buffer.writeCharCode(rune);
-    } else {
-      buffer.write('?');
-    }
-  }
-  return buffer.toString();
+/// Mounts the note off-screen (an overlay entry parked far to the left) and
+/// captures it as an image. Shared by the PDF and PNG exports.
+Future<ui.Image?> _renderNoteToImage(
+  BuildContext context, {
+  required String title,
+  required String content,
+  required _ProgressController progress,
+  double width = 800,
+  double pixelRatio = 2,
+}) async {
+  if (!context.mounted) return null;
+  final key = GlobalKey();
+  final overlay = Overlay.of(context, rootOverlay: true);
+  final completer = Completer<ui.Image?>();
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (_) => Positioned(
+      left: -10000,
+      top: 0,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(color: Color(0xFFFFFFFF)),
+        child: SizedBox(
+          width: width,
+          child: RepaintBoundary(
+            key: key,
+            child: _NotePosterBody(title: title, content: content),
+          ),
+        ),
+      ),
+    ),
+  );
+  overlay.insert(entry);
+  // Wait two frames so layout + paint finish before asking for the image.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        if (progress.isCanceled) {
+          completer.complete(null);
+          return;
+        }
+        final boundary =
+            key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+        completer.complete(await boundary.toImage(pixelRatio: pixelRatio));
+      } catch (e, st) {
+        debugPrint('Note render failed: $e\n$st');
+        completer.complete(null);
+      } finally {
+        entry.remove();
+      }
+    });
+  });
+  return completer.future;
+}
+
+/// Returns PNG bytes for the horizontal band of [source] starting at [top].
+Future<Uint8List> _cropImage(ui.Image source, int top, int height) async {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas.drawImageRect(
+    source,
+    Rect.fromLTWH(
+        0, top.toDouble(), source.width.toDouble(), height.toDouble()),
+    Rect.fromLTWH(0, 0, source.width.toDouble(), height.toDouble()),
+    Paint(),
+  );
+  final picture = recorder.endRecording();
+  final cropped = await picture.toImage(source.width, height);
+  picture.dispose();
+  final data = await cropped.toByteData(format: ui.ImageByteFormat.png);
+  cropped.dispose();
+  return data!.buffer.asUint8List();
 }
 
 Future<void> _shareAsImage(
@@ -186,72 +263,53 @@ Future<void> _shareAsImage(
   final progress = _ProgressController();
   _showProgress(context, progress: progress, label: S.of(context).preparingImage);
 
-  // Render the note off-screen using the same MarkdownView the live preview
-  // uses, then capture a PNG via RepaintBoundary.toImage. The widget needs
-  // to live inside a real tree to paint, so we mount it in a hidden overlay
-  // entry positioned off-screen.
-  final key = GlobalKey();
-  final overlay = Overlay.of(context, rootOverlay: true);
-  final pixelRatio =
-      ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
-  const width = 800.0;
-  final completer = Completer<void>();
-  late final OverlayEntry entry;
-  entry = OverlayEntry(
-    builder: (_) {
-      return Positioned(
-        left: -10000,
-        top: 0,
-        child: DecoratedBox(
-          decoration: const BoxDecoration(color: Color(0xFFFFFFFF)),
-          child: SizedBox(
-            width: width,
-            child: RepaintBoundary(
-              key: key,
-              child: _NotePosterBody(title: title, content: content),
-            ),
-          ),
-        ),
-      );
-    },
-  );
-  overlay.insert(entry);
-  // Wait two frames so layout + paint finish before we ask for the image.
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        if (progress.isCanceled) return;
-        final boundary =
-            key.currentContext!.findRenderObject() as RenderRepaintBoundary;
-        final image = await boundary.toImage(pixelRatio: pixelRatio);
-        if (progress.isCanceled) return;
-        final byteData =
-            await image.toByteData(format: ui.ImageByteFormat.png);
-        if (progress.isCanceled) return;
-        final bytes = byteData!.buffer.asUint8List();
-        final dir = await getTemporaryDirectory();
-        final fileName = '${_sanitizeFileName(title)}.png';
-        final file = File('${dir.path}/$fileName');
-        await file.writeAsBytes(bytes, flush: true);
-        if (progress.isCanceled) return;
-        progress.close();
-        await Share.shareXFiles(
-          [XFile(file.path, mimeType: 'image/png', name: fileName)],
-          subject: title,
-        );
-      } catch (e, st) {
-        debugPrint('Note image export failed: $e\n$st');
-        progress.close();
-        if (context.mounted) {
-          _showError(context, message: '$e');
-        }
-      } finally {
-        entry.remove();
-        completer.complete();
+  try {
+    // Same off-screen render the PDF path uses, at the device's own pixel
+    // ratio so the PNG is crisp on the sharing device.
+    final pixelRatio =
+        ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+    final image = await _renderNoteToImage(
+      context,
+      title: title,
+      content: content,
+      progress: progress,
+      pixelRatio: pixelRatio,
+    );
+    if (image == null || progress.isCanceled) {
+      image?.dispose();
+      progress.close();
+      if (image == null && !progress.isCanceled && context.mounted) {
+        _showError(context, message: S.of(context).exportFailed);
       }
-    });
-  });
-  await completer.future;
+      return;
+    }
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    if (byteData == null || progress.isCanceled) {
+      progress.close();
+      return;
+    }
+    final bytes = byteData.buffer.asUint8List();
+    final dir = await getTemporaryDirectory();
+    final fileName = '${_sanitizeFileName(title)}.png';
+    final file = File('${dir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+    if (progress.isCanceled) {
+      progress.close();
+      return;
+    }
+    progress.close();
+    await Share.shareXFiles(
+      [XFile(file.path, mimeType: 'image/png', name: fileName)],
+      subject: title,
+    );
+  } catch (e, st) {
+    debugPrint('Note image export failed: $e\n$st');
+    progress.close();
+    if (context.mounted) {
+      _showError(context, message: '$e');
+    }
+  }
 }
 
 String _sanitizeFileName(String input) {

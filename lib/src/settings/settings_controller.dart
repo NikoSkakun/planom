@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:google_fonts/google_fonts.dart';
 
 import '../database/database_service.dart';
+import '../finance/currency.dart';
 import '../finance/finance_format.dart';
 import '../localization/strings.dart';
 import '../notifications/notification_service.dart';
@@ -116,6 +117,22 @@ class BadgeSource {
 /// global default and as a per-tab override.
 enum PlusButtonSide { right, left }
 
+/// What a horizontal swipe across the tab bar moves between.
+enum TabBarSwipeMode {
+  /// Swipe pages of tabs (the historical behaviour). The page indicator dots
+  /// count the non-empty pages of [TabBarConfig].
+  pages,
+
+  /// Swipe between Spaces: the bar keeps showing page 1's tabs and the dots
+  /// count the user's spaces, with the active one highlighted.
+  spaces,
+}
+
+String encodeTabBarSwipeMode(TabBarSwipeMode m) => m.name;
+
+TabBarSwipeMode decodeTabBarSwipeMode(String? raw) =>
+    raw == 'spaces' ? TabBarSwipeMode.spaces : TabBarSwipeMode.pages;
+
 class SettingsController with ChangeNotifier {
   SettingsController(this._settingsService, this._db);
 
@@ -219,10 +236,15 @@ class SettingsController with ChangeNotifier {
   bool _countEventsInToday = false;
   bool get countEventsInToday => _countEventsInToday;
 
-  // Finance display prefs. The symbol is prefixed to every amount; turning
-  // decimals off suits currencies used in whole units (¥, ₩, …). Both are
-  // mirrored to [FinanceCurrency] so formatting call sites don't need the
-  // controller. Global (not per-space) like the other display settings.
+  // Finance display prefs. [financeCurrencyCode] is the space's default
+  // currency — used by entries with no account and as the default for a new
+  // account; the symbol follows the code unless the user typed a custom
+  // glyph. Turning decimals off suits currencies used in whole units (¥, ₩,
+  // …). All are mirrored to [FinanceCurrency] so formatting call sites don't
+  // need the controller. Global (not per-space) like the other display
+  // settings.
+  String _financeCurrencyCode = 'USD';
+  String get financeCurrencyCode => _financeCurrencyCode;
   String _financeCurrencySymbol = r'$';
   String get financeCurrencySymbol => _financeCurrencySymbol;
   bool _financeShowDecimals = true;
@@ -250,7 +272,8 @@ class SettingsController with ChangeNotifier {
   String get lastOverdueCheckDay => _lastOverdueCheckDay;
 
   // Floating + button placement. Global default plus optional per-tab overrides
-  // (Tasks 0 / Notes 1 / Calendar 2 / Routines 3 / Finance 5). A null override inherits the
+  // (Tasks 0 / Notes 1 / Calendar 2 / Routines 3 / Finance 5 / Goals 6). A
+  // null override inherits the
   // global side. Size is a multiplier on the stock 52 px button (1.0 = stock).
   PlusButtonSide _plusButtonSide = PlusButtonSide.right;
   PlusButtonSide get plusButtonSide => _plusButtonSide;
@@ -260,6 +283,7 @@ class SettingsController with ChangeNotifier {
     2: null,
     3: null,
     5: null,
+    6: null,
   };
   PlusButtonSide? plusButtonSideOverride(int tab) =>
       _plusButtonSideOverrides[tab];
@@ -311,11 +335,24 @@ class SettingsController with ChangeNotifier {
   bool get splitScreenDragAvailable =>
       _splitScreenEnabled && _splitScreenFromDrag;
 
+  // What swiping the tab bar does: page through tabs, or switch Space. The
+  // two are alternatives — in spaces mode the extra tab-bar pages stay in the
+  // config but are unreachable by swipe, so the gesture never means two
+  // things at once.
+  TabBarSwipeMode _tabBarSwipeMode = TabBarSwipeMode.pages;
+  TabBarSwipeMode get tabBarSwipeMode => _tabBarSwipeMode;
+
   /// Multi-page tab bar layout — supersedes the legacy [tabOrder] +
   /// [tabVisibility] booleans. On first load the legacy values are migrated
   /// into a single-page layout if no `tab_bar_config` row exists yet.
   TabBarConfig _tabBarConfig = TabBarConfig.defaultLayout();
   TabBarConfig get tabBarConfig => _tabBarConfig;
+
+  // Built-in tabs this user's layout has already been offered. A tab missing
+  // from the set is one that shipped after they last saved a layout, and gets
+  // surfaced once (see the migration in [loadSettings]); a tab they removed
+  // themselves stays in the set, so it is never forced back.
+  Set<int>? _knownBuiltinTabs;
 
   // Default icons applied when the user creates a new task/list/folder/note
   // folder without picking one. Strings match the existing iconId scheme:
@@ -369,26 +406,48 @@ class SettingsController with ChangeNotifier {
     3: true,
     4: true,
     5: true,
+    6: true,
   };
-  /// Whether the built-in tab [index] (0–5) appears anywhere in the live
-  /// [tabBarConfig]. Derived from the config — the source of truth for the
-  /// rendered tab bar — so callers (e.g. the Settings ⋯ fallback) stay in
-  /// sync with what the user actually sees. The legacy `_tabVisibility` map
-  /// is retained only to migrate old persisted layouts on first load.
-  bool isTabVisible(int index) => _tabBarConfig.flattened.any((it) =>
-      it.enabled && it.kind == TabKind.builtin && it.builtinIndex == index);
+  /// Whether the built-in tab [index] (0–6) is actually **reachable**.
+  ///
+  /// Derived from the live config — the source of truth for the rendered tab
+  /// bar — so callers (e.g. the Settings ⋯ fallback) stay in sync with what
+  /// the user can really get to. In [TabBarSwipeMode.spaces] the bar can only
+  /// ever show the first non-empty page, so tabs parked on later pages do NOT
+  /// count: otherwise a user with Settings on page 2 would lose the ⋯ →
+  /// Settings fallback and have no way back into Settings at all. The legacy
+  /// `_tabVisibility` map is retained only to migrate old persisted layouts on
+  /// first load.
+  bool isTabVisible(int index) {
+    final active = _tabBarConfig.active;
+    final pages = _tabBarSwipeMode == TabBarSwipeMode.spaces
+        ? [
+            for (final page in active.pages)
+              if (page.isNotEmpty) page,
+          ].take(1)
+        : active.pages;
+    for (final page in pages) {
+      for (final item in page) {
+        if (item.kind == TabKind.builtin && item.builtinIndex == index) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
-  /// Returns the count of built-in tabs (0–5) present in the live config.
+  /// Returns the count of built-in tabs (0–6) present in the live config.
   int get visibleOptionalTabCount =>
-      [0, 1, 2, 3, 4, 5].where(isTabVisible).length;
+      [0, 1, 2, 3, 4, 5, 6].where(isTabVisible).length;
 
-  // Settings (4) sits last by convention; Finance (5) slots in before it.
-  List<int> _tabOrder = [0, 1, 2, 3, 5, 4];
+  // Settings (4) sits last by convention; Finance (5) and Goals (6) slot in
+  // before it.
+  List<int> _tabOrder = [0, 1, 2, 3, 5, 6, 4];
 
   /// The user-defined display order of the logical tab indices.
   List<int> get tabOrder => List.unmodifiable(_tabOrder);
 
-  // Which tab to select on launch: a logical index ('0'–'5') or [kLastOpenedTab].
+  // Which tab to select on launch: a logical index ('0'–'6') or [kLastOpenedTab].
   String _defaultTab = '0';
   String get defaultTab => _defaultTab;
 
@@ -396,7 +455,7 @@ class SettingsController with ChangeNotifier {
   int _lastOpenedTab = 0;
   int get lastOpenedTab => _lastOpenedTab;
 
-  /// The logical tab (0–5) to show on launch, resolved against the tabs that
+  /// The logical tab (0–6) to show on launch, resolved against the tabs that
   /// are currently visible. Falls back to the first visible tab when the
   /// configured choice is hidden or invalid.
   int resolveInitialTab(List<int> visibleLogicalTabs) {
@@ -445,9 +504,9 @@ class SettingsController with ChangeNotifier {
           final seen = <int>{};
           final order = [
             for (final p in parts)
-              if (p >= 0 && p <= 5 && seen.add(p)) p,
+              if (p >= 0 && p <= 6 && seen.add(p)) p,
           ];
-          for (final i in [0, 1, 2, 3, 4, 5]) {
+          for (final i in [0, 1, 2, 3, 4, 5, 6]) {
             if (!seen.add(i)) continue;
             // New tabs go in front of Settings, which sits last by convention.
             final settingsIdx = order.indexOf(4);
@@ -466,9 +525,11 @@ class SettingsController with ChangeNotifier {
         }
       } else if (key == 'last_tab') {
         final v = int.tryParse(value);
-        if (v != null && v >= 0 && v <= 5) _lastOpenedTab = v;
+        if (v != null && v >= 0 && v <= 6) _lastOpenedTab = v;
       } else if (key == 'finance_currency') {
         if (value.isNotEmpty) _financeCurrencySymbol = value;
+      } else if (key == 'finance_currency_code') {
+        if (value.isNotEmpty) _financeCurrencyCode = value.toUpperCase();
       } else if (key == 'finance_show_decimals') {
         _financeShowDecimals = value != 'false';
       } else if (key == 'first_day_of_week') {
@@ -552,6 +613,14 @@ class SettingsController with ChangeNotifier {
         _splitScreenFromMenu = value != 'false';
       } else if (key == 'split_screen_from_drag') {
         _splitScreenFromDrag = value != 'false';
+      } else if (key == 'tab_bar_known_builtins') {
+        _knownBuiltinTabs = value
+            .split(',')
+            .map(int.tryParse)
+            .whereType<int>()
+            .toSet();
+      } else if (key == 'tab_bar_swipe_mode') {
+        _tabBarSwipeMode = decodeTabBarSwipeMode(value);
       } else if (key == 'tab_bar_config') {
         final parsed = TabBarConfig.tryParse(value);
         if (parsed != null) _tabBarConfig = parsed;
@@ -577,7 +646,19 @@ class SettingsController with ChangeNotifier {
     // checkboxes / row icons stuck at their previously enlarged sizes.
     AppScale.factor = _useSystemTextScale ? 1.0 : _textScale;
     DayBoundary.hour = _dayBoundaryHour;
+    DayBoundary.firstWeekday = _firstDayOfWeek;
     TimeFormatPref.use24h = _use24hTime;
+    // A layout saved before currencies had codes only stored a symbol. Derive
+    // the code from it where the catalogue makes that unambiguous, so an
+    // existing "€" user gets EUR accounts instead of silently reverting to $.
+    if (!rows.any((r) => r['key'] == 'finance_currency_code')) {
+      final derived = currencyByCode(_financeCurrencySymbol) ??
+          kCurrencies
+              .where((c) => c.symbol == _financeCurrencySymbol)
+              .firstOrNull;
+      if (derived != null) _financeCurrencyCode = derived.code;
+    }
+    FinanceCurrency.code = _financeCurrencyCode;
     FinanceCurrency.symbol = _financeCurrencySymbol;
     FinanceCurrency.showDecimals = _financeShowDecimals;
     NotificationService.instance.customSoundName =
@@ -596,6 +677,34 @@ class SettingsController with ChangeNotifier {
         tabVisibility: _tabVisibility,
         tabOrder: _tabOrder,
       );
+    }
+
+    // Surface built-in tabs that shipped after this layout was saved. Without
+    // this a user who had ever edited their tab bar would simply never see a
+    // new tab. The "known" set is seeded from the pre-growth built-ins plus
+    // whatever their layout holds, so tabs they deliberately removed are not
+    // resurrected.
+    final known = _knownBuiltinTabs ??
+        {
+          ...TabBarConfig.legacyBuiltins,
+          for (final it in _tabBarConfig.flattened)
+            if (it.kind == TabKind.builtin && it.builtinIndex != null)
+              it.builtinIndex!,
+        };
+    final missing =
+        TabBarConfig.allBuiltins.where((i) => !known.contains(i)).toList();
+    if (missing.isNotEmpty) {
+      var config = _tabBarConfig;
+      for (final index in missing) {
+        config = config.withBuiltinSurfaced(index);
+      }
+      _tabBarConfig = config;
+      await _db.setAppSetting('tab_bar_config', config.toJsonString());
+    }
+    if (_knownBuiltinTabs == null || missing.isNotEmpty) {
+      _knownBuiltinTabs = {...known, ...missing};
+      await _db.setAppSetting(
+          'tab_bar_known_builtins', _knownBuiltinTabs!.join(','));
     }
 
     // Enforce the Split Screen invariant: with no entry method enabled the
@@ -644,6 +753,14 @@ class SettingsController with ChangeNotifier {
     }
   }
 
+  Future<void> updateTabBarSwipeMode(TabBarSwipeMode mode) async {
+    if (mode == _tabBarSwipeMode) return;
+    _tabBarSwipeMode = mode;
+    notifyListeners();
+    await _db.setAppSetting(
+        'tab_bar_swipe_mode', encodeTabBarSwipeMode(mode));
+  }
+
   Future<void> updateTabBarConfig(TabBarConfig config) async {
     _tabBarConfig = config;
     notifyListeners();
@@ -657,7 +774,7 @@ class SettingsController with ChangeNotifier {
   }
 
   Future<void> updateTabOrder(List<int> order) async {
-    if (order.length != 6 || order.toSet().length != 6) return;
+    if (order.length != 7 || order.toSet().length != 7) return;
     _tabOrder = List.of(order);
     notifyListeners();
     await _db.setAppSetting('tab_order', order.join(','));
@@ -690,6 +807,7 @@ class SettingsController with ChangeNotifier {
     if (isoDay < 1 || isoDay > 7) return;
     if (isoDay == _firstDayOfWeek) return;
     _firstDayOfWeek = isoDay;
+    DayBoundary.firstWeekday = isoDay;
     notifyListeners();
     await _db.setAppSetting('first_day_of_week', isoDay.toString());
   }
@@ -802,6 +920,21 @@ class SettingsController with ChangeNotifier {
     await _db.setAppSetting('use_24h_time', value.toString());
   }
 
+  /// Sets the default currency by code and follows it with the catalogue's
+  /// symbol, replacing any custom glyph.
+  Future<void> updateFinanceCurrency(String code) async {
+    final upper = code.trim().toUpperCase();
+    if (upper.isEmpty || upper == _financeCurrencyCode) return;
+    _financeCurrencyCode = upper;
+    _financeCurrencySymbol = currencySymbol(upper);
+    FinanceCurrency.code = _financeCurrencyCode;
+    FinanceCurrency.symbol = _financeCurrencySymbol;
+    notifyListeners();
+    await _db.setAppSetting('finance_currency_code', _financeCurrencyCode);
+    await _db.setAppSetting('finance_currency', _financeCurrencySymbol);
+  }
+
+  /// Overrides just the glyph, for a currency the catalogue doesn't carry.
   Future<void> updateFinanceCurrencySymbol(String symbol) async {
     final trimmed = symbol.trim();
     if (trimmed.isEmpty || trimmed == _financeCurrencySymbol) return;
@@ -1128,12 +1261,6 @@ class SettingsController with ChangeNotifier {
 
   Future<void> updateShowNotesAddFolderButton(bool value) async {
     _smartListPrefs.showNotesAddFolderButton = value;
-    notifyListeners();
-    await _smartListPrefs.save();
-  }
-
-  Future<void> updateNotesUseMarkdown(bool value) async {
-    _smartListPrefs.notesUseMarkdown = value;
     notifyListeners();
     await _smartListPrefs.save();
   }

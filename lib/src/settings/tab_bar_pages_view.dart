@@ -77,6 +77,7 @@ class TabBarPagesEditor extends StatelessWidget {
         SelectionMenuOption(value: 2, label: s.tabCalendar),
         SelectionMenuOption(value: 3, label: s.tabRoutines),
         SelectionMenuOption(value: 5, label: s.tabFinance),
+        SelectionMenuOption(value: 6, label: s.tabGoals),
         SelectionMenuOption(value: 4, label: s.tabSettings),
       ],
     );
@@ -212,6 +213,8 @@ class TabBarPagesEditor extends StatelessWidget {
           return s.tabRoutines;
         case 5:
           return s.tabFinance;
+        case 6:
+          return s.tabGoals;
         default:
           return s.tabSettings;
       }
@@ -260,6 +263,8 @@ class TabBarPagesEditor extends StatelessWidget {
               AssetImage('assets/icons/tab_bar/routines.png'), size: 20);
         case 5:
           return const Icon(CupertinoIcons.money_dollar_circle, size: 20);
+        case 6:
+          return const Icon(CupertinoIcons.flag, size: 20);
         default:
           return const ImageIcon(
               AssetImage('assets/icons/tab_bar/settings.png'), size: 20);

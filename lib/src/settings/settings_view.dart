@@ -220,6 +220,18 @@ class _SettingsViewState extends State<SettingsView> {
             ),
             const SizedBox(height: 1),
             _NavRow(
+              label: s.tabGoals,
+              icon: CupertinoIcons.flag,
+              onTap: () => Navigator.of(context).push(
+                FastRoute<void>(
+                  builder: (_) => GoalsSettingsView(
+                    controller: widget.controller,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 1),
+            _NavRow(
               label: s.tabFinance,
               icon: CupertinoIcons.money_dollar_circle,
               onTap: () => Navigator.of(context).push(
@@ -440,6 +452,7 @@ String _tabLabel(S s, int tabIndex) {
     case 3: return s.tabRoutines;
     case 4: return s.tabSettings;
     case 5: return s.tabFinance;
+    case 6: return s.tabGoals;
     default: return '';
   }
 }
@@ -451,6 +464,24 @@ String defaultTabLabel(S s, SettingsController controller) {
   final value = controller.defaultTab;
   if (value == kLastOpenedTab) return s.lastOpenedTab;
   return _tabLabel(s, int.tryParse(value) ?? 0);
+}
+
+/// Opens the picker for what a horizontal swipe across the tab bar does.
+Future<void> showTabBarSwipeModePicker(
+    BuildContext context, SettingsController controller) async {
+  final s = S.of(context);
+  final selected = await showSelectionMenu<TabBarSwipeMode>(
+    context: context,
+    title: s.tabBarSwipeMode,
+    current: controller.tabBarSwipeMode,
+    options: [
+      SelectionMenuOption(
+          value: TabBarSwipeMode.pages, label: s.tabBarSwipePages),
+      SelectionMenuOption(
+          value: TabBarSwipeMode.spaces, label: s.tabBarSwipeSpaces),
+    ],
+  );
+  if (selected != null) await controller.updateTabBarSwipeMode(selected);
 }
 
 /// Opens the picker that lets the user pick the tab shown on app launch.
@@ -510,6 +541,27 @@ class TabBarSettingsView extends StatelessWidget {
                     label: s.defaultTab,
                     trailingLabel: defaultTabLabel(s, controller),
                     onTap: () => showDefaultTabPicker(context, controller),
+                  ),
+                  const SizedBox(height: 18),
+                  // ── Swipe behaviour ───────────────────────────────────
+                  _SectionHeader(s.tabBarSwipe),
+                  _NavRow(
+                    label: s.tabBarSwipeMode,
+                    trailingLabel:
+                        controller.tabBarSwipeMode == TabBarSwipeMode.spaces
+                            ? s.tabBarSwipeSpaces
+                            : s.tabBarSwipePages,
+                    onTap: () => showTabBarSwipeModePicker(context, controller),
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      controller.tabBarSwipeMode == TabBarSwipeMode.spaces
+                          ? s.tabBarSwipeSpacesHint
+                          : s.tabBarSwipePagesHint,
+                      style: TextStyle(fontSize: 13, color: labelColor),
+                    ),
                   ),
                   const SizedBox(height: 18),
                   // ── Visible Tabs (page 1 + additional pages) ───────────

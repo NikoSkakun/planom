@@ -11,7 +11,6 @@ import '../theme/app_theme.dart';
 import '../models/note.dart';
 import '../utils/dropdown_overlay.dart';
 import '../utils/dropdown_row.dart';
-import '../utils/emoji_text.dart';
 import '../utils/item_info_sheet.dart';
 import '../utils/keyboard_insets.dart';
 import '../utils/tap_offset.dart';
@@ -516,46 +515,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
     });
   }
 
-  /// Wraps [child] so a tap inside it switches into edit mode AND seeds
-  /// the cursor at the position the user tapped. [textForOffset] is the
-  /// source body text used to compute the offset; in markdown preview
-  /// that's the raw markdown, so headings and bullets still resolve to
-  /// somewhere reasonable. [contentPadding] is subtracted from the tap
-  /// before measuring so the offset matches the rendered text geometry.
-  Widget _wrapWithTapToEdit({
-    required Widget child,
-    required String textForOffset,
-    required EdgeInsets contentPadding,
-    TextStyle? measureStyle,
-  }) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapUp: (details) {
-            final local = details.localPosition - Offset(
-              contentPadding.left,
-              contentPadding.top,
-            );
-            final width = constraints.maxWidth -
-                contentPadding.left -
-                contentPadding.right;
-            final offset = tapOffsetInText(
-              text: textForOffset,
-              style: measureStyle ?? const TextStyle(fontSize: 16, height: 1.35),
-              maxWidth: width <= 0 ? 1 : width,
-              tapPosition: local,
-              textScaler: MediaQuery.textScalerOf(context),
-            );
-            _startEditing(cursorOffset: offset);
-          },
-          child: child,
-        );
-      },
-    );
-  }
-
-  Widget _buildContentArea({required bool useMarkdown}) {
+  Widget _buildContentArea() {
     // A single scroll view hosts every mode (edit / preview / placeholder) so
     // its scroll offset survives the mode switch. The inner child is forced to
     // at least the viewport height so the whole area is tappable-to-edit and
@@ -601,28 +561,6 @@ class _NoteDetailViewState extends State<NoteDetailView>
                     fontSize: 16,
                     color:
                         CupertinoColors.placeholderText.resolveFrom(context),
-                  ),
-                ),
-              ),
-            ),
-          );
-        } else if (!useMarkdown) {
-          // Plain-text mode: skip the markdown parser entirely and show the
-          // body verbatim. Tap-to-edit lands the cursor where the tap fell.
-          const padding = EdgeInsets.fromLTRB(20, 16, 20, 24);
-          child = _wrapWithTapToEdit(
-            textForOffset: _content.text,
-            contentPadding: padding,
-            child: Padding(
-              padding: padding,
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: Text.rich(
-                  TextSpan(
-                    children: buildEmojiSpans(
-                      _content.text,
-                      const TextStyle(fontSize: 16, height: 1.35),
-                    ),
                   ),
                 ),
               ),
@@ -680,9 +618,9 @@ class _NoteDetailViewState extends State<NoteDetailView>
     return ListenableBuilder(
       listenable: settingsCtl ?? const _NoopListenable(),
       builder: (context, _) {
-        final useMarkdown =
-            settingsCtl?.smartListPrefs.notesUseMarkdown ?? true;
-        final showToolbar = _contentFocus.hasFocus && useMarkdown;
+        // Notes are markdown, always — the body is parsed as CommonMark +
+        // GitHub extensions + LaTeX whenever it isn't being edited.
+        final showToolbar = _contentFocus.hasFocus;
         return PopScope(
           // The pop completes immediately for iOS swipe-back, but unfocusing
           // here forces the IME to commit any in-flight composition into
@@ -780,7 +718,7 @@ class _NoteDetailViewState extends State<NoteDetailView>
                           ),
                         ),
                         Expanded(
-                          child: _buildContentArea(useMarkdown: useMarkdown),
+                          child: _buildContentArea(),
                         ),
                       ],
                     ),

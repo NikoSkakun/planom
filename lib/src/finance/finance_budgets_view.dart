@@ -99,7 +99,10 @@ class FinanceBudgetsView extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Text(
-                    s.budgetsHint,
+                    // Budgets are denominated in the space's default currency;
+                    // entries on accounts in other currencies aren't counted,
+                    // because the app applies no exchange rates.
+                    '${s.budgetsHint}\n${s.budgetsCurrencyHint(FinanceCurrency.code)}',
                     style: TextStyle(
                       fontSize: 13,
                       color: CupertinoColors.secondaryLabel.resolveFrom(context),

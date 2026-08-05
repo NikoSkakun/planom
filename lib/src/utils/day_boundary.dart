@@ -14,6 +14,20 @@ library;
 /// dependency. Mirrored from [SettingsController.loadSettings] and bumped on
 /// every change to [SettingsController.updateDayBoundaryHour].
 class DayBoundary {
+  /// ISO weekday (1=Mon … 7=Sun) the user's week starts on — mirrored from
+  /// [SettingsController.firstDayOfWeek] so plain controllers can do week
+  /// arithmetic without a settings dependency, exactly like [hour].
+  static int firstWeekday = DateTime.monday;
+
+  /// Midnight of the first day of the week containing [date], honouring
+  /// [firstWeekday]. Uses calendar arithmetic rather than Duration subtraction
+  /// so a DST change inside the week can't shift the result by a day.
+  static DateTime startOfWeek(DateTime date) {
+    final day = DateTime(date.year, date.month, date.day);
+    final offset = (day.weekday - firstWeekday + 7) % 7;
+    return DateTime(day.year, day.month, day.day - offset);
+  }
+
   DayBoundary._();
 
   /// 0–23. Default 0 = standard midnight rollover.

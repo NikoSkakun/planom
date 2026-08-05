@@ -1,8 +1,9 @@
 import 'package:flutter/cupertino.dart';
 
+import '../finance/finance_accounts_view.dart';
 import '../finance/finance_budgets_view.dart';
 import '../finance/finance_categories_view.dart';
-import '../finance/finance_format.dart';
+import '../finance/currency.dart';
 import '../localization/strings.dart';
 import '../spaces/space_manager.dart';
 import '../theme/app_theme.dart';
@@ -19,23 +20,28 @@ class FinanceSettingsView extends StatelessWidget {
 
   final SettingsController controller;
 
+  /// Picks the space's default currency — the one used by entries with no
+  /// account, and the default for a newly created account.
   Future<void> _pickCurrency(BuildContext context) async {
     final s = S.of(context);
-    // Sentinel: opens a free-text prompt for symbols not in the shortlist.
+    // Sentinel: opens a free-text prompt for a symbol not in the catalogue.
     const custom = '__custom__';
     final picked = await showSelectionMenu<String>(
       context: context,
       title: s.currency,
-      current: controller.financeCurrencySymbol,
+      current: controller.financeCurrencyCode,
       options: [
-        for (final symbol in kCurrencySymbols)
-          SelectionMenuOption(value: symbol, label: symbol),
+        for (final currency in kCurrencies)
+          SelectionMenuOption(
+            value: currency.code,
+            label: '${currency.symbol}  ${currency.code} · ${currency.name}',
+          ),
         SelectionMenuOption(value: custom, label: s.customCurrency),
       ],
     );
     if (picked == null || !context.mounted) return;
     if (picked != custom) {
-      await controller.updateFinanceCurrencySymbol(picked);
+      await controller.updateFinanceCurrency(picked);
       return;
     }
     final typed = await _promptCustomSymbol(context);
@@ -102,7 +108,8 @@ class FinanceSettingsView extends StatelessWidget {
                 SettingsSectionHeader(s.sectionCurrency),
                 SettingsNavRow(
                   label: s.currency,
-                  trailingLabel: controller.financeCurrencySymbol,
+                  trailingLabel:
+                      '${controller.financeCurrencySymbol} · ${controller.financeCurrencyCode}',
                   onTap: () => _pickCurrency(context),
                 ),
                 const SizedBox(height: 1),
@@ -126,6 +133,17 @@ class FinanceSettingsView extends StatelessWidget {
                 if (financeController != null) ...[
                   const SizedBox(height: 18),
                   SettingsSectionHeader(s.tabFinance),
+                  SettingsNavRow(
+                    label: s.accounts,
+                    onTap: () => Navigator.of(context).push(
+                      FastRoute<void>(
+                        builder: (_) => FinanceAccountsView(
+                          controller: financeController,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 1),
                   SettingsNavRow(
                     label: s.categories,
                     onTap: () => Navigator.of(context).push(

@@ -218,7 +218,6 @@ void main() {
         hideTabLabels: true,
         showAddFolderButton: false,
         showNotesAddFolderButton: false,
-        notesUseMarkdown: false,
       );
 
       final json = src.toJson();
@@ -235,7 +234,6 @@ void main() {
       expect(dst.hideTabLabels, isTrue);
       expect(dst.showAddFolderButton, isFalse);
       expect(dst.showNotesAddFolderButton, isFalse);
-      expect(dst.notesUseMarkdown, isFalse);
     });
 
     test('round-trips defaults', () {
@@ -244,7 +242,6 @@ void main() {
         // Start from non-default values to prove applyJson overwrites them.
         today: SmartListVisibility.hidden,
         hideTabLabels: true,
-        notesUseMarkdown: false,
       );
       dst.applyJson(src.toJson());
 
@@ -258,7 +255,6 @@ void main() {
       expect(dst.hideTabLabels, isFalse);
       expect(dst.showAddFolderButton, isTrue);
       expect(dst.showNotesAddFolderButton, isTrue);
-      expect(dst.notesUseMarkdown, isTrue);
     });
 
     test('toJson encodes enums as the expected string tokens', () {

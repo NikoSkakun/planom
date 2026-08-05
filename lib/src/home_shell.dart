@@ -9,6 +9,9 @@ import 'contacts/contact_creation_sheet.dart';
 import 'finance/finance_controller.dart';
 import 'finance/finance_view.dart';
 import 'finance/transaction_sheet.dart';
+import 'goals/goal_controller.dart';
+import 'goals/goal_editor_view.dart';
+import 'goals/goals_view.dart';
 import 'folders/create_folder_list_sheet.dart';
 import 'folders/folder_controller.dart';
 import 'integrations/apple/device_calendar_controller.dart';
@@ -17,6 +20,7 @@ import 'models/list_type.dart';
 import 'notes/create_note_folder_sheet.dart';
 import 'notes/note_controller.dart';
 import 'notes/notes_view.dart';
+import 'spaces/space.dart';
 import 'spaces/space_manager.dart';
 import 'routines/routine_controller.dart';
 import 'routines/routine_creation_view.dart';
@@ -56,6 +60,7 @@ class HomeShell extends StatefulWidget {
     required this.eventController,
     required this.contactController,
     required this.financeController,
+    required this.goalController,
     required this.backupService,
     this.securityService,
     required this.googleCalendarController,
@@ -91,6 +96,7 @@ class HomeShell extends StatefulWidget {
   final EventController eventController;
   final ContactController contactController;
   final FinanceController financeController;
+  final GoalController goalController;
   final BackupService backupService;
   final SecurityService? securityService;
   final GoogleCalendarController googleCalendarController;
@@ -100,9 +106,17 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
+/// Tab to open in the next shell, set just before a Space switch so swiping
+/// between Spaces keeps the user on the tab they were reading. It survives
+/// because `main.dart` re-keys `MyApp` per Space — the old shell's state is
+/// thrown away, so the hand-off can't live on the State object. Consumed
+/// exactly once by the next [_HomeShellState.initState].
+int? _tabAcrossSpaceSwitch;
+
 class _HomeShellState extends State<HomeShell> {
-  // Logical indices: 0=Tasks 1=Notes 2=Calendar 3=Routines 4=Settings 5=Finance
-  final _navigatorKeys = List.generate(6, (_) => GlobalKey<NavigatorState>());
+  // Logical indices:
+  // 0=Tasks 1=Notes 2=Calendar 3=Routines 4=Settings 5=Finance 6=Goals
+  final _navigatorKeys = List.generate(7, (_) => GlobalKey<NavigatorState>());
   late final List<_DepthObserver> _depthObservers;
   final _activeListId = ValueNotifier<String?>(null);
   final _activeFolderId = ValueNotifier<String?>(null);
@@ -121,6 +135,9 @@ class _HomeShellState extends State<HomeShell> {
   // Month currently shown on the Finance tab (null = the present month), so a
   // + tap creates the entry inside the month the user is looking at.
   final _activeFinanceMonth = ValueNotifier<DateTime?>(null);
+  // Account the Finance tab is filtered to (null = all), so a + tap creates
+  // the entry on the account the user is looking at.
+  final _activeFinanceAccount = ValueNotifier<String?>(null);
   final _showPlusButton = ValueNotifier<bool>(true);
   final _plusButtonInset = ValueNotifier<double>(0);
   final _undoController = UndoController();
@@ -206,6 +223,8 @@ class _HomeShellState extends State<HomeShell> {
         return s.tabRoutines;
       case 5:
         return s.tabFinance;
+      case 6:
+        return s.tabGoals;
       default:
         return s.tabSettings;
     }
@@ -294,7 +313,13 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     final visible = _computeVisibleIndices();
-    _lastTabIndex = widget.settingsController.resolveInitialTab(visible);
+    // A Space switched by swiping the tab bar should land on the same tab, not
+    // on whichever tab the launch preference names.
+    final carried = _tabAcrossSpaceSwitch;
+    _tabAcrossSpaceSwitch = null;
+    _lastTabIndex = carried != null && visible.contains(carried)
+        ? carried
+        : widget.settingsController.resolveInitialTab(visible);
     final initialVisual = _visualForBuiltin(_lastTabIndex);
     _tabController =
         CupertinoTabController(initialIndex: initialVisual < 0 ? 0 : initialVisual);
@@ -340,6 +365,12 @@ class _HomeShellState extends State<HomeShell> {
       _DepthObserver(
         onChanged: (depth, trackedCount) {
           if (_lastTabIndex == 5) _showPlusButton.value = depth <= 1;
+        },
+      ),
+      // Goals tab: hide when navigated deeper (goal detail / editor).
+      _DepthObserver(
+        onChanged: (depth, trackedCount) {
+          if (_lastTabIndex == 6) _showPlusButton.value = depth <= 1;
         },
       ),
     ];
@@ -590,6 +621,7 @@ class _HomeShellState extends State<HomeShell> {
     _routinesResetSignal.dispose();
     _financeResetSignal.dispose();
     _activeFinanceMonth.dispose();
+    _activeFinanceAccount.dispose();
     _showPlusButton.dispose();
     _plusButtonInset.dispose();
     _globalSettingsOpen.dispose();
@@ -656,11 +688,17 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _onPlusPressed() {
+    if (_lastTabIndex == 6) {
+      _createGoal();
+      return;
+    }
+
     if (_lastTabIndex == 5) {
       showTransactionSheet(
         context,
         widget.financeController,
         initialDate: _activeFinanceMonth.value,
+        initialAccountId: _activeFinanceAccount.value,
       );
       return;
     }
@@ -744,6 +782,17 @@ class _HomeShellState extends State<HomeShell> {
       settingsController: widget.settingsController,
       emptyFolderWarning: emptyFolderWarning,
     );
+  }
+
+  /// Opens the goal editor on the Goals tab and saves whatever comes back.
+  Future<void> _createGoal() async {
+    final created = await showGoalEditor(
+      context,
+      goalController: widget.goalController,
+      taskController: widget.taskController,
+      folderController: widget.folderController,
+    );
+    if (created != null) await widget.goalController.addGoal(created);
   }
 
   /// Resolves where a new task lands when Inbox is hidden: the user's chosen
@@ -943,6 +992,13 @@ class _HomeShellState extends State<HomeShell> {
   List<TabItem> _pageItems() {
     final pages = _activePages();
     if (pages.isEmpty) return const [];
+    // In spaces mode the bar always shows the first non-empty page — swiping
+    // means "switch Space", so there is no way to reach the other pages and
+    // leaving the user parked on one would strand them.
+    if (_swipesSpaces) {
+      final navigable = _navigablePageIndices();
+      return pages[navigable.isEmpty ? 0 : navigable.first];
+    }
     final pageIdx = _currentPage.clamp(0, pages.length - 1);
     return pages[pageIdx];
   }
@@ -1155,6 +1211,21 @@ class _HomeShellState extends State<HomeShell> {
           activeIcon: activeIcon('assets/icons/tab_bar/routines.png'),
           label: hideLabels ? null : s.tabRoutines,
         );
+      case 6:
+        return BottomNavigationBarItem(
+          icon: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Icon(CupertinoIcons.flag),
+          ),
+          activeIcon: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Icon(
+              CupertinoIcons.flag_fill,
+              color: deselectAll ? null : AppColors.accent,
+            ),
+          ),
+          label: hideLabels ? null : s.tabGoals,
+        );
       case 5:
         // No bespoke PNG for Finance yet — the Cupertino glyph matches the
         // outline weight of the other tab icons closely enough.
@@ -1237,11 +1308,18 @@ class _HomeShellState extends State<HomeShell> {
           noteController: widget.noteController,
           eventController: widget.eventController,
         ),
+      6 => GoalsView(
+          controller: widget.goalController,
+          taskController: widget.taskController,
+          folderController: widget.folderController,
+          settingsController: widget.settingsController,
+        ),
       5 => FinanceView(
           controller: widget.financeController,
           settingsController: widget.settingsController,
           resetSignal: _financeResetSignal,
           activeMonth: _activeFinanceMonth,
+          activeAccount: _activeFinanceAccount,
         ),
       _ => SettingsView(
           controller: widget.settingsController,
@@ -1361,18 +1439,29 @@ class _HomeShellState extends State<HomeShell> {
         // Only pages that actually hold tabs count toward the multi-page UI —
         // empty pages get no dot and can't be swiped to.
         final hasMultiplePages = navigablePages.length > 1;
+        // Spaces mode swaps what the bar's swipe (and its dots) mean.
+        final swipesSpaces = _swipesSpaces;
+        final spaces = SpaceManagerProvider.maybeOf(context)?.spaces ??
+            const <Space>[];
+        final activeSpaceId =
+            SpaceManagerProvider.maybeOf(context)?.activeSpaceId;
+        final activeSpaceIndex =
+            spaces.indexWhere((sp) => sp.id == activeSpaceId);
+        // Whether the bar has something to swipe between at all — pages in
+        // pages mode, spaces in spaces mode. Drives both the dots and the
+        // "keep a bar even for a single tab" decision.
+        final swipeable =
+            swipesSpaces ? spaces.length > 1 : hasMultiplePages;
         final pageItems = _pageItems();
         // The bottom tab bar disappears entirely only when there's a single
         // reachable page holding a single tab — then the app reads as one
         // screen. As soon as there's more than one non-empty page we keep a bar
         // so the user can swipe between pages, even with just one tab on a page.
-        final singleNoBar =
-            !isWide && pageItems.length <= 1 && !hasMultiplePages;
+        final singleNoBar = !isWide && pageItems.length <= 1 && !swipeable;
         // A page that holds a single tab while other non-empty pages exist.
         // CupertinoTabBar requires ≥2 items, so this case gets a bespoke
         // one-item bar instead of CupertinoTabScaffold.
-        final customSingleBar =
-            !isWide && hasMultiplePages && pageItems.length < 2;
+        final customSingleBar = !isWide && swipeable && pageItems.length < 2;
         final hasBottomBar = !isWide && !singleNoBar;
 
         // The lone item (and the built-in tab it drives) for the custom bar.
@@ -1516,7 +1605,7 @@ class _HomeShellState extends State<HomeShell> {
             // detects horizontal pan to switch between (non-empty) pages.
             // Active whenever there's more than one non-empty page and we're in
             // the narrow (bottom tab bar) layout.
-            if (!isWide && hasMultiplePages)
+            if (!isWide && swipeable)
               Positioned(
                 left: 0,
                 right: 0,
@@ -1527,23 +1616,31 @@ class _HomeShellState extends State<HomeShell> {
                   onHorizontalDragEnd: (d) {
                     final vel = d.primaryVelocity ?? 0;
                     if (vel.abs() < 200) return;
-                    _switchPage(vel < 0 ? 1 : -1);
+                    final delta = vel < 0 ? 1 : -1;
+                    if (_swipesSpaces) {
+                      _switchSpace(delta);
+                    } else {
+                      _switchPage(delta);
+                    }
                   },
                 ),
               ),
-            // Page indicator dots, shown just above the tab bar when there's
-            // more than one non-empty page. Empty pages get no dot.
-            if (!isWide && hasMultiplePages)
+            // Indicator dots just above the tab bar: one per non-empty page,
+            // or one per Space when the bar swipes spaces.
+            if (!isWide && swipeable)
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 50 + MediaQuery.paddingOf(context).bottom + 2,
                 child: IgnorePointer(
                   child: _PageDots(
-                    count: navigablePages.length,
-                    current: navigablePages
-                        .indexOf(_currentPage)
-                        .clamp(0, navigablePages.length - 1),
+                    count:
+                        swipesSpaces ? spaces.length : navigablePages.length,
+                    current: swipesSpaces
+                        ? activeSpaceIndex.clamp(0, spaces.length - 1)
+                        : navigablePages
+                            .indexOf(_currentPage)
+                            .clamp(0, navigablePages.length - 1),
                   ),
                 ),
               ),
@@ -1896,6 +1993,41 @@ class _HomeShellState extends State<HomeShell> {
     // Shortcut: leave split, then route the shortcut normally.
     _exitSplitTo(_lastTabIndex);
     _handleTabTap(visualIndex);
+  }
+
+  /// Whether the tab bar's horizontal swipe moves between Spaces instead of
+  /// pages of tabs. The two modes are mutually exclusive by design — one
+  /// gesture, one meaning.
+  bool get _swipesSpaces =>
+      widget.settingsController.tabBarSwipeMode == TabBarSwipeMode.spaces;
+
+  /// Switches to the previous / next Space. The whole app re-keys on the
+  /// active space id (see main.dart), so this shell — and every navigator in
+  /// it — is rebuilt from scratch; nothing after the call may touch state.
+  bool _switchingSpace = false;
+
+  Future<void> _switchSpace(int delta) async {
+    // switchSpace tears down and rebuilds every per-space controller; a second
+    // swipe landing mid-switch would run that twice over the same state.
+    if (_switchingSpace) return;
+    final manager = SpaceManagerProvider.maybeOf(context);
+    if (manager == null) return;
+    final spaces = manager.spaces;
+    if (spaces.length < 2) return;
+    final current = spaces.indexWhere((sp) => sp.id == manager.activeSpaceId);
+    if (current < 0) return;
+    final next = (current + delta).clamp(0, spaces.length - 1);
+    if (next == current) return;
+    _switchingSpace = true;
+    try {
+      // Remember the tab so the next space opens on the same one — both for
+      // this switch and for the "last opened tab" launch preference.
+      _tabAcrossSpaceSwitch = _lastTabIndex;
+      await widget.settingsController.setLastOpenedTab(_lastTabIndex);
+      await manager.switchSpace(spaces[next].id);
+    } finally {
+      _switchingSpace = false;
+    }
   }
 
   void _switchPage(int delta) {

@@ -1,17 +1,31 @@
 import 'package:uuid/uuid.dart';
 
-/// Whether a finance entry (category / transaction) moves money out or in.
-enum FinanceEntryType { expense, income }
+/// What a finance entry does to the ledger: money out, money in, or a move
+/// between two of the user's own accounts.
+///
+/// Transfers are deliberately excluded from income / expense totals and from
+/// budgets — moving your own money isn't spending it.
+enum FinanceEntryType { expense, income, transfer }
 
-String encodeFinanceEntryType(FinanceEntryType t) =>
-    t == FinanceEntryType.income ? 'income' : 'expense';
+String encodeFinanceEntryType(FinanceEntryType t) => t.name;
 
-FinanceEntryType decodeFinanceEntryType(String? raw) =>
-    raw == 'income' ? FinanceEntryType.income : FinanceEntryType.expense;
+FinanceEntryType decodeFinanceEntryType(String? raw) {
+  switch (raw) {
+    case 'income':
+      return FinanceEntryType.income;
+    case 'transfer':
+      return FinanceEntryType.transfer;
+    default:
+      return FinanceEntryType.expense;
+  }
+}
 
 /// A spending / earning bucket a [FinanceTransaction] can be filed under
 /// (Groceries, Rent, Salary …). Categories are per-space data, seeded with a
 /// default set the first time the Finance tab is used in a space.
+///
+/// Only [FinanceEntryType.expense] and [FinanceEntryType.income] categories
+/// exist — transfers are never categorised.
 ///
 /// [iconId] is a key into `kFinanceCategoryIcons` (see
 /// `lib/src/finance/finance_icons.dart`) — not the custom-photo icon storage

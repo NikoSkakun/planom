@@ -164,9 +164,42 @@ class MarkdownToolbar extends StatelessWidget {
                       icon: CupertinoIcons.chevron_left_slash_chevron_right,
                       onTap: () => _wrap('`', '`', placeholder: 'code'),
                     ),
+                    _ToolbarTextButton(
+                      label: '```',
+                      onTap: () => _wrap('```\n', '\n```', placeholder: 'code'),
+                    ),
                     _ToolbarButton(
                       icon: CupertinoIcons.link,
                       onTap: () => _insertLink(context),
+                    ),
+                    // ── Full-markdown additions ─────────────────────────
+                    _ToolbarButton(
+                      icon: CupertinoIcons.checkmark_square,
+                      onTap: () => _linePrefix('- [ ] '),
+                    ),
+                    _ToolbarButton(
+                      icon: CupertinoIcons.table,
+                      onTap: () => _wrap(
+                        '| ',
+                        ' |  |\n| --- | --- |\n|  |  |',
+                        placeholder: 'Column',
+                      ),
+                    ),
+                    _ToolbarButton(
+                      icon: CupertinoIcons.minus,
+                      onTap: () => _wrap('\n---\n', ''),
+                    ),
+                    _ToolbarTextButton(
+                      label: r'$x$',
+                      onTap: () => _wrap(r'$', r'$', placeholder: 'x^2'),
+                    ),
+                    _ToolbarTextButton(
+                      label: r'$$',
+                      onTap: () => _wrap(
+                        '\n\$\$\n',
+                        '\n\$\$\n',
+                        placeholder: r'\int_0^1 x^2\,dx',
+                      ),
                     ),
                   ],
                 ),

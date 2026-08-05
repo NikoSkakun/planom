@@ -270,6 +270,8 @@ class _StorageViewState extends State<StorageView> {
           return s.tabRoutines;
         case 'finance':
           return s.tabFinance;
+        case 'goals':
+          return s.tabGoals;
         case 'tags':
           return s.tags;
         case 'containers':
@@ -285,6 +287,7 @@ class _StorageViewState extends State<StorageView> {
       Color(0xFF007AFF), // blue — events
       Color(0xFFAF52DE), // purple — routines
       Color(0xFF00C7BE), // teal — finance
+      Color(0xFF5856D6), // indigo — goals
       Color(0xFFFF9500), // orange — tags
       Color(0xFF8E8E93), // gray — folders/lists
     ];

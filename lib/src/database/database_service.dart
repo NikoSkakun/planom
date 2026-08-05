@@ -7,9 +7,11 @@ import '../models/app_folder.dart';
 import '../models/app_list.dart';
 import '../models/contact.dart';
 import '../models/event.dart';
+import '../models/finance_account.dart';
 import '../models/finance_budget.dart';
 import '../models/finance_category.dart';
 import '../models/finance_transaction.dart';
+import '../models/goal.dart';
 import '../models/list_section.dart';
 import '../models/note.dart';
 import '../models/note_folder.dart';
@@ -21,7 +23,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 37;
+  static const _dbVersion = 38;
 
   Database? _db;
 
@@ -239,6 +241,7 @@ class DatabaseService {
           )
         ''');
         await _createFinanceTables(db);
+        await _createGoalsTable(db);
         await _createFtsTables(db);
         await _createIndexes(db);
       },
@@ -703,6 +706,26 @@ class DatabaseService {
           // existing table is touched.
           await _createFinanceTables(db);
         }
+        if (oldVersion < 38) {
+          // Goals (a tracked collection of tasks) + Finance accounts.
+          //
+          // The account columns must be added conditionally: a DB coming from
+          // v36 or older ran the v37 branch moments ago, and
+          // `_createFinanceTables` already emits the full v38 column set — so
+          // an unconditional ALTER would throw "duplicate column name" and
+          // leave the app unable to open its database. Only a DB that was
+          // *already* at v37 has the old three-column-short table.
+          await _createGoalsTable(db);
+          await _createFinanceAccountsTable(db);
+          await _addColumnIfMissing(db, 'finance_transactions', 'accountId', 'TEXT');
+          await _addColumnIfMissing(
+              db, 'finance_transactions', 'toAccountId', 'TEXT');
+          await _addColumnIfMissing(
+              db, 'finance_transactions', 'toAmount', 'INTEGER');
+          await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_finance_transactions_accountId '
+              'ON finance_transactions(accountId)');
+        }
       },
     );
   }
@@ -729,6 +752,9 @@ class DatabaseService {
         amount INTEGER NOT NULL DEFAULT 0,
         type TEXT NOT NULL DEFAULT 'expense',
         categoryId TEXT,
+        accountId TEXT,
+        toAccountId TEXT,
+        toAmount INTEGER,
         date INTEGER NOT NULL,
         note TEXT,
         creationDate INTEGER NOT NULL,
@@ -745,14 +771,72 @@ class DatabaseService {
         updatedAt INTEGER NOT NULL DEFAULT 0
       )
     ''');
+    await _createFinanceAccountsTable(db);
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_finance_transactions_date ON finance_transactions(date)',
       'CREATE INDEX IF NOT EXISTS idx_finance_transactions_categoryId ON finance_transactions(categoryId)',
+      'CREATE INDEX IF NOT EXISTS idx_finance_transactions_accountId ON finance_transactions(accountId)',
       'CREATE INDEX IF NOT EXISTS idx_finance_budgets_categoryId ON finance_budgets(categoryId)',
     ];
     for (final stmt in indexes) {
       await db.execute(stmt);
     }
+  }
+
+  /// Accounts / cards money moves through, each with its own currency. Split
+  /// out of [_createFinanceTables] so the v38 upgrade (which adds accounts to
+  /// a DB that already has the other finance tables) can reuse it.
+  static Future<void> _createFinanceAccountsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS finance_accounts (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'cash',
+        currencyCode TEXT NOT NULL DEFAULT 'USD',
+        initialBalance INTEGER NOT NULL DEFAULT 0,
+        color INTEGER NOT NULL DEFAULT 0,
+        iconId TEXT NOT NULL DEFAULT 'creditcard',
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        isArchived INTEGER NOT NULL DEFAULT 0,
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+  }
+
+  /// Goals — a named collection of tasks resolved from JSON-encoded sources
+  /// (hand-picked ids, container scopes, or live filters).
+  static Future<void> _createGoalsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS goals (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        iconId TEXT NOT NULL DEFAULT 'flag',
+        color INTEGER NOT NULL DEFAULT 0,
+        sources TEXT,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        creationDate INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+  }
+
+  /// `ALTER TABLE … ADD COLUMN`, but only when the column isn't there yet.
+  /// SQLite has no `IF NOT EXISTS` for columns and throws on a duplicate,
+  /// which during `onUpgrade` means the database never opens — so any branch
+  /// that can run after a `CREATE TABLE` carrying the same column must ask
+  /// first.
+  static Future<void> _addColumnIfMissing(
+    Database db,
+    String table,
+    String column,
+    String type,
+  ) async {
+    final info = await db.rawQuery('PRAGMA table_info($table)');
+    final exists = info.any((row) => row['name'] == column);
+    if (exists) return;
+    await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
   }
 
   /// Creates indexes on the columns the controllers repeatedly filter on
@@ -1433,6 +1517,102 @@ class DatabaseService {
     return rows.map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
+  Future<List<FinanceAccount>> getFinanceAccounts() async {
+    final db = await _database;
+    final rows = await db.query('finance_accounts',
+        orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(FinanceAccount.fromMap).toList();
+  }
+
+  Future<void> insertFinanceAccount(FinanceAccount account) async {
+    final db = await _database;
+    await _putRow(db, 'finance_accounts', account.toMap());
+  }
+
+  Future<void> updateFinanceAccount(FinanceAccount account) async {
+    final db = await _database;
+    await _patchRow(db, 'finance_accounts', account.toMap(),
+        where: 'id = ?', whereArgs: [account.id]);
+  }
+
+  /// Deletes an account and detaches it from every entry that referenced it
+  /// (those entries fall back to the space's default currency), in one
+  /// transaction so no entry is left pointing at a missing account.
+  Future<void> deleteFinanceAccount(String id) async {
+    final db = await _database;
+    await db.transaction((txn) async {
+      await txn.delete('finance_accounts', where: 'id = ?', whereArgs: [id]);
+      await _patchRow(txn, 'finance_transactions', {'accountId': null},
+          where: 'accountId = ?', whereArgs: [id]);
+      await _patchRow(txn, 'finance_transactions', {'toAccountId': null},
+          where: 'toAccountId = ?', whereArgs: [id]);
+      await _recordTombstone(txn, 'finance_accounts', id);
+    });
+  }
+
+  Future<void> updateFinanceAccountSortOrders(
+      List<FinanceAccount> accounts) async {
+    if (accounts.isEmpty) return;
+    final db = await _database;
+    await db.transaction((txn) async {
+      for (final a in accounts) {
+        await _patchRow(txn, 'finance_accounts', {'sortOrder': a.sortOrder},
+            where: 'id = ?', whereArgs: [a.id]);
+      }
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> exportFinanceAccounts() async {
+    final db = await _database;
+    final rows = await db.query('finance_accounts');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  // ── Goals ─────────────────────────────────────────────────────────────────
+  // A goal's task set is resolved at read time from its JSON sources, so the
+  // only persisted rows are the goals themselves.
+
+  Future<List<Goal>> getGoals() async {
+    final db = await _database;
+    final rows =
+        await db.query('goals', orderBy: 'sortOrder ASC, creationDate ASC');
+    return rows.map(Goal.fromMap).toList();
+  }
+
+  Future<void> insertGoal(Goal goal) async {
+    final db = await _database;
+    await _putRow(db, 'goals', goal.toMap());
+  }
+
+  Future<void> updateGoal(Goal goal) async {
+    final db = await _database;
+    await _patchRow(db, 'goals', goal.toMap(),
+        where: 'id = ?', whereArgs: [goal.id]);
+  }
+
+  Future<void> deleteGoal(String id) async {
+    final db = await _database;
+    await db.delete('goals', where: 'id = ?', whereArgs: [id]);
+    await _recordTombstone(db, 'goals', id);
+  }
+
+  Future<void> updateGoalSortOrders(List<Goal> goals) async {
+    if (goals.isEmpty) return;
+    final db = await _database;
+    await db.transaction((txn) async {
+      for (final g in goals) {
+        await _patchRow(txn, 'goals', {'sortOrder': g.sortOrder},
+            where: 'id = ?', whereArgs: [g.id]);
+      }
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> exportGoals() async {
+    final db = await _database;
+    final rows = await db.query('goals');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
   // List sections — user-defined groups of tasks within a list
   Future<List<ListSection>> getListSections() async {
     final db = await _database;
@@ -1730,9 +1910,11 @@ class DatabaseService {
     'tombstones',
     'contacts',
     'events',
+    'goals',
     'finance_budgets',
     'finance_transactions',
     'finance_categories',
+    'finance_accounts',
     'list_sections',
     'app_settings',
     'routine_entries',
@@ -1772,9 +1954,11 @@ class DatabaseService {
     final db = await _database;
     await db.delete('contacts');
     await db.delete('events');
+    await db.delete('goals');
     await db.delete('finance_budgets');
     await db.delete('finance_transactions');
     await db.delete('finance_categories');
+    await db.delete('finance_accounts');
     await db.delete('list_sections');
     await db.delete('routine_entries');
     await db.delete('routines');

@@ -12,6 +12,7 @@ import '../contacts/contact_controller.dart';
 import '../database/database_service.dart';
 import '../finance/finance_controller.dart';
 import '../folders/folder_controller.dart';
+import '../goals/goal_controller.dart';
 import '../notes/note_controller.dart';
 import '../routines/routine_controller.dart';
 import '../settings/backup_service.dart';
@@ -43,6 +44,7 @@ class SpaceManager with ChangeNotifier {
   late EventController _eventController;
   late ContactController _contactController;
   late FinanceController _financeController;
+  late GoalController _goalController;
   late BackupService _backupService;
   late SyncController _syncController;
 
@@ -60,6 +62,7 @@ class SpaceManager with ChangeNotifier {
   EventController get eventController => _eventController;
   ContactController get contactController => _contactController;
   FinanceController get financeController => _financeController;
+  GoalController get goalController => _goalController;
   BackupService get backupService => _backupService;
   SyncController get syncController => _syncController;
   // Exposed for features (e.g. search) that need to query the active space's
@@ -158,6 +161,14 @@ class SpaceManager with ChangeNotifier {
     _eventController = EventController(_db);
     _contactController = ContactController(_db);
     _financeController = FinanceController(_db);
+    // Goals resolve their tasks through the task + folder controllers, so the
+    // controller is built with them (its own load only reads the goals table,
+    // so it can still run in the same batch).
+    _goalController = GoalController(
+      _db,
+      taskController: _taskController,
+      folderController: _folderController,
+    );
     await Future.wait([
       _taskController.load(),
       _folderController.load(),
@@ -166,6 +177,7 @@ class SpaceManager with ChangeNotifier {
       _eventController.load(),
       _contactController.load(),
       _financeController.load(),
+      _goalController.load(),
     ]);
 
     // Wire the badge to the global settings + current space's events.
@@ -204,6 +216,7 @@ class SpaceManager with ChangeNotifier {
       eventController: _eventController,
       contactController: _contactController,
       financeController: _financeController,
+      goalController: _goalController,
       settingsController: settingsController,
     );
 
