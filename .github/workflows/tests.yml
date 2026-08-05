@@ -1,11 +1,10 @@
 name: Tests
 
-# Runs on the SDK the shipped iOS build uses, which is the point: the app is
-# developed against whatever Flutter happens to be installed locally, but
-# TestFlight builds on 3.32.0 — so that is the version the test suite has to be
-# green on. Linux runners are used because the suite is platform-agnostic
-# (sqflite runs through its FFI backend there) and they are far quicker than
-# macOS ones.
+# Runs on the SDK the shipped iOS build uses, which is the point: nothing ran
+# the suite against the version TestFlight actually builds with until this job
+# existed. Keep FLUTTER_VERSION in step with testflight.yml. Linux runners are
+# used because the suite is platform-agnostic (sqflite runs through its FFI
+# backend there) and they are far quicker than macOS ones.
 
 on:
   push:
@@ -24,7 +23,7 @@ jobs:
     timeout-minutes: 30
 
     env:
-      FLUTTER_VERSION: "3.32.0"
+      FLUTTER_VERSION: "3.44.8"
 
     steps:
       - name: Checkout

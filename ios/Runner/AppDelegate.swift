@@ -3,7 +3,7 @@ import Flutter
 import UserNotifications
 import EventKit
 
-@UIApplicationMain
+@main
 @objc class AppDelegate: FlutterAppDelegate {
   private var eventKitBridge: EventKitBridge?
 
@@ -14,8 +14,15 @@ import EventKit
     GeneratedPluginRegistrant.register(with: self)
     UNUserNotificationCenter.current().delegate = self
 
-    if let controller = window?.rootViewController as? FlutterViewController {
-      eventKitBridge = EventKitBridge(messenger: controller.binaryMessenger)
+    // The messenger comes from a plugin registrar rather than from
+    // `window?.rootViewController`. FlutterAppDelegate is itself a
+    // FlutterPluginRegistry, so this resolves the same implicit engine without
+    // depending on the window already holding a FlutterViewController — which
+    // it does not under the UIScene life cycle, where the window belongs to the
+    // scene. Silently skipping the bridge there would leave the device-calendar
+    // channel unanswered with nothing to show for it.
+    if let registrar = registrar(forPlugin: "EventKitBridge") {
+      eventKitBridge = EventKitBridge(messenger: registrar.messenger())
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

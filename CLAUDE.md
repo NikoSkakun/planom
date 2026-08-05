@@ -12,7 +12,7 @@ flutter test test/widget_test.dart  # Run a single test file
 flutter run              # Run on connected device or emulator
 ```
 
-**The app follows the iOS toolchain: Flutter 3.32.0 or newer.** CI builds iOS and macOS on 3.32.0, and `flutter_math_fork` (the notes' LaTeX renderer) only compiles from 3.32 onwards — an older SDK fails with `RenderObjectWithLayoutCallbackMixin not found`. If more than one SDK is installed, run the commands above with the newer one.
+**The app follows the iOS toolchain: Flutter 3.44.8.** CI builds iOS, macOS and the test suite on it (`.github/workflows/testflight.yml`, `macos-release.yml`, `tests.yml` — keep the three in step). The floor is 3.32: `flutter_math_fork` (the notes' LaTeX renderer) needs 3.32+, and an older SDK fails with `RenderObjectWithLayoutCallbackMixin not found`. The ceiling used to be 3.32 as well, because Android is pinned to 3.24.5 — that constraint went away when the Android workflow was paused. 3.44 also matters for iOS itself: UIScene life-cycle support only exists from 3.38, and Apple requires it in the release after iOS 26. If more than one SDK is installed locally, run the commands above with the newer one.
 
 ### Android build configuration
 

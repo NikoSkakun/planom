@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 60
 
     env:
-      FLUTTER_VERSION: "3.32.0"   # pin to the version you develop with
+      FLUTTER_VERSION: "3.44.8"   # see the toolchain note in CLAUDE.md
 
     steps:
       # ── Source ───────────────────────────────────────────────────────────────
