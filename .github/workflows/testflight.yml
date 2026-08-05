@@ -31,6 +31,15 @@ jobs:
           channel: stable
           cache: true
 
+      # Flutter 3.44 resolves plugin dependencies through Swift Package Manager
+      # by default. Fastlane's `match` sets one provisioning profile for every
+      # target in the archive, and SPM package targets cannot carry one —
+      # "SwiftyGif_SwiftyGif does not support provisioning profiles" fails the
+      # archive even though `flutter build ios` itself succeeds. CocoaPods is
+      # how this project's plugins were built until 3.32 and it still works.
+      - name: Keep plugins on CocoaPods
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Cache pub dependencies
         uses: actions/cache@v4
         with:

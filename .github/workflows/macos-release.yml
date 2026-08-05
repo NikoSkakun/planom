@@ -29,6 +29,12 @@ jobs:
           channel: stable
           cache: true
 
+      # Same reason as testflight.yml: keep plugin dependencies on CocoaPods
+      # rather than the Swift Package Manager path Flutter 3.44 defaults to, so
+      # signing applies to targets that can accept a provisioning profile.
+      - name: Keep plugins on CocoaPods
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Cache pub dependencies
         uses: actions/cache@v4
         with:
