@@ -836,7 +836,17 @@ class DatabaseService {
     final info = await db.rawQuery('PRAGMA table_info($table)');
     final exists = info.any((row) => row['name'] == column);
     if (exists) return;
-    await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+    try {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+    } catch (error) {
+      // The PRAGMA is the real guard; this is insurance. A failed migration
+      // takes the whole database with it — the app then cannot open its data
+      // at all and launches to a blank screen — so an ALTER that fails only
+      // because the column is somehow already there must not be fatal.
+      if (!error.toString().toLowerCase().contains('duplicate column')) {
+        rethrow;
+      }
+    }
   }
 
   /// Creates indexes on the columns the controllers repeatedly filter on

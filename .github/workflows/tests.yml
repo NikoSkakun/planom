@@ -1,0 +1,53 @@
+name: Tests
+
+# Runs on the SDK the shipped iOS build uses, which is the point: the app is
+# developed against whatever Flutter happens to be installed locally, but
+# TestFlight builds on 3.32.0 — so that is the version the test suite has to be
+# green on. Linux runners are used because the suite is platform-agnostic
+# (sqflite runs through its FFI backend there) and they are far quicker than
+# macOS ones.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: flutter test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      FLUTTER_VERSION: "3.32.0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Install pub dependencies
+        run: flutter pub get
+
+      - name: Run tests
+        run: flutter test --reporter expanded

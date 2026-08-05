@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,12 +15,23 @@ import 'src/security/security_service.dart';
 import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
 import 'src/spaces/space_manager.dart';
+import 'src/startup.dart';
 import 'src/theme/app_background.dart';
 import 'src/utils/platform_capabilities.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // A build failure anywhere in the tree otherwise paints Flutter's release
+  // placeholder — a featureless light-grey rectangle that is impossible to
+  // tell apart from a blank app.
+  installReadableErrorWidget();
+  _startup();
+}
 
+/// Boots the app. Split out of [main] so a failure can be reported on screen
+/// and retried, instead of leaving the platform on its launch surface — which
+/// is what "the app opens to a white screen" actually is.
+Future<void> _startup() async {
   // Swap in the FFI factory (backed by the SQLite the `sqlite3` package bundles,
   // built with FTS5) before any controller opens a database. Linux/Windows have
   // no native sqflite backend; Android has one but its system SQLite often lacks
@@ -31,21 +44,26 @@ void main() async {
 
   if (PlatformCapabilities.supportsOrientationLock) {
     // Landscape is temporarily disabled — portrait only on phone/tablet for now.
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    await runOptionalStartupStep(
+      'locking orientation',
+      () => SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]),
+    );
   }
 
   // These four inits are independent (two cache the documents dir, one loads
   // the timezone db, one sets up the notification plugin), so run them
-  // concurrently to shorten startup. Behaviour is identical to awaiting each
-  // in turn — they share no state and none reads another's result.
+  // concurrently to shorten startup. Each is wrapped on its own: none of them
+  // is worth failing to launch over, and a plugin that never answers its
+  // platform channel must not hold the first frame hostage either.
   await Future.wait([
-    initFolderIconService(),
-    initBackgroundService(),
-    NotificationService.initTimezone(),
-    NotificationService.instance.init(),
+    runOptionalStartupStep('preparing icons', initFolderIconService),
+    runOptionalStartupStep('preparing backgrounds', initBackgroundService),
+    runOptionalStartupStep('loading time zones', NotificationService.initTimezone),
+    runOptionalStartupStep(
+        'starting notifications', NotificationService.instance.init),
   ]);
 
   // Shared planom.db handle: holds app_settings (tab visibility, appearance,
@@ -55,28 +73,32 @@ void main() async {
   final globalDb = DatabaseService();
 
   final settingsController = SettingsController(SettingsService(), globalDb);
-  await settingsController.loadSettings();
-
   final securityService = SecurityService(globalDb);
-  await securityService.load();
-
-  // Google Calendar integration is global (lives outside any space) so the
-  // same connection appears in every space. Initialisation is best-effort —
-  // a missing client ID or offline state just leaves the controller in its
-  // disconnected default and the rest of the app continues to work.
-  final googleCalendarController =
-      GoogleCalendarController(db: globalDb);
-  await googleCalendarController.load();
-
-  // Native Apple Calendar (EventKit) integration — also global, iOS/macOS only.
-  // Off those platforms `load()` is a no-op and the controller stays inert.
-  final deviceCalendarController =
-      DeviceCalendarController(db: globalDb);
-  await deviceCalendarController.load();
-
+  final googleCalendarController = GoogleCalendarController(db: globalDb);
+  final deviceCalendarController = DeviceCalendarController(db: globalDb);
   final spaceManager =
       SpaceManager(settingsController: settingsController, globalDb: globalDb);
-  await spaceManager.load();
+
+  // The steps the app cannot run without: reading settings (which is also what
+  // opens and migrates the database) and building the active space. A failure
+  // here is reported on screen with its stack, and can be retried.
+  var stage = 'reading your settings';
+  try {
+    await settingsController.loadSettings();
+    stage = 'checking the app lock';
+    await securityService.load();
+    stage = 'opening your spaces';
+    await spaceManager.load();
+  } catch (error, stack) {
+    debugPrint('Planom startup failed while $stage: $error\n$stack');
+    runApp(StartupErrorApp(
+      label: stage,
+      error: error,
+      stack: stack,
+      onRetry: _startup,
+    ));
+    return;
+  }
 
   runApp(
     ListenableBuilder(
@@ -104,4 +126,22 @@ void main() async {
       ),
     ),
   );
+
+  // Both calendar integrations are best-effort and, crucially, slow in ways the
+  // app has no control over: Google's silent sign-in makes a network call and
+  // EventKit can block on a permission prompt. Awaiting either before runApp
+  // means a stalled call shows as a launch that never finishes. They run after
+  // the first frame instead and repaint the calendar through their listeners
+  // when they land — an expired token or an offline device just leaves them
+  // disconnected.
+  unawaited(runOptionalStartupStep(
+    'connecting Google Calendar',
+    googleCalendarController.load,
+    timeout: const Duration(seconds: 30),
+  ));
+  unawaited(runOptionalStartupStep(
+    'reading the device calendar',
+    deviceCalendarController.load,
+    timeout: const Duration(seconds: 30),
+  ));
 }

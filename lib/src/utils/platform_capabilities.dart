@@ -27,7 +27,15 @@ class PlatformCapabilities {
   /// True on macOS + Linux + Windows — Planom switches to the iPad sidebar
   /// layout regardless of window width on these platforms, since they always
   /// have room for it.
-  static bool get isDesktop => isMacOS || isLinux || isWindows;
+  static bool get isDesktop => debugIsDesktopOverride ?? _isDesktop;
+
+  static bool get _isDesktop => isMacOS || isLinux || isWindows;
+
+  /// Forces [isDesktop] on or off. Tests run on the Linux VM, where [isDesktop]
+  /// is true and the shell therefore always builds the iPad sidebar — so
+  /// without this the phone tab-bar layout every iPhone user sees could not be
+  /// exercised at all. Set it in a test, reset it to null in the teardown.
+  static bool? debugIsDesktopOverride;
 
   /// Whether to use the `sqflite_common_ffi` factory backed by the SQLite the
   /// `sqlite3` package bundles (built with FTS5) instead of the platform's native
