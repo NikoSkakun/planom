@@ -370,6 +370,11 @@ class S {
   String get animationSpeedSlow => t('animationSpeedSlow');
   String get tabBarPages => t('tabBarPages');
   String get tabBarPagesHint => t('tabBarPagesHint');
+  String tabBarSpaceScope(String space) =>
+      t('tabBarSpaceScope').replaceFirst('{space}', space);
+  String tabBarSpaceScopeShared(String space) =>
+      t('tabBarSpaceScopeShared').replaceFirst('{space}', space);
+  String get tabBarUseDefaultSpaceLayout => t('tabBarUseDefaultSpaceLayout');
   String get addPage => t('addPage');
   String get removePageTitle => t('removePageTitle');
   String get removePageBody => t('removePageBody');
@@ -1382,6 +1387,9 @@ const Map<String, String> _en = {
   'animationSpeedSlow': 'Slow',
   'tabBarPages': 'Tab Bar Pages',
   'tabBarPagesHint': 'Add more pages to fit more than 7 tabs. Swipe horizontally on the tab bar to switch between pages.',
+  'tabBarSpaceScope': 'These tabs apply to {space} only. Every space keeps its own tab bar.',
+  'tabBarSpaceScopeShared': '{space} is using the tab bar from your default space. Change anything here and it gets its own.',
+  'tabBarUseDefaultSpaceLayout': 'Use Default Space\'s Tab Bar',
   'addPage': 'Add page',
   'removePageTitle': 'Remove page?',
   'removePageBody': 'All tabs on this page will be removed too.',
@@ -2104,6 +2112,9 @@ const Map<String, String> _uk = {
   'animationSpeedSlow': 'Повільна',
   'tabBarPages': 'Сторінки панелі вкладок',
   'tabBarPagesHint': 'Додавайте більше сторінок, щоб умістити понад 7 вкладок. Гортайте панель вкладок по горизонталі для перемикання між сторінками.',
+  'tabBarSpaceScope': 'Ці вкладки стосуються лише простору {space}. Кожен простір має власну панель вкладок.',
+  'tabBarSpaceScopeShared': '{space} використовує панель вкладок типового простору. Змініть тут будь-що — і він отримає власну.',
+  'tabBarUseDefaultSpaceLayout': 'Використати панель типового простору',
   'addPage': 'Додати сторінку',
   'removePageTitle': 'Видалити сторінку?',
   'removePageBody': 'Усі вкладки на цій сторінці також буде видалено.',
@@ -2698,6 +2709,9 @@ const Map<String, String> _es = {
   'animationSpeedSlow': 'Lenta',
   'tabBarPages': 'Páginas de la barra',
   'tabBarPagesHint': 'Añade más páginas para tener más de 7 pestañas. Desliza horizontalmente en la barra para cambiar de página.',
+  'tabBarSpaceScope': 'Estas pestañas solo se aplican a {space}. Cada espacio tiene su propia barra.',
+  'tabBarSpaceScopeShared': '{space} usa la barra de pestañas de tu espacio predeterminado. Cambia algo aquí y tendrá la suya.',
+  'tabBarUseDefaultSpaceLayout': 'Usar la barra del espacio predeterminado',
   'addPage': 'Añadir página',
   'removePageTitle': '¿Quitar página?',
   'removePageBody': 'También se quitarán todas las pestañas de esta página.',
@@ -3292,6 +3306,9 @@ const Map<String, String> _fr = {
   'animationSpeedSlow': 'Lente',
   'tabBarPages': 'Pages de la barre d\'onglets',
   'tabBarPagesHint': 'Ajoutez des pages pour dépasser 7 onglets. Balayez horizontalement sur la barre d\'onglets pour changer de page.',
+  'tabBarSpaceScope': 'Ces onglets s\'appliquent uniquement à {space}. Chaque espace a sa propre barre.',
+  'tabBarSpaceScopeShared': '{space} utilise la barre d\'onglets de votre espace par défaut. Modifiez quelque chose ici et il aura la sienne.',
+  'tabBarUseDefaultSpaceLayout': 'Utiliser la barre de l\'espace par défaut',
   'addPage': 'Ajouter une page',
   'removePageTitle': 'Supprimer la page ?',
   'removePageBody': 'Tous les onglets de cette page seront aussi supprimés.',
@@ -3886,6 +3903,9 @@ const Map<String, String> _de = {
   'animationSpeedSlow': 'Langsam',
   'tabBarPages': 'Tableisten-Seiten',
   'tabBarPagesHint': 'Füge weitere Seiten hinzu, um mehr als 7 Tabs unterzubringen. Wische horizontal über die Tableiste, um zwischen Seiten zu wechseln.',
+  'tabBarSpaceScope': 'Diese Tabs gelten nur für {space}. Jeder Bereich hat seine eigene Tab-Leiste.',
+  'tabBarSpaceScopeShared': '{space} verwendet die Tab-Leiste deines Standardbereichs. Ändere hier etwas, und er bekommt eine eigene.',
+  'tabBarUseDefaultSpaceLayout': 'Tab-Leiste des Standardbereichs verwenden',
   'addPage': 'Seite hinzufügen',
   'removePageTitle': 'Seite entfernen?',
   'removePageBody': 'Alle Tabs auf dieser Seite werden ebenfalls entfernt.',
@@ -4480,6 +4500,9 @@ const Map<String, String> _it = {
   'animationSpeedSlow': 'Lenta',
   'tabBarPages': 'Pagine barra schede',
   'tabBarPagesHint': 'Aggiungi altre pagine per più di 7 schede. Scorri orizzontalmente sulla barra delle schede per passare da una pagina all\'altra.',
+  'tabBarSpaceScope': 'Queste schede valgono solo per {space}. Ogni spazio ha la propria barra.',
+  'tabBarSpaceScopeShared': '{space} usa la barra delle schede dello spazio predefinito. Modifica qualcosa qui e avrà la sua.',
+  'tabBarUseDefaultSpaceLayout': 'Usa la barra dello spazio predefinito',
   'addPage': 'Aggiungi pagina',
   'removePageTitle': 'Rimuovere la pagina?',
   'removePageBody': 'Verranno rimosse anche tutte le schede di questa pagina.',
@@ -5074,6 +5097,9 @@ const Map<String, String> _pt = {
   'animationSpeedSlow': 'Lenta',
   'tabBarPages': 'Páginas da barra de abas',
   'tabBarPagesHint': 'Adicione mais páginas para ter mais de 7 abas. Deslize horizontalmente na barra de abas para alternar entre as páginas.',
+  'tabBarSpaceScope': 'Estas abas aplicam-se apenas a {space}. Cada espaço tem a sua própria barra.',
+  'tabBarSpaceScopeShared': '{space} está a usar a barra de abas do teu espaço predefinido. Muda algo aqui e passa a ter a sua.',
+  'tabBarUseDefaultSpaceLayout': 'Usar a barra do espaço predefinido',
   'addPage': 'Adicionar página',
   'removePageTitle': 'Remover página?',
   'removePageBody': 'Todas as abas desta página também serão removidas.',
@@ -5668,6 +5694,9 @@ const Map<String, String> _ru = {
   'animationSpeedSlow': 'Медленно',
   'tabBarPages': 'Страницы вкладок',
   'tabBarPagesHint': 'Добавьте страницы, чтобы разместить больше 7 вкладок. Проводите по панели вкладок по горизонтали для переключения страниц.',
+  'tabBarSpaceScope': 'Эти вкладки относятся только к пространству {space}. У каждого пространства своя панель вкладок.',
+  'tabBarSpaceScopeShared': '{space} использует панель вкладок пространства по умолчанию. Измените здесь что-нибудь — и появится своя.',
+  'tabBarUseDefaultSpaceLayout': 'Использовать панель пространства по умолчанию',
   'addPage': 'Добавить страницу',
   'removePageTitle': 'Удалить страницу?',
   'removePageBody': 'Все вкладки на этой странице также будут удалены.',
@@ -6260,6 +6289,9 @@ const Map<String, String> _zh = {
   'animationSpeedSlow': '慢',
   'tabBarPages': '标签栏页面',
   'tabBarPagesHint': '添加更多页面以容纳超过 7 个标签。在标签栏上左右滑动可切换页面。',
+  'tabBarSpaceScope': '这些标签仅适用于{space}。每个空间都有自己的标签栏。',
+  'tabBarSpaceScopeShared': '{space}正在使用默认空间的标签栏。在此做任何更改后，它将拥有自己的标签栏。',
+  'tabBarUseDefaultSpaceLayout': '使用默认空间的标签栏',
   'addPage': '添加页面',
   'removePageTitle': '移除页面？',
   'removePageBody': '此页面上的所有标签也将被移除。',
@@ -6852,6 +6884,9 @@ const Map<String, String> _ja = {
   'animationSpeedSlow': '遅い',
   'tabBarPages': 'タブバーのページ',
   'tabBarPagesHint': 'ページを追加すると 7 つを超えるタブを配置できます。タブバーを横にスワイプしてページを切り替えます。',
+  'tabBarSpaceScope': 'これらのタブは{space}にのみ適用されます。スペースごとに独自のタブバーがあります。',
+  'tabBarSpaceScopeShared': '{space}は既定のスペースのタブバーを使用しています。ここで変更すると独自のものになります。',
+  'tabBarUseDefaultSpaceLayout': '既定のスペースのタブバーを使う',
   'addPage': 'ページを追加',
   'removePageTitle': 'ページを削除しますか？',
   'removePageBody': 'このページのタブもすべて削除されます。',

@@ -1,3 +1,9 @@
+/// Id of the space that ships with the app. It is special in two ways: its
+/// data lives in the shared `planom.db` rather than a file of its own, and it
+/// cannot be deleted — so several subsystems key their "fall back to this one"
+/// behaviour on it.
+const String kDefaultSpaceId = 'default';
+
 class Space {
   const Space({
     required this.id,

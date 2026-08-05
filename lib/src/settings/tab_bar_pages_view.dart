@@ -6,6 +6,7 @@ import '../folders/folder_controller.dart';
 import '../folders/folder_icon_picker.dart';
 import '../localization/strings.dart';
 import '../notes/note_controller.dart';
+import '../spaces/space.dart' show kDefaultSpaceId;
 import '../spaces/space_manager.dart';
 import '../theme/app_theme.dart';
 import '../utils/confirm_dialogs.dart';
@@ -313,9 +314,33 @@ class TabBarPagesEditor extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final cfg = controller.tabBarConfig;
+    // Which space this layout belongs to. Every space keeps its own tab bar, so
+    // saying so up front is the difference between "my tabs changed" and "I
+    // changed this space's tabs".
+    final manager = SpaceManagerProvider.maybeOf(context);
+    final spaceName = manager?.spaces
+        .where((sp) => sp.id == controller.activeSpaceId)
+        .map((sp) => sp.name)
+        .firstOrNull;
+    final borrowed = controller.activeSpaceId != kDefaultSpaceId &&
+        !controller.hasOwnTabBarConfig(controller.activeSpaceId);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (spaceName != null && (manager?.spaces.length ?? 0) > 1) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              borrowed
+                  ? s.tabBarSpaceScopeShared(spaceName)
+                  : s.tabBarSpaceScope(spaceName),
+              style: TextStyle(
+                fontSize: 13,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+          ),
+        ],
         for (var p = 0; p < cfg.pages.length; p++) ...[
           _PageHeader(
             pageNumber: p + 1,
@@ -356,6 +381,13 @@ class TabBarPagesEditor extends StatelessWidget {
           label: s.addPage,
           onTap: () => _addPage(context),
         ),
+        if (!borrowed && controller.activeSpaceId != kDefaultSpaceId) ...[
+          const SizedBox(height: 6),
+          SettingsNavRow(
+            label: s.tabBarUseDefaultSpaceLayout,
+            onTap: () => controller.resetTabBarConfig(controller.activeSpaceId),
+          ),
+        ],
         const SizedBox(height: 6),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),

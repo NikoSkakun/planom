@@ -7,6 +7,7 @@ import '../finance/currency.dart';
 import '../finance/finance_format.dart';
 import '../localization/strings.dart';
 import '../notifications/notification_service.dart';
+import '../spaces/space.dart' show kDefaultSpaceId;
 import '../tasks/task_field_prefs.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
@@ -342,11 +343,53 @@ class SettingsController with ChangeNotifier {
   TabBarSwipeMode _tabBarSwipeMode = TabBarSwipeMode.pages;
   TabBarSwipeMode get tabBarSwipeMode => _tabBarSwipeMode;
 
-  /// Multi-page tab bar layout — supersedes the legacy [tabOrder] +
-  /// [tabVisibility] booleans. On first load the legacy values are migrated
-  /// into a single-page layout if no `tab_bar_config` row exists yet.
-  TabBarConfig _tabBarConfig = TabBarConfig.defaultLayout();
-  TabBarConfig get tabBarConfig => _tabBarConfig;
+  /// Multi-page tab bar layout, **per space** — supersedes the legacy
+  /// [tabOrder] + [tabVisibility] booleans. On first load the legacy values are
+  /// migrated into a single-page layout if no `tab_bar_config` row exists yet.
+  ///
+  /// Keyed by space id. The default space keeps the original
+  /// `tab_bar_config` key so an existing layout survives the upgrade untouched;
+  /// every other space stores `tab_bar_config:<spaceId>`. A space with no entry
+  /// of its own falls back to the default space's layout, so adding a space
+  /// starts from the bar the user already has rather than from a stock one —
+  /// and the moment they edit it, the two part ways.
+  final Map<String, TabBarConfig> _tabBarConfigBySpace = {};
+
+  /// Space whose settings [tabBarConfig] reads and writes. Kept in step with
+  /// [SpaceManager.activeSpaceId], which sets it while loading and on every
+  /// switch.
+  String _activeSpaceId = kDefaultSpaceId;
+  String get activeSpaceId => _activeSpaceId;
+
+  TabBarConfig get tabBarConfig => tabBarConfigFor(_activeSpaceId);
+
+  /// The layout [spaceId] renders with: its own if it has one, otherwise the
+  /// default space's, otherwise the stock layout.
+  TabBarConfig tabBarConfigFor(String spaceId) =>
+      _tabBarConfigBySpace[spaceId] ??
+      _tabBarConfigBySpace[kDefaultSpaceId] ??
+      TabBarConfig.defaultLayout();
+
+  /// Whether [spaceId] has a layout of its own rather than borrowing the
+  /// default space's. Drives the "same as <default space>" hint in Settings.
+  bool hasOwnTabBarConfig(String spaceId) =>
+      _tabBarConfigBySpace.containsKey(spaceId);
+
+  /// Points the tab-bar settings at [spaceId]. Called by [SpaceManager] on load
+  /// and on every switch; a no-op when nothing changes so it can be called
+  /// freely.
+  void setActiveSpace(String spaceId) {
+    if (spaceId == _activeSpaceId) return;
+    _activeSpaceId = spaceId;
+    notifyListeners();
+  }
+
+  /// Storage key for a space's layout. The default space keeps the historical
+  /// unsuffixed key — renaming it would strand every existing layout.
+  static String _tabBarConfigKey(String spaceId) =>
+      spaceId == kDefaultSpaceId
+          ? 'tab_bar_config'
+          : 'tab_bar_config:$spaceId';
 
   // Built-in tabs this user's layout has already been offered. A tab missing
   // from the set is one that shipped after they last saved a layout, and gets
@@ -419,7 +462,7 @@ class SettingsController with ChangeNotifier {
   /// `_tabVisibility` map is retained only to migrate old persisted layouts on
   /// first load.
   bool isTabVisible(int index) {
-    final active = _tabBarConfig.active;
+    final active = tabBarConfig.active;
     final pages = _tabBarSwipeMode == TabBarSwipeMode.spaces
         ? [
             for (final page in active.pages)
@@ -623,7 +666,12 @@ class SettingsController with ChangeNotifier {
         _tabBarSwipeMode = decodeTabBarSwipeMode(value);
       } else if (key == 'tab_bar_config') {
         final parsed = TabBarConfig.tryParse(value);
-        if (parsed != null) _tabBarConfig = parsed;
+        if (parsed != null) _tabBarConfigBySpace[kDefaultSpaceId] = parsed;
+      } else if (key.startsWith('tab_bar_config:')) {
+        final parsed = TabBarConfig.tryParse(value);
+        if (parsed != null) {
+          _tabBarConfigBySpace[key.substring('tab_bar_config:'.length)] = parsed;
+        }
       } else if (key == TaskFieldPrefs.storageKey) {
         _taskFieldPrefs = TaskFieldPrefs.fromJson(value);
       } else if (key == kAppearancePrefsKey) {
@@ -667,13 +715,13 @@ class SettingsController with ChangeNotifier {
     _applyAnimationSpeed(_animationSpeed);
 
     // Migrate the legacy single-row tab layout to TabBarConfig the first time
-    // a user opens the new tab-bar UI. Existing _tabBarConfig is the default
-    // if no `tab_bar_config` row was loaded above; merge the user's visibility
-    // + order into it so they don't lose their existing layout.
+    // a user opens the new tab-bar UI. The default space's layout is the stock
+    // one if no `tab_bar_config` row was loaded above; merge the user's
+    // visibility + order into it so they don't lose their existing layout.
     final loadedConfig =
         rows.any((r) => r['key'] == 'tab_bar_config');
     if (!loadedConfig) {
-      _tabBarConfig = TabBarConfig.fromLegacy(
+      _tabBarConfigBySpace[kDefaultSpaceId] = TabBarConfig.fromLegacy(
         tabVisibility: _tabVisibility,
         tabOrder: _tabOrder,
       );
@@ -682,24 +730,30 @@ class SettingsController with ChangeNotifier {
     // Surface built-in tabs that shipped after this layout was saved. Without
     // this a user who had ever edited their tab bar would simply never see a
     // new tab. The "known" set is seeded from the pre-growth built-ins plus
-    // whatever their layout holds, so tabs they deliberately removed are not
-    // resurrected.
+    // whatever their layouts hold, so tabs they deliberately removed are not
+    // resurrected. Layouts are per space, so this runs over every one of them —
+    // a new tab that only appeared in the space that happened to be open would
+    // be worse than not surfacing it at all.
     final known = _knownBuiltinTabs ??
         {
           ...TabBarConfig.legacyBuiltins,
-          for (final it in _tabBarConfig.flattened)
-            if (it.kind == TabKind.builtin && it.builtinIndex != null)
-              it.builtinIndex!,
+          for (final config in _tabBarConfigBySpace.values)
+            for (final it in config.flattened)
+              if (it.kind == TabKind.builtin && it.builtinIndex != null)
+                it.builtinIndex!,
         };
     final missing =
         TabBarConfig.allBuiltins.where((i) => !known.contains(i)).toList();
     if (missing.isNotEmpty) {
-      var config = _tabBarConfig;
-      for (final index in missing) {
-        config = config.withBuiltinSurfaced(index);
+      for (final entry in _tabBarConfigBySpace.entries.toList()) {
+        var config = entry.value;
+        for (final index in missing) {
+          config = config.withBuiltinSurfaced(index);
+        }
+        _tabBarConfigBySpace[entry.key] = config;
+        await _db.setAppSetting(
+            _tabBarConfigKey(entry.key), config.toJsonString());
       }
-      _tabBarConfig = config;
-      await _db.setAppSetting('tab_bar_config', config.toJsonString());
     }
     if (_knownBuiltinTabs == null || missing.isNotEmpty) {
       _knownBuiltinTabs = {...known, ...missing};
@@ -761,10 +815,31 @@ class SettingsController with ChangeNotifier {
         'tab_bar_swipe_mode', encodeTabBarSwipeMode(mode));
   }
 
-  Future<void> updateTabBarConfig(TabBarConfig config) async {
-    _tabBarConfig = config;
+  /// Saves a layout for [spaceId], defaulting to the space in view. The first
+  /// save is what gives a space a layout of its own — until then it renders the
+  /// default space's.
+  Future<void> updateTabBarConfig(TabBarConfig config, {String? spaceId}) async {
+    final id = spaceId ?? _activeSpaceId;
+    _tabBarConfigBySpace[id] = config;
     notifyListeners();
-    await _db.setAppSetting('tab_bar_config', config.toJsonString());
+    await _db.setAppSetting(_tabBarConfigKey(id), config.toJsonString());
+  }
+
+  /// Drops [spaceId]'s own layout so it follows the default space's again.
+  /// Refuses on the default space, which has nothing to fall back to.
+  Future<void> resetTabBarConfig(String spaceId) async {
+    if (spaceId == kDefaultSpaceId) return;
+    if (_tabBarConfigBySpace.remove(spaceId) == null) return;
+    notifyListeners();
+    await _db.deleteAppSetting(_tabBarConfigKey(spaceId));
+  }
+
+  /// Forgets a deleted space's layout so its key doesn't linger in settings —
+  /// and so a new space that happened to reuse the id starts clean.
+  Future<void> forgetSpaceSettings(String spaceId) async {
+    if (spaceId == kDefaultSpaceId) return;
+    _tabBarConfigBySpace.remove(spaceId);
+    await _db.deleteAppSetting(_tabBarConfigKey(spaceId));
   }
 
   Future<void> setTabVisible(int index, bool visible) async {

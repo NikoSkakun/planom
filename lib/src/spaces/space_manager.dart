@@ -122,6 +122,9 @@ class SpaceManager with ChangeNotifier {
 
     _spaces = _spaces.where((s) => s.id != id).toList();
     await _saveMetadata();
+    // Drop the space's own settings (its tab bar layout) along with its data,
+    // so nothing lingers and a later space reusing the id starts clean.
+    await settingsController.forgetSpaceSettings(id);
 
     final dbPath = await getDatabasesPath();
     try {
@@ -136,6 +139,10 @@ class SpaceManager with ChangeNotifier {
   // ── Private ────────────────────────────────────────────────────────────────
 
   Future<void> _initControllers(String spaceId) async {
+    // Point the settings at this space before anything reads them: the tab bar
+    // layout is per space, and the shell builds its bar from
+    // `settingsController.tabBarConfig` as soon as the controllers are ready.
+    settingsController.setActiveSpace(spaceId);
     // Close previous DB unless it was the default space — its handle is the
     // shared globalDb, still referenced by SettingsController/SecurityService.
     if (_initialized && _prevSpaceId != null && _prevSpaceId != 'default') {

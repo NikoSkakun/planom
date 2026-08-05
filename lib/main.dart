@@ -15,6 +15,7 @@ import 'src/security/security_service.dart';
 import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
 import 'src/spaces/space_manager.dart';
+import 'src/spaces/space_switch_transition.dart';
 import 'src/startup.dart';
 import 'src/theme/app_background.dart';
 import 'src/utils/platform_capabilities.dart';
@@ -101,27 +102,31 @@ Future<void> _startup() async {
   }
 
   runApp(
-    ListenableBuilder(
-      listenable: spaceManager,
-      builder: (context, _) => SpaceManagerProvider(
-        spaceManager: spaceManager,
-        child: MyApp(
-          // New key on every space switch forces a full widget-tree rebuild,
-          // giving each space a completely fresh navigator + scroll state.
-          key: ValueKey(spaceManager.activeSpaceId),
-          settingsController: settingsController,
-          taskController: spaceManager.taskController,
-          folderController: spaceManager.folderController,
-          noteController: spaceManager.noteController,
-          routineController: spaceManager.routineController,
-          eventController: spaceManager.eventController,
-          contactController: spaceManager.contactController,
-          financeController: spaceManager.financeController,
-          goalController: spaceManager.goalController,
-          backupService: spaceManager.backupService,
-          securityService: securityService,
-          googleCalendarController: googleCalendarController,
-          deviceCalendarController: deviceCalendarController,
+    // Sits above the re-keyed MyApp on purpose: switching Space disposes that
+    // whole subtree, so the widget that animates the switch has to outlive it.
+    SpaceSwitchTransition(
+      child: ListenableBuilder(
+        listenable: spaceManager,
+        builder: (context, _) => SpaceManagerProvider(
+          spaceManager: spaceManager,
+          child: MyApp(
+            // New key on every space switch forces a full widget-tree rebuild,
+            // giving each space a completely fresh navigator + scroll state.
+            key: ValueKey(spaceManager.activeSpaceId),
+            settingsController: settingsController,
+            taskController: spaceManager.taskController,
+            folderController: spaceManager.folderController,
+            noteController: spaceManager.noteController,
+            routineController: spaceManager.routineController,
+            eventController: spaceManager.eventController,
+            contactController: spaceManager.contactController,
+            financeController: spaceManager.financeController,
+            goalController: spaceManager.goalController,
+            backupService: spaceManager.backupService,
+            securityService: securityService,
+            googleCalendarController: googleCalendarController,
+            deviceCalendarController: deviceCalendarController,
+          ),
         ),
       ),
     ),

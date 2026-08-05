@@ -25,7 +25,10 @@ import 'package:planom/src/security/security_service.dart';
 import 'package:planom/src/settings/backup_service.dart';
 import 'package:planom/src/settings/settings_controller.dart';
 import 'package:planom/src/settings/settings_service.dart';
+import 'package:planom/src/settings/tab_bar_config.dart';
+import 'package:planom/src/spaces/space.dart';
 import 'package:planom/src/spaces/space_manager.dart';
+import 'package:planom/src/spaces/space_switch_transition.dart';
 import 'package:planom/src/tasks/task_controller.dart';
 import 'package:planom/src/utils/platform_capabilities.dart';
 
@@ -53,7 +56,8 @@ class _FakePathProvider extends PathProviderPlatform
 void main() {
   initTestDatabaseFactory();
 
-  Future<Widget> bootShell(WidgetTester tester, DatabaseService db) async {
+  Future<Widget> bootShell(WidgetTester tester, DatabaseService db,
+      {SpaceManager? manager, bool withTransition = false}) async {
     final task = TaskController(db);
     final folder = FolderController(db);
     final note = NoteController(db);
@@ -76,7 +80,7 @@ void main() {
       goalController: goals,
       settingsController: settings,
     );
-    final sm = SpaceManager(settingsController: settings, globalDb: db);
+    final sm = manager ?? SpaceManager(settingsController: settings, globalDb: db);
 
     await tester.runAsync(() async {
       await task.load();
@@ -91,7 +95,10 @@ void main() {
       await sm.load();
     });
 
-    return CupertinoApp(
+    Widget wrap(Widget app) =>
+        withTransition ? SpaceSwitchTransition(child: app) : app;
+
+    return wrap(CupertinoApp(
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
@@ -117,7 +124,7 @@ void main() {
           deviceCalendarController: DeviceCalendarController(db: db),
         ),
       ),
-    );
+    ));
   }
 
   setUp(() {
@@ -192,5 +199,62 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(CupertinoTabScaffold), findsOneWidget);
+  });
+
+  testWidgets('swiping the tab bar moves the screen and switches Space',
+      (tester) async {
+    final tmp = Directory.systemTemp.createTempSync('planom_test');
+    PathProviderPlatform.instance = _FakePathProvider(tmp.path);
+    addTearDown(() => tmp.deleteSync(recursive: true));
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final db = freshDb();
+    final settings = SettingsController(SettingsService(), db);
+    final manager = SpaceManager(settingsController: settings, globalDb: db);
+    await tester.runAsync(() async {
+      await settings.loadSettings();
+      await settings.updateTabBarSwipeMode(TabBarSwipeMode.spaces);
+      await manager.load();
+      await manager.addSpace('Work');
+      // addSpace switches to the new space; go back so there is one on
+      // either side of us to swipe to.
+      await manager.switchSpace(kDefaultSpaceId);
+    });
+    expect(manager.spaces.length, 2);
+
+    await tester.pumpWidget(
+        await bootShell(tester, db, manager: manager, withTransition: true));
+    await tester.pumpAndSettle();
+
+    final transition = tester.state<SpaceSwitchTransitionState>(
+        find.byType(SpaceSwitchTransition));
+    expect(transition.debugIsMoving, isFalse);
+
+    // Drag left across the tab bar. The moves are incremental on purpose: the
+    // first one is swallowed by the drag being recognised (touch slop), so a
+    // single jump would never produce an update.
+    final gesture =
+        await tester.startGesture(tester.getCenter(find.byType(CupertinoTabBar)));
+    for (var i = 0; i < 4; i++) {
+      await gesture.moveBy(const Offset(-25, 0));
+      await tester.pump();
+    }
+    expect(transition.debugIsMoving, isTrue,
+        reason: 'the space moves with the finger');
+    expect(transition.debugOffset, lessThan(0));
+
+    // Carry it past the commit threshold and let go.
+    for (var i = 0; i < 5; i++) {
+      await gesture.moveBy(const Offset(-25, 0));
+      await tester.pump();
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(manager.activeSpaceId, isNot(kDefaultSpaceId),
+        reason: 'a committed swipe changes Space');
   });
 }

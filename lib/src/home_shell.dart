@@ -22,6 +22,7 @@ import 'notes/note_controller.dart';
 import 'notes/notes_view.dart';
 import 'spaces/space.dart';
 import 'spaces/space_manager.dart';
+import 'spaces/space_switch_transition.dart';
 import 'routines/routine_controller.dart';
 import 'routines/routine_creation_view.dart';
 import 'routines/routines_view.dart';
@@ -1613,16 +1614,50 @@ class _HomeShellState extends State<HomeShell> {
                 height: 50 + MediaQuery.paddingOf(context).bottom,
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
+                  // In spaces mode the drag moves the screen as it happens, so
+                  // the gesture has to be tracked rather than just measured at
+                  // the end. Page mode keeps the flick it always had — pages
+                  // live inside one shell and swap without a transition.
+                  onHorizontalDragStart:
+                      _swipesSpaces ? (_) => _spaceDragOffset = 0 : null,
+                  onHorizontalDragUpdate: _swipesSpaces
+                      ? (d) {
+                          _spaceDragOffset += d.delta.dx;
+                          final width = MediaQuery.sizeOf(context).width;
+                          if (width <= 0) return;
+                          // Positive fraction = towards the next space.
+                          SpaceSwitchTransition.maybeOf(context)
+                              ?.dragTo(-_spaceDragOffset / width);
+                        }
+                      : null,
                   onHorizontalDragEnd: (d) {
                     final vel = d.primaryVelocity ?? 0;
-                    if (vel.abs() < 200) return;
-                    final delta = vel < 0 ? 1 : -1;
-                    if (_swipesSpaces) {
-                      _switchSpace(delta);
-                    } else {
-                      _switchPage(delta);
+                    if (!_swipesSpaces) {
+                      if (vel.abs() < 200) return;
+                      _switchPage(vel < 0 ? 1 : -1);
+                      return;
                     }
+                    final width = MediaQuery.sizeOf(context).width;
+                    final dragged = width > 0 ? _spaceDragOffset / width : 0.0;
+                    _spaceDragOffset = 0;
+                    // Commit on a flick or on a drag past a third of the
+                    // screen; anything less springs back.
+                    final flick = vel.abs() >= 200;
+                    final far = dragged.abs() >= 0.33;
+                    if (!flick && !far) {
+                      SpaceSwitchTransition.maybeOf(context)?.cancelDrag();
+                      return;
+                    }
+                    final delta =
+                        flick ? (vel < 0 ? 1 : -1) : (dragged < 0 ? 1 : -1);
+                    _switchSpace(delta);
                   },
+                  onHorizontalDragCancel: _swipesSpaces
+                      ? () {
+                          _spaceDragOffset = 0;
+                          SpaceSwitchTransition.maybeOf(context)?.cancelDrag();
+                        }
+                      : null,
                 ),
               ),
             // Indicator dots just above the tab bar: one per non-empty page,
@@ -2006,28 +2041,56 @@ class _HomeShellState extends State<HomeShell> {
   /// it — is rebuilt from scratch; nothing after the call may touch state.
   bool _switchingSpace = false;
 
+  /// Horizontal distance the current space-swipe has covered, in pixels.
+  /// Accumulated across drag updates so the release can tell a deliberate pull
+  /// from a stray twitch.
+  double _spaceDragOffset = 0;
+
   Future<void> _switchSpace(int delta) async {
     // switchSpace tears down and rebuilds every per-space controller; a second
     // swipe landing mid-switch would run that twice over the same state.
     if (_switchingSpace) return;
     final manager = SpaceManagerProvider.maybeOf(context);
-    if (manager == null) return;
-    final spaces = manager.spaces;
-    if (spaces.length < 2) return;
-    final current = spaces.indexWhere((sp) => sp.id == manager.activeSpaceId);
-    if (current < 0) return;
-    final next = (current + delta).clamp(0, spaces.length - 1);
-    if (next == current) return;
-    _switchingSpace = true;
-    try {
-      // Remember the tab so the next space opens on the same one — both for
-      // this switch and for the "last opened tab" launch preference.
-      _tabAcrossSpaceSwitch = _lastTabIndex;
-      await widget.settingsController.setLastOpenedTab(_lastTabIndex);
-      await manager.switchSpace(spaces[next].id);
-    } finally {
-      _switchingSpace = false;
+    final transition = SpaceSwitchTransition.maybeOf(context);
+    if (manager == null) {
+      transition?.cancelDrag();
+      return;
     }
+    final spaces = manager.spaces;
+    if (spaces.length < 2) {
+      transition?.cancelDrag();
+      return;
+    }
+    final current = spaces.indexWhere((sp) => sp.id == manager.activeSpaceId);
+    if (current < 0) {
+      transition?.cancelDrag();
+      return;
+    }
+    final next = (current + delta).clamp(0, spaces.length - 1);
+    if (next == current) {
+      // Already at the first or last space — let the drag fall back rather
+      // than leaving the screen parked off-centre.
+      transition?.cancelDrag();
+      return;
+    }
+    _switchingSpace = true;
+    Future<void> apply() async {
+      try {
+        // Remember the tab so the next space opens on the same one — both for
+        // this switch and for the "last opened tab" launch preference.
+        _tabAcrossSpaceSwitch = _lastTabIndex;
+        await widget.settingsController.setLastOpenedTab(_lastTabIndex);
+        await manager.switchSpace(spaces[next].id);
+      } finally {
+        _switchingSpace = false;
+      }
+    }
+
+    if (transition == null) {
+      await apply();
+      return;
+    }
+    await transition.run(direction: delta, switchSpace: apply);
   }
 
   void _switchPage(int delta) {
