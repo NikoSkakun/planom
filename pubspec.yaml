@@ -46,7 +46,11 @@ dependencies:
   googleapis: ^13.2.0
   http: ^1.2.0
   pdf: ^3.11.3
-  flutter_math_fork: 0.7.3
+  # 0.7.4 is the first release that builds against Flutter 3.32 (it swapped
+  # `rebuildIfNecessary()` for `runLayoutCallback()`); 0.7.3 fails to compile
+  # there. The iOS/macOS toolchain is the one this app targets — see the note
+  # on the paused Android workflow in .github/workflows/android-apk.yml.
+  flutter_math_fork: ^0.7.4
 
 dev_dependencies:
   flutter_test:

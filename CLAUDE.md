@@ -12,9 +12,14 @@ flutter test test/widget_test.dart  # Run a single test file
 flutter run              # Run on connected device or emulator
 ```
 
-Flutter is on PATH (`flutter`, resolving to `/usr/local/bin/flutter` → SDK at `/usr/local/share/flutter`, **3.44.1** stable as of this writing).
+**The app follows the iOS toolchain: Flutter 3.32.0 or newer.** CI builds iOS and macOS on 3.32.0, and `flutter_math_fork` (the notes' LaTeX renderer) only compiles from 3.32 onwards — an older SDK fails with `RenderObjectWithLayoutCallbackMixin not found`. If more than one SDK is installed, run the commands above with the newer one.
 
 ### Android build configuration
+
+> **Android is paused.** Its CI workflow (`.github/workflows/android-apk.yml`) is manual-trigger only:
+> Android is pinned to Flutter 3.24.5 (3.32's Gradle plugin crashes reconciling NDK versions for plugins
+> that declare none) while the app itself now needs 3.32+, so an Android build would fail on every push
+> for reasons unrelated to the commit. Re-enable the `push` trigger once Android moves to the same SDK.
 
 The Android Gradle toolchain was upgraded for Flutter 3.44.1 / JDK 21 (Flutter runs Gradle with Android Studio's bundled JDK 21, ignoring `JAVA_HOME`):
 
@@ -41,7 +46,7 @@ The Android Gradle toolchain was upgraded for Flutter 3.44.1 / JDK 21 (Flutter r
 - **Icons**: `cupertino_icons`; custom PNG tab-bar icons in `assets/icons/tab_bar/` (Tasks/Notes/Calendar/Routines use PNGs; Settings uses `CupertinoIcons.gear_alt` / `gear_alt_fill`); list icons (`inbox.png`, `today.png`, `upcoming.png`, `folder.png`, `list.png`) in `assets/icons/`.
 - **App badge**: `flutter_app_badger ^1.5.0` (discontinued but functional) — set by `TaskController._updateBadge()` per the selected `BadgeMode`; when `SettingsController.badgeIncludeRoutines` is on, today's uncompleted routines are added (via an injected count getter). Gated to mobile via `PlatformCapabilities.supportsAppBadge`.
 - **Backup / share**: `share_plus` (iOS/Android/macOS share sheet) for `.planom` files; `file_picker` for document picker import. `pdf` for note PDF export. `image_picker` (mobile) + `file_picker` (desktop) for custom-icon photo selection.
-- **Markdown**: notes are **always** markdown — `flutter_markdown` with the full `md.ExtensionSet.gitHubWeb` (tables, task lists, strikethrough, footnotes, autolinks, heading ids, alerts, `:emoji:`) plus LaTeX through `flutter_math_fork` (see Notes). A custom inline-markdown stripper is still used for note-row previews. `flutter_math_fork` is **pinned to 0.7.3**: 0.7.4 needs `RenderObjectWithLayoutCallbackMixin`, which the Flutter SDK used here (3.24.5) doesn't have.
+- **Markdown**: notes are **always** markdown — `flutter_markdown` with the full `md.ExtensionSet.gitHubWeb` (tables, task lists, strikethrough, footnotes, autolinks, heading ids, alerts, `:emoji:`) plus LaTeX through `flutter_math_fork` (see Notes). A custom inline-markdown stripper is still used for note-row previews. `flutter_math_fork` requires **0.7.4 or newer** — it is the first release that builds on Flutter 3.32 (`runLayoutCallback()` replaced `rebuildIfNecessary()`), and conversely it will not build on an SDK older than 3.32.
 - **Fonts**: `google_fonts` — full ~1500-font catalogue exposed via the in-app Font Picker; cached at `<appSupport>/google_fonts/` automatically.
 - **Google Calendar**: `google_sign_in` + `googleapis` + `extension_google_sign_in_as_googleapis_auth` (see Google Calendar integration). Optional — disabled until client IDs are configured.
 
