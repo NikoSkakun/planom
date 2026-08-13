@@ -372,6 +372,47 @@ void main() {
           today().add(const Duration(days: 3)));
     });
 
+    test('moving the start date forward clears a stale overdue occurrence',
+        () async {
+      // Completed 10 days ago; with a 3-day interval the next occurrence fell
+      // due 7 days ago and has been carrying forward as overdue ever since.
+      final r = waitRoutine(today().subtract(const Duration(days: 20)));
+      await controller.addRoutine(r);
+      await controller.recordProgress(
+          r, today().subtract(const Duration(days: 10)));
+      expect(controller.openOccurrenceDate(r),
+          today().subtract(const Duration(days: 7)));
+      expect(controller.isOverdueOn(r, today()), isTrue);
+
+      // Starting it again today re-anchors the schedule: the open occurrence
+      // is today's, not the one inherited from the pre-restart completion.
+      await controller.updateRoutine(r.copyWith(startDate: today()));
+      final moved = controller.routines.firstWhere((x) => x.id == r.id);
+      expect(controller.openOccurrenceDate(moved), today());
+      expect(controller.isOverdueOn(moved, today()), isFalse);
+      expect(controller.routinesForDate(today()).map((x) => x.id),
+          contains(r.id));
+    });
+
+    test('completions on or after the new start date still drive the schedule',
+        () async {
+      final r = waitRoutine(today().subtract(const Duration(days: 20)));
+      await controller.addRoutine(r);
+      // One completion before the new start day, one on it.
+      await controller.recordProgress(
+          r, today().subtract(const Duration(days: 10)));
+      await controller.recordProgress(
+          r, today().subtract(const Duration(days: 2)));
+
+      await controller.updateRoutine(
+          r.copyWith(startDate: today().subtract(const Duration(days: 2))));
+      final moved = controller.routines.firstWhere((x) => x.id == r.id);
+      // Only the kept completion counts: next occurrence is 3 days after it.
+      expect(controller.openOccurrenceDate(moved),
+          today().add(const Duration(days: 1)));
+      expect(controller.isOverdueOn(moved, today()), isFalse);
+    });
+
     test('schedule survives a reload', () async {
       final start = today().subtract(const Duration(days: 2));
       final r = waitRoutine(start);

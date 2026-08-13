@@ -147,11 +147,20 @@ class RoutineController with ChangeNotifier {
     return _epochDay(day) > _epochDay(open) && !isCompletedOnDate(r, day);
   }
 
+  /// Completion days that count toward the routine's *current* schedule, i.e.
+  /// only those on or after its start day.
+  ///
+  /// Moving the start date forward restarts the routine: completions recorded
+  /// before it belong to the schedule the user just replaced, and letting them
+  /// keep anchoring the next occurrence would leave a wait-for-completion
+  /// routine stuck overdue on a date the new start date has already passed.
   List<DateTime> _completionDates(Routine r) {
     final goal = goalFor(r);
+    final floor = _epochDay(startFloor(r));
     final dates = _entries
         .where((e) => e.routineId == r.id && e.amount >= goal)
         .map((e) => normalizeDate(e.date))
+        .where((d) => _epochDay(d) >= floor)
         .toList()
       ..sort();
     return dates;

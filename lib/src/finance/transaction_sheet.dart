@@ -6,6 +6,7 @@ import '../models/finance_account.dart';
 import '../models/finance_category.dart';
 import '../models/finance_transaction.dart';
 import '../theme/app_theme.dart';
+import '../utils/date_wheel_picker.dart';
 import '../utils/selection_menu.dart';
 import 'currency.dart';
 import 'finance_controller.dart';
@@ -235,44 +236,7 @@ class _TransactionSheetState extends State<_TransactionSheet> {
 
   Future<void> _pickDate() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    var temp = _date;
-    final picked = await showCupertinoModalPopup<DateTime>(
-      context: context,
-      builder: (ctx) => Container(
-        height: 320,
-        color: CupertinoColors.systemBackground.resolveFrom(ctx),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    CupertinoButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(S.of(ctx).cancel),
-                    ),
-                    CupertinoButton(
-                      onPressed: () => Navigator.of(ctx).pop(temp),
-                      child: Text(S.of(ctx).done),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.date,
-                  initialDateTime: _date,
-                  onDateTimeChanged: (d) => temp = d,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    final picked = await showDateWheelPicker(context, initial: _date);
     if (picked != null && mounted) {
       setState(() => _date = DateTime(picked.year, picked.month, picked.day));
     }

@@ -10,6 +10,7 @@ import '../models/routine_reminder.dart';
 import '../tasks/calendar_date_picker.dart'
     show formatDoTime, formatTaskDateRelative;
 import '../theme/app_theme.dart';
+import '../utils/date_wheel_picker.dart';
 import '../utils/day_boundary.dart';
 import '../utils/fast_route.dart';
 import '../utils/selection_menu.dart';
@@ -231,8 +232,10 @@ class _RoutineCreationViewState extends State<RoutineCreationView> {
   }
 
   Future<void> _pickStartDate() async {
-    final picked = await _showDatePicker(context, _startDate);
-    if (picked != null && mounted) setState(() => _startDate = picked);
+    final picked = await showDateWheelPicker(context, initial: _startDate);
+    if (picked != null && mounted) {
+      setState(() => _startDate = RoutineController.normalizeDate(picked));
+    }
   }
 
   String _reminderSummary(BuildContext context, RoutineReminder r) {
@@ -1178,23 +1181,6 @@ String _formatMinutes(int minutes) {
   final h = minutes ~/ 60;
   final m = minutes % 60;
   return m == 0 ? '${h}h' : '${h}h ${m}m';
-}
-
-Future<DateTime?> _showDatePicker(BuildContext context, DateTime initial) {
-  DateTime selected = initial;
-  return showCupertinoModalPopup<DateTime>(
-    context: context,
-    builder: (ctx) => _PickerScaffold(
-      onCancel: () => Navigator.of(ctx).pop(),
-      onDone: () => Navigator.of(ctx).pop(
-          RoutineController.normalizeDate(selected)),
-      child: CupertinoDatePicker(
-        mode: CupertinoDatePickerMode.date,
-        initialDateTime: initial,
-        onDateTimeChanged: (d) => selected = d,
-      ),
-    ),
-  );
 }
 
 Future<int?> _showTimeOfDayPicker(BuildContext context, int initialMinute) {

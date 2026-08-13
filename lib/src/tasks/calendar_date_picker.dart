@@ -101,6 +101,10 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
   DateTime _monthForPage(int page) =>
       DateTime(_base.year + page ~/ 12, _base.month + page % 12, 1);
 
+  // Page holding the current month, so a grid showing any other month can offer
+  // the jump back.
+  late final int _todayPage;
+
   @override
   void initState() {
     super.initState();
@@ -109,6 +113,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
     _showTimePicker = widget.initialDoTime != null;
     final page = _pageOf(_selected).clamp(0, _totalMonths - 1);
     _pageCtrl = PageController(initialPage: page);
+    _todayPage = _pageOf(DateTime.now()).clamp(0, _totalMonths - 1);
   }
 
   @override
@@ -137,6 +142,16 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
   DateTime _todayDate() {
     final n = DateTime.now();
     return DateTime(n.year, n.month, n.day);
+  }
+
+  // Pages the grid back to the current month. Purely navigational — the
+  // selection is left alone (the Today chip above is the "pick today" path).
+  void _jumpToTodayMonth() {
+    _pageCtrl.animateToPage(
+      _todayPage,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOut,
+    );
   }
 
   void _commitDate(DateTime date) {
@@ -204,6 +219,9 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                       duration: const Duration(milliseconds: 280),
                       curve: Curves.easeInOut,
                     ),
+                    // Off the current month: offer a way straight back to it.
+                    onJumpToToday:
+                        page == _todayPage ? null : _jumpToTodayMonth,
                     onSelect: (d) => setState(() => _selected = d),
                   );
                 },
@@ -357,6 +375,7 @@ class _MonthGrid extends StatelessWidget {
     required this.onPrev,
     required this.onNext,
     required this.onSelect,
+    this.onJumpToToday,
   });
 
   final DateTime month;
@@ -365,6 +384,8 @@ class _MonthGrid extends StatelessWidget {
   final VoidCallback onPrev;
   final VoidCallback onNext;
   final ValueChanged<DateTime> onSelect;
+  // Null while this grid already shows the current month.
+  final VoidCallback? onJumpToToday;
 
   static const _rowHeight = 36.0;
 
@@ -400,11 +421,45 @@ class _MonthGrid extends StatelessWidget {
                     color: CupertinoColors.label.resolveFrom(context),
                   ),
                 ),
-                Text(
-                  '${monthNames[month.month - 1]} ${month.year}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          '${monthNames[month.month - 1]} ${month.year}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (onJumpToToday != null) ...[
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: onJumpToToday,
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: accent.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            child: Text(
+                              S.of(context).todayShort,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: accent,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 CupertinoButton(
