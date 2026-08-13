@@ -4,6 +4,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:planom/src/database/database_service.dart';
 import 'package:planom/src/models/finance_category.dart';
+import 'package:planom/src/models/finance_transaction.dart';
 import 'package:planom/src/models/goal.dart';
 
 import 'support/test_db.dart';
@@ -51,6 +52,33 @@ const _legacyCategories = '''
   )
 ''';
 
+/// The reverted build's transactions table. The detail that matters is
+/// `accountId TEXT NOT NULL`: today an entry may have no account.
+const _legacyTransactions = '''
+  CREATE TABLE IF NOT EXISTS finance_transactions (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL DEFAULT 'expense',
+    amount INTEGER NOT NULL DEFAULT 0,
+    accountId TEXT NOT NULL,
+    toAccountId TEXT,
+    categoryId TEXT,
+    title TEXT NOT NULL DEFAULT '',
+    note TEXT,
+    date INTEGER NOT NULL,
+    creationDate INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL DEFAULT 0
+  )
+''';
+
+/// Present on any real database since v35 — the fixture needs it because
+/// deletes record a tombstone.
+const _tombstones = '''
+  CREATE TABLE IF NOT EXISTS tombstones (
+    tbl TEXT NOT NULL, id TEXT NOT NULL, deletedAt INTEGER NOT NULL,
+    PRIMARY KEY (tbl, id)
+  )
+''';
+
 const _legacyAccounts = '''
   CREATE TABLE IF NOT EXISTS finance_accounts (
     id TEXT PRIMARY KEY,
@@ -83,6 +111,8 @@ void main() {
           await db.execute(_legacyGoals);
           await db.execute(_legacyCategories);
           await db.execute(_legacyAccounts);
+          await db.execute(_legacyTransactions);
+          await db.execute(_tombstones);
         },
       ),
     );
@@ -117,6 +147,16 @@ void main() {
       'openingBalance': 25000,
       'currencyCode': 'EUR',
       'sortOrder': 2,
+      'creationDate': now,
+    });
+    await db.insert('finance_transactions', {
+      'id': 't1',
+      'type': 'expense',
+      'amount': 200,
+      'accountId': 'a1',
+      'categoryId': 'c1',
+      'title': 'Coffee',
+      'date': now,
       'creationDate': now,
     });
     await db.close();
@@ -187,5 +227,39 @@ void main() {
     await fresh.insertGoal(Goal(name: 'Fresh', sortOrder: 1));
     expect((await fresh.getGoals()).single.name, 'Fresh');
     expect(await fresh.getFinanceAccounts(), isEmpty);
+  });
+
+  test('an account can be deleted, unassigning the entries it touched',
+      () async {
+    // The reverted build made `finance_transactions.accountId` NOT NULL.
+    // Deleting an account clears that column on every entry that referenced
+    // it, so on such a database the delete failed with "NOT NULL constraint
+    // failed" and the account could never be removed — the swiped row just
+    // hung there.
+    final svc = DatabaseService(dbName: await seedRevertedDatabase());
+
+    expect((await svc.getFinanceAccounts()).single.id, 'a1');
+    await svc.deleteFinanceAccount('a1');
+
+    expect(await svc.getFinanceAccounts(), isEmpty);
+    final entries = await svc.getFinanceTransactions();
+    expect(entries.single.id, 't1', reason: 'the entry itself survives');
+    expect(entries.single.accountId, isNull, reason: 'but loses its account');
+
+    await svc.close();
+  });
+
+  test('an entry can be recorded with no account at all', () async {
+    final svc = DatabaseService(dbName: await seedRevertedDatabase());
+    await svc.insertFinanceTransaction(FinanceTransaction(
+      title: 'Cash lunch',
+      amount: 850,
+      date: DateTime(2026, 8, 1),
+    ));
+    final unassigned = (await svc.getFinanceTransactions())
+        .where((t) => t.accountId == null)
+        .toList();
+    expect(unassigned.single.title, 'Cash lunch');
+    await svc.close();
   });
 }

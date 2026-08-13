@@ -25,7 +25,6 @@ import 'package:planom/src/security/security_service.dart';
 import 'package:planom/src/settings/backup_service.dart';
 import 'package:planom/src/settings/settings_controller.dart';
 import 'package:planom/src/settings/settings_service.dart';
-import 'package:planom/src/settings/tab_bar_config.dart';
 import 'package:planom/src/spaces/space.dart';
 import 'package:planom/src/spaces/space_manager.dart';
 import 'package:planom/src/spaces/space_switch_transition.dart';

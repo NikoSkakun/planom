@@ -310,7 +310,9 @@ Migration history:
 
 | v39 | Repairs tables left over from the Goals/Finance build that shipped once and was reverted (commit 6745e0e). It created `goals`, `finance_categories` and `finance_accounts` under the same names with different columns (`title`, `kind`, `colorValue`, `openingBalance`), and since every `CREATE TABLE` here is `IF NOT EXISTS`, the current schema was never applied on a device that ran it — `goals.name` read back null and the cast threw during space load, so the app never drew a frame. `_repairRevertedFeatureTables` rebuilds each table in today's shape, carrying across what still means the same thing; goals lose only their membership, which the old feature never had |
 
-When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch. Current version: **39**.
+| v40 | Re-runs `_repairRevertedFeatureTables`, which now also relaxes `finance_transactions.accountId`. The reverted build declared it NOT NULL; today an entry may have no account, so deleting an account (which clears the column on every entry that referenced it) failed with "NOT NULL constraint failed" and the account could never be removed. `_relaxLegacyNotNull` rebuilds the table without the constraint — SQLite cannot alter one in place — and every other step of the repair is a no-op on a table already in today's shape |
+
+When adding new tables/columns, bump `_dbVersion` and add an `onUpgrade` branch. Current version: **40**.
 
 **Full-text search (FTS5)** — `DatabaseService.searchAll(query, {limit = 50}) → SearchResults` returns id sets keyed by source table. Each token is wrapped in `"…"*` (with internal quotes doubled), so the user gets implicit AND prefix matching without exposed FTS5 syntax. Triggers keep `tasks_fts` / `notes_fts` / `events_fts` in sync; `_backfillFts` populates pre-existing rows during the v21 upgrade.
 

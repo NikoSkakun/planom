@@ -39,15 +39,44 @@ class _FinanceAccountsViewState extends State<FinanceAccountsView> {
     if (updated != null) await widget.controller.updateAccount(updated);
   }
 
-  Future<void> _delete(FinanceAccount account) async {
+  /// Asks, without doing anything yet. Used as `confirmDismiss` so the swipe
+  /// resolves on the answer alone.
+  Future<bool> _confirmDelete() async {
     final s = S.of(context);
-    final ok = await confirmHardDelete(
+    return confirmHardDelete(
       context,
       title: s.deleteAccountTitle,
       body: s.deleteAccountBody,
       confirmLabel: s.delete,
     );
-    if (ok) await widget.controller.deleteAccount(account.id);
+  }
+
+  Future<void> _delete(FinanceAccount account) async {
+    if (await _confirmDelete()) {
+      await widget.controller.deleteAccount(account.id);
+    }
+  }
+
+  /// Answers the swipe with what actually happened: the row only leaves if the
+  /// account is really gone.
+  ///
+  /// The delete belongs here rather than in `onDismissed` because it can fail —
+  /// a database constraint, a locked file — and by the time `onDismissed` runs
+  /// the row is already out of the tree, leaving an account that is off the
+  /// screen but still in the ledger. Returning false on failure springs the row
+  /// back, which is the truth. (The old shape did the opposite: it deleted here
+  /// and always returned false, asking the row to bounce back at the same
+  /// moment the list was dropping it — and when the delete threw, the row was
+  /// stranded off screen with the red background showing and nothing said.)
+  Future<bool> _confirmAndDelete(FinanceAccount account) async {
+    if (!await _confirmDelete()) return false;
+    try {
+      await widget.controller.deleteAccount(account.id);
+      return true;
+    } catch (error) {
+      debugPrint('Deleting account ${account.id} failed: $error');
+      return false;
+    }
   }
 
   Future<void> _menu(FinanceAccount account) async {
@@ -200,10 +229,8 @@ class _FinanceAccountsViewState extends State<FinanceAccountsView> {
                               child: Dismissible(
                                 key: ValueKey('dismiss_${account.id}'),
                                 direction: DismissDirection.endToStart,
-                                confirmDismiss: (_) async {
-                                  await _delete(account);
-                                  return false;
-                                },
+                                confirmDismiss: (_) =>
+                                    _confirmAndDelete(account),
                                 background: Container(
                                   alignment: Alignment.centerRight,
                                   padding: const EdgeInsets.only(right: 20),

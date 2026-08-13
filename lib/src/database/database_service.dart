@@ -23,7 +23,7 @@ class DatabaseService {
   DatabaseService({this.dbName = 'planom.db'});
 
   final String dbName;
-  static const _dbVersion = 39;
+  static const _dbVersion = 40;
 
   Database? _db;
 
@@ -729,6 +729,13 @@ class DatabaseService {
         if (oldVersion < 39) {
           await _repairRevertedFeatureTables(db);
         }
+        if (oldVersion < 40) {
+          // v39 shipped before the NOT NULL constraint on
+          // `finance_transactions.accountId` was known about, so devices that
+          // already ran it need the repair again. Every step of it is a no-op
+          // on a table already in today's shape.
+          await _repairRevertedFeatureTables(db);
+        }
       },
     );
   }
@@ -809,6 +816,53 @@ class DatabaseService {
       },
       requires: {'openingBalance', 'colorValue', 'type', 'currencyCode'},
     );
+
+    // The reverted build also declared `finance_transactions.accountId` NOT
+    // NULL. Today an entry may have no account at all — one can be recorded
+    // without picking an account, and deleting an account clears it from the
+    // entries it touched. On a database still carrying that constraint,
+    // deleting an account fails with "NOT NULL constraint failed" halfway
+    // through its transaction, so the account can never be removed. The table
+    // is otherwise today's shape, so only the constraint needs relaxing.
+    await _relaxLegacyNotNull(
+      db,
+      table: 'finance_transactions',
+      column: 'accountId',
+      create: _createFinanceTables,
+    );
+  }
+
+  /// Rebuilds [table] without the NOT NULL constraint that an older schema put
+  /// on [column]. SQLite cannot alter a constraint in place, so the table is
+  /// renamed aside, recreated from [create], and its rows copied across every
+  /// column the two shapes share.
+  static Future<void> _relaxLegacyNotNull(
+    Database db, {
+    required String table,
+    required String column,
+    required Future<void> Function(Database) create,
+  }) async {
+    final info = await db.rawQuery('PRAGMA table_info($table)');
+    if (info.isEmpty) return; // no such table
+    final target = info.where((row) => row['name'] == column).toList();
+    if (target.isEmpty) return;
+    if ((target.first['notnull'] as int? ?? 0) == 0) return; // already nullable
+
+    final legacyColumns = [for (final row in info) row['name'] as String];
+    final legacy = '${table}_legacy';
+    await db.execute('DROP TABLE IF EXISTS $legacy');
+    await db.execute('ALTER TABLE $table RENAME TO $legacy');
+    await create(db);
+    final shared =
+        (await _columnsOf(db, table)).where(legacyColumns.contains).toList();
+    await db.execute('INSERT INTO $table (${shared.join(', ')}) '
+        'SELECT ${shared.join(', ')} FROM $legacy');
+    await db.execute('DROP TABLE $legacy');
+    // Indexes follow a table through RENAME, so the ones created above were
+    // skipped as already-existing while they still belonged to the old table —
+    // and went with it when it was dropped. Running the creator again now that
+    // the names are free puts them back.
+    await create(db);
   }
 
   /// Rebuilds [table] in today's shape when it exists but predates it.
